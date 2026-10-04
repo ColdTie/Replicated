@@ -119,8 +119,13 @@ Done:
 - Verified headless: no page errors; scripted playtest mined nodes, killed an enemy, collected shards; touch drag moved and a second finger attacked.
 - Screenshots: `screenshots/phase0-gameplay.png`, `phase0-landing.png`, `phase0-touch.png`, `sprite-sheet.png`.
 
+### Session 1b (2026-10-04): new body model, faster movement
+- Deployed to GitHub Pages (PR #1 merged; repo renamed to `Replicated`, site at coldtie.github.io/Replicated/).
+- New default body "replicant" (`tools/sprites/replicant.json`, 16x20): slim humanoid with a visor band, head fin with a glowing tip, a glowing chest core and a short red cape. The original drone (`tools/sprites/player.json`) is kept and selectable with `?model=drone`. Models are listed in `src/data/player.json`.
+- Move speed raised from 78 to 90.
+
 Not done / next:
-- Not yet deployed or confirmed on the iPad (needs Steve: enable Pages and merge to `main`).
+- Not yet confirmed on the iPad or confirmed on the iPad (needs Steve: enable Pages and merge to `main`).
 - No audio yet. Phase 0 skipped it; add in Phase 3 (or earlier), starting only after the first tap.
 - Rock outcrops still have stair-step edges (no full autotiling). Fine for placeholder art.
 - Then Phase 1: second enemy type, base area plus Replicator placement, Supabase profiles and saves.

@@ -7,6 +7,15 @@ import type { PlanetScene } from '../scenes/PlanetScene';
 
 const WARM = PALETTE[10];
 
+type ModelId = keyof typeof PLAYER.models;
+
+/** Body model from ?model= in the URL, else the default in player.json. */
+function pickModel() {
+  const q = new URLSearchParams(location.search).get('model');
+  const id = (q && q in PLAYER.models ? q : PLAYER.model) as ModelId;
+  return PLAYER.models[id];
+}
+
 export class Player {
   readonly zone: Phaser.GameObjects.Zone;
   readonly body: Phaser.Physics.Arcade.Body;
@@ -14,6 +23,8 @@ export class Player {
   private shadow: Phaser.GameObjects.Image;
   private glow: Phaser.GameObjects.Image;
   readonly light: Light;
+  private key: string;
+  private headY: number;
 
   hp = PLAYER.maxHp;
   facing = 1;
@@ -31,8 +42,11 @@ export class Player {
     this.body = this.zone.body as Phaser.Physics.Arcade.Body;
     this.body.setDrag(0, 0);
     this.shadow = scene.add.image(x, y, 'shadow').setAlpha(0.45).setTint(PALETTE[25]).setDepth(50);
-    this.sprite = scene.add.sprite(x, y, 'player').setOrigin(0.5, 1);
-    this.sprite.play(anim('player', 'idle'));
+    const model = pickModel();
+    this.key = model.sprite;
+    this.headY = model.headY;
+    this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1);
+    this.sprite.play(anim(this.key, 'idle'));
     this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.18).setScale(0.9).setDepth(6100);
     this.light = scene.lighting.add({ x, y, radius: 70, color: 0xffe2b8, intensity: 1 });
   }
@@ -67,8 +81,8 @@ export class Player {
     if (time > this.attackingUntil) {
       const key = moving ? 'walk' : 'idle';
       const cur = this.sprite.anims.currentAnim?.key;
-      if (cur !== anim('player', key) && !(cur === anim('player', 'hurt') && time < this.invulnUntil - PLAYER.invulnMs + 250)) {
-        this.sprite.play(anim('player', key), true);
+      if (cur !== anim(this.key, key) && !(cur === anim(this.key, 'hurt') && time < this.invulnUntil - PLAYER.invulnMs + 250)) {
+        this.sprite.play(anim(this.key, key), true);
       }
     }
     this.sprite.setFlipX(this.facing < 0);
@@ -104,7 +118,7 @@ export class Player {
       this.aim.set(target.x - this.x, target.y - this.y).normalize();
       if (Math.abs(this.aim.x) > 0.2) this.facing = Math.sign(this.aim.x);
     }
-    this.sprite.play(anim('player', 'attack'), true);
+    this.sprite.play(anim(this.key, 'attack'), true);
     this.body.velocity.x += this.aim.x * 60;
     this.body.velocity.y += this.aim.y * 60;
     const { reach, radius } = PLAYER.attack;
@@ -121,7 +135,7 @@ export class Player {
     this.hp = Math.max(0, this.hp - damage);
     const dir = new Phaser.Math.Vector2(this.x - fromX, this.y - fromY).normalize();
     this.body.velocity.set(dir.x * 190, dir.y * 190);
-    this.sprite.play(anim('player', 'hurt'), true);
+    this.sprite.play(anim(this.key, 'hurt'), true);
     flashWhite(this.scene, this.sprite, 90);
     squash(this.scene, this.sprite, 0.75, 1.25, 110);
     this.scene.hitStop(100);
@@ -155,9 +169,9 @@ export class Player {
     const x = Math.round(this.x), y = Math.round(this.y);
     this.sprite.setPosition(x, y + 3).setDepth(100 + y);
     this.shadow.setPosition(x, y + 2);
-    this.glow.setPosition(x, y - 6);
+    this.glow.setPosition(x, y + this.headY);
     this.light.x = x;
-    this.light.y = y - 6;
+    this.light.y = y + this.headY;
   }
 }
 
