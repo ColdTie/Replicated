@@ -22,7 +22,7 @@ const port = 4179;
 const server = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], { cwd: root, stdio: 'ignore', detached: true });
 const stopServer = () => { try { process.kill(-server.pid, 'SIGTERM'); } catch {} };
 for (let i = 0; ; i++) {
-  try { if ((await fetch(`http://localhost:${port}/metanoia-replicants/`)).ok) break; } catch {}
+  try { if ((await fetch(`http://localhost:${port}/Replicated/`)).ok) break; } catch {}
   if (i > 100 || server.exitCode !== null) { stopServer(); throw new Error('vite preview did not start'); }
   await new Promise((r) => setTimeout(r, 200));
 }
@@ -34,7 +34,7 @@ try {
   const page = await browser.newPage({ viewport: { width: vw, height: vh }, deviceScaleFactor: 1 });
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto(`http://localhost:${port}/metanoia-replicants/?${query}`);
+  await page.goto(`http://localhost:${port}/Replicated/?${query}`);
   await page.waitForFunction(() => !!window.__scene, null, { timeout: 15000 });
   await page.waitForTimeout(wait);
   fs.mkdirSync(path.join(root, 'screenshots'), { recursive: true });

@@ -3,7 +3,7 @@
 A 2D top-down sci-fi game for the browser (iPad Safari first). Phaser 3 + TypeScript + Vite.
 
 - Design brief, architecture and progress: [CLAUDE.md](CLAUDE.md)
-- Play: https://coldtie.github.io/metanoia-replicants/ (after the Pages deploy runs from `main`)
+- Play: https://coldtie.github.io/Replicated/ (after the Pages deploy runs from `main`)
 
 ```
 npm install
