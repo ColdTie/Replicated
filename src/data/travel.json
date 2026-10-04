@@ -1,0 +1,15 @@
+{
+  "_doc": "Real-time travel. Trip minutes = minutesAtRef * (lightYears / refLy) ^ exponent: Alpha Centauri about 45 minutes, 12 ly about 10 hours, a beacon (25-43 ly) about 3 to 10 days. fuel (Embers from the planet you leave) = fuelBase + fuelPerLy * lightYears. needCopy: someone has to stay behind, so you can only launch from a planet that has at least one copy. ?fast in the URL turns minutes into seconds for testing.",
+  "minutesAtRef": 45,
+  "refLy": 4.37,
+  "exponent": 2.5,
+  "fuelBase": 10,
+  "fuelPerLy": 2,
+  "needCopy": true,
+  "landedPlanetIndex": 1,
+  "starLight": {
+    "_doc": "Light color of each spectral class (first letter), mixed into a world's darkness color and sky.",
+    "O": ["9bb0ff", 0.3], "B": ["aabfff", 0.25], "A": ["cad7ff", 0.2], "F": ["f8f7ff", 0.1],
+    "G": ["fff4ea", 0.0], "K": ["ffd2a1", 0.25], "M": ["ff8a6a", 0.3]
+  }
+}

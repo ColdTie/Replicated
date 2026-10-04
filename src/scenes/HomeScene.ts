@@ -198,11 +198,17 @@ export class HomeScene extends Phaser.Scene {
       return;
     }
     const params = new URLSearchParams(location.search);
+    // Flying between stars: go to the ship (it lands by itself if it arrived while you were away)
+    if (session.replicant.status === 'in_transit') {
+      const j = await store.activeJourney(session.replicant).catch(() => null);
+      if (j) { this.scene.start('travel', { journey: j }); return; }
+      session.replicant.status = 'active';
+    }
     this.scene.start('planet', {
+      visit: params.get('star') ? { star: params.get('star')!, planetIndex: 1 } : undefined,
       planetId: params.get('planet') ?? undefined,
       seed: params.get('seed') ? Number(params.get('seed')) : undefined,
       shot: params.has('shot'),
     });
-    this.scene.launch('ui');
   }
 }

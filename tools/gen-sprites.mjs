@@ -27,7 +27,8 @@ const palette = readJson('src/data/palette.json').colors.map((hex) => [
   parseInt(hex.slice(2, 4), 16),
   parseInt(hex.slice(4, 6), 16),
 ]);
-const planets = readJson('src/data/planets.json').planets;
+// Tinted sheets are made for every hand-made planet and every biome (worlds around other stars share a biome's sheet)
+const planets = [...readJson('src/data/planets.json').planets, ...readJson('src/data/biomes.json').biomes];
 const player = readJson('src/data/player.json');
 
 function roleResolver(planet, feature = player.feature) {

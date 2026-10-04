@@ -22,10 +22,20 @@ import { makeVignette } from '../fx/textures';
 import { Controls } from '../input/Controls';
 import type { DoorState, NodeState, PlanetData, PlanetSave, ReplicantSave } from '../net/store';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
+import { TRAVEL, distanceLy, fuelFor, planetFor, travelMs } from '../world/galaxy';
+import type { StarMapData } from './StarMapScene';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
 
-interface InitData { planetId?: string; seed?: number; shot?: boolean }
+interface InitData {
+  planetId?: string;
+  seed?: number;
+  shot?: boolean;
+  /** Visiting a settled planet as a hologram while your ship is in flight */
+  visit?: { star: string; planetIndex: number };
+  /** Just arrived from a journey: the vessel lands */
+  arrival?: boolean;
+}
 
 const SAVE_EVERY_MS = 4000;
 const POS_SAVE_EVERY_MS = 10000;
@@ -76,6 +86,12 @@ export class PlanetScene extends Phaser.Scene {
   // pending changes not yet written to the store
   private pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number } = { embers: 0, nodes: {}, doors: {} };
   private replicating = false;
+  /** Hologram visit while the replicant's ship is flying elsewhere: no position saves, no launching */
+  visit: { star: string; planetIndex: number } | null = null;
+  private arrival = false;
+  private launching = false;
+  private boardSpot = { x: 0, y: 0 };
+  private boardRing?: Phaser.GameObjects.Ellipse;
   private npcTickAt = 0;
   private saving = false;
   private lastSaveAt = 0;
@@ -85,14 +101,19 @@ export class PlanetScene extends Phaser.Scene {
 
   init(data: InitData) {
     const r = session.replicant;
+    this.visit = data.visit ?? null;
+    this.arrival = !!data.arrival;
     this.planet = PLANETS.find((p) => p.id === data.planetId)
-      ?? PLANETS.find((p) => r && p.star === r.star_id && p.planetIndex === r.planet_index)
+      ?? (this.visit ? planetFor(this.visit.star, this.visit.planetIndex) : undefined)
+      ?? (r ? planetFor(r.star_id, r.planet_index) : undefined)
       ?? PLANETS[0];
     this.seed = data.seed;
     this.shot = !!data.shot;
     this.enemies = []; this.nodes = []; this.shards = []; this.spores = []; this.ruins = []; this.embers = 0; this.stopped = false; this.frozen = false;
     this.grazers = []; this.flocks = []; this.butterflies = undefined; this.bendables = new Map(); this.slow = 1;
-    this.npcs = []; this.replicating = false;
+    this.npcs = []; this.replicating = false; this.launching = false;
+    // the scene object is reused between planets: drop the old player so update() waits for the new world
+    this.player = undefined as unknown as Player;
     this.pending = { embers: 0, nodes: {}, doors: {} };
   }
 
@@ -181,6 +202,9 @@ export class PlanetScene extends Phaser.Scene {
     this.vessel = this.add.sprite(b.vessel.x, b.vessel.y + 4, 'vessel').setOrigin(0.5, 1).setDepth(DEPTH.actors + b.vessel.y);
     this.vessel.play(anim('vessel', 'idle'));
     this.addSolid(b.vessel.x, b.vessel.y - 4, 24, 10);
+    // stand here (just below the vessel) and press action to open the star map
+    this.boardSpot = { x: b.vessel.x, y: b.vessel.y + 14 };
+    this.boardRing = this.add.ellipse(this.boardSpot.x, this.boardSpot.y, 20, 8).setDepth(55).setStrokeStyle(1, PALETTE[9], 0.4);
     const vesselLight = this.lighting.add({ x: b.vessel.x, y: b.vessel.y - 10, radius: 110, color: 0xffc98a, intensity: 1, flicker: 0.08 });
     const vesselGlow = this.add.image(b.vessel.x, b.vessel.y - 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.22).setScale(1.4).setDepth(DEPTH.glow);
     if (p.intro === 'wake') {
@@ -246,9 +270,16 @@ export class PlanetScene extends Phaser.Scene {
     this.game.events.emit('embers', this.embers);
     this.setupSaving();
 
+    this.scene.launch('ui'); // (re)starts the overlay; the previous planet's shutdown stopped it
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scene.stop('ui'));
+    if (this.visit) this.player.setHologram();
     if (this.shot) {
       this.player.locked = false;
       this.stageForScreenshot();
+    } else if (this.arrival) {
+      this.playLanding(vesselShadow, vesselLight, vesselGlow);
+    } else if (this.visit) {
+      this.playReturn();
     } else if (p.intro === 'wake' && !awake) {
       this.playWake();
     } else if (p.intro === 'land' && !saved) {
@@ -516,6 +547,12 @@ export class PlanetScene extends Phaser.Scene {
     this.updateCamera();
     this.base.update(time, this.embers);
     this.base.updateSpot(time, this.canReplicate());
+    if (this.boardRing) {
+      const ready = this.canLaunch() || !!this.visit;
+      const on = this.playerOnBoardSpot();
+      this.boardRing.setStrokeStyle(1, ready ? PALETTE[9] : PALETTE[22], ready ? 0.5 + 0.4 * Math.sin(time / 300) : 0.3)
+        .setFillStyle(PALETTE[9], ready && on ? 0.3 : 0);
+    }
     for (const n of this.npcs) n.update(time, dt);
     this.watchFps(time);
     this.env.update(dt);
@@ -547,7 +584,7 @@ export class PlanetScene extends Phaser.Scene {
 
   private async saveReplicant() {
     const r = session.replicant, st = session.store;
-    if (!r || !st || this.shot || !this.player.alive || this.player.locked) return;
+    if (!r || !st || this.shot || this.visit || this.launching || !this.player.alive || this.player.locked) return;
     r.star_id = this.planet.star;
     r.planet_index = this.planet.planetIndex;
     r.pos_x = Math.round(this.player.x);
@@ -625,6 +662,7 @@ export class PlanetScene extends Phaser.Scene {
 
   /** The action button does something other than attack here (build). Returns true if it did. */
   tryInteract(): boolean {
+    if (this.playerOnBoardSpot()) return this.tryBoard();
     if (this.base.playerOnSpot()) return this.tryReplicate();
     if (!this.base.playerOnPad() || !this.base.canBuild(this.embers)) return false;
     const cost = STRUCTURES.replicator.cost;
@@ -641,6 +679,110 @@ export class PlanetScene extends Phaser.Scene {
       void this.flushPlanet();
     });
     return true;
+  }
+
+  // --- leaving the planet ---
+
+  private playerOnBoardSpot() {
+    const p = this.player;
+    return Math.abs(p.x - this.boardSpot.x) < 13 && Math.abs(p.y - this.boardSpot.y) < 9;
+  }
+
+  /** Someone has to stay behind: you can launch once this planet has a copy (travel.json needCopy). */
+  canLaunch() {
+    return !this.visit && (!TRAVEL.needCopy || this.npcs.length > 0);
+  }
+
+  private tryBoard(): boolean {
+    if (this.visit) {
+      // hologram visit: the vessel takes you back to your ship in flight
+      void this.returnToShip();
+      return true;
+    }
+    if (!this.canLaunch()) {
+      sound.denied();
+      this.tweens.add({ targets: this.vessel, x: this.vessel.x + 1, duration: 40, yoyo: true, repeat: 3 });
+      // hint without words: a ghost of a copy blinks by the Replicator (or the build pad)
+      const ghost = this.add.image(this.base.x + 24, this.base.y + 10, this.player.sprite.texture.key, 0).setOrigin(0.5, 1)
+        .setTintFill(PALETTE[18]).setAlpha(0).setDepth(6110).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({ targets: ghost, alpha: 0.6, duration: 300, yoyo: true, repeat: 3, onComplete: () => ghost.destroy() });
+      return true;
+    }
+    this.player.locked = true;
+    this.player.body.setVelocity(0, 0);
+    sound.coreHum();
+    const data: StarMapData = {
+      mode: 'launch',
+      from: this.planet.star,
+      embers: this.embers,
+      onLaunch: (to) => this.launch(to),
+      onClose: () => { this.player.locked = false; this.scene.resume(); },
+    };
+    this.scene.pause();
+    this.scene.launch('starmap', data);
+    return true;
+  }
+
+  private async returnToShip() {
+    const r = session.replicant, st = session.store;
+    const j = r && st ? await st.activeJourney(r).catch(() => null) : null;
+    this.cameras.main.fadeOut(400, 24, 20, 37);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      if (j) this.scene.start('travel', { journey: j });
+      else this.scene.start('planet', {});
+    });
+  }
+
+  /** Fuel paid, the replicant hops in, the vessel lifts off, then the flight begins. */
+  private launch(to: string) {
+    this.scene.resume();
+    const ly = distanceLy(this.planet.star, to);
+    const fuel = fuelFor(ly);
+    this.launching = true;
+    this.embers -= fuel;
+    this.pending.embers -= fuel;
+    this.game.events.emit('embers', this.embers);
+    void this.flushPlanet();
+    const pl = this.player, v = this.vessel;
+    pl.locked = true;
+    // hop into the vessel
+    const hop = { t: 0 };
+    const sx = pl.x, sy = pl.y, ex = v.x, ey = v.y - 8;
+    this.tweens.add({
+      targets: hop, t: 1, duration: 360,
+      onUpdate: () => { pl.setPosition(sx + (ex - sx) * hop.t, sy + (ey - sy) * hop.t); pl.sprite.y -= Math.sin(hop.t * Math.PI) * 12; },
+      onComplete: () => { pl.sprite.setVisible(false); pl.hide(); this.liftOff(to, ly); },
+    });
+  }
+
+  private liftOff(to: string, ly: number) {
+    const v = this.vessel;
+    const thrust = this.add.particles(0, 0, 'px', {
+      lifespan: { min: 200, max: 500 }, speedY: { min: 60, max: 140 }, speedX: { min: -20, max: 20 },
+      scale: { start: 1.6, end: 0 }, tint: [PALETTE[10], PALETTE[9], PALETTE[11]], blendMode: Phaser.BlendModes.ADD, frequency: 8,
+    }).setDepth(DEPTH.fx);
+    const light = this.lighting.add({ x: v.x, y: v.y, radius: 70, color: PALETTE[9], intensity: 1 });
+    sound.build();
+    this.shake(900, 0.004);
+    for (let i = 0; i < 8; i++) this.fx.dust(v.x - 20 + i * 6, v.y, 5);
+    this.cameras.main.stopFollow();
+    this.tweens.add({
+      targets: v, y: v.y - 320, duration: 2600, ease: 'Quad.easeIn', delay: 500,
+      onUpdate: () => { thrust.setPosition(v.x, v.y - 4); light.x = v.x; light.y = v.y; this.cameras.main.centerOn(v.x, Math.max(v.y + 40, this.boardSpot.y - 200)); },
+    });
+    this.time.delayedCall(2400, () => this.cameras.main.fadeOut(700, 24, 20, 37));
+    const arrivesAt = new Date(Date.now() + travelMs(ly));
+    const r = session.replicant, st = session.store;
+    const journeyP = r && st && !this.shot
+      ? st.startJourney(r, to, arrivesAt)
+      : Promise.resolve({ id: 'local', replicant_id: r?.id ?? '', from_star: this.planet.star, to_star: to, departs_at: new Date().toISOString(), arrives_at: arrivesAt.toISOString() });
+    this.time.delayedCall(3200, () => {
+      journeyP.then((journey) => this.scene.start('travel', { journey, depart: true }))
+        .catch((e) => {
+          console.warn('launch failed', e);
+          this.scene.start('planet', {}); // back on the ground; nothing was saved
+        });
+    });
   }
 
   // --- replication ---

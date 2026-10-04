@@ -50,6 +50,8 @@ export class Player {
   /** Visor color (or drifted trail color), used for the dash trail */
   readonly featureColor: number;
   private gear?: Gear;
+  private hologram = false;
+  private hidden = false;
   private stepTimer = 0;
   private dead = false;
 
@@ -154,7 +156,8 @@ export class Player {
     this.glow.setAlpha((0.08 + 0.14 * frac) * (1 - low)).setScale(0.6 + 0.4 * frac);
 
     // invulnerability blink (not while dashing: the trail already shows it)
-    this.sprite.setVisible(dashing || time > this.invulnUntil || Math.floor(time / 70) % 2 === 0);
+    this.sprite.setVisible(!this.hidden && (dashing || time > this.invulnUntil || Math.floor(time / 70) % 2 === 0));
+    if (this.hologram) this.sprite.setAlpha(Math.random() < 0.04 ? 0.5 : 0.85);
     this.syncVisuals();
   }
 
@@ -207,6 +210,24 @@ export class Player {
     this.scene.fx.dust(this.x, this.y + 2, 6);
     squash(this.scene, this.sprite, 1.4, 0.7, 100);
     sound.dash();
+  }
+
+  /** Hologram look for visits while your ship is flying: cool tint and a gentle flicker. */
+  setHologram() {
+    this.hologram = true;
+    this.sprite.setTint(0x9fe8ff);
+    this.light.color = 0x9fe8ff;
+  }
+
+  /** Gone into the vessel: no light, glow or shadow left behind. */
+  hide() {
+    this.locked = true;
+    this.light.intensity = 0;
+    this.light.active = false;
+    this.glow.setVisible(false);
+    this.shadow.setVisible(false);
+    this.gear?.image.setVisible(false);
+    this.hidden = true;
   }
 
   get dashing() { return this.scene.time.now < this.dashUntil; }

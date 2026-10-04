@@ -1,0 +1,53 @@
+{
+  "_doc": "World types for planets around other stars. A star's id picks one (seeded). Same fields as planets.json minus star/seed/name; the star's light (travel.json starLight) tints ambient and sky. Each biome gets its own tinted sprite sheets at build time.",
+  "biomes": [
+    {
+      "id": "verdant", "subtitle": "WILD AND GREEN",
+      "accent": [13, 12, 11], "ground": [25, 14, 13], "ambient": "7a9a8a",
+      "sky": ["181425", "193c3e", "3e8948", "fee761"],
+      "size": [96, 72], "islandRadius": 0.88, "rockThreshold": 0.63, "ruins": 3, "resourceNodes": 18,
+      "enemies": { "skitter": 6, "hopper": 4, "spitter": 3 }, "decorDensity": 0.12, "sporeRate": 3,
+      "trees": 0.06, "towers": 0, "ponds": 4, "flowers": 0.04, "wildlife": { "grazers": 5, "birds": 8, "butterflies": 8 }
+    },
+    {
+      "id": "frost", "subtitle": "COLD AND QUIET",
+      "accent": [16, 17, 18], "ground": [25, 23, 21], "ambient": "8a9ac8",
+      "sky": ["181425", "262b44", "124e89", "c0cbdc"],
+      "size": [92, 70], "islandRadius": 0.86, "rockThreshold": 0.58, "ruins": 3, "resourceNodes": 16,
+      "enemies": { "skitter": 7, "hopper": 3 }, "decorDensity": 0.06, "sporeRate": 1,
+      "trees": 0, "towers": 0, "ponds": 3, "flowers": 0, "wildlife": { "grazers": 3, "birds": 4, "butterflies": 0 }
+    },
+    {
+      "id": "dune", "subtitle": "DRY AND OLD",
+      "accent": [5, 1, 3], "ground": [6, 5, 31], "ambient": "b08a7a",
+      "sky": ["181425", "3e2731", "733e39", "e4a672"],
+      "size": [100, 72], "islandRadius": 0.9, "rockThreshold": 0.6, "ruins": 5, "resourceNodes": 16,
+      "enemies": { "skitter": 8, "spitter": 4 }, "decorDensity": 0.05, "sporeRate": 0.5,
+      "trees": 0, "towers": 2, "ponds": 0, "flowers": 0, "wildlife": { "grazers": 0, "birds": 6, "butterflies": 0 }
+    },
+    {
+      "id": "spore", "subtitle": "SOFT AND STRANGE",
+      "accent": [27, 28, 29], "ground": [25, 24, 27], "ambient": "6a5f94",
+      "sky": ["181425", "262b44", "68386c", "f6757a"],
+      "size": [96, 72], "islandRadius": 0.86, "rockThreshold": 0.6, "ruins": 3, "resourceNodes": 16,
+      "enemies": { "skitter": 6, "hopper": 5, "spitter": 3 }, "decorDensity": 0.1, "sporeRate": 5,
+      "trees": 0.03, "towers": 0, "ponds": 2, "flowers": 0.02, "wildlife": { "grazers": 4, "birds": 0, "butterflies": 6 }
+    },
+    {
+      "id": "ember", "subtitle": "HOT AND RESTLESS",
+      "accent": [7, 0, 9], "ground": [25, 6, 5], "ambient": "b07a68",
+      "sky": ["181425", "3e2731", "a22633", "f77622"],
+      "size": [92, 70], "islandRadius": 0.84, "rockThreshold": 0.56, "ruins": 2, "resourceNodes": 22,
+      "enemies": { "skitter": 9, "hopper": 4, "spitter": 2 }, "decorDensity": 0.05, "sporeRate": 2,
+      "trees": 0, "towers": 0, "ponds": 0, "flowers": 0, "wildlife": { "grazers": 0, "birds": 0, "butterflies": 0 }
+    },
+    {
+      "id": "moon", "subtitle": "GREY AND STILL",
+      "accent": [22, 21, 20], "ground": [25, 24, 23], "ambient": "8a8fa8",
+      "sky": ["181425", "181425", "262b44", "3a4466"],
+      "size": [88, 66], "islandRadius": 0.85, "rockThreshold": 0.55, "ruins": 4, "resourceNodes": 14,
+      "enemies": { "skitter": 5, "hopper": 3 }, "decorDensity": 0.04, "sporeRate": 0.3,
+      "trees": 0, "towers": 0, "ponds": 0, "flowers": 0, "wildlife": { "grazers": 0, "birds": 0, "butterflies": 0 }
+    }
+  ]
+}
