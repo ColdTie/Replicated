@@ -16,7 +16,11 @@ export interface ReplicantSave {
   profile_id: string | null;
   name: string;
   model: string;
-  traits: { awake?: boolean; feature?: number; mods?: string[] };
+  traits: { awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number };
+  stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
+  parent_id?: string | null;
+  generation?: number;
+  status?: 'active' | 'npc' | 'in_transit';
   star_id: string;
   planet_index: number;
   pos_x: number | null;
@@ -30,6 +34,8 @@ export interface PlanetData {
   nodes?: Record<string, NodeState>;
   /** Ruin doors by index: opened with a core, reward taken */
   doors?: Record<string, DoorState>;
+  /** When the copies' offline gathering was last counted (ms epoch) */
+  npcTick?: number;
   structures?: StructureSave[];
 }
 export interface PlanetSave {
@@ -48,6 +54,9 @@ export interface GameStore {
   loadReplicant(profile: Profile): Promise<ReplicantSave>;
   saveReplicant(r: ReplicantSave): Promise<void>;
   loadPlanet(star: string, planetIndex: number, seed: number): Promise<PlanetSave>;
+  /** Copies (NPC replicants) living on a planet. */
+  listNpcs(star: string, planetIndex: number): Promise<ReplicantSave[]>;
+  createReplicant(r: Omit<ReplicantSave, 'id'>): Promise<ReplicantSave>;
   /** Atomic: adds emberDelta to the shared pool, merges node states, replaces structures if given. */
   applyPlanetDelta(star: string, planetIndex: number, emberDelta: number, data: PlanetData): Promise<PlanetSave | null>;
   signOut(): Promise<void>;
@@ -111,6 +120,18 @@ export class LocalStore implements GameStore {
     return { ...r, traits: { ...r.traits } };
   }
 
+  async listNpcs(star: string, planetIndex: number) {
+    return this.db.replicants.filter((r) => r.status === 'npc' && r.star_id === star && r.planet_index === planetIndex)
+      .map((r) => structuredClone(r));
+  }
+
+  async createReplicant(r: Omit<ReplicantSave, 'id'>) {
+    const row = { ...structuredClone(r), id: uuid() };
+    this.db.replicants.push(row);
+    this.flush();
+    return structuredClone(row);
+  }
+
   async saveReplicant(r: ReplicantSave) {
     const i = this.db.replicants.findIndex((x) => x.id === r.id);
     if (i >= 0) this.db.replicants[i] = { ...r };
@@ -131,6 +152,7 @@ export class LocalStore implements GameStore {
     cur.embers = Math.max(0, cur.embers + emberDelta);
     if (data.nodes) cur.data.nodes = { ...(cur.data.nodes ?? {}), ...data.nodes };
     if (data.doors) cur.data.doors = { ...(cur.data.doors ?? {}), ...data.doors };
+    if (data.npcTick !== undefined) cur.data.npcTick = data.npcTick;
     if (data.structures) cur.data.structures = data.structures;
     this.flush();
     return structuredClone(cur);
@@ -140,6 +162,8 @@ export class LocalStore implements GameStore {
 }
 
 // ---------------------------------------------------------------- cloud
+
+const REPLICANT_COLS = 'id,profile_id,parent_id,generation,name,model,traits,stats,status,star_id,planet_index,pos_x,pos_y';
 
 let clientPromise: Promise<SupabaseClient> | null = null;
 
@@ -199,13 +223,26 @@ export class CloudStore implements GameStore {
   }
 
   async loadReplicant(profile: Profile) {
-    const cols = 'id,profile_id,name,model,traits,star_id,planet_index,pos_x,pos_y';
+    const cols = REPLICANT_COLS;
     const { data, error } = await this.sb.from('replicants').select(cols).eq('profile_id', profile.id).neq('status', 'npc').order('created_at').limit(1);
     if (error) throw error;
     if (data.length) return data[0] as ReplicantSave;
     const ins = await this.sb.from('replicants').insert({ ...newReplicant(profile), galaxy_id: this.galaxyId }).select(cols).single();
     if (ins.error) throw ins.error;
     return ins.data as ReplicantSave;
+  }
+
+  async listNpcs(star: string, planetIndex: number) {
+    const { data, error } = await this.sb.from('replicants').select(REPLICANT_COLS)
+      .eq('status', 'npc').eq('star_id', star).eq('planet_index', planetIndex).order('created_at');
+    if (error) throw error;
+    return data as ReplicantSave[];
+  }
+
+  async createReplicant(r: Omit<ReplicantSave, 'id'>) {
+    const { data, error } = await this.sb.from('replicants').insert({ ...r, galaxy_id: this.galaxyId }).select(REPLICANT_COLS).single();
+    if (error) throw error;
+    return data as ReplicantSave;
   }
 
   async saveReplicant(r: ReplicantSave) {

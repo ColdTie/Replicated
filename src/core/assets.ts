@@ -7,6 +7,8 @@ export interface SpriteEntry {
   animations: Record<string, { fps: number; frames: number[]; repeat?: number }>;
   tinted: boolean;
   featured?: boolean;
+  /** featured sprites: visor pixel per frame, used to place headgear */
+  anchors?: [number, number][];
   files: Record<string, string>;
 }
 

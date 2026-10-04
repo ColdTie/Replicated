@@ -1,0 +1,18 @@
+{
+  "_doc": "Replication. cost = Embers from the planet pool per copy; maxPerPlanet copies can live on one planet. Each copy inherits its parent's look and stats, then drifts: chances to change visor color, headgear (gear.json frame 1..6) and trail color (palette index), plus small stat nudges (multipliers, clamped). gatherPerHour = Embers one copy adds to the pool per real hour (times its gather stat), counted while nobody is playing up to offlineCapHours. tripMs = how often a copy brings back an Ember while you watch.",
+  "cost": 30,
+  "maxPerPlanet": 6,
+  "visorChance": 0.6,
+  "gearChance": 0.75,
+  "trailChance": 0.8,
+  "gears": [1, 2, 3, 4, 5, 6],
+  "trails": [9, 10, 11, 12, 17, 18, 26, 28, 29],
+  "stats": {
+    "speed": { "drift": 0.06, "min": 0.8, "max": 1.3 },
+    "light": { "drift": 0.1, "min": 0.7, "max": 1.6 },
+    "gather": { "drift": 0.25, "min": 0.5, "max": 2.5 }
+  },
+  "gatherPerHour": 4,
+  "offlineCapHours": 12,
+  "tripMs": 22000
+}
