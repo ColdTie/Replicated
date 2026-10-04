@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { anim, tex } from '../core/assets';
-import { BACKEND, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, hex, type HopperDef, type PlanetDef, type SkitterDef } from '../core/data';
+import { anim, ensurePlanetAnims, queuePlanetSprites, tex } from '../core/assets';
+import { BACKEND, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, TRAVEL, hex, starById, type HopperDef, type PlanetDef, type SkitterDef } from '../core/data';
 import { session } from '../core/session';
 import { DRIFT, accrue, makeCopy } from '../core/drift';
 import { Base } from '../entities/Base';
@@ -14,7 +14,8 @@ import { Atmosphere } from '../fx/Atmosphere';
 import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
-import { Controls } from '../input/Controls';
+import { Controls, touch } from '../input/Controls';
+import { fuelCost, lyBetween, travelMinutes } from './StarMapScene';
 import type { NodeState, PlanetData, PlanetSave, ReplicantSave } from '../net/store';
 import { COLLIDE_TILES, Cell, DECOR, generatePlanet, type PlanetMap } from '../world/planetGen';
 
@@ -85,7 +86,12 @@ export class PlanetScene extends Phaser.Scene {
     return { save, npcs };
   }
 
+  preload() {
+    queuePlanetSprites(this, this.planet);
+  }
+
   create() {
+    ensurePlanetAnims(this, this.planet);
     // Loading the planet save is async; build the world once it arrives.
     this.cameras.main.setBackgroundColor(PALETTE[25]);
     this.preloadSave()
@@ -110,7 +116,7 @@ export class PlanetScene extends Phaser.Scene {
 
     // Tilemap: ground + walls (walls layer also holds invisible collision over the void)
     const tm = this.make.tilemap({ tileWidth: 16, tileHeight: 16, width: m.w, height: m.h });
-    const ts = tm.addTilesetImage('tiles', tex('tiles', p.id), 16, 16, 0, 0)!;
+    const ts = tm.addTilesetImage('tiles', tex('tiles', p), 16, 16, 0, 0)!;
     tm.createBlankLayer('ground', ts)!.putTilesAt(m.ground, 0, 0).setDepth(DEPTH.ground);
     this.walls = tm.createBlankLayer('walls', ts)!.putTilesAt(m.walls, 0, 0).setDepth(DEPTH.walls);
     this.walls.setCollision(COLLIDE_TILES);
@@ -118,11 +124,11 @@ export class PlanetScene extends Phaser.Scene {
 
     // Decor, landmarks and the glows that make the world readable without words
     for (const d of m.decor) {
-      this.add.image(d.x, d.y, tex('decor', p.id), d.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + d.y - (d.frame === DECOR.door ? 20 : 0));
+      this.add.image(d.x, d.y, tex('decor', p), d.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + d.y - (d.frame === DECOR.door ? 20 : 0));
     }
     for (const pr of m.props) {
-      const s = this.add.sprite(pr.x, pr.y, tex(pr.sprite, p.id), pr.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + pr.y);
-      if (pr.sprite === 'tree' && pr.frame === 0) this.time.delayedCall(Math.random() * 1500, () => s.play(anim(tex('tree', p.id), 'sway')));
+      const s = this.add.sprite(pr.x, pr.y, tex(pr.sprite, p), pr.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + pr.y);
+      if (pr.sprite === 'tree' && pr.frame === 0) this.time.delayedCall(Math.random() * 1500, () => s.play(anim(tex('tree', p), 'sway')));
     }
     for (const b of m.blockers) this.addSolid(b.x, b.y, b.w, b.h);
     for (const g of m.glows) {
@@ -148,7 +154,7 @@ export class PlanetScene extends Phaser.Scene {
     const vesselLight = this.lighting.add({ x: b.vessel.x, y: b.vessel.y - 10, radius: 110, color: 0xffc98a, intensity: 1, flicker: 0.08 });
     const vesselGlow = this.add.image(b.vessel.x, b.vessel.y - 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.22).setScale(1.4).setDepth(DEPTH.glow);
     if (p.intro === 'wake') {
-      this.cradle = this.add.image(b.cradle.x, b.cradle.y + 6, tex('cradle', p.id), 1).setOrigin(0.5, 1).setDepth(DEPTH.actors + b.cradle.y - 4);
+      this.cradle = this.add.image(b.cradle.x, b.cradle.y + 6, tex('cradle', p), 1).setOrigin(0.5, 1).setDepth(DEPTH.actors + b.cradle.y - 4);
       this.lighting.add({ x: b.cradle.x, y: b.cradle.y, radius: 30, color: PALETTE[18], intensity: 0.5, flicker: 0.2 });
     }
     const built = !!save?.data.structures?.some((s) => s.type === 'replicator');
@@ -515,6 +521,10 @@ export class PlanetScene extends Phaser.Scene {
 
   /** The action button does something other than attack here (build, replicate). Returns true if it did. */
   tryInteract(): boolean {
+    if (this.playerAtVessel()) {
+      this.openStarMap();
+      return true;
+    }
     if (this.base.playerAtReplicator() && this.base.canReplicate(this.embers, this.npcs.length)) {
       this.replicate();
       return true;
@@ -533,6 +543,80 @@ export class PlanetScene extends Phaser.Scene {
       void this.flushPlanet();
     });
     return true;
+  }
+
+  // --- the vessel: star map and launch ---
+
+  /** Standing at the vessel's ramp (just below it). */
+  playerAtVessel() {
+    const p = this.player, v = this.vessel;
+    return !this.shot && p.alive && Math.abs(p.x - v.x) < 16 && p.y - v.y > -4 && p.y - v.y < 18;
+  }
+
+  private openStarMap() {
+    this.player.body.setVelocity(0, 0);
+    touch.x = 0; touch.y = 0;
+    this.scene.pause();
+    this.scene.sleep('ui');
+    this.scene.launch('starmap', { mode: 'pick', from: this.planet.star, embers: this.embers });
+    const ev = this.game.events;
+    const done = () => {
+      ev.off('starmap-close', onClose);
+      ev.off('starmap-launch', onLaunch);
+      this.scene.stop('starmap');
+      this.scene.resume();
+      this.scene.wake('ui');
+    };
+    const onClose = () => done();
+    const onLaunch = (starId: string) => { done(); this.launch(starId); };
+    ev.on('starmap-close', onClose);
+    ev.on('starmap-launch', onLaunch);
+  }
+
+  /** Pay the fuel, climb aboard, take off, and start the real-time journey. */
+  private launch(toStar: string) {
+    const from = starById(this.planet.star), to = starById(toStar);
+    if (!from || !to) return;
+    const ly = lyBetween(from, to);
+    const cost = fuelCost(ly);
+    if (this.embers < cost || ly > TRAVEL.jumpRangeLy) return;
+    this.embers -= cost;
+    this.pending.embers -= cost;
+    this.game.events.emit('embers', this.embers);
+    const pl = this.player, v = this.vessel;
+    pl.locked = true;
+    pl.body.setVelocity(0, 0);
+    // hop up the ramp and vanish inside
+    this.tweens.add({ targets: pl.sprite, x: v.x, y: v.y - 6, scaleX: 0.6, scaleY: 0.6, alpha: 0, duration: 380, ease: 'Quad.easeIn' });
+    pl.light.intensity = 0;
+    const thrust = this.add.particles(v.x, v.y - 4, 'px', {
+      lifespan: { min: 200, max: 420 }, speedY: { min: 60, max: 140 }, speedX: { min: -20, max: 20 },
+      scale: { start: 1.5, end: 0 }, tint: [PALETTE[10], PALETTE[9], PALETTE[11]], blendMode: Phaser.BlendModes.ADD, frequency: 10,
+    }).setDepth(DEPTH.fx);
+    this.time.delayedCall(450, () => {
+      this.shake(500, 0.008);
+      for (let i = 0; i < 6; i++) this.fx.dust(v.x - 18 + i * 7, v.y - 1, 5);
+      this.cameras.main.stopFollow();
+      this.tweens.add({
+        targets: v, y: v.y - 220, duration: 1600, ease: 'Quad.easeIn',
+        onUpdate: () => thrust.setPosition(v.x, v.y - 4),
+      });
+      this.cameras.main.fadeOut(1500, 24, 20, 37);
+    });
+    const arrivesAt = new Date(Date.now() + travelMinutes(ly) * 60000);
+    const start = (async () => {
+      await this.flushPlanet();
+      const r = session.replicant, st = session.store;
+      if (!r || !st) return null;
+      return st.startJourney(r, toStar, arrivesAt);
+    })();
+    this.time.delayedCall(2100, async () => {
+      let journey;
+      try { journey = await start; } catch (e) { console.warn('launch failed', e); }
+      this.scene.stop('ui');
+      if (journey) this.scene.start('starmap', { mode: 'transit', journey });
+      else this.scene.start('home');
+    });
   }
 
   // --- copies ---

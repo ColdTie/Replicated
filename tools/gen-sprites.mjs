@@ -7,7 +7,8 @@
 //     "frames": [ ["row", "row", ...], ... ] }
 // Roles: a0/a1/a2 = planet accent (dark/mid/light), g0/g1/g2 = planet ground (dark/base/speckle),
 // f0/f1 = replicant feature color.
-// Tinted sprites are rendered once per planet as <name>.<planetId>.png.
+// Tinted sprites are rendered once per planet palette (accent + ground, across planets.json and
+// galaxy.gen.json) as <name>.<accent>_<ground>.png; the game loads only the current planet's set.
 // Featured sprites ("featured": true; replicant bodies) are rendered once per visor x cape pair from player.json
 // (featureColors x capeColors) as rows of one sheet; manifest variants map "f<visor>.c<cape>" to the row.
 //
@@ -29,6 +30,10 @@ const palette = readJson('src/data/palette.json').colors.map((hex) => [
   parseInt(hex.slice(4, 6), 16),
 ]);
 const planets = readJson('src/data/planets.json').planets;
+// Tinted sheets are made once per palette (accent + ground), shared by every planet that uses it
+const paletteKey = (p) => `${p.accent.join('-')}_${(p.ground ?? [25, 24, 23]).join('-')}`;
+const palettes = new Map();
+for (const p of [...planets, ...readJson('src/data/galaxy.gen.json').planets]) if (!palettes.has(paletteKey(p))) palettes.set(paletteKey(p), p);
 const player = readJson('src/data/player.json');
 
 function roleResolver(planet, feature = player.feature, cape = player.cape) {
@@ -129,13 +134,13 @@ for (const file of fs.readdirSync(spriteDir).filter((f) => f.endsWith('.json')).
     manifest.sprites[name] = entry;
     continue;
   }
-  const variants = sprite.tinted ? planets : [null];
-  for (const planet of variants) {
+  const variants = sprite.tinted ? [...palettes.entries()] : [[null, null]];
+  for (const [key, planet] of variants) {
     const png = render(sprite, roleResolver(planet ?? planets[0]), name);
-    const fname = planet ? `${name}.${planet.id}.png` : `${name}.png`;
+    const fname = key ? `${name}.${key}.png` : `${name}.png`;
     fs.writeFileSync(path.join(outDir, fname), PNG.sync.write(png));
-    entry.files[planet ? planet.id : '*'] = fname;
-    if (!planet || planet === planets[0]) previews.push({ name, png });
+    entry.files[key ?? '*'] = fname;
+    if (!planet || key === paletteKey(planets[0])) previews.push({ name, png });
   }
   manifest.sprites[name] = entry;
 }

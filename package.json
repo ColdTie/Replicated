@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "sprites": "node tools/gen-sprites.mjs",
+    "sprites": "node tools/gen-galaxy.mjs && node tools/gen-sprites.mjs",
     "dev": "npm run sprites && vite",
     "build": "npm run sprites && tsc --noEmit && vite build",
     "preview": "vite preview",

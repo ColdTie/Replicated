@@ -1,0 +1,413 @@
+{
+ "_doc": "Real nearby stars: right ascension (hours), declination (degrees), distance (light years), spectral class. Public astronomical facts compiled by hand; extend freely.",
+ "stars": [
+  {
+   "id": "sol",
+   "name": "SOL",
+   "ra": 0.0,
+   "dec": 0.0,
+   "dist": 0.0,
+   "type": "G2"
+  },
+  {
+   "id": "proxima-centauri",
+   "name": "PROXIMA",
+   "ra": 14.495,
+   "dec": -62.683,
+   "dist": 4.24,
+   "type": "M5"
+  },
+  {
+   "id": "alpha-centauri",
+   "name": "ALPHA CENTAURI",
+   "ra": 14.66,
+   "dec": -60.833,
+   "dist": 4.37,
+   "type": "G2"
+  },
+  {
+   "id": "barnards-star",
+   "name": "BARNARD'S STAR",
+   "ra": 17.9633,
+   "dec": 4.683,
+   "dist": 5.96,
+   "type": "M4"
+  },
+  {
+   "id": "wolf-359",
+   "name": "WOLF 359",
+   "ra": 10.9417,
+   "dec": 7.017,
+   "dist": 7.86,
+   "type": "M6"
+  },
+  {
+   "id": "lalande-21185",
+   "name": "LALANDE 21185",
+   "ra": 11.055,
+   "dec": 35.967,
+   "dist": 8.31,
+   "type": "M2"
+  },
+  {
+   "id": "sirius",
+   "name": "SIRIUS",
+   "ra": 6.7517,
+   "dec": -16.717,
+   "dist": 8.6,
+   "type": "A1"
+  },
+  {
+   "id": "uv-ceti",
+   "name": "UV CETI",
+   "ra": 1.65,
+   "dec": -17.95,
+   "dist": 8.73,
+   "type": "M5"
+  },
+  {
+   "id": "ross-154",
+   "name": "ROSS 154",
+   "ra": 18.83,
+   "dec": -23.833,
+   "dist": 9.7,
+   "type": "M3"
+  },
+  {
+   "id": "ross-248",
+   "name": "ROSS 248",
+   "ra": 23.6983,
+   "dec": 44.167,
+   "dist": 10.3,
+   "type": "M5"
+  },
+  {
+   "id": "epsilon-eridani",
+   "name": "EPSILON ERIDANI",
+   "ra": 3.5483,
+   "dec": -9.45,
+   "dist": 10.5,
+   "type": "K2"
+  },
+  {
+   "id": "lacaille-9352",
+   "name": "LACAILLE 9352",
+   "ra": 23.0983,
+   "dec": -35.85,
+   "dist": 10.7,
+   "type": "M0"
+  },
+  {
+   "id": "ross-128",
+   "name": "ROSS 128",
+   "ra": 11.795,
+   "dec": 0.8,
+   "dist": 11.0,
+   "type": "M4"
+  },
+  {
+   "id": "ez-aquarii",
+   "name": "EZ AQUARII",
+   "ra": 22.6433,
+   "dec": -15.3,
+   "dist": 11.1,
+   "type": "M5"
+  },
+  {
+   "id": "procyon",
+   "name": "PROCYON",
+   "ra": 7.655,
+   "dec": 5.233,
+   "dist": 11.4,
+   "type": "F5"
+  },
+  {
+   "id": "61-cygni",
+   "name": "61 CYGNI",
+   "ra": 21.115,
+   "dec": 38.75,
+   "dist": 11.4,
+   "type": "K5"
+  },
+  {
+   "id": "struve-2398",
+   "name": "STRUVE 2398",
+   "ra": 18.7133,
+   "dec": 59.633,
+   "dist": 11.5,
+   "type": "M3"
+  },
+  {
+   "id": "groombridge-34",
+   "name": "GROOMBRIDGE 34",
+   "ra": 0.3067,
+   "dec": 44.017,
+   "dist": 11.6,
+   "type": "M1"
+  },
+  {
+   "id": "dx-cancri",
+   "name": "DX CANCRI",
+   "ra": 8.4967,
+   "dec": 26.783,
+   "dist": 11.8,
+   "type": "M6"
+  },
+  {
+   "id": "epsilon-indi",
+   "name": "EPSILON INDI",
+   "ra": 22.0567,
+   "dec": -56.783,
+   "dist": 11.9,
+   "type": "K5"
+  },
+  {
+   "id": "tau-ceti",
+   "name": "TAU CETI",
+   "ra": 1.735,
+   "dec": -15.933,
+   "dist": 11.9,
+   "type": "G8"
+  },
+  {
+   "id": "gj-1061",
+   "name": "GJ 1061",
+   "ra": 3.6,
+   "dec": -44.517,
+   "dist": 12.0,
+   "type": "M5"
+  },
+  {
+   "id": "yz-ceti",
+   "name": "YZ CETI",
+   "ra": 1.2083,
+   "dec": -17.0,
+   "dist": 12.1,
+   "type": "M4"
+  },
+  {
+   "id": "luytens-star",
+   "name": "LUYTEN'S STAR",
+   "ra": 7.4567,
+   "dec": 5.233,
+   "dist": 12.2,
+   "type": "M3"
+  },
+  {
+   "id": "teegardens-star",
+   "name": "TEEGARDEN'S STAR",
+   "ra": 2.8833,
+   "dec": 16.883,
+   "dist": 12.5,
+   "type": "M7"
+  },
+  {
+   "id": "kapteyns-star",
+   "name": "KAPTEYN'S STAR",
+   "ra": 5.195,
+   "dec": -45.017,
+   "dist": 12.8,
+   "type": "M1"
+  },
+  {
+   "id": "lacaille-8760",
+   "name": "LACAILLE 8760",
+   "ra": 21.2883,
+   "dec": -38.867,
+   "dist": 12.9,
+   "type": "M0"
+  },
+  {
+   "id": "kruger-60",
+   "name": "KRUGER 60",
+   "ra": 22.4667,
+   "dec": 57.7,
+   "dist": 13.1,
+   "type": "M3"
+  },
+  {
+   "id": "wolf-1061",
+   "name": "WOLF 1061",
+   "ra": 16.505,
+   "dec": -12.667,
+   "dist": 14.0,
+   "type": "M3"
+  },
+  {
+   "id": "van-maanens-star",
+   "name": "VAN MAANEN'S STAR",
+   "ra": 0.82,
+   "dec": 5.383,
+   "dist": 14.1,
+   "type": "D"
+  },
+  {
+   "id": "gliese-1",
+   "name": "GLIESE 1",
+   "ra": 0.09,
+   "dec": -37.35,
+   "dist": 14.2,
+   "type": "M2"
+  },
+  {
+   "id": "gliese-674",
+   "name": "GLIESE 674",
+   "ra": 17.4783,
+   "dec": -46.9,
+   "dist": 14.8,
+   "type": "M3"
+  },
+  {
+   "id": "gliese-687",
+   "name": "GLIESE 687",
+   "ra": 17.6067,
+   "dec": 68.333,
+   "dist": 14.8,
+   "type": "M3"
+  },
+  {
+   "id": "gliese-876",
+   "name": "GLIESE 876",
+   "ra": 22.8883,
+   "dec": -14.267,
+   "dist": 15.2,
+   "type": "M4"
+  },
+  {
+   "id": "40-eridani",
+   "name": "40 ERIDANI",
+   "ra": 4.255,
+   "dec": -7.65,
+   "dist": 16.3,
+   "type": "K1"
+  },
+  {
+   "id": "70-ophiuchi",
+   "name": "70 OPHIUCHI",
+   "ra": 18.0917,
+   "dec": 2.5,
+   "dist": 16.6,
+   "type": "K0"
+  },
+  {
+   "id": "altair",
+   "name": "ALTAIR",
+   "ra": 19.8467,
+   "dec": 8.867,
+   "dist": 16.7,
+   "type": "A7"
+  },
+  {
+   "id": "sigma-draconis",
+   "name": "SIGMA DRACONIS",
+   "ra": 19.54,
+   "dec": 69.667,
+   "dist": 18.8,
+   "type": "K0"
+  },
+  {
+   "id": "eta-cassiopeiae",
+   "name": "ETA CASSIOPEIAE",
+   "ra": 0.8183,
+   "dec": 57.817,
+   "dist": 19.4,
+   "type": "G0"
+  },
+  {
+   "id": "36-ophiuchi",
+   "name": "36 OPHIUCHI",
+   "ra": 17.255,
+   "dec": -26.6,
+   "dist": 19.5,
+   "type": "K1"
+  },
+  {
+   "id": "82-eridani",
+   "name": "82 ERIDANI",
+   "ra": 3.3317,
+   "dec": -43.067,
+   "dist": 19.7,
+   "type": "G8"
+  },
+  {
+   "id": "delta-pavonis",
+   "name": "DELTA PAVONIS",
+   "ra": 20.145,
+   "dec": -66.183,
+   "dist": 19.9,
+   "type": "G8"
+  },
+  {
+   "id": "gliese-581",
+   "name": "GLIESE 581",
+   "ra": 15.3233,
+   "dec": -7.717,
+   "dist": 20.5,
+   "type": "M3"
+  },
+  {
+   "id": "gliese-667",
+   "name": "GLIESE 667",
+   "ra": 17.3167,
+   "dec": -34.983,
+   "dist": 23.6,
+   "type": "K3"
+  },
+  {
+   "id": "vega",
+   "name": "VEGA",
+   "ra": 18.615,
+   "dec": 38.783,
+   "dist": 25.0,
+   "type": "A0"
+  },
+  {
+   "id": "fomalhaut",
+   "name": "FOMALHAUT",
+   "ra": 22.96,
+   "dec": -29.617,
+   "dist": 25.1,
+   "type": "A3"
+  },
+  {
+   "id": "pollux",
+   "name": "POLLUX",
+   "ra": 7.755,
+   "dec": 28.033,
+   "dist": 33.8,
+   "type": "K0"
+  },
+  {
+   "id": "arcturus",
+   "name": "ARCTURUS",
+   "ra": 14.2617,
+   "dec": 19.183,
+   "dist": 36.7,
+   "type": "K1"
+  },
+  {
+   "id": "trappist-1",
+   "name": "TRAPPIST-1",
+   "ra": 23.1083,
+   "dec": -5.033,
+   "dist": 40.7,
+   "type": "M8"
+  },
+  {
+   "id": "capella",
+   "name": "CAPELLA",
+   "ra": 5.2783,
+   "dec": 46.0,
+   "dist": 42.9,
+   "type": "G5"
+  },
+  {
+   "id": "castor",
+   "name": "CASTOR",
+   "ra": 7.5767,
+   "dec": 31.883,
+   "dist": 51.0,
+   "type": "A1"
+  }
+ ]
+}

@@ -96,20 +96,25 @@ Steve's ideas for later phases. Do not build these until a phase explicitly pick
 ```
 tools/sprites/*.json     sprite source: palette-index grids + legend + animations (font.json = pixel font)
 tools/gen-sprites.mjs    JSON -> public/assets/gen/*.png + manifest.json
-                         "tinted": one sheet per planet (accent a0-a2, ground g0-g2 roles)
-                         "featured": one sheet per visor color in player.json featureColors (f0/f1 roles)
+                         "tinted": one sheet per planet palette (accent a0-a2 + ground g0-g2), loaded per planet
+                         "featured": replicant bodies, one sheet with a row per visor x cape (f0/f1, c0/c1)
+tools/gen-galaxy.mjs     src/data/stars.json (real stars) -> src/data/galaxy.gen.json: 3D positions, 6 beacons,
+                         one generated planet per star (run by `npm run sprites`; output is committed)
 tools/screenshot.mjs     build preview + headless Chromium capture -> screenshots/<name>.png
-src/data/*.json          palette, planets, player, enemies, items, structures, backend (all tunables)
+src/data/*.json          palette, planets (hand-made), stars, travel, drift, player, enemies, items, structures, backend
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
 src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalStore (localStorage)
 src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, enemies, decor, glows,
                          trees/towers + blockers, fixed base layout (vessel, cradle, build pad)
 src/fx/                  Lighting (multiply darkness RT + additive lights), Atmosphere (sky, stars, fog,
                          dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
-src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember), Base (pad + Replicator)
+src/core/drift.ts        copy creation (visor/cape/stat drift) and NPC Ember accrual over real time
+src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember), Base (pad,
+                         Replicator, Ember pile), Npc (copies)
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame
 src/ui/overlay.ts        HTML forms over the canvas (sign-in, new profile)
 src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Planet (world, saving) + UI (counter, title, touch)
+                         StarMap: 3D real-star map; 'pick' from the vessel (launch), 'transit' during a journey
 supabase/migrations/     schema applied to the "Replicated" Supabase project (keep in sync when changing the DB)
 ```
 
@@ -118,13 +123,19 @@ Saving: the shared Ember pool, node damage and structures live in `planet_states
 pool. The replicant row stores position, planet and `traits.awake` (Earth's wake-up intro plays once per replicant).
 Every table is scoped by `galaxy_id` with row level security; `ensure_family_galaxy()` creates the galaxy on first sign-in.
 
+Travel: walk to the vessel ramp and press action to open the star map. A jump (max `jumpRangeLy`) costs Embers from
+the planet's pool and takes real time (`src/data/travel.json`). The replicant row becomes `in_transit` with a
+`journeys` row; opening that profile shows the countdown, and once `arrives_at` passes it lands on the target star's
+planet (`discovered_stars` updated). Copies (NPC rows, `status = npc`) stay on their planet and fill the Ember pile
+(`planet_states.data.cache`, counted up to `data.tick`).
+
 Sprite legend roles: `a0/a1/a2` = planet accent (dark, mid, light), `g0/g1/g2` = planet ground, `f0/f1` = replicant
-feature color (visor, antenna tip, chest core).
+feature color (visor, antenna tip, chest core), `c0/c1` = cape.
 
 Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`.
 
 URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
-screenshot pose (enemies frozen; add `&view=base` for the base, `&kid` for kid mode), `?planet=solace`, `?seed=123`,
+screenshot pose (enemies frozen; add `&view=base` or `&view=copies`, `&kid` for kid mode), `?planet=solace`, `?seed=123`,
 `?model=drone`.
 
 ## Progress
@@ -163,9 +174,23 @@ Done:
 - Verified headless: create profiles, wake, mine 27 Embers, build, reload and resume with everything restored; no errors.
 - Screenshots: `screenshots/phase1-*.png`.
 
+### Session 3 (2026-10-04): Phase 2, copies, star map, real-time travel
+- Steve created the family login on the live site.
+- Replicate: stand at the Replicator with 15 Embers, press action: a copy appears with drift (visor and/or cape color
+  always changes, plus small speed / HP / work changes). Up to 4 copies per planet. Copies wander the base, greet you,
+  and fill a glowing Ember pile while nobody is there (every 3 min x work rate, cap 40). Walk into the pile to collect.
+- Galaxy: 51 real stars (Sol to Castor, 51 ly) with true 3D positions; 6 beacons (Ross 128, 40 Eridani, 70 Ophiuchi,
+  Sigma Draconis, Delta Pavonis, TRAPPIST-1); every star has a generated planet (palette, sky by star class, enemies).
+- Star map: rotatable 3D point cloud (drag, pinch, scroll), floor rings, drop lines, jump-range ring, overlays for
+  copies / found stars / beacons, journeys in flight. Launch: fuel = 3 Embers/ly, time = 15 min/ly, range 8 ly.
+- Launch: replicant boards, vessel takes off; profile shows the countdown; on arrival it lands on the new planet.
+- Verified headless: replicate twice, 30 min away gave 20 Embers in the pile; Earth -> Proxima b trip end to end.
+- Screenshots: `screenshots/phase2-*.png`.
+
 Not done / next:
-- Not yet confirmed on the iPad. Cloud sign-in not yet tested by Steve (needs the family login created).
-- Phase 2: the Replicator makes a drifted copy that stays as an NPC; launch the vessel; star map of real stars;
-  real-time journeys.
+- Not yet confirmed on the iPad (Phase 2 not merged to main at the end of this session unless noted).
+- Beacons are 11 to 41 ly away because the catalogue is sparse; add more real stars near 30 ly to make them farther.
+- Generated planets reuse Earth-like palettes sometimes; bias accent/ground by star class for more variety.
+- Phase 3: Spark resource and handoff (awaken a copy for another family member), kid mode polish, sound.
 - No audio yet. Phase 0 skipped it; add in Phase 3 (or earlier), starting only after the first tap.
 - Rock outcrops still have stair-step edges (no full autotiling). Fine for placeholder art.

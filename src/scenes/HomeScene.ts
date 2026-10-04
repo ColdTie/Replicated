@@ -7,6 +7,7 @@ import { session } from '../core/session';
 import { makeSky, makeStars } from '../fx/textures';
 import { CloudStore, LocalStore, currentSession, signIn, signUp, type GameStore, type Profile } from '../net/store';
 import { el, openOverlay, overlayBusy, paletteCss } from '../ui/overlay';
+import { arrive } from './StarMapScene';
 
 const CARD_W = 76, CARD_H = 100;
 
@@ -197,6 +198,21 @@ export class HomeScene extends Phaser.Scene {
       this.status.setText('COULD NOT LOAD - CHECK CONNECTION');
       this.picking = false;
       return;
+    }
+    // A replicant between stars: show the journey, or land if it has arrived
+    const r = session.replicant!;
+    if (r.status === 'in_transit') {
+      try {
+        const j = await store.activeJourney(r);
+        if (j && Date.now() < Date.parse(j.arrives_at)) { this.scene.start('starmap', { mode: 'transit', journey: j }); return; }
+        if (j) { await arrive(this, j); return; }
+        r.status = 'active';
+      } catch (e) {
+        console.warn(e);
+        this.status.setText('COULD NOT LOAD - CHECK CONNECTION');
+        this.picking = false;
+        return;
+      }
     }
     const params = new URLSearchParams(location.search);
     this.scene.start('planet', {

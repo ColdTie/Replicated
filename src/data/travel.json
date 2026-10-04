@@ -1,0 +1,8 @@
+{
+  "_doc": "Real-time travel. A jump to a star within jumpRangeLy costs embersPerLy x distance from the launch planet's shared pool and takes minutesPerLy x distance of real time. Beacons sit at beaconDistanceLy along +-x, +-y, +-z from Sol, snapped to the nearest real star.",
+  "minutesPerLy": 15,
+  "embersPerLy": 3,
+  "jumpRangeLy": 8,
+  "beaconDistanceLy": 30,
+  "beaconResourceNodes": 40
+}

@@ -14,6 +14,7 @@ export class BootScene extends Phaser.Scene {
     this.load.once('filecomplete-json-manifest', (_key: string, _type: string, data: Manifest) => {
       setManifest(data);
       for (const [name, s] of Object.entries(data.sprites)) {
+        if (s.tinted) continue; // per-planet palettes load with the planet
         for (const [variant, file] of Object.entries(s.files)) {
           const key = variant === '*' ? name : `${name}.${variant}`;
           this.load.spritesheet(key, `${GEN_URL}${file}`, { frameWidth: s.frameWidth, frameHeight: s.frameHeight });
@@ -26,6 +27,7 @@ export class BootScene extends Phaser.Scene {
   create() {
     const m = getManifest();
     for (const [name, s] of Object.entries(m.sprites)) {
+      if (s.tinted) continue;
       for (const variant of Object.keys(s.files)) {
         const key = variant === '*' ? name : `${name}.${variant}`;
         if (s.featured && s.variants) {

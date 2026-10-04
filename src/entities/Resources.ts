@@ -18,7 +18,7 @@ export class CrystalNode {
   constructor(private scene: PlanetScene, readonly x: number, readonly y: number, readonly index: number, startHits = 0) {
     this.zone = scene.add.zone(x, y - 2, 12, 7);
     scene.physics.add.existing(this.zone, true);
-    this.sprite = scene.add.sprite(x, y + 2, tex(EMBER.nodeSprite, scene.planet.id), 0).setOrigin(0.5, 1).setDepth(100 + y);
+    this.sprite = scene.add.sprite(x, y + 2, tex(EMBER.nodeSprite, scene.planet), 0).setOrigin(0.5, 1).setDepth(100 + y);
     this.glow = scene.add.image(x, y - 7, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.22).setScale(0.7).setDepth(6100);
     this.light = scene.lighting.add({ x, y: y - 6, radius: 46, color: PALETTE[9], intensity: 0.85, flicker: 0.25 });
     scene.tweens.add({ targets: this.glow, alpha: 0.12, duration: 1400 + Math.random() * 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });

@@ -24,7 +24,7 @@ export class Skitter implements Enemy {
   private hasHit = false;
 
   constructor(private scene: PlanetScene, readonly def: SkitterDef, readonly homeX: number, readonly homeY: number) {
-    this.texKey = tex(def.sprite, scene.planet.id);
+    this.texKey = tex(def.sprite, scene.planet);
     this.zone = scene.add.zone(homeX, homeY, 10, 6);
     scene.physics.add.existing(this.zone);
     this.body = this.zone.body as Phaser.Physics.Arcade.Body;

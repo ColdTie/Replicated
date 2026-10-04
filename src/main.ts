@@ -2,7 +2,9 @@ import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { HomeScene } from './scenes/HomeScene';
 import { PlanetScene } from './scenes/PlanetScene';
+import { StarMapScene } from './scenes/StarMapScene';
 import { UIScene } from './scenes/UIScene';
+import { session } from './core/session';
 
 const game = new Phaser.Game({
   type: Phaser.WEBGL,
@@ -16,7 +18,8 @@ const game = new Phaser.Game({
   physics: { default: 'arcade', arcade: { debug: false } },
   input: { activePointers: 3, gamepad: true },
   render: { antialias: false, powerPreference: 'high-performance' },
-  scene: [BootScene, HomeScene, PlanetScene, UIScene],
+  scene: [BootScene, HomeScene, PlanetScene, UIScene, StarMapScene],
 });
 
-(window as unknown as { __game: Phaser.Game }).__game = game;
+// Handles for headless playtests (tools/ and screenshots)
+Object.assign(window as object, { __game: game, __session: session });
