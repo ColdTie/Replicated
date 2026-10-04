@@ -1,6 +1,10 @@
 import Phaser from 'phaser';
 import { anim, tex } from '../core/assets';
-import { ENEMIES, PALETTE, PLANETS, PLAYER, hex, type PlanetDef } from '../core/data';
+import { BACKEND, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, hex, type HopperDef, type PlanetDef, type SkitterDef } from '../core/data';
+import { session } from '../core/session';
+import { Base } from '../entities/Base';
+import type { Enemy } from '../entities/Enemy';
+import { Hopper } from '../entities/Hopper';
 import { Player, squash } from '../entities/Player';
 import { CrystalNode, Shard } from '../entities/Resources';
 import { Skitter } from '../entities/Skitter';
@@ -9,11 +13,15 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
 import { Controls } from '../input/Controls';
+import type { NodeState, PlanetData, PlanetSave } from '../net/store';
 import { COLLIDE_TILES, Cell, DECOR, generatePlanet, type PlanetMap } from '../world/planetGen';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
 
 interface InitData { planetId?: string; seed?: number; shot?: boolean }
+
+const SAVE_EVERY_MS = 4000;
+const POS_SAVE_EVERY_MS = 10000;
 
 export class PlanetScene extends Phaser.Scene {
   planet!: PlanetDef;
@@ -21,7 +29,7 @@ export class PlanetScene extends Phaser.Scene {
   lighting!: Lighting;
   fx!: Fx;
   player!: Player;
-  enemies: Skitter[] = [];
+  enemies: Enemy[] = [];
   nodes: CrystalNode[] = [];
   shards: Shard[] = [];
   embers = 0;
@@ -29,34 +37,64 @@ export class PlanetScene extends Phaser.Scene {
   private atmosphere!: Atmosphere;
   private controls!: Controls;
   private walls!: Phaser.Tilemaps.TilemapLayer;
+  private solids!: Phaser.Physics.Arcade.StaticGroup;
   private vessel!: Phaser.GameObjects.Sprite;
-  private landing = new Phaser.Math.Vector2();
+  private cradle?: Phaser.GameObjects.Image;
+  private base!: Base;
+  private home = new Phaser.Math.Vector2();
   private stopped = false;
   private seed?: number;
   private shot = false;
   /** Screenshot mode: enemies hold still. */
   private frozen = false;
 
+  // pending changes not yet written to the store
+  private pending: { embers: number; nodes: Record<string, NodeState>; structures?: PlanetData['structures'] } = { embers: 0, nodes: {} };
+  private saving = false;
+  private lastSaveAt = 0;
+  private lastPosSaveAt = 0;
+
   constructor() { super('planet'); }
 
   init(data: InitData) {
-    this.planet = PLANETS.find((p) => p.id === data.planetId) ?? PLANETS[0];
+    const r = session.replicant;
+    this.planet = PLANETS.find((p) => p.id === data.planetId)
+      ?? PLANETS.find((p) => r && p.star === r.star_id && p.planetIndex === r.planet_index)
+      ?? PLANETS[0];
     this.seed = data.seed;
     this.shot = !!data.shot;
     this.enemies = []; this.nodes = []; this.shards = []; this.embers = 0; this.stopped = false; this.frozen = false;
+    this.pending = { embers: 0, nodes: {} };
+  }
+
+  async preloadSave(): Promise<PlanetSave | null> {
+    const st = session.store;
+    if (!st) return null;
+    return st.loadPlanet(this.planet.star, this.planet.planetIndex, this.seed ?? this.planet.seed);
   }
 
   create() {
+    // Loading the planet save is async; build the world once it arrives.
+    this.cameras.main.setBackgroundColor(PALETTE[25]);
+    this.preloadSave()
+      .catch((e) => { console.warn('planet load failed, playing without saving', e); return null; })
+      .then((save) => this.build(save));
+  }
+
+  private build(save: PlanetSave | null) {
+    session.planet = save;
     const p = this.planet;
     const { width, height } = this.scale;
     this.map = generatePlanet(p, this.seed ?? p.seed);
     const m = this.map;
     const pw = m.w * 16, ph = m.h * 16;
+    this.embers = save?.embers ?? 0;
 
     this.lighting = new Lighting(this, hex(p.ambient), DEPTH.dark);
     this.fx = new Fx(this, PALETTE[p.accent[1]], PALETTE[p.accent[2]]);
     this.atmosphere = new Atmosphere(this, p);
     this.controls = new Controls(this);
+    this.solids = this.physics.add.staticGroup();
 
     // Tilemap: ground + walls (walls layer also holds invisible collision over the void)
     const tm = this.make.tilemap({ tileWidth: 16, tileHeight: 16, width: m.w, height: m.h });
@@ -66,10 +104,15 @@ export class PlanetScene extends Phaser.Scene {
     this.walls.setCollision(COLLIDE_TILES);
     this.drawRockEdges();
 
-    // Decor and the glows that make the world readable without words
+    // Decor, landmarks and the glows that make the world readable without words
     for (const d of m.decor) {
       this.add.image(d.x, d.y, tex('decor', p.id), d.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + d.y - (d.frame === DECOR.door ? 20 : 0));
     }
+    for (const pr of m.props) {
+      const s = this.add.sprite(pr.x, pr.y, tex(pr.sprite, p.id), pr.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + pr.y);
+      if (pr.sprite === 'tree' && pr.frame === 0) this.time.delayedCall(Math.random() * 1500, () => s.play(anim(tex('tree', p.id), 'sway')));
+    }
+    for (const b of m.blockers) this.addSolid(b.x, b.y, b.w, b.h);
     for (const g of m.glows) {
       if (g.kind === 'door') {
         this.lighting.add({ x: g.x, y: g.y, radius: 64, color: PALETTE[10], intensity: 0.95, flicker: 0.15 });
@@ -83,33 +126,54 @@ export class PlanetScene extends Phaser.Scene {
       }
     }
 
-    // Landing site and vessel (warm, ours)
-    this.landing.set(m.spawn.x * 16 + 8, m.spawn.y * 16 + 4);
-    const vesselShadow = this.add.image(this.landing.x, this.landing.y + 2, 'shadow').setTint(PALETTE[25]).setAlpha(0.5).setScale(2.6, 2).setDepth(DEPTH.shadow);
-    this.vessel = this.add.sprite(this.landing.x, this.landing.y + 4, 'vessel').setOrigin(0.5, 1).setDepth(DEPTH.actors + this.landing.y);
+    // Base: vessel (warm, ours), the cradle on Earth, the build pad
+    const b = m.base;
+    this.home.set(b.cradle.x, b.cradle.y + 16);
+    const vesselShadow = this.add.image(b.vessel.x, b.vessel.y + 2, 'shadow').setTint(PALETTE[25]).setAlpha(0.5).setScale(2.6, 2).setDepth(DEPTH.shadow);
+    this.vessel = this.add.sprite(b.vessel.x, b.vessel.y + 4, 'vessel').setOrigin(0.5, 1).setDepth(DEPTH.actors + b.vessel.y);
     this.vessel.play(anim('vessel', 'idle'));
-    const vesselBody = this.add.zone(this.landing.x, this.landing.y - 4, 24, 10);
-    this.physics.add.existing(vesselBody, true);
-    const vesselLight = this.lighting.add({ x: this.landing.x, y: this.landing.y - 10, radius: 110, color: 0xffc98a, intensity: 1, flicker: 0.08 });
-    const vesselGlow = this.add.image(this.landing.x, this.landing.y - 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.22).setScale(1.4).setDepth(DEPTH.glow);
+    this.addSolid(b.vessel.x, b.vessel.y - 4, 24, 10);
+    const vesselLight = this.lighting.add({ x: b.vessel.x, y: b.vessel.y - 10, radius: 110, color: 0xffc98a, intensity: 1, flicker: 0.08 });
+    const vesselGlow = this.add.image(b.vessel.x, b.vessel.y - 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.22).setScale(1.4).setDepth(DEPTH.glow);
+    if (p.intro === 'wake') {
+      this.cradle = this.add.image(b.cradle.x, b.cradle.y + 6, tex('cradle', p.id), 1).setOrigin(0.5, 1).setDepth(DEPTH.actors + b.cradle.y - 4);
+      this.lighting.add({ x: b.cradle.x, y: b.cradle.y, radius: 30, color: PALETTE[18], intensity: 0.5, flicker: 0.2 });
+    }
+    const built = !!save?.data.structures?.some((s) => s.type === 'replicator');
+    this.base = new Base(this, b.pad.x, b.pad.y, built);
 
-    // Resources and enemies
-    for (const n of m.nodes) this.nodes.push(new CrystalNode(this, n.x * 16 + 8, n.y * 16 + 10));
-    for (const e of m.enemies) this.enemies.push(new Skitter(this, ENEMIES[e.type], e.x * 16 + 8, e.y * 16 + 8));
+    // Resources (restoring chipped/broken crystals; they regrow after a while) and creatures
+    const regrowMs = BACKEND.nodeRegrowMinutes * 60_000;
+    m.nodes.forEach((n, i) => {
+      let hits = save?.data.nodes?.[i]?.hits ?? 0;
+      const at = save?.data.nodes?.[i]?.at ?? 0;
+      if (hits >= ITEMS.ember.nodeHits && Date.now() - at > regrowMs) {
+        hits = 0;
+        this.pending.nodes[i] = { hits: 0, at: Date.now() };
+      }
+      this.nodes.push(new CrystalNode(this, n.x * 16 + 8, n.y * 16 + 10, i, hits));
+    });
+    for (const e of m.enemies) {
+      const def = ENEMIES[e.type];
+      const ex = e.x * 16 + 8, ey = e.y * 16 + 8;
+      if (def.kind === 'hopper') this.enemies.push(new Hopper(this, def as HopperDef, ex, ey));
+      else this.enemies.push(new Skitter(this, def as SkitterDef, ex, ey));
+    }
 
-    // Player
-    this.player = new Player(this, this.landing.x, this.landing.y + 18);
+    // Player: a returning replicant appears where it was; a new one wakes in the cradle
+    const r = session.replicant;
+    const awake = !!r?.traits.awake;
+    const saved = r && r.star_id === p.star && r.planet_index === p.planetIndex && r.pos_x != null && r.pos_y != null
+      && this.isWalkable(r.pos_x, r.pos_y) ? { x: r.pos_x, y: r.pos_y! } : null;
+    const start = saved ?? this.home;
+    this.player = new Player(this, start.x, start.y);
 
     // Physics
     this.physics.world.setBounds(0, 0, pw, ph);
     const nodeZones = this.nodes.map((n) => n.zone);
     const enemyZones = this.enemies.map((e) => e.zone);
-    this.physics.add.collider(this.player.zone, this.walls);
-    this.physics.add.collider(this.player.zone, nodeZones);
-    this.physics.add.collider(this.player.zone, vesselBody);
-    this.physics.add.collider(enemyZones, this.walls);
-    this.physics.add.collider(enemyZones, nodeZones);
-    this.physics.add.collider(enemyZones, vesselBody);
+    this.physics.add.collider(this.player.zone, [this.walls, this.solids, ...nodeZones] as Phaser.Types.Physics.Arcade.ArcadeColliderType);
+    this.physics.add.collider(enemyZones, [this.walls, this.solids, ...nodeZones] as Phaser.Types.Physics.Arcade.ArcadeColliderType);
     this.physics.add.collider(enemyZones, enemyZones);
 
     // Camera
@@ -117,21 +181,31 @@ export class PlanetScene extends Phaser.Scene {
     cam.setBounds(0, 0, pw, ph);
     cam.setRoundPixels(true);
     cam.startFollow(this.player.zone, true, 0.1, 0.1, 0, 8);
-    cam.centerOn(this.landing.x, this.landing.y);
+    cam.centerOn(start.x, start.y);
 
     makeVignette(this, width, height);
     this.add.image(0, 0, 'vignette').setOrigin(0).setScrollFactor(0).setDepth(DEPTH.vignette);
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off('restart'));
     this.game.events.emit('embers', this.embers);
+    this.setupSaving();
 
     if (this.shot) {
       this.player.locked = false;
       this.stageForScreenshot();
-    } else {
+    } else if (p.intro === 'wake' && !awake) {
+      this.playWake();
+    } else if (p.intro === 'land' && !saved) {
       this.playLanding(vesselShadow, vesselLight, vesselGlow);
+    } else {
+      this.playReturn();
     }
     (window as unknown as { __scene: PlanetScene }).__scene = this;
+  }
+
+  addSolid(x: number, y: number, w: number, h: number) {
+    const z = this.add.zone(x, y, w, h);
+    this.solids.add(z);
+    return z;
   }
 
   /** 1px rims on the sides of rock and ruins so outcrops read as raised shapes, not flat blocks. */
@@ -154,6 +228,63 @@ export class PlanetScene extends Phaser.Scene {
     }
   }
 
+  // --- intros ---
+
+  /** Earth, first time: the cradle glows, opens, and the replicant boots up (visor flickers on). */
+  private playWake() {
+    const pl = this.player;
+    const c = this.cradle!;
+    c.setFrame(0);
+    pl.locked = true;
+    pl.sprite.setVisible(false);
+    pl.light.intensity = 0;
+    this.cameras.main.fadeIn(1400, 24, 20, 37);
+    const lid = this.lighting.add({ x: c.x, y: c.y - 8, radius: 40, color: PALETTE[18], intensity: 0 });
+    this.tweens.add({ targets: lid, intensity: 1, duration: 900, yoyo: true, hold: 500, delay: 600 });
+    this.time.delayedCall(1700, () => {
+      c.setFrame(1);
+      this.fx.sparks(c.x, c.y - 8, PALETTE[18], 12);
+      this.shake(120, 0.004);
+      pl.setPosition(c.x, c.y - 2);
+      pl.sprite.setVisible(true).setTint(0x404060);
+      // visor flickers on: dark, flash, dark, on
+      const steps = [[0, 0.15], [140, 0], [260, 0.6], [360, 0.2], [520, 1]];
+      for (const [t, v] of steps) this.time.delayedCall(t, () => { pl.light.intensity = v; if (v > 0.5) pl.sprite.clearTint(); });
+    });
+    this.time.delayedCall(2500, () => {
+      const hop = { t: 0 };
+      const sx = c.x, sy = c.y - 2, ex = this.home.x, ey = this.home.y;
+      this.tweens.add({
+        targets: hop, t: 1, duration: 360,
+        onUpdate: () => { pl.setPosition(sx + (ex - sx) * hop.t, sy + (ey - sy) * hop.t); pl.sprite.y -= Math.sin(hop.t * Math.PI) * 10; },
+        onComplete: () => {
+          pl.setPosition(ex, ey);
+          squash(this, pl.sprite, 1.35, 0.7, 120);
+          this.fx.dust(ex, ey + 2, 6);
+          pl.locked = false;
+          this.markAwake();
+          this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
+        },
+      });
+    });
+  }
+
+  /** Returning replicant: fades in where it was standing. */
+  private playReturn() {
+    const pl = this.player;
+    pl.locked = true;
+    this.cameras.main.fadeIn(700, 24, 20, 37);
+    pl.sprite.setAlpha(0);
+    this.tweens.add({ targets: pl.sprite, alpha: 1, duration: 500, delay: 250 });
+    this.time.delayedCall(450, () => {
+      squash(this, pl.sprite, 0.7, 1.3, 140);
+      this.fx.sparks(pl.x, pl.y - 8, PALETTE[10], 8);
+      pl.locked = false;
+      this.markAwake();
+      this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
+    });
+  }
+
   /** Vessel descends, thumps down, the replicant hops out, title card. */
   private playLanding(shadow: Phaser.GameObjects.Image, light: { intensity: number }, glow: Phaser.GameObjects.Image) {
     const ly = this.vessel.y;
@@ -161,6 +292,7 @@ export class PlanetScene extends Phaser.Scene {
     shadow.setScale(0.6, 0.5).setAlpha(0.1);
     this.player.sprite.setVisible(false);
     this.player.locked = true;
+    this.cameras.main.centerOn(this.vessel.x, ly);
     light.intensity = 0.5;
     glow.setAlpha(0.1);
     const thrust = this.add.particles(0, 0, 'px', {
@@ -198,7 +330,7 @@ export class PlanetScene extends Phaser.Scene {
 
   private hopOut() {
     const pl = this.player;
-    const sx = this.landing.x, sy = this.landing.y - 2, ex = this.landing.x, ey = this.landing.y + 18;
+    const sx = this.vessel.x, sy = this.vessel.y - 6, ex = this.vessel.x, ey = this.vessel.y + 14;
     pl.sprite.setVisible(true);
     const hop = { t: 0 };
     this.tweens.add({
@@ -212,31 +344,39 @@ export class PlanetScene extends Phaser.Scene {
         squash(this, pl.sprite, 1.35, 0.7, 120);
         this.fx.dust(ex, ey + 2, 6);
         pl.locked = false;
+        this.markAwake();
         this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
       },
     });
   }
 
-  /** Deterministic pose for screenshots: player next to a crystal, a skitter closing in, shards around. */
+  /** Deterministic pose for screenshots: player next to a crystal, a creature nearby, shards around. */
   private stageForScreenshot() {
+    const c = this.map.base.center;
     const node = this.nodes.slice().sort((a, b) =>
-      Phaser.Math.Distance.Between(a.x, a.y, this.landing.x, this.landing.y) - Phaser.Math.Distance.Between(b.x, b.y, this.landing.x, this.landing.y))[0];
+      Phaser.Math.Distance.Between(a.x, a.y, c.x, c.y) - Phaser.Math.Distance.Between(b.x, b.y, c.x, c.y))[0];
     let px = node.x - 30, py = node.y + 6;
     for (const [ox, oy] of [[-30, 6], [30, 6], [0, 26], [-26, 20], [26, 20], [0, -20]]) {
       if (this.isWalkable(node.x + ox, node.y + oy) && this.isWalkable(node.x + ox * 2.2, node.y + oy)) { px = node.x + ox; py = node.y + oy; break; }
     }
+    const view = new URLSearchParams(location.search).get('view');
+    if (view === 'base') { px = c.x + 20; py = c.y + 30; }
     this.player.setPosition(px, py);
     this.player.facing = 1;
-    const e = this.enemies[0];
-    e.body.reset(px + (px < node.x ? -40 : 40), py + 8);
-    e.sync();
+    this.enemies.forEach((e, i) => {
+      if (i > 1) return;
+      e.body.reset(px + (i ? 46 : -40), py + (i ? -14 : 8));
+      e.sync();
+    });
     this.cameras.main.centerOn(px, py);
     for (let i = 0; i < 3; i++) this.spawnShard(node.x - 12, node.y + 2);
-    this.embers = 12;
+    this.embers = Math.max(this.embers, view === 'base' ? STRUCTURES.replicator.cost : 12);
+    this.game.events.emit('embers', this.embers, true);
     this.frozen = true;
   }
 
   update(time: number, dt: number) {
+    if (!this.player) return; // still loading the save
     dt = Math.min(dt, 50);
     const input = this.controls.read();
     if (!this.stopped) {
@@ -245,8 +385,68 @@ export class PlanetScene extends Phaser.Scene {
       for (const s of this.shards) s.update(time, dt);
       this.shards = this.shards.filter((s) => !s.collected);
     }
+    this.base.update(time, this.embers);
     this.lighting.update(dt);
     this.atmosphere.update(dt);
+    if (time - this.lastSaveAt > SAVE_EVERY_MS) { this.lastSaveAt = time; void this.flushPlanet(); }
+    if (time - this.lastPosSaveAt > POS_SAVE_EVERY_MS) { this.lastPosSaveAt = time; void this.saveReplicant(); }
+  }
+
+  // --- saving ---
+
+  private setupSaving() {
+    const flushAll = () => { void this.flushPlanet(); void this.saveReplicant(); };
+    const onHide = () => { if (document.visibilityState === 'hidden') flushAll(); };
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', flushAll);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', flushAll);
+    });
+  }
+
+  private markAwake() {
+    const r = session.replicant;
+    if (!r || r.traits.awake) return;
+    r.traits.awake = true;
+    void this.saveReplicant();
+  }
+
+  private async saveReplicant() {
+    const r = session.replicant, st = session.store;
+    if (!r || !st || this.shot || !this.player.alive || this.player.locked) return;
+    r.star_id = this.planet.star;
+    r.planet_index = this.planet.planetIndex;
+    r.pos_x = Math.round(this.player.x);
+    r.pos_y = Math.round(this.player.y);
+    try { await st.saveReplicant(r); } catch (e) { console.warn('replicant save failed', e); }
+  }
+
+  /** Send queued ember / node / structure changes. Server value wins so family members share one pool. */
+  private async flushPlanet() {
+    const st = session.store;
+    if (!st || this.shot || this.saving) return;
+    const p = this.pending;
+    if (!p.embers && !Object.keys(p.nodes).length && !p.structures) return;
+    this.pending = { embers: 0, nodes: {} };
+    this.saving = true;
+    try {
+      const data: PlanetData = { nodes: p.nodes };
+      if (p.structures) data.structures = p.structures;
+      const row = await st.applyPlanetDelta(this.planet.star, this.planet.planetIndex, p.embers, data);
+      if (row) {
+        this.embers = row.embers + this.pending.embers;
+        session.planet = row;
+        this.game.events.emit('embers', this.embers, true);
+      }
+    } catch (e) {
+      console.warn('planet save failed, will retry', e);
+      this.pending.embers += p.embers;
+      this.pending.nodes = { ...p.nodes, ...this.pending.nodes };
+      this.pending.structures ??= p.structures;
+    } finally {
+      this.saving = false;
+    }
   }
 
   // --- services used by entities ---
@@ -271,7 +471,7 @@ export class PlanetScene extends Phaser.Scene {
     let best: { x: number; y: number } | null = null;
     let bd = range;
     for (const e of this.enemies) {
-      if (!e.alive) continue;
+      if (!e.alive || e.hittable === false) continue;
       const d = Math.hypot(e.x - x, e.y - y);
       if (d < bd) { bd = d; best = e; }
     }
@@ -283,10 +483,28 @@ export class PlanetScene extends Phaser.Scene {
     return best;
   }
 
+  /** The action button does something other than attack here (build). Returns true if it did. */
+  tryInteract(): boolean {
+    if (!this.base.playerOnPad() || !this.base.canBuild(this.embers)) return false;
+    const cost = STRUCTURES.replicator.cost;
+    this.embers -= cost;
+    this.pending.embers -= cost;
+    this.game.events.emit('embers', this.embers);
+    this.player.locked = true;
+    this.player.body.setVelocity(0, 0);
+    this.base.build(this.player.x, this.player.y, () => {
+      this.player.locked = false;
+      this.pending.structures = [...(session.planet?.data.structures ?? []).filter((s) => s.type !== 'replicator'),
+        { type: 'replicator', x: this.base.x, y: this.base.y, at: Date.now() }];
+      void this.flushPlanet();
+    });
+    return true;
+  }
+
   resolveAttack(hx: number, hy: number, radius: number, aim: Phaser.Math.Vector2) {
     let hit = false;
     for (const e of this.enemies) {
-      if (!e.alive || Math.hypot(e.x - hx, e.y - 3 - hy) > radius + 5) continue;
+      if (!e.alive || e.hittable === false || Math.hypot(e.x - hx, e.y - 3 - hy) > radius + 5) continue;
       const dir = new Phaser.Math.Vector2(e.x - this.player.x, e.y - this.player.y).normalize();
       e.hit(PLAYER.attack.damage, dir.lengthSq() ? dir : aim, PLAYER.attack.knockback);
       hit = true;
@@ -302,14 +520,19 @@ export class PlanetScene extends Phaser.Scene {
     }
   }
 
+  onNodeHit(n: CrystalNode) {
+    this.pending.nodes[n.index] = { hits: n.hits, at: Date.now() };
+  }
+
   spawnShard(x: number, y: number, dir?: Phaser.Math.Vector2) {
     this.shards.push(new Shard(this, x, y, dir));
   }
 
   collectShard(x: number, y: number) {
     this.embers++;
+    this.pending.embers++;
     this.fx.sparks(x, y - 4, PALETTE[10], 5);
-    this.fx.floatIcon(this.player.x, this.player.y - 18, 'shard');
+    this.fx.floatIcon(this.player.x, this.player.y - 22, 'shard');
     this.game.events.emit('embers', this.embers);
   }
 
@@ -317,8 +540,8 @@ export class PlanetScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.fadeOut(300, 24, 20, 37);
     cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.player.respawn(this.landing.x, this.landing.y + 18);
-      cam.centerOn(this.landing.x, this.landing.y);
+      this.player.respawn(this.home.x, this.home.y);
+      cam.centerOn(this.home.x, this.home.y);
       cam.fadeIn(500, 24, 20, 37);
     });
   }

@@ -49,13 +49,6 @@ export class BootScene extends Phaser.Scene {
     makeLightTexture(this);
     makeGlowTexture(this);
 
-    const params = new URLSearchParams(location.search);
-    const seed = params.get('seed');
-    this.scene.start('planet', {
-      planetId: params.get('planet') ?? undefined,
-      seed: seed ? Number(seed) : undefined,
-      shot: params.has('shot'),
-    });
-    this.scene.launch('ui');
+    this.scene.start('home');
   }
 }
