@@ -1,0 +1,22 @@
+{
+  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures.",
+  "planets": [
+    {
+      "id": "solace",
+      "name": "SOLACE",
+      "subtitle": "FIRST LANDING",
+      "seed": 7741,
+      "accent": [27, 28, 29],
+      "ambient": "6a5f94",
+      "sky": ["181425", "262b44", "68386c"],
+      "size": [96, 72],
+      "islandRadius": 0.86,
+      "rockThreshold": 0.6,
+      "ruins": 3,
+      "resourceNodes": 16,
+      "enemies": { "skitter": 9 },
+      "decorDensity": 0.07,
+      "sporeRate": 3
+    }
+  ]
+}

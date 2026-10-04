@@ -1,0 +1,201 @@
+// Seeded planet surface: a floating island of floor and rock, a few ruins, resource nodes and enemy spawns.
+import type { PlanetDef } from '../core/data';
+import { fbm, mulberry32, randInt, type Rng } from '../core/rng';
+
+export const enum Cell { Void = 0, Floor = 1, Rock = 2, Ruin = 3 }
+
+// Frame indexes in tools/sprites/tiles.json
+export const TILE = {
+  empty: 0, floor: [1, 2], pebble: 3, moss: [4, 17], shadow: 5, crack: 6,
+  rockTop: [7, 16, 18], rockRim: 8, rockFace: 9, rockVein: 10,
+  cliff: 11, cliffFade: 12, ruinTop: 13, ruinFace: 14, ruinFloor: 15,
+} as const;
+export const COLLIDE_TILES = [0, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18];
+
+// Frame indexes in tools/sprites/decor.json
+export const DECOR = { tuft: 0, tuftSmall: 1, mushroom: 2, pebbles: 3, pillar: 4, machine: 5, door: 6, pod: 7 } as const;
+
+export interface Point { x: number; y: number }
+export interface PlanetMap {
+  w: number;
+  h: number;
+  cells: Uint8Array;
+  ground: number[][];
+  walls: number[][];
+  spawn: Point;               // tile coords of the landing site
+  nodes: Point[];             // tile coords
+  enemies: { type: string; x: number; y: number }[];
+  decor: { frame: number; x: number; y: number }[]; // pixel coords (feet)
+  glows: { x: number; y: number; kind: 'door' | 'mushroom' | 'machine' }[];
+}
+
+export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
+  const [w, h] = def.size;
+  const r = mulberry32(seed);
+  const cells = new Uint8Array(w * h);
+  const ruinFloor = new Uint8Array(w * h);
+  const idx = (x: number, y: number) => y * w + x;
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? Cell.Void : cells[idx(x, y)]);
+  const cx = Math.floor(w / 2), cy = Math.floor(h / 2);
+
+  // 1. Island silhouette
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const nx = (x - cx) / (w / 2), ny = (y - cy) / (h / 2);
+    const d = Math.hypot(nx, ny) + (fbm(x * 0.07, y * 0.07, seed) - 0.5) * 0.55;
+    const border = x < 3 || y < 3 || x >= w - 3 || y >= h - 4;
+    cells[idx(x, y)] = !border && d < def.islandRadius ? Cell.Floor : Cell.Void;
+  }
+
+  // 2. Rock outcrops, smoothed with a couple of cellular automaton passes
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (at(x, y) === Cell.Floor && fbm(x * 0.11, y * 0.11, seed + 77) > def.rockThreshold) cells[idx(x, y)] = Cell.Rock;
+  }
+  for (let pass = 0; pass < 2; pass++) {
+    const next = cells.slice();
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      if (at(x, y) === Cell.Void) continue;
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && at(x + dx, y + dy) === Cell.Rock) n++;
+      if (n >= 5) next[idx(x, y)] = Cell.Rock;
+      else if (n <= 2) next[idx(x, y)] = Cell.Floor;
+    }
+    cells.set(next);
+  }
+
+  // 3. Clear the landing site
+  for (let y = cy - 6; y <= cy + 6; y++) for (let x = cx - 7; x <= cx + 7; x++) {
+    if (Math.hypot((x - cx) / 7, (y - cy) / 6) <= 1) cells[idx(x, y)] = Cell.Floor;
+  }
+
+  // 4. Ruins: broken rectangular rooms with a doorway at the bottom and a glowing door on the back wall
+  const ruinRects: { x: number; y: number; w: number; h: number }[] = [];
+  const decor: PlanetMap['decor'] = [];
+  const glows: PlanetMap['glows'] = [];
+  for (let attempt = 0; attempt < 200 && ruinRects.length < def.ruins; attempt++) {
+    const rw = randInt(r, 7, 10), rh = randInt(r, 5, 7);
+    const rx = randInt(r, 4, w - rw - 5), ry = randInt(r, 4, h - rh - 6);
+    if (Math.hypot(rx + rw / 2 - cx, ry + rh / 2 - cy) < 16) continue;
+    let ok = true;
+    for (let y = ry - 2; y < ry + rh + 3 && ok; y++) for (let x = rx - 2; x < rx + rw + 2; x++) if (at(x, y) === Cell.Void) { ok = false; break; }
+    if (!ok || ruinRects.some((o) => rx < o.x + o.w + 4 && rx + rw + 4 > o.x && ry < o.y + o.h + 4 && ry + rh + 4 > o.y)) continue;
+    ruinRects.push({ x: rx, y: ry, w: rw, h: rh });
+    const doorX = rx + Math.floor(rw / 2);
+    for (let y = ry - 1; y <= ry + rh + 1; y++) for (let x = rx - 1; x <= rx + rw; x++) cells[idx(x, y)] = Cell.Floor;
+    for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) {
+      const edge = x === rx || x === rx + rw - 1 || y === ry || y === ry + rh - 1;
+      const topWall = y === ry || y === ry + 1;
+      if (y === ry + 1) { // back wall is two tiles tall so it reads as a wall face
+        if (x !== rx && x !== rx + rw - 1) { cells[idx(x, y)] = Cell.Ruin; continue; }
+      }
+      if (edge || topWall) {
+        const gap = (y === ry + rh - 1 && Math.abs(x - doorX) <= 1) || (!topWall && r() < 0.28);
+        cells[idx(x, y)] = gap ? Cell.Floor : Cell.Ruin;
+        if (gap) ruinFloor[idx(x, y)] = 1;
+      } else {
+        ruinFloor[idx(x, y)] = 1;
+      }
+    }
+    // glowing sealed door on the back wall, plus props
+    decor.push({ frame: DECOR.door, x: doorX * 16 + 8, y: (ry + 2) * 16 + 1 });
+    glows.push({ x: doorX * 16 + 8, y: (ry + 2) * 16 - 6, kind: 'door' });
+    if (r() < 0.8) {
+      const mx = rx + 1 + Math.floor(r() * 2), my = ry + rh - 2;
+      decor.push({ frame: DECOR.machine, x: mx * 16 + 8, y: my * 16 + 15 });
+      glows.push({ x: mx * 16 + 6, y: my * 16 + 9, kind: 'machine' });
+    }
+    decor.push({ frame: DECOR.pillar, x: (rx + rw - 2) * 16 + 8, y: (ry + rh - 2) * 16 + 15 });
+  }
+
+  // 5. Keep only floor reachable from the landing site
+  const seen = new Uint8Array(w * h);
+  const stack = [idx(cx, cy)];
+  seen[idx(cx, cy)] = 1;
+  while (stack.length) {
+    const i = stack.pop()!;
+    const x = i % w, y = (i / w) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (at(nx, ny) !== Cell.Floor || seen[idx(nx, ny)]) continue;
+      seen[idx(nx, ny)] = 1;
+      stack.push(idx(nx, ny));
+    }
+  }
+  for (let i = 0; i < cells.length; i++) if (cells[i] === Cell.Floor && !seen[i]) cells[i] = Cell.Rock;
+
+  // 6. Tile frames
+  const solid = (c: Cell) => c === Cell.Rock || c === Cell.Ruin;
+  const ground: number[][] = [];
+  const walls: number[][] = [];
+  for (let y = 0; y < h; y++) {
+    const g: number[] = [], wl: number[] = [];
+    for (let x = 0; x < w; x++) {
+      const c = at(x, y), above = at(x, y - 1), above2 = at(x, y - 2), below = at(x, y + 1);
+      if (c === Cell.Void) {
+        g.push(-1);
+        wl.push(above !== Cell.Void ? TILE.cliff : above2 !== Cell.Void ? TILE.cliffFade : TILE.empty);
+        continue;
+      }
+      // ground under everything that is not void
+      let gt: number = TILE.floor[r() < 0.5 ? 0 : 1];
+      const moss = fbm(x * 0.15, y * 0.15, seed + 404);
+      if (ruinFloor[idx(x, y)]) gt = TILE.ruinFloor;
+      else if (moss > 0.6 && r() < (moss - 0.6) * 4) gt = TILE.moss[r() < 0.5 ? 0 : 1];
+      else if (r() < 0.05) gt = TILE.pebble;
+      else if (r() < 0.04) gt = TILE.crack;
+      if (c === Cell.Floor && solid(above)) gt = TILE.shadow;
+      g.push(gt);
+      if (c === Cell.Rock) {
+        if (below !== Cell.Rock) wl.push(r() < 0.18 ? TILE.rockVein : TILE.rockFace);
+        else wl.push(above !== Cell.Rock ? TILE.rockRim : TILE.rockTop[Math.floor(r() * 3)]);
+      } else if (c === Cell.Ruin) {
+        wl.push(solid(below) ? TILE.ruinTop : TILE.ruinFace);
+      } else wl.push(-1);
+    }
+    ground.push(g);
+    walls.push(wl);
+  }
+
+  // 7. Placement helpers
+  const isOpen = (x: number, y: number) => at(x, y) === Cell.Floor && !solid(at(x, y - 1));
+  const taken: Point[] = [];
+  const farFrom = (x: number, y: number, list: Point[], d: number) => list.every((p) => Math.hypot(p.x - x, p.y - y) >= d);
+  const scatter = (count: number, minCenter: number, spacing: number, score: (x: number, y: number) => boolean, rr: Rng) => {
+    const out: Point[] = [];
+    for (let attempt = 0; attempt < count * 80 && out.length < count; attempt++) {
+      const x = randInt(rr, 2, w - 3), y = randInt(rr, 2, h - 3);
+      if (!isOpen(x, y) || Math.hypot(x - cx, y - cy) < minCenter) continue;
+      if (ruinFloor[idx(x, y)] || !score(x, y) || !farFrom(x, y, out, spacing) || !farFrom(x, y, taken, 2)) continue;
+      out.push({ x, y });
+    }
+    taken.push(...out);
+    return out;
+  };
+
+  const nearRock = (x: number, y: number) => {
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (solid(at(x + dx, y + dy))) return true;
+    return false;
+  };
+  const nodes = scatter(Math.ceil(def.resourceNodes * 0.7), 6, 6, nearRock, r);
+  nodes.push(...scatter(def.resourceNodes - nodes.length, 6, 6, () => true, r));
+
+  const enemies: PlanetMap['enemies'] = [];
+  for (const [type, count] of Object.entries(def.enemies)) {
+    for (const p of scatter(count, 13, 7, () => true, r)) enemies.push({ type, ...p });
+  }
+
+  // 8. Decor: tufts and pebbles everywhere, mushrooms and spore pods on moss
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    if (!isOpen(x, y) || Math.hypot(x - cx, y - cy) < 3.5 || ruinFloor[idx(x, y)]) continue;
+    if (taken.some((p) => p.x === x && p.y === y)) continue;
+    if (r() > def.decorDensity) continue;
+    const onMoss = ground[y][x] === TILE.moss[0] || ground[y][x] === TILE.moss[1];
+    const roll = r();
+    let frame: number = roll < 0.45 ? DECOR.tuft : roll < 0.75 ? DECOR.tuftSmall : DECOR.pebbles;
+    if (onMoss && r() < 0.45) frame = r() < 0.6 ? DECOR.mushroom : DECOR.pod;
+    const px = x * 16 + randInt(r, 3, 13), py = y * 16 + randInt(r, 8, 15);
+    decor.push({ frame, x: px, y: py });
+    if (frame === DECOR.mushroom) glows.push({ x: px, y: py - 7, kind: 'mushroom' });
+  }
+
+  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, enemies, decor, glows };
+}
