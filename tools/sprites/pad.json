@@ -1,0 +1,76 @@
+{
+  "size": [32, 16],
+  "tinted": false,
+  "legend": {
+    ".": null,
+    "H": 21,
+    "R": 22,
+    "r": 23,
+    "O": 9,
+    "Y": 10,
+    "W": 11
+  },
+  "animations": {
+    "ready": {
+      "fps": 4,
+      "frames": [1, 2],
+      "repeat": -1
+    }
+  },
+  "frames": [
+    [
+      "................................",
+      "................................",
+      "................................",
+      "..........rrrrrHrrrrrr..........",
+      "......rrrRRRRrrrrrrRRRRrrr......",
+      "....rrRRrrrrrrrrrrrrrrrrRRrr....",
+      "...rrRRrrrrrrrrrrrrrrrrrrRRrr...",
+      "..rrRHrrrrrrrrrrrrrrrrrrrrHRrr..",
+      "..rrRRrrrrrrrrrrrrrrrrrrrrRRrr..",
+      "...rrRRrrrrrrrrrrrrrrrrrrRRrr...",
+      "....rrRRrrrrrrrrrrrrrrrrRRrr....",
+      "......rrrRRRRrrrrrrRRRRrrr......",
+      "..........rrrrrrHrrrrr..........",
+      "................................",
+      "................................",
+      "................................"
+    ],
+    [
+      "................................",
+      "................................",
+      "................................",
+      "..........OOOOOYOOOOOO..........",
+      "......OOORRRRrrrrrrRRRROOO......",
+      "....OORRrOrrrrrrrrrrrrOrRROO....",
+      "...OORRrrOrrrrrrrrrrrrOrrRROO...",
+      "..OORYrrrOrrrrrrrrrrrrOrrrYROO..",
+      "..OORRrrrOrrrrrrrrrrrrOrrrRROO..",
+      "...OORRrrOrrrrrrrrrrrrOrrRROO...",
+      "....OORRrOrrrrrrrrrrrrOrRROO....",
+      "......OOORRRRrrrrrrRRRROOO......",
+      "..........OOOOOOYOOOOO..........",
+      "................................",
+      "................................",
+      "................................"
+    ],
+    [
+      "................................",
+      "................................",
+      "................................",
+      "..........OOOOOWOOOOOO..........",
+      "......OOORRRRrrrrrrRRRROOO......",
+      "....OORRrOrrrrrrrrrrrrOrRROO....",
+      "...OORRrrOrrrrrrrrrrrrOrrRROO...",
+      "..OORWrrrOrrrrrrrrrrrrOrrrWROO..",
+      "..OORRrrrOrrrrrrrrrrrrOrrrRROO..",
+      "...OORRrrOrrrrrrrrrrrrOrrRROO...",
+      "....OORRrOrrrrrrrrrrrrOrRROO....",
+      "......OOORRRRrrrrrrRRRROOO......",
+      "..........OOOOOOWOOOOO..........",
+      "................................",
+      "................................",
+      "................................"
+    ]
+  ]
+}

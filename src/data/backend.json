@@ -1,0 +1,6 @@
+{
+  "_doc": "Supabase project for the family galaxy. The publishable key is safe in client code; row level security protects the data.",
+  "url": "https://vgoijybibhopfichyirj.supabase.co",
+  "publishableKey": "sb_publishable_q_EX2q8gQRj-SretxScDMw_uLweOQHY",
+  "nodeRegrowMinutes": 30
+}

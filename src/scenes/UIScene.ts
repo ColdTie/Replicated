@@ -1,6 +1,7 @@
 // Screen-space layer: ember counter, landing title card, and touch controls.
 import Phaser from 'phaser';
 import { PALETTE } from '../core/data';
+import { isKid } from '../core/session';
 import { touch } from '../input/Controls';
 
 const STICK_RADIUS = 26;
@@ -25,6 +26,8 @@ export class UIScene extends Phaser.Scene {
     const icon = this.add.image(0, 0, 'shard').setOrigin(0, 0);
     this.counterText = this.add.bitmapText(15, 5, 'pixel', '0');
     this.counter = this.add.container(6, 4, [icon, this.counterText]).setAlpha(0.35);
+    // Kid mode: no numbers on screen; collected embers still float up and fill the shared base
+    this.counter.setVisible(!isKid());
 
     this.game.events.on('embers', this.onEmbers, this);
     this.counterText.setText(String((this.scene.get('planet') as unknown as { embers: number }).embers ?? 0));
@@ -93,8 +96,9 @@ export class UIScene extends Phaser.Scene {
     this.input.on('pointerupoutside', release);
   }
 
-  private onEmbers(n: number) {
+  private onEmbers(n: number, quiet = false) {
     this.counterText.setText(String(n));
+    if (quiet) return;
     this.counter.setAlpha(1);
     this.tweens.add({ targets: this.counter, scale: { from: 1.25, to: 1 }, duration: 160, ease: 'Back.easeOut' });
     this.counterFade?.remove();

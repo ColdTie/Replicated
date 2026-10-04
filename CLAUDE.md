@@ -54,8 +54,8 @@ No final art yet. Generate placeholder sprites with a Node script that writes pi
 ## Phase plan
 
 - **Phase 0, vertical slice** (do this first, nothing else): one planet, one player, movement, one enemy, one resource, the lighting and particle look from the brief, touch controls, deployed to GitHub Pages and confirmed on the iPad. It should already feel polished. Take a screenshot (headless Chromium via Playwright) and save it to `screenshots/` after each milestone so Steve can review the look in chat.
-- **Phase 1:** full loop steps 1 to 3 plus Supabase profiles and saves.
-- **Phase 2:** steps 4 and 5.
+- **Phase 1:** full loop steps 1 to 3 plus Supabase profiles and saves. Start on Earth (hand-tuned, peaceful and overgrown) instead of a random planet. Design the Supabase schema for the shared galaxy from day one (see Long-term decisions), even though travel comes in Phase 2.
+- **Phase 2:** steps 4 and 5. Travel uses real-world time; the star map shows real nearby stars.
 - **Phase 3:** step 6, kid mode polish, sound, family playtest fixes.
 
 ## Out of scope
@@ -69,6 +69,16 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 - Ask before adding any dependency beyond Phaser, Vite, TypeScript, supabase js, pngjs, and Playwright.
 - Update the Progress section below at the end of every session.
 - When something needs Steve (keys, account creation, testing on the iPad), stop and give a short numbered list.
+
+## Long-term decisions (agreed with Steve, 2026-10-04)
+
+These shape the data model now, even where the feature comes later.
+
+- **Travel runs on real-world time.** Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
+- **One shared galaxy for the family.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that the three profiles share. Store a `galaxy_id` on everything so more families could get their own galaxy later. No strangers, no public play.
+- **Earth is the start.** Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly for a 5 year old. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
+- **Messages travel at light speed until FTL comms exist.** A message between replicants in different systems arrives after a delay based on distance (scaled like travel). Building or finding the FTL comms device makes messages from that system instant.
+- **Stars are real.** The galaxy is real nearby stars (positions relative to the Sun). Each star's planets are generated from a seed derived from the star's id. Beacon systems sit at fixed, symmetrical points around the Sun, snapped to the nearest real star.
 
 ## Backlog: long-term vision (recorded 2026-10-04, not scheduled)
 
@@ -85,23 +95,37 @@ Steve's ideas for later phases. Do not build these until a phase explicitly pick
 
 ```
 tools/sprites/*.json     sprite source: palette-index grids + legend + animations (font.json = pixel font)
-tools/gen-sprites.mjs    JSON -> public/assets/gen/*.png + manifest.json (tinted sprites rendered per planet)
+tools/gen-sprites.mjs    JSON -> public/assets/gen/*.png + manifest.json
+                         "tinted": one sheet per planet (accent a0-a2, ground g0-g2 roles)
+                         "featured": one sheet per visor color in player.json featureColors (f0/f1 roles)
 tools/screenshot.mjs     build preview + headless Chromium capture -> screenshots/<name>.png
-src/data/*.json          palette, planets, player, enemies, items (all tunables live here)
-src/core/                rng/noise, typed data access, sprite manifest helpers
-src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, enemies, decor, glows
+src/data/*.json          palette, planets, player, enemies, items, structures, backend (all tunables)
+src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
+src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalStore (localStorage)
+src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, enemies, decor, glows,
+                         trees/towers + blockers, fixed base layout (vessel, cradle, build pad)
 src/fx/                  Lighting (multiply darkness RT + additive lights), Atmosphere (sky, stars, fog,
                          dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
-src/entities/            Player, Skitter (enemy), CrystalNode + Shard (Ember resource)
+src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember), Base (pad + Replicator)
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame
-src/scenes/              Boot (loads manifest, anims, font), Planet (world), UI (counter, title card, touch)
+src/ui/overlay.ts        HTML forms over the canvas (sign-in, new profile)
+src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Planet (world, saving) + UI (counter, title, touch)
+supabase/migrations/     schema applied to the "Replicated" Supabase project (keep in sync when changing the DB)
 ```
 
-Sprite legend roles: `a0/a1/a2` = planet accent (dark, mid, light), `f0/f1` = replicant feature color (visor, antenna tip). Feature color currently comes from `src/data/player.json`; drift will swap it per replicant.
+Saving: the shared Ember pool, node damage and structures live in `planet_states` and are written as atomic deltas
+(`apply_planet_delta` RPC) every 4s and when the page is hidden; the server value wins so family members share one
+pool. The replicant row stores position, planet and `traits.awake` (Earth's wake-up intro plays once per replicant).
+Every table is scoped by `galaxy_id` with row level security; `ensure_family_galaxy()` creates the galaxy on first sign-in.
+
+Sprite legend roles: `a0/a1/a2` = planet accent (dark, mid, light), `g0/g1/g2` = planet ground, `f0/f1` = replicant
+feature color (visor, antenna tip, chest core).
 
 Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`.
 
-URL params: `?seed=123` to try another planet layout, `?shot=1` skips the landing intro and stages a screenshot pose (enemies frozen).
+URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
+screenshot pose (enemies frozen; add `&view=base` for the base, `&kid` for kid mode), `?planet=solace`, `?seed=123`,
+`?model=drone`.
 
 ## Progress
 
@@ -119,8 +143,29 @@ Done:
 - Verified headless: no page errors; scripted playtest mined nodes, killed an enemy, collected shards; touch drag moved and a second finger attacked.
 - Screenshots: `screenshots/phase0-gameplay.png`, `phase0-landing.png`, `phase0-touch.png`, `sprite-sheet.png`.
 
+### Session 1b (2026-10-04): new body model, faster movement
+- Deployed to GitHub Pages (PR #1 merged; repo renamed to `Replicated`, site at coldtie.github.io/Replicated/).
+- New default body "replicant" (`tools/sprites/replicant.json`, 16x20): slim humanoid with a visor band, head fin with a glowing tip, a glowing chest core and a short red cape. The original drone (`tools/sprites/player.json`) is kept and selectable with `?model=drone`. Models are listed in `src/data/player.json`.
+- Move speed raised from 78 to 90.
+
+### Session 2 (2026-10-04): Phase 1, Earth, saves, Replicator
+- Long-term decisions recorded (real-time travel, one family galaxy, peaceful overgrown Earth, light-speed messages).
+- Supabase: schema for galaxies, members, profiles, replicants, planet states, journeys, discovered stars and messages,
+  all with RLS (verified: another family's login sees and changes nothing). Sign-in is one family login per device.
+- Home screen: title, family sign-in form, profile cards with each replicant in its visor color, add profile
+  (name, visor color, kid mode), sign out. `?local` / "play on this device" works offline.
+- Earth is the start planet: teal-green overgrown ground, trees that sway, vine-covered towers, the cradle where the
+  first replicant wakes (visor flickers on), vessel parked at the base.
+- Second enemy: Hopper (crouches, shows a landing ring, hops; only hittable on the ground).
+- Base: build pad glows when the shared pool has 25 Embers; stand on it and press action to build the Replicator.
+- Saves: Embers, crystal damage (regrows after 30 min), Replicator, replicant position and awake state.
+- Kid mode: no Ember counter, no dying (sparkle back to base).
+- Verified headless: create profiles, wake, mine 27 Embers, build, reload and resume with everything restored; no errors.
+- Screenshots: `screenshots/phase1-*.png`.
+
 Not done / next:
-- Not yet deployed or confirmed on the iPad (needs Steve: enable Pages and merge to `main`).
+- Not yet confirmed on the iPad. Cloud sign-in not yet tested by Steve (needs the family login created).
+- Phase 2: the Replicator makes a drifted copy that stays as an NPC; launch the vessel; star map of real stars;
+  real-time journeys.
 - No audio yet. Phase 0 skipped it; add in Phase 3 (or earlier), starting only after the first tap.
 - Rock outcrops still have stair-step edges (no full autotiling). Fine for placeholder art.
-- Then Phase 1: second enemy type, base area plus Replicator placement, Supabase profiles and saves.

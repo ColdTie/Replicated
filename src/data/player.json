@@ -1,9 +1,65 @@
 {
-  "speed": 78,
-  "accel": 900,
+  "_doc": "model picks the body; add ?model=drone to the URL to try another one. Models map to sprites in tools/sprites/.",
+  "model": "replicant",
+  "models": {
+    "replicant": {
+      "sprite": "replicant",
+      "headY": -9
+    },
+    "drone": {
+      "sprite": "player",
+      "headY": -6
+    }
+  },
+  "speed": 90,
+  "accel": 1000,
   "maxHp": 5,
   "invulnMs": 900,
-  "attack": { "damage": 1, "cooldownMs": 280, "reach": 14, "radius": 17, "knockback": 170 },
+  "attack": {
+    "damage": 1,
+    "cooldownMs": 280,
+    "reach": 14,
+    "radius": 17,
+    "knockback": 170
+  },
   "lightRadius": 1.0,
-  "feature": [9, 10]
+  "feature": [
+    9,
+    10
+  ],
+  "featureColors": [
+    [
+      9,
+      10
+    ],
+    [
+      17,
+      18
+    ],
+    [
+      13,
+      12
+    ],
+    [
+      27,
+      28
+    ],
+    [
+      0,
+      9
+    ],
+    [
+      10,
+      11
+    ],
+    [
+      16,
+      17
+    ],
+    [
+      7,
+      8
+    ]
+  ],
+  "_featureDoc": "feature = default visor [dark, light]; featureColors = choices offered for profiles and drift (Endesga 32 indexes)."
 }

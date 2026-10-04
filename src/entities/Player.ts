@@ -1,11 +1,21 @@
 import Phaser from 'phaser';
-import { anim } from '../core/assets';
+import { anim, featureTex } from '../core/assets';
 import { PALETTE, PLAYER } from '../core/data';
+import { isKid, session } from '../core/session';
 import type { Light } from '../fx/Lighting';
 import type { InputFrame } from '../input/Controls';
 import type { PlanetScene } from '../scenes/PlanetScene';
 
 const WARM = PALETTE[10];
+
+type ModelId = keyof typeof PLAYER.models;
+
+/** Body model from ?model= in the URL, else the default in player.json. */
+function pickModel() {
+  const q = new URLSearchParams(location.search).get('model');
+  const id = (q && q in PLAYER.models ? q : PLAYER.model) as ModelId;
+  return PLAYER.models[id];
+}
 
 export class Player {
   readonly zone: Phaser.GameObjects.Zone;
@@ -14,6 +24,8 @@ export class Player {
   private shadow: Phaser.GameObjects.Image;
   private glow: Phaser.GameObjects.Image;
   readonly light: Light;
+  private key: string;
+  private headY: number;
 
   hp = PLAYER.maxHp;
   facing = 1;
@@ -31,8 +43,11 @@ export class Player {
     this.body = this.zone.body as Phaser.Physics.Arcade.Body;
     this.body.setDrag(0, 0);
     this.shadow = scene.add.image(x, y, 'shadow').setAlpha(0.45).setTint(PALETTE[25]).setDepth(50);
-    this.sprite = scene.add.sprite(x, y, 'player').setOrigin(0.5, 1);
-    this.sprite.play(anim('player', 'idle'));
+    const model = pickModel();
+    this.key = featureTex(model.sprite, session.replicant?.traits.feature ?? session.profile?.feature_color ?? PLAYER.feature[1]);
+    this.headY = model.headY;
+    this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1);
+    this.sprite.play(anim(this.key, 'idle'));
     this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.18).setScale(0.9).setDepth(6100);
     this.light = scene.lighting.add({ x, y, radius: 70, color: 0xffe2b8, intensity: 1 });
   }
@@ -67,8 +82,8 @@ export class Player {
     if (time > this.attackingUntil) {
       const key = moving ? 'walk' : 'idle';
       const cur = this.sprite.anims.currentAnim?.key;
-      if (cur !== anim('player', key) && !(cur === anim('player', 'hurt') && time < this.invulnUntil - PLAYER.invulnMs + 250)) {
-        this.sprite.play(anim('player', key), true);
+      if (cur !== anim(this.key, key) && !(cur === anim(this.key, 'hurt') && time < this.invulnUntil - PLAYER.invulnMs + 250)) {
+        this.sprite.play(anim(this.key, key), true);
       }
     }
     this.sprite.setFlipX(this.facing < 0);
@@ -81,7 +96,7 @@ export class Player {
       }
     }
 
-    if (!this.locked && input.attack && time >= this.attackReadyAt) this.attack(time);
+    if (!this.locked && input.attack && time >= this.attackReadyAt && !this.scene.tryInteract()) this.attack(time);
 
     // Health is the glow: dimmer and smaller as hp drops, flickering when low
     const frac = this.hp / PLAYER.maxHp;
@@ -104,7 +119,7 @@ export class Player {
       this.aim.set(target.x - this.x, target.y - this.y).normalize();
       if (Math.abs(this.aim.x) > 0.2) this.facing = Math.sign(this.aim.x);
     }
-    this.sprite.play(anim('player', 'attack'), true);
+    this.sprite.play(anim(this.key, 'attack'), true);
     this.body.velocity.x += this.aim.x * 60;
     this.body.velocity.y += this.aim.y * 60;
     const { reach, radius } = PLAYER.attack;
@@ -121,7 +136,7 @@ export class Player {
     this.hp = Math.max(0, this.hp - damage);
     const dir = new Phaser.Math.Vector2(this.x - fromX, this.y - fromY).normalize();
     this.body.velocity.set(dir.x * 190, dir.y * 190);
-    this.sprite.play(anim('player', 'hurt'), true);
+    this.sprite.play(anim(this.key, 'hurt'), true);
     flashWhite(this.scene, this.sprite, 90);
     squash(this.scene, this.sprite, 0.75, 1.25, 110);
     this.scene.hitStop(100);
@@ -134,6 +149,13 @@ export class Player {
     this.dead = true;
     this.body.setVelocity(0, 0);
     this.body.enable = false;
+    if (isKid()) {
+      // Kid mode never shows dying: a sparkle, then home to the base
+      this.scene.fx.sparks(this.x, this.y - 8, PALETTE[18], 14);
+      this.scene.tweens.add({ targets: this.sprite, alpha: 0, duration: 300 });
+      this.scene.time.delayedCall(450, () => this.scene.respawnPlayer());
+      return;
+    }
     this.scene.fx.sparks(this.x, this.y - 6, PALETTE[10], 18);
     this.scene.tweens.add({ targets: this.sprite, alpha: 0, scaleY: 1.6, scaleX: 0.3, duration: 450, ease: 'Quad.easeIn' });
     this.scene.tweens.add({ targets: this.light, intensity: 0, duration: 600 });
@@ -155,9 +177,9 @@ export class Player {
     const x = Math.round(this.x), y = Math.round(this.y);
     this.sprite.setPosition(x, y + 3).setDepth(100 + y);
     this.shadow.setPosition(x, y + 2);
-    this.glow.setPosition(x, y - 6);
+    this.glow.setPosition(x, y + this.headY);
     this.light.x = x;
-    this.light.y = y - 6;
+    this.light.y = y + this.headY;
   }
 }
 

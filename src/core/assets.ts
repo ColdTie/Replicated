@@ -6,6 +6,7 @@ export interface SpriteEntry {
   frames: number;
   animations: Record<string, { fps: number; frames: number[]; repeat?: number }>;
   tinted: boolean;
+  featured?: boolean;
   files: Record<string, string>;
 }
 
@@ -23,6 +24,13 @@ export const getManifest = () => manifest;
 /** Texture key for a sprite on a planet: tinted sprites have one texture per planet. */
 export function tex(name: string, planetId: string): string {
   return manifest.sprites[name]?.tinted ? `${name}.${planetId}` : name;
+}
+
+/** Texture key for a replicant body in a given feature (visor) color. */
+export function featureTex(name: string, featureLight: number): string {
+  const s = manifest.sprites[name];
+  if (!s?.featured) return name;
+  return s.files[`f${featureLight}`] ? `${name}.f${featureLight}` : `${name}.${Object.keys(s.files)[0]}`;
 }
 
 export const anim = (texKey: string, name: string) => `${texKey}:${name}`;

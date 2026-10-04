@@ -11,7 +11,27 @@
     "lungeMs": 220,
     "cooldownMs": 700,
     "contactDamage": 1,
-    "drops": { "ember": 2 },
-    "respawnMs": 25000
+    "drops": {
+      "ember": 2
+    },
+    "respawnMs": 25000,
+    "kind": "skitter"
+  },
+  "hopper": {
+    "kind": "hopper",
+    "sprite": "hopper",
+    "hp": 2,
+    "senseRange": 100,
+    "hopRange": 64,
+    "windupMs": 480,
+    "airMs": 560,
+    "restMs": 900,
+    "wanderEveryMs": 2600,
+    "contactDamage": 1,
+    "landRadius": 14,
+    "drops": {
+      "ember": 1
+    },
+    "respawnMs": 30000
   }
 }

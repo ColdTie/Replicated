@@ -4,13 +4,18 @@ import planetsJson from '../data/planets.json';
 import playerJson from '../data/player.json';
 import enemiesJson from '../data/enemies.json';
 import itemsJson from '../data/items.json';
+import structuresJson from '../data/structures.json';
+import backendJson from '../data/backend.json';
 
 export interface PlanetDef {
   id: string;
   name: string;
   subtitle: string;
+  star: string;
+  planetIndex: number;
   seed: number;
   accent: [number, number, number];
+  ground?: [number, number, number];
   ambient: string;
   sky: string[];
   size: [number, number];
@@ -21,15 +26,22 @@ export interface PlanetDef {
   enemies: Record<string, number>;
   decorDensity: number;
   sporeRate: number;
+  trees: number;
+  towers: number;
+  intro: 'wake' | 'land';
 }
 
-export type EnemyDef = (typeof enemiesJson)['skitter'];
+export type SkitterDef = (typeof enemiesJson)['skitter'];
+export type HopperDef = (typeof enemiesJson)['hopper'];
+export type EnemyDef = SkitterDef | HopperDef;
 
 export const PALETTE: number[] = paletteJson.colors.map((h) => parseInt(h, 16));
 export const PLANETS = planetsJson.planets as unknown as PlanetDef[];
 export const PLAYER = playerJson;
-export const ENEMIES = enemiesJson as Record<string, EnemyDef>;
+export const ENEMIES = enemiesJson as unknown as Record<string, EnemyDef>;
 export const ITEMS = itemsJson;
+export const STRUCTURES = structuresJson;
+export const BACKEND = backendJson;
 
 export const hex = (s: string) => parseInt(s, 16);
 export const accentColor = (p: PlanetDef, i: 0 | 1 | 2) => PALETTE[p.accent[i]];

@@ -1,0 +1,8 @@
+{
+  "_doc": "Buildable structures. cost is in Embers from the planet's shared base.",
+  "replicator": {
+    "sprite": "replicator",
+    "cost": 25,
+    "buildMs": 1400
+  }
+}

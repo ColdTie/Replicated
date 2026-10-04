@@ -1,0 +1,56 @@
+{
+  "size": [16, 16],
+  "tinted": true,
+  "legend": {
+    ".": null,
+    "o": 25,
+    "k": 24,
+    "H": 21,
+    "R": 22,
+    "r": 23,
+    "c": 18,
+    "C": 17,
+    "O": 9,
+    "Y": 10,
+    "m": "a1"
+  },
+  "animations": {},
+  "frames": [
+    [
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "...oooooooooo...",
+      "..occcccccccco..",
+      "..oCCCCCCCCCCo..",
+      ".oHHHHHmHHHHHHo.",
+      ".oRRYYYYYYYYRRo.",
+      ".oRROOOOOOOORmo.",
+      ".oRmRRRRRRRRROo.",
+      ".omRRRRRRRRRmRo.",
+      ".orrrrmrrrrrrro.",
+      "..oooooooooooo.."
+    ],
+    [
+      "................",
+      "................",
+      "................",
+      "................",
+      "...o............",
+      "..oco...........",
+      ".oco............",
+      ".oco............",
+      ".oCooooooooooo..",
+      ".oHHHHHmHHHHHHo.",
+      ".oRRkkkkkkkkRRo.",
+      ".oRRkkkkkkkkRmo.",
+      ".oRmRRRRRRRRROo.",
+      ".omRRRRRRRRRmRo.",
+      ".orrrrmrrrrrrro.",
+      "..oooooooooooo.."
+    ]
+  ]
+}
