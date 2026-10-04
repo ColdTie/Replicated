@@ -139,7 +139,7 @@ Done:
 - Feel: landing sequence (vessel descends with thrusters, thump, shake, replicant hops out with squash), title card, 6-frame walk with footstep dust, one-button attack with a generous hitbox and gentle auto-aim, white hit flash, 100ms hit pause, small shake, knockback, squash and stretch. Skitters wander, chase, telegraph (crouch with yellow eyes), and lunge.
 - Health is the player's glow: it shrinks and dims as HP drops and flickers when low. Death fades you out and respawns you at the vessel.
 - Ember resource: crystals chip as you hit them, shards pop out, bounce, get pulled toward you, and float up as an icon when collected. The counter (top left) fades when idle.
-- Touch: floating joystick on the left 45% of the screen; tap anywhere on the right for action; multitouch. Keyboard: WASD/arrows + Space/J/Enter/Z. Gamepad: left stick/d-pad + A/B/X/R1.
+- Touch: floating joystick on the left 45% of the screen; tap anywhere on the right for action; multitouch. Keyboard: WASD/arrows + Space/J/Enter/Z or left click. Gamepad: left stick/d-pad + A/B/X/R1.
 - Verified headless: no page errors; scripted playtest mined nodes, killed an enemy, collected shards; touch drag moved and a second finger attacked.
 - Screenshots: `screenshots/phase0-gameplay.png`, `phase0-landing.png`, `phase0-touch.png`, `sprite-sheet.png`.
 
@@ -162,6 +162,11 @@ Done:
 - Kid mode: no Ember counter, no dying (sparkle back to base).
 - Verified headless: create profiles, wake, mine 27 Embers, build, reload and resume with everything restored; no errors.
 - Screenshots: `screenshots/phase1-*.png`.
+
+### Session 2b (2026-10-04): playtest fixes
+- Left mouse click attacks / interacts (same as Space).
+- Health regenerates (1 hp every 2.5s after 4s without a hit; `regen` in `src/data/player.json`). The player light
+  keeps a higher floor at low health so a hurt replicant no longer fades into the darkness and looks see-through.
 
 Not done / next:
 - Not yet confirmed on the iPad. Cloud sign-in not yet tested by Steve (needs the family login created).
