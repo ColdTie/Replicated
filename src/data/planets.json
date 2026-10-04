@@ -1,22 +1,82 @@
 {
-  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures.",
+  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures. The first planet is the default start. intro: 'wake' (Earth cradle) or 'land' (vessel descends). ground = [dark, base, speckle] floor colors (default [25, 24, 23]).",
   "planets": [
+    {
+      "id": "earth",
+      "name": "EARTH",
+      "subtitle": "HOME, LONG AGO",
+      "star": "sol",
+      "planetIndex": 3,
+      "seed": 1969,
+      "accent": [
+        14,
+        13,
+        12
+      ],
+      "ambient": "8a8fb8",
+      "sky": [
+        "181425",
+        "124e89",
+        "0099db",
+        "63c74d"
+      ],
+      "size": [
+        104,
+        80
+      ],
+      "islandRadius": 0.9,
+      "rockThreshold": 0.66,
+      "ruins": 5,
+      "resourceNodes": 16,
+      "enemies": {
+        "skitter": 5,
+        "hopper": 6
+      },
+      "decorDensity": 0.11,
+      "sporeRate": 2,
+      "trees": 0.05,
+      "towers": 4,
+      "intro": "wake",
+      "ground": [
+        25,
+        15,
+        14
+      ]
+    },
     {
       "id": "solace",
       "name": "SOLACE",
       "subtitle": "FIRST LANDING",
       "seed": 7741,
-      "accent": [27, 28, 29],
+      "accent": [
+        27,
+        28,
+        29
+      ],
       "ambient": "6a5f94",
-      "sky": ["181425", "262b44", "68386c"],
-      "size": [96, 72],
+      "sky": [
+        "181425",
+        "262b44",
+        "68386c"
+      ],
+      "size": [
+        96,
+        72
+      ],
       "islandRadius": 0.86,
       "rockThreshold": 0.6,
       "ruins": 3,
       "resourceNodes": 16,
-      "enemies": { "skitter": 9 },
+      "enemies": {
+        "skitter": 9
+      },
       "decorDensity": 0.07,
-      "sporeRate": 3
+      "sporeRate": 3,
+      "star": "solace",
+      "planetIndex": 1,
+      "intro": "land",
+      "trees": 0,
+      "towers": 0
     }
   ]
 }

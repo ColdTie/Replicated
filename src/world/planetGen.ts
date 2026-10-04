@@ -27,6 +27,12 @@ export interface PlanetMap {
   enemies: { type: string; x: number; y: number }[];
   decor: { frame: number; x: number; y: number }[]; // pixel coords (feet)
   glows: { x: number; y: number; kind: 'door' | 'mushroom' | 'machine' }[];
+  /** Big y-sorted props (trees, towers) in pixel coords (feet) */
+  props: { sprite: 'tree' | 'tower'; frame: number; x: number; y: number }[];
+  /** Solid rectangles for props, pixel coords, centered */
+  blockers: { x: number; y: number; w: number; h: number }[];
+  /** Fixed base layout around the landing site, pixel coords */
+  base: { vessel: Point; cradle: Point; pad: Point; center: Point };
 }
 
 export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
@@ -183,6 +189,23 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     for (const p of scatter(count, 13, 7, () => true, r)) enemies.push({ type, ...p });
   }
 
+  // 7b. Landmarks: overgrown towers and trees
+  const props: PlanetMap['props'] = [];
+  const blockers: PlanetMap['blockers'] = [];
+  const towerSpot = (x: number, y: number) => isOpen(x + 1, y) && isOpen(x, y - 1) && isOpen(x + 1, y - 1) && isOpen(x, y - 2) && isOpen(x + 1, y - 2);
+  for (const p of scatter(def.towers ?? 0, 9, 14, towerSpot, r)) {
+    props.push({ sprite: 'tower', frame: r() < 0.5 ? 0 : 1, x: p.x * 16 + 16, y: p.y * 16 + 16 });
+    blockers.push({ x: p.x * 16 + 16, y: p.y * 16 + 11, w: 28, h: 10 });
+    taken.push({ x: p.x + 1, y: p.y }, { x: p.x, y: p.y - 1 }, { x: p.x + 1, y: p.y - 1 });
+  }
+  if (def.trees) {
+    const treeCount = Math.round(w * h * def.trees * 0.25);
+    for (const p of scatter(treeCount, 6, 3, (x, y) => isOpen(x, y - 1), r)) {
+      props.push({ sprite: 'tree', frame: r() < 0.7 ? 0 : 2, x: p.x * 16 + 8, y: p.y * 16 + 14 });
+      blockers.push({ x: p.x * 16 + 8, y: p.y * 16 + 12, w: 8, h: 5 });
+    }
+  }
+
   // 8. Decor: tufts and pebbles everywhere, mushrooms and spore pods on moss
   for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
     if (!isOpen(x, y) || Math.hypot(x - cx, y - cy) < 3.5 || ruinFloor[idx(x, y)]) continue;
@@ -197,5 +220,12 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     if (frame === DECOR.mushroom) glows.push({ x: px, y: py - 7, kind: 'mushroom' });
   }
 
-  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, enemies, decor, glows };
+  const c = { x: cx * 16 + 8, y: cy * 16 + 8 };
+  const base = {
+    center: c,
+    vessel: { x: c.x - 40, y: c.y - 6 },
+    cradle: { x: c.x, y: c.y + 22 },
+    pad: { x: c.x + 46, y: c.y + 12 },
+  };
+  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, enemies, decor, glows, props, blockers, base };
 }

@@ -15,13 +15,35 @@ export class CrystalNode {
   private light: Light;
   hits = 0;
 
-  constructor(private scene: PlanetScene, readonly x: number, readonly y: number) {
+  constructor(private scene: PlanetScene, readonly x: number, readonly y: number, readonly index: number, startHits = 0) {
     this.zone = scene.add.zone(x, y - 2, 12, 7);
     scene.physics.add.existing(this.zone, true);
     this.sprite = scene.add.sprite(x, y + 2, tex(EMBER.nodeSprite, scene.planet.id), 0).setOrigin(0.5, 1).setDepth(100 + y);
     this.glow = scene.add.image(x, y - 7, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.22).setScale(0.7).setDepth(6100);
     this.light = scene.lighting.add({ x, y: y - 6, radius: 46, color: PALETTE[9], intensity: 0.85, flicker: 0.25 });
     scene.tweens.add({ targets: this.glow, alpha: 0.12, duration: 1400 + Math.random() * 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.hits = Math.min(startHits, EMBER.nodeHits);
+    if (this.hits) this.applyStage(false);
+  }
+
+  /** Visuals for the current damage stage (used on hit and when restoring a save). */
+  private applyStage(animate: boolean) {
+    this.sprite.setFrame(Math.min(3, this.hits));
+    const left = 1 - this.hits / EMBER.nodeHits;
+    this.light.radius = 20 + 26 * left;
+    this.light.intensity = 0.4 + 0.45 * left;
+    if (this.alive) return;
+    (this.zone.body as Phaser.Physics.Arcade.StaticBody).enable = false;
+    this.scene.tweens.killTweensOf(this.glow);
+    if (!animate) {
+      this.glow.setAlpha(0);
+      this.light.intensity = 0.15;
+      this.light.radius = 16;
+      return;
+    }
+    this.scene.fx.sparks(this.x, this.y - 8, PALETTE[11], 16);
+    this.scene.tweens.add({ targets: this.glow, alpha: 0, duration: 500 });
+    this.scene.tweens.add({ targets: this.light, intensity: 0.15, radius: 16, duration: 800 });
   }
 
   get alive() { return this.hits < EMBER.nodeHits; }
@@ -34,17 +56,8 @@ export class CrystalNode {
     this.scene.fx.sparks(this.x, this.y - 8, PALETTE[10], 8);
     const drops = this.alive ? EMBER.nodeDropsPerHit : EMBER.nodeDropsOnBreak;
     for (let i = 0; i < drops; i++) this.scene.spawnShard(this.x, this.y - 4, dir);
-    this.sprite.setFrame(Math.min(3, this.hits));
-    const left = 1 - this.hits / EMBER.nodeHits;
-    this.light.radius = 20 + 26 * left;
-    this.light.intensity = 0.4 + 0.45 * left;
-    if (!this.alive) {
-      (this.zone.body as Phaser.Physics.Arcade.StaticBody).enable = false;
-      this.scene.fx.sparks(this.x, this.y - 8, PALETTE[11], 16);
-      this.scene.tweens.killTweensOf(this.glow);
-      this.scene.tweens.add({ targets: this.glow, alpha: 0, duration: 500 });
-      this.scene.tweens.add({ targets: this.light, intensity: 0.15, radius: 16, duration: 800 });
-    }
+    this.applyStage(true);
+    this.scene.onNodeHit(this);
   }
 }
 

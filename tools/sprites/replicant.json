@@ -1,6 +1,7 @@
 {
   "size": [16, 20],
   "tinted": false,
+  "featured": true,
   "legend": {
     ".": null,
     "o": 25,

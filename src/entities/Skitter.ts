@@ -1,14 +1,15 @@
 import Phaser from 'phaser';
 import { anim, tex } from '../core/assets';
-import { PALETTE, type EnemyDef } from '../core/data';
+import { PALETTE, type SkitterDef } from '../core/data';
 import type { Light } from '../fx/Lighting';
 import type { PlanetScene } from '../scenes/PlanetScene';
+import type { Enemy } from './Enemy';
 import { flashWhite, squash } from './Player';
 
 type State = 'wander' | 'chase' | 'windup' | 'lunge' | 'recover' | 'dead';
 
 /** Low crawling creature: wanders, chases, telegraphs (crouch + yellow eyes), then lunges. */
-export class Skitter {
+export class Skitter implements Enemy {
   readonly zone: Phaser.GameObjects.Zone;
   readonly body: Phaser.Physics.Arcade.Body;
   readonly sprite: Phaser.GameObjects.Sprite;
@@ -22,7 +23,7 @@ export class Skitter {
   private lungeDir = new Phaser.Math.Vector2();
   private hasHit = false;
 
-  constructor(private scene: PlanetScene, readonly def: EnemyDef, readonly homeX: number, readonly homeY: number) {
+  constructor(private scene: PlanetScene, readonly def: SkitterDef, readonly homeX: number, readonly homeY: number) {
     this.texKey = tex(def.sprite, scene.planet.id);
     this.zone = scene.add.zone(homeX, homeY, 10, 6);
     scene.physics.add.existing(this.zone);

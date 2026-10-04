@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
-import { anim } from '../core/assets';
+import { anim, featureTex } from '../core/assets';
 import { PALETTE, PLAYER } from '../core/data';
+import { isKid, session } from '../core/session';
 import type { Light } from '../fx/Lighting';
 import type { InputFrame } from '../input/Controls';
 import type { PlanetScene } from '../scenes/PlanetScene';
@@ -43,7 +44,7 @@ export class Player {
     this.body.setDrag(0, 0);
     this.shadow = scene.add.image(x, y, 'shadow').setAlpha(0.45).setTint(PALETTE[25]).setDepth(50);
     const model = pickModel();
-    this.key = model.sprite;
+    this.key = featureTex(model.sprite, session.replicant?.traits.feature ?? session.profile?.feature_color ?? PLAYER.feature[1]);
     this.headY = model.headY;
     this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1);
     this.sprite.play(anim(this.key, 'idle'));
@@ -95,7 +96,7 @@ export class Player {
       }
     }
 
-    if (!this.locked && input.attack && time >= this.attackReadyAt) this.attack(time);
+    if (!this.locked && input.attack && time >= this.attackReadyAt && !this.scene.tryInteract()) this.attack(time);
 
     // Health is the glow: dimmer and smaller as hp drops, flickering when low
     const frac = this.hp / PLAYER.maxHp;
@@ -148,6 +149,13 @@ export class Player {
     this.dead = true;
     this.body.setVelocity(0, 0);
     this.body.enable = false;
+    if (isKid()) {
+      // Kid mode never shows dying: a sparkle, then home to the base
+      this.scene.fx.sparks(this.x, this.y - 8, PALETTE[18], 14);
+      this.scene.tweens.add({ targets: this.sprite, alpha: 0, duration: 300 });
+      this.scene.time.delayedCall(450, () => this.scene.respawnPlayer());
+      return;
+    }
     this.scene.fx.sparks(this.x, this.y - 6, PALETTE[10], 18);
     this.scene.tweens.add({ targets: this.sprite, alpha: 0, scaleY: 1.6, scaleX: 0.3, duration: 450, ease: 'Quad.easeIn' });
     this.scene.tweens.add({ targets: this.light, intensity: 0, duration: 600 });

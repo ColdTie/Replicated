@@ -5,8 +5,10 @@
 //     "legend": { ".": null, "o": 25, "v": "f1", "m": "a1" },   // palette index, role name, or null
 //     "animations": { "walk": { "fps": 10, "frames": [0,1,2] } },
 //     "frames": [ ["row", "row", ...], ... ] }
-// Roles: a0/a1/a2 = planet accent (dark/mid/light), f0/f1 = replicant feature color.
+// Roles: a0/a1/a2 = planet accent (dark/mid/light), g0/g1/g2 = planet ground (dark/base/speckle),
+// f0/f1 = replicant feature color.
 // Tinted sprites are rendered once per planet as <name>.<planetId>.png.
+// Featured sprites ("featured": true) are rendered once per player.json featureColors pair as <name>.f<light>.png.
 //
 // Usage: node tools/gen-sprites.mjs [--preview]   (--preview writes screenshots/sprite-sheet.png)
 
@@ -28,13 +30,16 @@ const palette = readJson('src/data/palette.json').colors.map((hex) => [
 const planets = readJson('src/data/planets.json').planets;
 const player = readJson('src/data/player.json');
 
-function roleResolver(planet) {
+function roleResolver(planet, feature = player.feature) {
   return {
     a0: planet?.accent[0] ?? 22,
     a1: planet?.accent[1] ?? 21,
     a2: planet?.accent[2] ?? 20,
-    f0: player.feature[0],
-    f1: player.feature[1],
+    f0: feature[0],
+    f1: feature[1],
+    g0: planet?.ground?.[0] ?? 25,
+    g1: planet?.ground?.[1] ?? 24,
+    g2: planet?.ground?.[2] ?? 23,
   };
 }
 
@@ -104,6 +109,20 @@ for (const file of fs.readdirSync(spriteDir).filter((f) => f.endsWith('.json')).
     tinted: !!sprite.tinted,
     files: {},
   };
+  if (sprite.featured) {
+    // One sheet per replicant feature color (visor / antenna tip): key <name>.f<lightIndex>
+    entry.featured = true;
+    for (const feature of player.featureColors) {
+      const png = render(sprite, roleResolver(planets[0], feature), name);
+      const variant = `f${feature[1]}`;
+      const fname = `${name}.${variant}.png`;
+      fs.writeFileSync(path.join(outDir, fname), PNG.sync.write(png));
+      entry.files[variant] = fname;
+      if (feature[1] === player.feature[1]) previews.push({ name, png });
+    }
+    manifest.sprites[name] = entry;
+    continue;
+  }
   const variants = sprite.tinted ? planets : [null];
   for (const planet of variants) {
     const png = render(sprite, roleResolver(planet ?? planets[0]), name);
