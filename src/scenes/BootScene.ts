@@ -28,6 +28,20 @@ export class BootScene extends Phaser.Scene {
     for (const [name, s] of Object.entries(m.sprites)) {
       for (const variant of Object.keys(s.files)) {
         const key = variant === '*' ? name : `${name}.${variant}`;
+        if (s.featured && s.variants) {
+          // One row per visor x cape variant: anims "<name>.<variant>:<anim>" point at that row's frames
+          for (const [v, row] of Object.entries(s.variants)) {
+            for (const [a, def] of Object.entries(s.animations)) {
+              this.anims.create({
+                key: anim(`${name}.${v}`, a),
+                frames: this.anims.generateFrameNumbers(name, { frames: def.frames.map((f) => f + row * s.frames) }),
+                frameRate: def.fps,
+                repeat: def.repeat ?? -1,
+              });
+            }
+          }
+          continue;
+        }
         for (const [a, def] of Object.entries(s.animations)) {
           this.anims.create({
             key: anim(key, a),

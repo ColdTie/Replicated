@@ -61,5 +61,27 @@
       8
     ]
   ],
-  "_featureDoc": "feature = default visor [dark, light]; featureColors = choices offered for profiles and drift (Endesga 32 indexes)."
+  "_featureDoc": "feature = default visor [dark, light]; featureColors = visor choices; capeColors = cape choices; drift picks from these (Endesga 32 indexes).",
+  "capeColors": [
+    [
+      7,
+      8
+    ],
+    [
+      16,
+      17
+    ],
+    [
+      14,
+      13
+    ],
+    [
+      27,
+      28
+    ]
+  ],
+  "cape": [
+    7,
+    8
+  ]
 }

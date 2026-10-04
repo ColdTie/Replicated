@@ -8,7 +8,8 @@
 // Roles: a0/a1/a2 = planet accent (dark/mid/light), g0/g1/g2 = planet ground (dark/base/speckle),
 // f0/f1 = replicant feature color.
 // Tinted sprites are rendered once per planet as <name>.<planetId>.png.
-// Featured sprites ("featured": true) are rendered once per player.json featureColors pair as <name>.f<light>.png.
+// Featured sprites ("featured": true; replicant bodies) are rendered once per visor x cape pair from player.json
+// (featureColors x capeColors) as rows of one sheet; manifest variants map "f<visor>.c<cape>" to the row.
 //
 // Usage: node tools/gen-sprites.mjs [--preview]   (--preview writes screenshots/sprite-sheet.png)
 
@@ -30,8 +31,10 @@ const palette = readJson('src/data/palette.json').colors.map((hex) => [
 const planets = readJson('src/data/planets.json').planets;
 const player = readJson('src/data/player.json');
 
-function roleResolver(planet, feature = player.feature) {
+function roleResolver(planet, feature = player.feature, cape = player.cape) {
   return {
+    c0: cape[0],
+    c1: cape[1],
     a0: planet?.accent[0] ?? 22,
     a1: planet?.accent[1] ?? 21,
     a2: planet?.accent[2] ?? 20,
@@ -110,16 +113,19 @@ for (const file of fs.readdirSync(spriteDir).filter((f) => f.endsWith('.json')).
     files: {},
   };
   if (sprite.featured) {
-    // One sheet per replicant feature color (visor / antenna tip): key <name>.f<lightIndex>
+    // Replicant bodies: one sheet, one row per visor x cape color pair. Variant "f<visor>.c<cape>" -> row.
     entry.featured = true;
-    for (const feature of player.featureColors) {
-      const png = render(sprite, roleResolver(planets[0], feature), name);
-      const variant = `f${feature[1]}`;
-      const fname = `${name}.${variant}.png`;
-      fs.writeFileSync(path.join(outDir, fname), PNG.sync.write(png));
-      entry.files[variant] = fname;
-      if (feature[1] === player.feature[1]) previews.push({ name, png });
+    entry.variants = {};
+    const rows = [];
+    for (const feature of player.featureColors) for (const cape of player.capeColors) {
+      entry.variants[`f${feature[1]}.c${cape[1]}`] = rows.length;
+      rows.push(render(sprite, roleResolver(planets[0], feature, cape), name));
     }
+    const sheet = new PNG({ width: rows[0].width, height: rows[0].height * rows.length });
+    rows.forEach((png, i) => PNG.bitblt(png, sheet, 0, 0, png.width, png.height, 0, i * png.height));
+    fs.writeFileSync(path.join(outDir, `${name}.png`), PNG.sync.write(sheet));
+    entry.files['*'] = `${name}.png`;
+    previews.push({ name, png: rows[entry.variants[`f${player.feature[1]}.c${player.cape[1]}`]] });
     manifest.sprites[name] = entry;
     continue;
   }

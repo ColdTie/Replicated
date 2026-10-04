@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { anim, featureTex } from '../core/assets';
+import { anim, bodyVariant } from '../core/assets';
 import { PALETTE, PLAYER } from '../core/data';
 import { isKid, session } from '../core/session';
 import type { Light } from '../fx/Lighting';
@@ -44,9 +44,10 @@ export class Player {
     this.body.setDrag(0, 0);
     this.shadow = scene.add.image(x, y, 'shadow').setAlpha(0.45).setTint(PALETTE[25]).setDepth(50);
     const model = pickModel();
-    this.key = featureTex(model.sprite, session.replicant?.traits.feature ?? session.profile?.feature_color ?? PLAYER.feature[1]);
+    const t = session.replicant?.traits;
+    this.key = bodyVariant(model.sprite, t?.feature ?? session.profile?.feature_color ?? PLAYER.feature[1], t?.cape ?? PLAYER.cape[1]);
     this.headY = model.headY;
-    this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1);
+    this.sprite = scene.add.sprite(x, y, model.sprite).setOrigin(0.5, 1);
     this.sprite.play(anim(this.key, 'idle'));
     this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.18).setScale(0.9).setDepth(6100);
     this.light = scene.lighting.add({ x, y, radius: 70, color: 0xffe2b8, intensity: 1 });

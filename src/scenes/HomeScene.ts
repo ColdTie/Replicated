@@ -1,7 +1,7 @@
 // Title + "tap your face" profile picker. Signs in once per device (one family login), then lists
 // the family's profiles. ?local plays from this device's storage without signing in.
 import Phaser from 'phaser';
-import { anim, featureTex } from '../core/assets';
+import { anim, bodyVariant } from '../core/assets';
 import { PALETTE, PLAYER } from '../core/data';
 import { session } from '../core/session';
 import { makeSky, makeStars } from '../fx/textures';
@@ -132,8 +132,9 @@ export class HomeScene extends Phaser.Scene {
 
   private profileCard(x: number, y: number, p: Profile, onPick: () => void) {
     const c = this.cardFrame(x, y, PALETTE[p.feature_color] ?? PALETTE[10]);
-    const key = featureTex(PLAYER.models[PLAYER.model as keyof typeof PLAYER.models].sprite, p.feature_color);
-    const body = this.add.sprite(0, 18, key).setOrigin(0.5, 1).setScale(3);
+    const sprite = PLAYER.models[PLAYER.model as keyof typeof PLAYER.models].sprite;
+    const key = bodyVariant(sprite, p.feature_color, PLAYER.cape[1]);
+    const body = this.add.sprite(0, 18, sprite).setOrigin(0.5, 1).setScale(3);
     body.play(anim(key, 'idle'));
     const name = this.add.bitmapText(0, CARD_H / 2 - 16, 'pixel', p.name.toUpperCase().slice(0, 10)).setOrigin(0.5);
     c.add([body, name]);

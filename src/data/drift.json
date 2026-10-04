@@ -1,0 +1,12 @@
+{
+  "_doc": "Replication and drift. A copy inherits its parent's colors and stats, then each drift roll may change one thing. Colors come from player.json featureColors/capeColors.",
+  "replicateCost": 15,
+  "maxCopiesPerPlanet": 4,
+  "visorChance": 0.65,
+  "capeChance": 0.35,
+  "speed": { "chance": 0.5, "min": -0.06, "max": 0.08 },
+  "maxHp": { "chance": 0.25, "values": [-1, 1, 1] },
+  "work": { "chance": 0.6, "min": -0.2, "max": 0.35 },
+  "emberEveryMinutes": 3,
+  "cacheCap": 40
+}

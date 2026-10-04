@@ -2,7 +2,9 @@ import Phaser from 'phaser';
 import { anim, tex } from '../core/assets';
 import { BACKEND, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, hex, type HopperDef, type PlanetDef, type SkitterDef } from '../core/data';
 import { session } from '../core/session';
+import { DRIFT, accrue, makeCopy } from '../core/drift';
 import { Base } from '../entities/Base';
+import { Npc } from '../entities/Npc';
 import type { Enemy } from '../entities/Enemy';
 import { Hopper } from '../entities/Hopper';
 import { Player, squash } from '../entities/Player';
@@ -13,7 +15,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
 import { Controls } from '../input/Controls';
-import type { NodeState, PlanetData, PlanetSave } from '../net/store';
+import type { NodeState, PlanetData, PlanetSave, ReplicantSave } from '../net/store';
 import { COLLIDE_TILES, Cell, DECOR, generatePlanet, type PlanetMap } from '../world/planetGen';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
@@ -49,7 +51,12 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  private pending: { embers: number; nodes: Record<string, NodeState>; structures?: PlanetData['structures'] } = { embers: 0, nodes: {} };
+  private pending: { embers: number; nodes: Record<string, NodeState>; set: Omit<PlanetData, 'nodes'> } = { embers: 0, nodes: {}, set: {} };
+  npcs: Npc[] = [];
+  /** Embers the copies have gathered (waiting in the pile) and the wall-clock time counted up to */
+  private pileEmbers = 0;
+  private tick = 0;
+  private lastAccrueAt = 0;
   private saving = false;
   private lastSaveAt = 0;
   private lastPosSaveAt = 0;
@@ -64,24 +71,29 @@ export class PlanetScene extends Phaser.Scene {
     this.seed = data.seed;
     this.shot = !!data.shot;
     this.enemies = []; this.nodes = []; this.shards = []; this.embers = 0; this.stopped = false; this.frozen = false;
-    this.pending = { embers: 0, nodes: {} };
+    this.pending = { embers: 0, nodes: {}, set: {} };
+    this.npcs = [];
   }
 
-  async preloadSave(): Promise<PlanetSave | null> {
+  async preloadSave(): Promise<{ save: PlanetSave | null; npcs: ReplicantSave[] }> {
     const st = session.store;
-    if (!st) return null;
-    return st.loadPlanet(this.planet.star, this.planet.planetIndex, this.seed ?? this.planet.seed);
+    if (!st) return { save: null, npcs: [] };
+    const [save, npcs] = await Promise.all([
+      st.loadPlanet(this.planet.star, this.planet.planetIndex, this.seed ?? this.planet.seed),
+      st.listNpcs(this.planet.star, this.planet.planetIndex),
+    ]);
+    return { save, npcs };
   }
 
   create() {
     // Loading the planet save is async; build the world once it arrives.
     this.cameras.main.setBackgroundColor(PALETTE[25]);
     this.preloadSave()
-      .catch((e) => { console.warn('planet load failed, playing without saving', e); return null; })
-      .then((save) => this.build(save));
+      .catch((e) => { console.warn('planet load failed, playing without saving', e); return { save: null, npcs: [] }; })
+      .then(({ save, npcs }) => this.build(save, npcs));
   }
 
-  private build(save: PlanetSave | null) {
+  private build(save: PlanetSave | null, npcSaves: ReplicantSave[]) {
     session.planet = save;
     const p = this.planet;
     const { width, height } = this.scale;
@@ -175,6 +187,12 @@ export class PlanetScene extends Phaser.Scene {
     this.physics.add.collider(this.player.zone, [this.walls, this.solids, ...nodeZones] as Phaser.Types.Physics.Arcade.ArcadeColliderType);
     this.physics.add.collider(enemyZones, [this.walls, this.solids, ...nodeZones] as Phaser.Types.Physics.Arcade.ArcadeColliderType);
     this.physics.add.collider(enemyZones, enemyZones);
+
+    // Copies left at this base, and what they gathered while nobody was here
+    for (const n of npcSaves) this.addNpc(n);
+    this.pileEmbers = save?.data.cache ?? 0;
+    this.tick = save?.data.tick ?? Date.now();
+    this.accrueNow(true);
 
     // Camera
     const cam = this.cameras.main;
@@ -360,7 +378,17 @@ export class PlanetScene extends Phaser.Scene {
       if (this.isWalkable(node.x + ox, node.y + oy) && this.isWalkable(node.x + ox * 2.2, node.y + oy)) { px = node.x + ox; py = node.y + oy; break; }
     }
     const view = new URLSearchParams(location.search).get('view');
-    if (view === 'base') { px = c.x + 20; py = c.y + 30; }
+    if (view === 'base' || view === 'copies') { px = c.x + 20; py = c.y + 30; }
+    if (view === 'copies') {
+      if (!this.base.built) this.base.placeReplicator(false);
+      const parent = session.replicant!;
+      for (let i = 0; i < 3; i++) {
+        const copy = makeCopy(parent, i, this.planet.star, this.planet.planetIndex, c.x - 30 + i * 34, c.y + 44 - (i % 2) * 14);
+        this.addNpc({ ...copy, id: `shot-${i}` });
+      }
+      this.pileEmbers = 7;
+      this.base.setPile(7);
+    }
     this.player.setPosition(px, py);
     this.player.facing = 1;
     this.enemies.forEach((e, i) => {
@@ -385,7 +413,10 @@ export class PlanetScene extends Phaser.Scene {
       for (const s of this.shards) s.update(time, dt);
       this.shards = this.shards.filter((s) => !s.collected);
     }
-    this.base.update(time, this.embers);
+    for (const n of this.npcs) n.update(time);
+    this.base.update(time, this.embers, this.npcs.length);
+    if (this.base.playerAtPile() && this.pileEmbers > 0 && this.player.alive) this.collectPile();
+    if (time - this.lastAccrueAt > 20_000) { this.lastAccrueAt = time; this.accrueNow(false); }
     this.lighting.update(dt);
     this.atmosphere.update(dt);
     if (time - this.lastSaveAt > SAVE_EVERY_MS) { this.lastSaveAt = time; void this.flushPlanet(); }
@@ -427,12 +458,11 @@ export class PlanetScene extends Phaser.Scene {
     const st = session.store;
     if (!st || this.shot || this.saving) return;
     const p = this.pending;
-    if (!p.embers && !Object.keys(p.nodes).length && !p.structures) return;
-    this.pending = { embers: 0, nodes: {} };
+    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.set).length) return;
+    this.pending = { embers: 0, nodes: {}, set: {} };
     this.saving = true;
     try {
-      const data: PlanetData = { nodes: p.nodes };
-      if (p.structures) data.structures = p.structures;
+      const data: PlanetData = { ...p.set, nodes: p.nodes };
       const row = await st.applyPlanetDelta(this.planet.star, this.planet.planetIndex, p.embers, data);
       if (row) {
         this.embers = row.embers + this.pending.embers;
@@ -443,7 +473,7 @@ export class PlanetScene extends Phaser.Scene {
       console.warn('planet save failed, will retry', e);
       this.pending.embers += p.embers;
       this.pending.nodes = { ...p.nodes, ...this.pending.nodes };
-      this.pending.structures ??= p.structures;
+      this.pending.set = { ...p.set, ...this.pending.set };
     } finally {
       this.saving = false;
     }
@@ -483,8 +513,12 @@ export class PlanetScene extends Phaser.Scene {
     return best;
   }
 
-  /** The action button does something other than attack here (build). Returns true if it did. */
+  /** The action button does something other than attack here (build, replicate). Returns true if it did. */
   tryInteract(): boolean {
+    if (this.base.playerAtReplicator() && this.base.canReplicate(this.embers, this.npcs.length)) {
+      this.replicate();
+      return true;
+    }
     if (!this.base.playerOnPad() || !this.base.canBuild(this.embers)) return false;
     const cost = STRUCTURES.replicator.cost;
     this.embers -= cost;
@@ -494,11 +528,81 @@ export class PlanetScene extends Phaser.Scene {
     this.player.body.setVelocity(0, 0);
     this.base.build(this.player.x, this.player.y, () => {
       this.player.locked = false;
-      this.pending.structures = [...(session.planet?.data.structures ?? []).filter((s) => s.type !== 'replicator'),
+      this.pending.set.structures = [...(session.planet?.data.structures ?? []).filter((s) => s.type !== 'replicator'),
         { type: 'replicator', x: this.base.x, y: this.base.y, at: Date.now() }];
       void this.flushPlanet();
     });
     return true;
+  }
+
+  // --- copies ---
+
+  private addNpc(save: ReplicantSave) {
+    const b = this.map.base;
+    const homeX = (b.pad.x + b.vessel.x) / 2, homeY = b.pad.y + 10;
+    let x = save.pos_x ?? homeX, y = save.pos_y ?? homeY;
+    if (!this.isWalkable(x, y)) { x = homeX; y = homeY; }
+    const npc = new Npc(this, save, x, y, homeX, homeY);
+    this.physics.add.collider(npc.zone, [this.walls, this.solids] as Phaser.Types.Physics.Arcade.ArcadeColliderType);
+    this.npcs.push(npc);
+    return npc;
+  }
+
+  /** The Replicator makes a drifted copy of you that stays here. */
+  private replicate() {
+    const cost = DRIFT.replicateCost;
+    const parent = session.replicant;
+    this.embers -= cost;
+    this.pending.embers -= cost;
+    this.game.events.emit('embers', this.embers);
+    this.player.locked = true;
+    this.player.body.setVelocity(0, 0);
+    this.base.replicate(this.player.x, this.player.y, () => {
+      this.player.locked = false;
+      const x = this.base.x, y = this.base.y + 20;
+      const parentSave: ReplicantSave = parent ?? { id: 'local', profile_id: null, name: 'REPLICANT', model: 'replicant', traits: {}, star_id: this.planet.star, planet_index: this.planet.planetIndex, pos_x: null, pos_y: null };
+      const copy = makeCopy(parentSave, this.npcs.length, this.planet.star, this.planet.planetIndex, x, y);
+      const npc = this.addNpc({ ...copy, id: `pending-${Date.now()}` });
+      npc.sprite.setTintFill(0xffffff);
+      npc.sprite.setAlpha(0);
+      this.tweens.add({ targets: npc.sprite, alpha: 1, duration: 260 });
+      this.time.delayedCall(380, () => { npc.sprite.clearTint(); npc.hop(); });
+      this.fx.sparks(x, y - 10, PALETTE[copy.traits.feature ?? 10], 18);
+      // a fresh pile clock starts with the first copy
+      if (this.npcs.length === 1) { this.tick = Date.now(); this.pending.set.tick = this.tick; }
+      void this.flushPlanet();
+      void session.store?.createReplicant(copy)
+        .then((saved) => Object.assign(npc.save, saved))
+        .catch((e) => console.warn('copy save failed', e));
+    });
+  }
+
+  /** Count NPC work since the last tick into the pile. */
+  private accrueNow(initial: boolean) {
+    const saves = this.npcs.map((n) => n.save);
+    const before = this.pileEmbers;
+    const r = accrue(saves, this.tick, Date.now(), this.pileEmbers);
+    if (r.cache !== before || r.tick !== this.tick) {
+      this.pileEmbers = r.cache;
+      this.tick = r.tick;
+      this.pending.set.cache = this.pileEmbers;
+      this.pending.set.tick = this.tick;
+      if (!initial && r.cache > before) this.npcs.forEach((n) => n.hop());
+    }
+    this.base.setPile(this.pileEmbers);
+  }
+
+  private collectPile() {
+    const n = this.pileEmbers;
+    this.base.collectPile(this.player.x, this.player.y);
+    this.pileEmbers = 0;
+    this.pending.set.cache = 0;
+    this.pending.set.tick = this.tick;
+    this.embers += n;
+    this.pending.embers += n;
+    this.fx.floatIcon(this.player.x, this.player.y - 22, 'shard');
+    this.game.events.emit('embers', this.embers);
+    void this.flushPlanet();
   }
 
   resolveAttack(hx: number, hy: number, radius: number, aim: Phaser.Math.Vector2) {

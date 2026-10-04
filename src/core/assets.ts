@@ -7,6 +7,7 @@ export interface SpriteEntry {
   animations: Record<string, { fps: number; frames: number[]; repeat?: number }>;
   tinted: boolean;
   featured?: boolean;
+  variants?: Record<string, number>;
   files: Record<string, string>;
 }
 
@@ -26,11 +27,15 @@ export function tex(name: string, planetId: string): string {
   return manifest.sprites[name]?.tinted ? `${name}.${planetId}` : name;
 }
 
-/** Texture key for a replicant body in a given feature (visor) color. */
-export function featureTex(name: string, featureLight: number): string {
+/**
+ * Animation prefix for a replicant body in a visor x cape color. The texture is the sprite name; the
+ * variant picks the row. Falls back to the first variant when a color isn't in the palette lists.
+ */
+export function bodyVariant(name: string, visor: number, cape: number): string {
   const s = manifest.sprites[name];
-  if (!s?.featured) return name;
-  return s.files[`f${featureLight}`] ? `${name}.f${featureLight}` : `${name}.${Object.keys(s.files)[0]}`;
+  if (!s?.variants) return name;
+  const v = `f${visor}.c${cape}`;
+  return `${name}.${v in s.variants ? v : Object.keys(s.variants)[0]}`;
 }
 
 export const anim = (texKey: string, name: string) => `${texKey}:${name}`;
