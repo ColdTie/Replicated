@@ -51,7 +51,11 @@ export class UIScene extends Phaser.Scene {
     this.touchUi.setVisible(this.sys.game.device.input.touch);
 
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      if (!p.wasTouch) return;
+      // Mouse: left click attacks / interacts, like Space
+      if (!p.wasTouch) {
+        if (p.button === 0) touch.actionQueued = true;
+        return;
+      }
       touch.active = true;
       this.touchUi.setVisible(true);
       if (p.x < width * 0.45 && this.stickPointer === null) {

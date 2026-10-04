@@ -15,6 +15,11 @@
   "accel": 1000,
   "maxHp": 5,
   "invulnMs": 900,
+  "regen": {
+    "delayMs": 4000,
+    "everyMs": 2500
+  },
+  "_regenDoc": "After delayMs without being hit, 1 hp returns every everyMs.",
   "attack": {
     "damage": 1,
     "cooldownMs": 280,

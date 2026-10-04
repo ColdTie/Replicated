@@ -32,6 +32,8 @@ export class Player {
   aim = new Phaser.Math.Vector2(1, 0);
   locked = true;
   private invulnUntil = 0;
+  private lastHurtAt = -Infinity;
+  private nextRegenAt = 0;
   private attackReadyAt = 0;
   private attackingUntil = 0;
   private stepTimer = 0;
@@ -98,11 +100,22 @@ export class Player {
 
     if (!this.locked && input.attack && time >= this.attackReadyAt && !this.scene.tryInteract()) this.attack(time);
 
-    // Health is the glow: dimmer and smaller as hp drops, flickering when low
+    // Out of danger for a moment: health slowly comes back
+    const { delayMs, everyMs } = PLAYER.regen;
+    if (!this.dead && this.hp < PLAYER.maxHp && time - this.lastHurtAt > delayMs && time >= this.nextRegenAt) {
+      if (this.nextRegenAt > 0) {
+        this.hp += 1;
+        this.scene.fx.sparks(this.x, this.y - 8, WARM, 4);
+      }
+      this.nextRegenAt = time + everyMs;
+    }
+
+    // Health is the glow: smaller and dimmer as hp drops, flickering when low. The light never drops
+    // so far that the body sinks into the darkness.
     const frac = this.hp / PLAYER.maxHp;
-    const low = frac <= 0.4 ? 0.25 * (0.5 + 0.5 * Math.sin(time / 90)) : 0;
-    this.light.radius = (52 + 48 * frac) * PLAYER.lightRadius;
-    this.light.intensity = 0.55 + 0.45 * frac - low;
+    const low = frac <= 0.4 ? 0.15 * (0.5 + 0.5 * Math.sin(time / 90)) : 0;
+    this.light.radius = (60 + 40 * frac) * PLAYER.lightRadius;
+    this.light.intensity = 0.8 + 0.2 * frac - low;
     this.glow.setAlpha((0.08 + 0.14 * frac) * (1 - low)).setScale(0.6 + 0.4 * frac);
 
     // invulnerability blink
@@ -134,6 +147,8 @@ export class Player {
     if (this.dead || this.locked || now < this.invulnUntil) return;
     this.invulnUntil = now + PLAYER.invulnMs;
     this.hp = Math.max(0, this.hp - damage);
+    this.lastHurtAt = now;
+    this.nextRegenAt = 0;
     const dir = new Phaser.Math.Vector2(this.x - fromX, this.y - fromY).normalize();
     this.body.velocity.set(dir.x * 190, dir.y * 190);
     this.sprite.play(anim(this.key, 'hurt'), true);
