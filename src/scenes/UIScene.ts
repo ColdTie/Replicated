@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import { PALETTE } from '../core/data';
 import { isKid } from '../core/session';
 import { touch } from '../input/Controls';
+import { sound } from '../audio/Sound';
 
 const STICK_RADIUS = 26;
 
@@ -16,6 +17,7 @@ export class UIScene extends Phaser.Scene {
   private stickPointer: number | null = null;
   private stickOrigin = new Phaser.Math.Vector2();
   private touchUi!: Phaser.GameObjects.Container;
+  private swipes = new Map<number, { x: number; y: number; t: number; done: boolean }>();
 
   constructor() { super('ui'); }
 
@@ -39,6 +41,7 @@ export class UIScene extends Phaser.Scene {
 
     // Touch controls: floating stick on the left half, big action button on the right
     this.input.addPointer(2);
+    this.input.mouse?.disableContextMenu();
     this.stickBase = this.add.circle(0, 0, STICK_RADIUS, PALETTE[24], 0.35).setStrokeStyle(1, PALETTE[21], 0.6).setVisible(false);
     this.stickKnob = this.add.circle(0, 0, 10, PALETTE[20], 0.55).setVisible(false);
     const bx = width - 52, by = height - 52;
@@ -50,10 +53,31 @@ export class UIScene extends Phaser.Scene {
     this.touchUi = this.add.container(0, 0, [hint, this.actionBtn]);
     this.touchUi.setVisible(this.sys.game.device.input.touch);
 
+    // Sound toggle: a tiny speaker in the top right corner (M on the keyboard)
+    const speaker = this.add.graphics().setPosition(width - 16, 6).setAlpha(0.45);
+    const drawSpeaker = () => {
+      speaker.clear();
+      speaker.fillStyle(PALETTE[20]).fillRect(0, 3, 3, 4).fillTriangle(2, 5, 6, 0, 6, 10);
+      if (sound.muted) speaker.fillStyle(PALETTE[8]).fillRect(8, 2, 1, 1).fillRect(9, 3, 1, 1).fillRect(10, 4, 1, 1).fillRect(11, 5, 1, 1).fillRect(12, 6, 1, 1)
+        .fillRect(12, 2, 1, 1).fillRect(11, 3, 1, 1).fillRect(9, 5, 1, 1).fillRect(8, 6, 1, 1);
+      else speaker.fillStyle(PALETTE[20]).fillRect(8, 3, 1, 4).fillRect(10, 2, 1, 6);
+    };
+    drawSpeaker();
+    const toggleSound = () => { sound.start(); sound.setMuted(!sound.muted); drawSpeaker(); };
+    this.input.keyboard?.on('keydown-M', toggleSound);
+    const onSpeaker = (p: Phaser.Input.Pointer) => p.x > width - 26 && p.y < 22;
+
+    if (new URLSearchParams(location.search).has('fps')) {
+      const fps = this.add.bitmapText(width - 40, 6, 'pixel', '').setTint(PALETTE[11]);
+      this.time.addEvent({ delay: 500, loop: true, callback: () => fps.setText(String(Math.round(this.game.loop.actualFps))) });
+    }
+
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      // Mouse: left click attacks / interacts, like Space
+      if (onSpeaker(p)) { toggleSound(); return; }
+      // Mouse: left click attacks / interacts, right click dashes
       if (!p.wasTouch) {
         if (p.button === 0) touch.actionQueued = true;
+        else if (p.button === 2) { touch.dashQueued = true; touch.dashX = 0; touch.dashY = 0; }
         return;
       }
       touch.active = true;
@@ -66,10 +90,20 @@ export class UIScene extends Phaser.Scene {
         hint.setVisible(false);
       } else if (p.x >= width * 0.45) {
         touch.actionQueued = true;
+        this.swipes.set(p.id, { x: p.x, y: p.y, t: this.time.now, done: false });
         this.tweens.add({ targets: this.actionBtn, scale: { from: 0.85, to: 1 }, duration: 140, ease: 'Back.easeOut' });
       }
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      // Swipe on the action side: dash in the swipe direction
+      const sw = this.swipes.get(p.id);
+      if (sw && !sw.done && this.time.now - sw.t < 300 && Math.hypot(p.x - sw.x, p.y - sw.y) > 14) {
+        sw.done = true;
+        const len = Math.hypot(p.x - sw.x, p.y - sw.y);
+        touch.dashQueued = true;
+        touch.dashX = (p.x - sw.x) / len;
+        touch.dashY = (p.y - sw.y) / len;
+      }
       if (p.id !== this.stickPointer) return;
       const v = new Phaser.Math.Vector2(p.x - this.stickOrigin.x, p.y - this.stickOrigin.y);
       const len = v.length();
@@ -89,6 +123,7 @@ export class UIScene extends Phaser.Scene {
       touch.y = dir.y * mag;
     });
     const release = (p: Phaser.Input.Pointer) => {
+      this.swipes.delete(p.id);
       if (p.id !== this.stickPointer) return;
       this.stickPointer = null;
       touch.x = 0; touch.y = 0;

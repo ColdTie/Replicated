@@ -1,0 +1,13 @@
+{
+  "_doc": "Volumes 0..1. chords = MIDI notes of the ambient pad progression, one chord every chordSeconds.",
+  "master": 0.8,
+  "sfx": 0.9,
+  "music": 0.7,
+  "chordSeconds": 9,
+  "chords": [
+    [50, 57, 62, 66],
+    [47, 54, 59, 62],
+    [43, 50, 55, 59],
+    [45, 52, 57, 61]
+  ]
+}

@@ -25,8 +25,22 @@
     "cooldownMs": 280,
     "reach": 14,
     "radius": 17,
-    "knockback": 170
+    "knockback": 170,
+    "comboWindowMs": 520,
+    "heavy": {
+      "damage": 2,
+      "radiusScale": 1.35,
+      "knockbackScale": 1.6,
+      "cooldownMs": 480
+    }
   },
+  "dash": {
+    "speed": 270,
+    "ms": 150,
+    "cooldownMs": 420,
+    "afterimageEveryMs": 22
+  },
+  "_dashDoc": "Dash: Shift/K/X, right mouse button, gamepad B/L1, or swipe on the right half of a touch screen. Invulnerable while dashing.",
   "lightRadius": 1.0,
   "feature": [
     9,

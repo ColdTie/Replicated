@@ -2,18 +2,22 @@
 import type { PlanetDef } from '../core/data';
 import { fbm, mulberry32, randInt, type Rng } from '../core/rng';
 
-export const enum Cell { Void = 0, Floor = 1, Rock = 2, Ruin = 3 }
+export const enum Cell { Void = 0, Floor = 1, Rock = 2, Ruin = 3, Water = 4 }
 
 // Frame indexes in tools/sprites/tiles.json
 export const TILE = {
   empty: 0, floor: [1, 2], pebble: 3, moss: [4, 17], shadow: 5, crack: 6,
   rockTop: [7, 16, 18], rockRim: 8, rockFace: 9, rockVein: 10,
   cliff: 11, cliffFade: 12, ruinTop: 13, ruinFace: 14, ruinFloor: 15,
+  water: [19, 20], waterTop: 21,
 } as const;
 export const COLLIDE_TILES = [0, 7, 8, 9, 10, 11, 12, 13, 14, 16, 18];
 
 // Frame indexes in tools/sprites/decor.json
-export const DECOR = { tuft: 0, tuftSmall: 1, mushroom: 2, pebbles: 3, pillar: 4, machine: 5, door: 6, pod: 7 } as const;
+export const DECOR = {
+  tuft: 0, tuftSmall: 1, mushroom: 2, pebbles: 3, pillar: 4, machine: 5, door: 6, pod: 7,
+  lily: 8, reeds: 9, flower: 10, doorOpen: 11, machineEmpty: 12,
+} as const;
 
 export interface Point { x: number; y: number }
 export interface PlanetMap {
@@ -31,6 +35,8 @@ export interface PlanetMap {
   props: { sprite: 'tree' | 'tower'; frame: number; x: number; y: number }[];
   /** Solid rectangles for props, pixel coords, centered */
   blockers: { x: number; y: number; w: number; h: number }[];
+  /** Ruins: sealed door (feet), broken machine holding a core (feet), spot inside where the reward appears */
+  ruins: { door: Point; machine: Point; inside: Point }[];
   /** Fixed base layout around the landing site, pixel coords */
   base: { vessel: Point; cradle: Point; pad: Point; center: Point };
 }
@@ -77,6 +83,7 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
   const ruinRects: { x: number; y: number; w: number; h: number }[] = [];
   const decor: PlanetMap['decor'] = [];
   const glows: PlanetMap['glows'] = [];
+  const ruins: PlanetMap['ruins'] = [];
   for (let attempt = 0; attempt < 200 && ruinRects.length < def.ruins; attempt++) {
     const rw = randInt(r, 7, 10), rh = randInt(r, 5, 7);
     const rx = randInt(r, 4, w - rw - 5), ry = randInt(r, 4, h - rh - 6);
@@ -101,14 +108,12 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
         ruinFloor[idx(x, y)] = 1;
       }
     }
-    // glowing sealed door on the back wall, plus props
-    decor.push({ frame: DECOR.door, x: doorX * 16 + 8, y: (ry + 2) * 16 + 1 });
-    glows.push({ x: doorX * 16 + 8, y: (ry + 2) * 16 - 6, kind: 'door' });
-    if (r() < 0.8) {
-      const mx = rx + 1 + Math.floor(r() * 2), my = ry + rh - 2;
-      decor.push({ frame: DECOR.machine, x: mx * 16 + 8, y: my * 16 + 15 });
-      glows.push({ x: mx * 16 + 6, y: my * 16 + 9, kind: 'machine' });
-    }
+    // glowing sealed door on the back wall and a broken machine that still holds the door's core.
+    // (The r() calls stay in the same order so existing planets keep their layout.)
+    const door = { x: doorX * 16 + 8, y: (ry + 2) * 16 + 1 };
+    r();
+    const mx = rx + 1 + Math.floor(r() * 2), my = ry + rh - 2;
+    ruins.push({ door, machine: { x: mx * 16 + 8, y: my * 16 + 15 }, inside: { x: door.x, y: door.y + 18 } });
     decor.push({ frame: DECOR.pillar, x: (rx + rw - 2) * 16 + 8, y: (ry + rh - 2) * 16 + 15 });
   }
 
@@ -220,6 +225,49 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     if (frame === DECOR.mushroom) glows.push({ x: px, y: py - 7, kind: 'mushroom' });
   }
 
+  // 9. Ponds, reeds, lily pads and flowers, carved last so everything placed above keeps its spot
+  if (def.ponds || def.flowers) {
+    const r2 = mulberry32(seed ^ 0x9e3779b9);
+    const blocked = new Uint8Array(w * h);
+    for (const p of [...taken, ...nodes]) blocked[idx(p.x, p.y)] = 1;
+    for (const b of blockers) blocked[idx(Math.floor(b.x / 16), Math.floor(b.y / 16))] = 1;
+    for (const e of enemies) blocked[idx(e.x, e.y)] = 1;
+    for (const rr of ruinRects) for (let y = rr.y - 2; y < rr.y + rr.h + 2; y++) for (let x = rr.x - 2; x < rr.x + rr.w + 2; x++) if (x >= 0 && y >= 0 && x < w && y < h) blocked[idx(x, y)] = 1;
+    let made = 0;
+    for (let attempt = 0; attempt < 300 && made < (def.ponds ?? 0); attempt++) {
+      const px = randInt(r2, 6, w - 7), py = randInt(r2, 6, h - 7);
+      if (Math.hypot(px - cx, py - cy) < 13 || at(px, py) !== Cell.Floor || blocked[idx(px, py)]) continue;
+      const rad = 2.2 + r2() * 2.3;
+      let carved = 0;
+      for (let y = Math.floor(py - rad - 1); y <= py + rad + 1; y++) for (let x = Math.floor(px - rad * 1.4 - 1); x <= px + rad * 1.4 + 1; x++) {
+        if (at(x, y) !== Cell.Floor || blocked[idx(x, y)] || ruinFloor[idx(x, y)]) continue;
+        const d = Math.hypot((x - px) / 1.4, y - py) / rad + (fbm(x * 0.4, y * 0.4, seed + 991) - 0.5) * 0.6;
+        if (d < 1) { cells[idx(x, y)] = Cell.Water; carved++; }
+      }
+      if (carved) made++;
+    }
+    const isWater = (x: number, y: number) => at(x, y) === Cell.Water;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (!isWater(x, y)) continue;
+      ground[y][x] = isWater(x, y - 1) ? TILE.water[(x + y) & 1] : TILE.waterTop;
+      if (isWater(x, y - 1) && isWater(x, y + 1) && r2() < 0.12) decor.push({ frame: DECOR.lily, x: x * 16 + randInt(r2, 4, 12), y: y * 16 + randInt(r2, 10, 15) });
+    }
+    // drop decor that ended up in the water, then reeds along the banks
+    for (let i = decor.length - 1; i >= 0; i--) {
+      const d = decor[i];
+      if (d.frame !== DECOR.lily && isWater(Math.floor(d.x / 16), Math.floor((d.y - 1) / 16))) decor.splice(i, 1);
+    }
+    for (let i = glows.length - 1; i >= 0; i--) if (isWater(Math.floor(glows[i].x / 16), Math.floor((glows[i].y + 7) / 16))) glows.splice(i, 1);
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      if (!isOpen(x, y) || blocked[idx(x, y)]) continue;
+      const bank = isWater(x - 1, y) || isWater(x + 1, y) || isWater(x, y - 1) || isWater(x, y + 1);
+      if (bank && r2() < 0.35) decor.push({ frame: DECOR.reeds, x: x * 16 + randInt(r2, 4, 12), y: y * 16 + randInt(r2, 10, 15) });
+      else if (!bank && def.flowers && r2() < def.flowers && Math.hypot(x - cx, y - cy) > 3.5 && !ruinFloor[idx(x, y)]) {
+        decor.push({ frame: DECOR.flower, x: x * 16 + randInt(r2, 3, 13), y: y * 16 + randInt(r2, 8, 15) });
+      }
+    }
+  }
+
   const c = { x: cx * 16 + 8, y: cy * 16 + 8 };
   const base = {
     center: c,
@@ -227,5 +275,5 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     cradle: { x: c.x, y: c.y + 22 },
     pad: { x: c.x + 46, y: c.y + 12 },
   };
-  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, enemies, decor, glows, props, blockers, base };
+  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, enemies, decor, glows, props, blockers, ruins, base };
 }

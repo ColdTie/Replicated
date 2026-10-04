@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
 import { PALETTE, type SkitterDef } from '../core/data';
 import type { Light } from '../fx/Lighting';
@@ -63,7 +64,7 @@ export class Skitter implements Enemy {
       case 'chase':
         v.set((dx / dist) * this.def.chaseSpeed, (dy / dist) * this.def.chaseSpeed);
         if (!canSee || dist > this.def.senseRange * 1.4) this.state = 'wander';
-        else if (dist < this.def.lungeRange) this.enter('windup', time + this.def.windupMs);
+        else if (dist < this.def.lungeRange) { this.enter('windup', time + this.def.windupMs); sound.windup(); }
         break;
       case 'windup':
         v.scale(0.8);
@@ -120,6 +121,7 @@ export class Skitter implements Enemy {
     this.body.enable = false;
     const x = this.x, y = this.y;
     this.scene.fx.debris(x, y - 4, 14);
+    this.scene.onEnemyKilled(this);
     this.scene.time.delayedCall(110, () => {
       for (let i = 0; i < (this.def.drops.ember ?? 0); i++) this.scene.spawnShard(x, y, dir);
     });

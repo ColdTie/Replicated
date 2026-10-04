@@ -33,5 +33,20 @@
       "ember": 1
     },
     "respawnMs": 30000
+  },
+  "spitter": {
+    "kind": "spitter",
+    "sprite": "spitter",
+    "hp": 3,
+    "fireRange": 120,
+    "windupMs": 650,
+    "cooldownMs": 1900,
+    "shotSpeed": 68,
+    "shotLifeMs": 2600,
+    "contactDamage": 1,
+    "drops": {
+      "ember": 2
+    },
+    "respawnMs": 40000
   }
 }

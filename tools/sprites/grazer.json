@@ -1,0 +1,178 @@
+{
+  "size": [
+    16,
+    16
+  ],
+  "tinted": true,
+  "legend": {
+    ".": null,
+    "o": 25,
+    "d": "a0",
+    "m": "a1",
+    "l": "a2",
+    "c": 2,
+    "x": 25,
+    "n": 6,
+    "p": 29,
+    "Y": 11
+  },
+  "animations": {
+    "idle": {
+      "fps": 2,
+      "frames": [
+        0,
+        0,
+        0,
+        1,
+        1,
+        0
+      ],
+      "repeat": -1
+    },
+    "walk": {
+      "fps": 8,
+      "frames": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "repeat": -1
+    },
+    "happy": {
+      "fps": 1,
+      "frames": [
+        6
+      ],
+      "repeat": 0
+    }
+  },
+  "frames": [
+    [
+      "................",
+      "..........Y..Y..",
+      "..........l..l..",
+      "...........ll...",
+      "..........ommmo.",
+      ".........omxmmpo",
+      "..........ommcco",
+      "...oooooooommoo.",
+      "..ommmllllmmmo..",
+      ".oommmmmmmmmmo..",
+      ".ommmmmmmmmmmo..",
+      "..occccccccmo...",
+      "..odo.odo.odo...",
+      "..odo.odo..odo..",
+      "..ono.ono..ono..",
+      "................"
+    ],
+    [
+      "................",
+      "................",
+      "................",
+      "................",
+      "................",
+      "..........Y..Y..",
+      "..........l..l..",
+      "...oooooooolloo.",
+      "..ommmllllommmo.",
+      ".oommmmmmomxmmpo",
+      ".ommmmmmmmommcco",
+      "..occccccoommoo.",
+      "..odo.odo.odo...",
+      "..odo.odo..odo..",
+      "..ono.ono..ono..",
+      "................"
+    ],
+    [
+      "................",
+      "..........Y..Y..",
+      "..........l..l..",
+      "...........ll...",
+      "..........ommmo.",
+      ".........omxmmpo",
+      "..........ommcco",
+      "...oooooooommoo.",
+      "..ommmllllmmmo..",
+      ".oommmmmmmmmmo..",
+      ".ommmmmmmmmmmo..",
+      "..occccccccmo...",
+      "..odo.odo.odo...",
+      "..odo.odo..odo..",
+      "..ono.ono..ono..",
+      "................"
+    ],
+    [
+      "................",
+      "..........Y..Y..",
+      "..........l..l..",
+      "...........ll...",
+      "..........ommmo.",
+      ".........omxmmpo",
+      "..........ommcco",
+      "...oooooooommoo.",
+      "..ommmllllmmmo..",
+      ".oommmmmmmmmmo..",
+      ".ommmmmmmmmmmo..",
+      "..occccccccmo...",
+      "..odo..odo.odo..",
+      ".odo...odoodo...",
+      ".ono...onoono...",
+      "................"
+    ],
+    [
+      "................",
+      "..........Y..Y..",
+      "..........l..l..",
+      "...........ll...",
+      "..........ommmo.",
+      ".........omxmmpo",
+      "..........ommcco",
+      "...oooooooommoo.",
+      "..ommmllllmmmo..",
+      ".oommmmmmmmmmo..",
+      ".ommmmmmmmmmmo..",
+      "..occccccccmo...",
+      "...odo.odo.odo..",
+      "...odoodo..odo..",
+      "...onoono..ono..",
+      "................"
+    ],
+    [
+      "................",
+      "..........Y..Y..",
+      "..........l..l..",
+      "...........ll...",
+      "..........ommmo.",
+      ".........omxmmpo",
+      "..........ommcco",
+      "...oooooooommoo.",
+      "..ommmllllmmmo..",
+      ".oommmmmmmmmmo..",
+      ".ommmmmmmmmmmo..",
+      "..occccccccmo...",
+      "..odo..odoodo...",
+      "..odo.odo..odo..",
+      "..ono.ono...ono.",
+      "................"
+    ],
+    [
+      "..........l..l..",
+      "...........ll...",
+      "..........ommmo.",
+      ".........omommpo",
+      "..........ommcco",
+      "...oooooooommoo.",
+      "..ommmllllmmmo..",
+      ".oommmmmmmmmmo..",
+      ".ommmmmmmmmmmo..",
+      "..occccccccmo...",
+      "..odo.odo.odo...",
+      "..odo.odo..odo..",
+      "..ono.ono..ono..",
+      "................",
+      "................",
+      "................"
+    ]
+  ]
+}

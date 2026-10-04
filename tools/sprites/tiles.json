@@ -1,5 +1,8 @@
 {
-  "size": [16, 16],
+  "size": [
+    16,
+    16
+  ],
   "tinted": true,
   "legend": {
     ".": null,
@@ -16,7 +19,11 @@
     "b": 22,
     "d": "a0",
     "m": "a1",
-    "l": "a2"
+    "l": "a2",
+    "w": 16,
+    "W": 17,
+    "q": 15,
+    "Q": 18
   },
   "animations": {},
   "frames": [
@@ -361,6 +368,60 @@
       "RRRRRRRHRRRRRrRr",
       "RRRRRRRRrRRRRHrr",
       "RrRRRRRRRRRRRRRH"
+    ],
+    [
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwWWWwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwWWwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wWWwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwWWWwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwWWwwwwwwwwww",
+      "wwwwwwwwwwwwwwWw",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww"
+    ],
+    [
+      "wwwwwwwwwwwwwwww",
+      "wWWWwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwWWww",
+      "wwwwwwWwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwWWWww",
+      "wwwwwwwwwwwwwwww",
+      "wwwWWwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwWWwwwww"
+    ],
+    [
+      "qqqqqqqqqqqqqqqq",
+      "qqqqqqqqqqqqqqqq",
+      "qwqwqwqwqwqwqwqw",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwWWwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wWWwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwWWWwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww",
+      "wwwwWWwwwwwwwwww",
+      "wwwwwwwwwwwwwwWw",
+      "wwwwwwwwwwwwwwww",
+      "wwwwwwwwwwwwwwww"
     ]
   ]
 }

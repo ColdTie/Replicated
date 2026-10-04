@@ -16,7 +16,7 @@ export interface ReplicantSave {
   profile_id: string | null;
   name: string;
   model: string;
-  traits: { awake?: boolean; feature?: number };
+  traits: { awake?: boolean; feature?: number; mods?: string[] };
   star_id: string;
   planet_index: number;
   pos_x: number | null;
@@ -25,8 +25,11 @@ export interface ReplicantSave {
 
 export interface NodeState { hits: number; at: number }
 export interface StructureSave { type: string; x: number; y: number; at: number }
+export interface DoorState { open: boolean; taken?: boolean }
 export interface PlanetData {
   nodes?: Record<string, NodeState>;
+  /** Ruin doors by index: opened with a core, reward taken */
+  doors?: Record<string, DoorState>;
   structures?: StructureSave[];
 }
 export interface PlanetSave {
@@ -127,6 +130,7 @@ export class LocalStore implements GameStore {
     if (!cur) return null;
     cur.embers = Math.max(0, cur.embers + emberDelta);
     if (data.nodes) cur.data.nodes = { ...(cur.data.nodes ?? {}), ...data.nodes };
+    if (data.doors) cur.data.doors = { ...(cur.data.doors ?? {}), ...data.doors };
     if (data.structures) cur.data.structures = data.structures;
     this.flush();
     return structuredClone(cur);
