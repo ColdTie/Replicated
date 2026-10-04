@@ -110,7 +110,8 @@ src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode
 src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
 src/audio/Sound.ts       procedural WebAudio: every sound effect and the generative ambient music (no audio files)
 src/entities/            ... Spitter + Spore (reflectable), Ruin (machine core -> sealed door -> module), Wildlife
-                         (Grazer you pet, bird Flock that scatters, Butterflies by day)
+                         (Grazer you pet, bird Flock that scatters, Butterflies by day), Npc (drifted copies), Gear
+src/core/drift.ts        replication drift (visor, headgear, trail, stats) from src/data/drift.json
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame
 src/ui/overlay.ts        HTML forms over the canvas (sign-in, new profile)
 src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Planet (world, saving) + UI (counter, title, touch)
@@ -200,11 +201,22 @@ Plan agreed with Steve: M1 visuals, M2 feel, M3 Replicate, M4 Leaving Earth (spa
 - Performance: `?fps` counter, auto low-detail mode (drops sunbeams and firefly lights) under 40 fps.
 - Screenshots: `screenshots/m1-*.png` (day, dusk, night, rain, pond day/night, ruin).
 
+### Session 3b (2026-10-04): Milestone 3, Replicate
+- With the Replicator built, a ring glows in front of it once the pool has 30 Embers (`src/data/drift.json`). Stand on
+  it and press action: a scanner beam sweeps you, the copy builds up line by line beside the Replicator, its visor
+  flickers through colors and settles on its own, its name floats up (STEVE II, STEVE III, ...). Not enough Embers:
+  the Replicator buzzes and dims.
+- Drift (`src/core/drift.ts`): visor color, headgear (`tools/sprites/gear.json`: antennae, halo, horns, sprout, dish,
+  crown; tinted with the trail color and pinned to the visor pixel per frame via manifest `anchors`), trail color,
+  and stat nudges (speed, light, gather). Stored as `replicants` rows with `status = 'npc'`, `parent_id`, `generation`.
+- Copies wander the base, greet you (turn, hop, chirp), walk to crystals near the base, mine, and carry an Ember back
+  to the Replicator (+1 to the shared pool per trip). While nobody plays they gather `gatherPerHour` each (times their
+  gather stat), counted from `planet_states.data.npcTick` up to 12 hours; on return the Embers stream in from them.
+- Player replicants use their own stats too (speed, light) and show headgear/trail if they have them (for handoff).
+- Migration 0005: `apply_planet_delta` shallow-merges any top-level key (nodes/doors still merge per key).
+- `?shot=1&view=replicate` stages a birth; `&copies=4` adds made-up copies for screenshots. Screenshots `m3-*.png`.
+
 Not done / next:
 - Milestone 1 leftovers: rounded autotiled rock edges, bloom, a guardian mini-boss in the largest ruin.
-- Milestone 3 (Replicate) and Milestone 4 (Leaving Earth) as planned.
+- Milestone 4 (Leaving Earth) as planned.
 - Not yet confirmed on the iPad. Cloud sign-in not yet tested by Steve (needs the family login created).
-- Phase 2: the Replicator makes a drifted copy that stays as an NPC; launch the vessel; star map of real stars;
-  real-time journeys.
-- No audio yet. Phase 0 skipped it; add in Phase 3 (or earlier), starting only after the first tap.
-- Rock outcrops still have stair-step edges (no full autotiling). Fine for placeholder art.

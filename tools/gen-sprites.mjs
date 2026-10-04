@@ -112,6 +112,12 @@ for (const file of fs.readdirSync(spriteDir).filter((f) => f.endsWith('.json')).
   if (sprite.featured) {
     // One sheet per replicant feature color (visor / antenna tip): key <name>.f<lightIndex>
     entry.featured = true;
+    // Per-frame anchor = first visor pixel (legend role f0), so headgear overlays can follow the head
+    const visorChars = Object.entries(sprite.legend).filter(([, v]) => v === 'f0').map(([k]) => k);
+    entry.anchors = sprite.frames.map((rows) => {
+      for (let y = 0; y < rows.length; y++) for (let x = 0; x < rows[y].length; x++) if (visorChars.includes(rows[y][x])) return [x, y];
+      return [Math.floor(sprite.size[0] / 2), 0];
+    });
     for (const feature of player.featureColors) {
       const png = render(sprite, roleResolver(planets[0], feature), name);
       const variant = `f${feature[1]}`;
