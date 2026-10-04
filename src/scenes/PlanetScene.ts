@@ -2,10 +2,12 @@ import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
 import { BACKEND, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
+import { DRIFT, replicate, stat } from '../core/drift';
 import { session } from '../core/session';
 import { Base } from '../entities/Base';
 import type { Enemy } from '../entities/Enemy';
 import { Hopper } from '../entities/Hopper';
+import { Npc } from '../entities/Npc';
 import { Player, squash } from '../entities/Player';
 import { CrystalNode, Shard } from '../entities/Resources';
 import { Ruin } from '../entities/Ruin';
@@ -18,7 +20,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
 import { Controls } from '../input/Controls';
-import type { DoorState, NodeState, PlanetData, PlanetSave } from '../net/store';
+import type { DoorState, NodeState, PlanetData, PlanetSave, ReplicantSave } from '../net/store';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
@@ -39,6 +41,7 @@ export class PlanetScene extends Phaser.Scene {
   shards: Shard[] = [];
   spores: Spore[] = [];
   ruins: Ruin[] = [];
+  npcs: Npc[] = [];
   embers = 0;
   env!: Environment;
 
@@ -71,7 +74,9 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  private pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures'] } = { embers: 0, nodes: {}, doors: {} };
+  private pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number } = { embers: 0, nodes: {}, doors: {} };
+  private replicating = false;
+  private npcTickAt = 0;
   private saving = false;
   private lastSaveAt = 0;
   private lastPosSaveAt = 0;
@@ -87,6 +92,7 @@ export class PlanetScene extends Phaser.Scene {
     this.shot = !!data.shot;
     this.enemies = []; this.nodes = []; this.shards = []; this.spores = []; this.ruins = []; this.embers = 0; this.stopped = false; this.frozen = false;
     this.grazers = []; this.flocks = []; this.butterflies = undefined; this.bendables = new Map(); this.slow = 1;
+    this.npcs = []; this.replicating = false;
     this.pending = { embers: 0, nodes: {}, doors: {} };
   }
 
@@ -96,15 +102,25 @@ export class PlanetScene extends Phaser.Scene {
     return st.loadPlanet(this.planet.star, this.planet.planetIndex, this.seed ?? this.planet.seed);
   }
 
+  async loadNpcs(): Promise<ReplicantSave[]> {
+    const st = session.store;
+    if (!st) return [];
+    return st.listNpcs(this.planet.star, this.planet.planetIndex);
+  }
+
   create() {
     // Loading the planet save is async; build the world once it arrives.
     this.cameras.main.setBackgroundColor(PALETTE[25]);
-    this.preloadSave()
-      .catch((e) => { console.warn('planet load failed, playing without saving', e); return null; })
-      .then((save) => this.build(save));
+    const save = this.preloadSave().catch((e) => { console.warn('planet load failed, playing without saving', e); return null; });
+    const npcs = this.loadNpcs().catch((e) => { console.warn('copies load failed', e); return [] as ReplicantSave[]; });
+    void Promise.all([save, npcs]).then(([s, n]) => this.build(s, n));
   }
 
-  private build(save: PlanetSave | null) {
+  get baseCenter() { return this.map.base.center; }
+  /** Where copies bring their Embers */
+  get replicatorSpot() { return { x: this.base.x, y: this.base.y }; }
+
+  private build(save: PlanetSave | null, npcRows: ReplicantSave[] = []) {
     session.planet = save;
     const p = this.planet;
     const { width, height } = this.scale;
@@ -173,6 +189,7 @@ export class PlanetScene extends Phaser.Scene {
     }
     const built = !!save?.data.structures?.some((s) => s.type === 'replicator');
     this.base = new Base(this, b.pad.x, b.pad.y, built);
+    this.spawnNpcs(npcRows, save);
 
     // Resources (restoring chipped/broken crystals; they regrow after a while) and creatures
     const regrowMs = BACKEND.nodeRegrowMinutes * 60_000;
@@ -470,6 +487,13 @@ export class PlanetScene extends Phaser.Scene {
     this.embers = Math.max(this.embers, view === 'base' ? STRUCTURES.replicator.cost : 12);
     this.game.events.emit('embers', this.embers, true);
     this.frozen = true;
+    if (view === 'replicate') {
+      (this.base as unknown as { placeReplicator(a: boolean): void }).placeReplicator(false);
+      this.embers = DRIFT.cost;
+      this.player.setPosition(this.base.spotX, this.base.spotY);
+      this.cameras.main.centerOn(this.base.x, this.base.y + 10);
+      this.time.delayedCall(300, () => this.tryReplicate());
+    }
   }
 
   update(time: number, dt: number) {
@@ -491,6 +515,8 @@ export class PlanetScene extends Phaser.Scene {
     this.updateWater();
     this.updateCamera();
     this.base.update(time, this.embers);
+    this.base.updateSpot(time, this.canReplicate());
+    for (const n of this.npcs) n.update(time, dt);
     this.watchFps(time);
     this.env.update(dt);
     this.lighting.update(dt);
@@ -534,12 +560,16 @@ export class PlanetScene extends Phaser.Scene {
     const st = session.store;
     if (!st || this.shot || this.saving) return;
     const p = this.pending;
-    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures) return;
+    // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
+    if (this.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
+    if (p.npcTick !== undefined) this.npcTickAt = Date.now();
+    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && p.npcTick === undefined) return;
     this.pending = { embers: 0, nodes: {}, doors: {} };
     this.saving = true;
     try {
       const data: PlanetData = { nodes: p.nodes };
       if (Object.keys(p.doors).length) data.doors = p.doors;
+      if (p.npcTick !== undefined) data.npcTick = p.npcTick;
       if (p.structures) data.structures = p.structures;
       const row = await st.applyPlanetDelta(this.planet.star, this.planet.planetIndex, p.embers, data);
       if (row) {
@@ -552,6 +582,7 @@ export class PlanetScene extends Phaser.Scene {
       this.pending.embers += p.embers;
       this.pending.nodes = { ...p.nodes, ...this.pending.nodes };
       this.pending.doors = { ...p.doors, ...this.pending.doors };
+      this.pending.npcTick ??= p.npcTick;
       this.pending.structures ??= p.structures;
     } finally {
       this.saving = false;
@@ -594,6 +625,7 @@ export class PlanetScene extends Phaser.Scene {
 
   /** The action button does something other than attack here (build). Returns true if it did. */
   tryInteract(): boolean {
+    if (this.base.playerOnSpot()) return this.tryReplicate();
     if (!this.base.playerOnPad() || !this.base.canBuild(this.embers)) return false;
     const cost = STRUCTURES.replicator.cost;
     this.embers -= cost;
@@ -609,6 +641,117 @@ export class PlanetScene extends Phaser.Scene {
       void this.flushPlanet();
     });
     return true;
+  }
+
+  // --- replication ---
+
+  canReplicate() {
+    return this.base.built && !this.replicating && !!session.replicant && this.embers >= DRIFT.cost && this.npcs.length < DRIFT.maxPerPlanet;
+  }
+
+  private tryReplicate(): boolean {
+    if (!this.canReplicate()) {
+      if (this.replicating) return true;
+      this.base.hungry();
+      sound.denied();
+      return true; // standing on the spot: never swing at the Replicator
+    }
+    const parent = session.replicant!;
+    this.replicating = true;
+    this.embers -= DRIFT.cost;
+    this.pending.embers -= DRIFT.cost;
+    this.game.events.emit('embers', this.embers);
+    const pl = this.player;
+    pl.locked = true;
+    pl.body.setVelocity(0, 0);
+    pl.facing = 1;
+    pl.setPosition(this.base.spotX, this.base.spotY);
+    sound.scan();
+    this.base.scan(pl.sprite, pl.featureColor, 1600);
+    // the copy appears beside the Replicator, on whichever side is open
+    const side = this.isWalkable(this.base.x + 24, this.base.y + 8) ? 24 : -24;
+    const bx = this.base.x + side, by = this.base.y + 8;
+    const row = replicate(parent, this.planet.star, this.planet.planetIndex, bx, by);
+    this.time.delayedCall(1700, () => {
+      const npc = new Npc(this, { ...row, id: 'pending' }, bx, by);
+      this.npcs.push(npc);
+      sound.birth();
+      npc.playBirth(() => {
+        pl.locked = false;
+        this.replicating = false;
+        this.floatName(npc);
+      });
+      const st = session.store;
+      if (st && !this.shot) {
+        st.createReplicant(row).then((saved) => { Object.assign(npc.data, saved); })
+          .catch((e) => console.warn('copy save failed', e));
+        this.pending.npcTick ??= Date.now();
+      }
+    });
+    return true;
+  }
+
+  /** The copy's name floats above it for a moment so the family knows who is who. */
+  private floatName(npc: Npc) {
+    const t = this.add.bitmapText(npc.x, npc.y - 30, 'pixel', npc.data.name).setOrigin(0.5).setTint(npc.trailColor).setDepth(6300).setAlpha(0);
+    this.tweens.add({ targets: t, alpha: 1, y: t.y - 4, duration: 400, ease: 'Sine.easeOut' });
+    this.tweens.add({ targets: t, alpha: 0, delay: 2200, duration: 600, onComplete: () => t.destroy() });
+  }
+
+  private spawnNpcs(rows: ReplicantSave[], save: PlanetSave | null) {
+    // screenshots: ?copies=3 shows made-up copies
+    const fake = Number(new URLSearchParams(location.search).get('copies') ?? 0);
+    if (this.shot && fake && session.replicant) {
+      let parent = session.replicant;
+      for (let i = 0; i < fake; i++) {
+        const r = { ...replicate(parent, this.planet.star, this.planet.planetIndex, 0, 0), id: `fake${i}` } as ReplicantSave;
+        rows.push(r);
+        parent = r;
+      }
+    }
+    const c = this.map.base.center;
+    rows.forEach((r, i) => {
+      let x = r.pos_x ?? 0, y = r.pos_y ?? 0;
+      if (!x || !this.isWalkable(x, y)) { x = c.x - 30 + (i % 3) * 30; y = c.y + 50 + Math.floor(i / 3) * 18; }
+      this.npcs.push(new Npc(this, r, x, y));
+    });
+    // Embers the copies gathered while nobody was here
+    if (!this.npcs.length || this.shot) return;
+    const tick = save?.data.npcTick;
+    const now = Date.now();
+    this.pending.npcTick = now;
+    if (!tick) return;
+    const hours = Math.min(DRIFT.offlineCapHours, Math.max(0, (now - tick) / 3_600_000));
+    const rate = this.npcs.reduce((s, n) => s + stat(n.data, 'gather'), 0) * DRIFT.gatherPerHour;
+    const gained = Math.floor(rate * hours);
+    if (gained <= 0) return;
+    this.embers += gained;
+    this.pending.embers += gained;
+    this.time.delayedCall(2600, () => this.showAwayGain(gained));
+  }
+
+  /** Copies bring in what they gathered while you were away: a stream of Embers into the Replicator. */
+  private showAwayGain(n: number) {
+    const target = this.base.built ? this.replicatorSpot : this.map.base.center;
+    const count = Math.min(24, n);
+    for (let i = 0; i < count; i++) {
+      const from = this.npcs[i % this.npcs.length];
+      const s = this.add.image(from.x, from.y - 14, 'shard').setDepth(6300);
+      this.tweens.add({
+        targets: s, x: target.x, y: target.y - 10, delay: i * 90, duration: 600, ease: 'Quad.easeIn',
+        onComplete: () => { s.destroy(); this.fx.sparks(target.x, target.y - 10, PALETTE[10], 2); sound.collect(); },
+      });
+    }
+    this.time.delayedCall(count * 90 + 600, () => this.game.events.emit('embers', this.embers));
+  }
+
+  /** A copy dropped an Ember it mined into the Replicator. */
+  npcDelivered(_npc: Npc, x: number, y: number) {
+    this.embers++;
+    this.pending.embers++;
+    this.fx.sparks(x, y, PALETTE[10], 4);
+    if (Math.hypot(this.player.x - x, this.player.y - y) < 200) sound.collect();
+    this.game.events.emit('embers', this.embers, true);
   }
 
   resolveAttack(hx: number, hy: number, radius: number, aim: Phaser.Math.Vector2, heavy = false) {

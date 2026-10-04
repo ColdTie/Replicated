@@ -233,6 +233,27 @@ class SoundEngine {
     [0, 4, 7, 12, 7, 12, 16, 19].forEach((s, i) => this.tone(midi(72 + s), 0.5, { type: i % 2 ? 'sine' : 'triangle', vol: 0.08, delay: i * 0.07, rev: 0.6 }));
   }
 
+  /** Replicator scanning the player: a soft rising and falling sweep. */
+  scan() {
+    if (!this.ready('scan', 500)) return;
+    this.tone(220, 0.8, { type: 'sine', to: 880, vol: 0.06, attack: 0.1, rev: 0.5 });
+    this.tone(880, 0.8, { type: 'sine', to: 220, vol: 0.06, attack: 0.1, delay: 0.8, rev: 0.5 });
+    this.noise(1.6, { freq: 2000, q: 8, vol: 0.03, attack: 0.3 });
+  }
+
+  /** A copy is born: a warm chord that ends on a bright note. */
+  birth() {
+    if (!this.ready('birth', 500)) return;
+    [0, 7, 12, 16, 19, 24].forEach((s, i) => this.tone(midi(62 + s), 1.8, { type: i % 2 ? 'sine' : 'triangle', vol: 0.07, delay: i * 0.09, rev: 0.8 }));
+  }
+
+  /** Not enough Embers: a low double buzz. */
+  denied() {
+    if (!this.ready('denied', 400)) return;
+    this.tone(110, 0.12, { type: 'square', vol: 0.06 });
+    this.tone(98, 0.14, { type: 'square', vol: 0.06, delay: 0.15 });
+  }
+
   coreHum() { if (this.ready('core', 200)) this.tone(midi(64), 0.5, { type: 'sine', vol: 0.06, rev: 0.6 }); }
   thunder() { if (this.ready('thunder', 2000)) this.noise(2.5, { type: 'lowpass', freq: 300, to: 60, vol: 0.3, attack: 0.05, rev: 0.4 }); }
 

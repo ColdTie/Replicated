@@ -3,6 +3,8 @@ import { anim, featureTex } from '../core/assets';
 import { PALETTE, PLAYER } from '../core/data';
 import { isKid, session } from '../core/session';
 import { sound } from '../audio/Sound';
+import { stat } from '../core/drift';
+import { Gear } from './Gear';
 import type { Light } from '../fx/Lighting';
 import type { InputFrame } from '../input/Controls';
 import type { PlanetScene } from '../scenes/PlanetScene';
@@ -45,8 +47,9 @@ export class Player {
   private dashReadyAt = 0;
   private nextAfterimage = 0;
   private dashDir = new Phaser.Math.Vector2();
-  /** Visor color, used for the dash trail */
+  /** Visor color (or drifted trail color), used for the dash trail */
   readonly featureColor: number;
+  private gear?: Gear;
   private stepTimer = 0;
   private dead = false;
 
@@ -58,11 +61,13 @@ export class Player {
     this.shadow = scene.add.image(x, y, 'shadow').setAlpha(0.45).setTint(PALETTE[25]).setDepth(50);
     const model = pickModel();
     const feature = session.replicant?.traits.feature ?? session.profile?.feature_color ?? PLAYER.feature[1];
-    this.featureColor = PALETTE[feature];
+    const traits = session.replicant?.traits;
+    this.featureColor = PALETTE[traits?.trail ?? feature];
     this.key = featureTex(model.sprite, feature);
     this.headY = model.headY;
     this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1);
     this.sprite.play(anim(this.key, 'idle'));
+    if (traits?.gear) this.gear = new Gear(scene, this.sprite, model.sprite, traits.gear, this.featureColor);
     this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.18).setScale(0.9).setDepth(6100);
     this.light = scene.lighting.add({ x, y, radius: 70, color: 0xffe2b8, intensity: 1 });
   }
@@ -79,7 +84,7 @@ export class Player {
   update(time: number, dt: number, input: InputFrame) {
     if (this.dead) { this.syncVisuals(); return; }
     const moving = !this.locked && (input.x !== 0 || input.y !== 0);
-    const speed = PLAYER.speed * (this.scene.surfaceAt(this.x, this.y + 2) === 'water' ? 0.72 : 1);
+    const speed = PLAYER.speed * stat(session.replicant, 'speed') * (this.scene.surfaceAt(this.x, this.y + 2) === 'water' ? 0.72 : 1);
     const tx = this.locked ? 0 : input.x * speed, ty = this.locked ? 0 : input.y * speed;
     const a = (PLAYER.accel * dt) / 1000;
     const v = this.body.velocity;
@@ -144,7 +149,7 @@ export class Player {
     // so far that the body sinks into the darkness.
     const frac = this.hp / PLAYER.maxHp;
     const low = frac <= 0.4 ? 0.15 * (0.5 + 0.5 * Math.sin(time / 90)) : 0;
-    this.light.radius = (60 + 40 * frac) * PLAYER.lightRadius * this.mod('light');
+    this.light.radius = (60 + 40 * frac) * PLAYER.lightRadius * this.mod('light') * stat(session.replicant, 'light');
     this.light.intensity = 0.8 + 0.2 * frac - low;
     this.glow.setAlpha((0.08 + 0.14 * frac) * (1 - low)).setScale(0.6 + 0.4 * frac);
 
@@ -267,6 +272,7 @@ export class Player {
     this.glow.setPosition(x, y + this.headY);
     this.light.x = x;
     this.light.y = y + this.headY;
+    this.gear?.sync();
   }
 }
 

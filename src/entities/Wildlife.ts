@@ -21,6 +21,7 @@ export class Grazer {
   private petReadyAt = 0;
   private followUntil = 0;
   private happyUntil = 0;
+  private z = 0;
   x: number; y: number;
 
   constructor(private scene: PlanetScene, x: number, y: number) {
@@ -67,7 +68,7 @@ export class Grazer {
       if (this.sprite.anims.currentAnim?.key !== want) this.sprite.play(want);
     }
     const x = Math.round(this.x), y = Math.round(this.y);
-    this.sprite.setPosition(x, y + 2).setDepth(100 + y);
+    this.sprite.setPosition(x, y + 2 - Math.round(this.z)).setDepth(100 + y);
     this.shadow.setPosition(x, y + 1);
     this.antlers.x = x + (this.sprite.flipX ? -3 : 3);
     this.antlers.y = y - 13;
@@ -80,7 +81,7 @@ export class Grazer {
     this.target = null;
     this.sprite.play(anim(this.texKey, 'happy'));
     squash(this.scene, this.sprite, 0.8, 1.25, 140);
-    this.scene.tweens.add({ targets: this.sprite, y: this.sprite.y - 6, duration: 160, yoyo: true, ease: 'Quad.easeOut' });
+    this.scene.tweens.add({ targets: this, z: 6, duration: 160, yoyo: true, ease: 'Quad.easeOut' });
     for (let i = 0; i < 3; i++) {
       const h = this.scene.add.image(this.x + (i - 1) * 6, this.y - 16, 'heart').setDepth(6300).setAlpha(0);
       this.scene.tweens.add({ targets: h, y: h.y - 16 - i * 3, alpha: { from: 1, to: 0 }, delay: i * 120, duration: 900, ease: 'Quad.easeOut', onComplete: () => h.destroy() });

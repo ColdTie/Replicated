@@ -57,6 +57,13 @@ try {
     await page.waitForTimeout(1200);
     log('reflected', reflected, 'spitter hp', await ev(()=>window.__scene.enemies.find(e=>e.def?.kind==='spitter').hp), 'player hp', await ev(()=>window.__scene.player.hp));
   }
+  // replicate: build the Replicator, stand on the glowing spot, press action
+  await ev(()=>{const s=window.__scene; s.base.placeReplicator(false); s.embers=45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked=false;});
+  await page.keyboard.press('Space');
+  await page.waitForFunction(()=>window.__scene.npcs.length===1 && !window.__scene.replicating,null,{timeout:30000});
+  log('copy', await ev(()=>{const s=window.__scene; const n=s.npcs[0]; return JSON.stringify({name:n.data.name, gen:n.data.generation, traits:n.data.traits, stats:n.data.stats, embers:s.embers, unlocked:!s.player.locked});}));
+  await page.keyboard.press('Space'); await page.waitForTimeout(300);
+  log('second copy without embers', await ev(()=>window.__scene.npcs.length));
   // grazer pet
   const pet = await ev(()=>{const s=window.__scene; const g=s.grazers[0]; s.player.setPosition(g.x+6,g.y); return !!g;});
   await page.waitForTimeout(300);
