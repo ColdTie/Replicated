@@ -1,0 +1,17 @@
+{
+  "skitter": {
+    "sprite": "skitter",
+    "hp": 3,
+    "speed": 34,
+    "chaseSpeed": 52,
+    "senseRange": 96,
+    "lungeRange": 30,
+    "windupMs": 380,
+    "lungeSpeed": 175,
+    "lungeMs": 220,
+    "cooldownMs": 700,
+    "contactDamage": 1,
+    "drops": { "ember": 2 },
+    "respawnMs": 25000
+  }
+}

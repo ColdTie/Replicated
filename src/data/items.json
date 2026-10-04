@@ -1,0 +1,11 @@
+{
+  "ember": {
+    "sprite": "shard",
+    "glow": "f77622",
+    "magnetRange": 44,
+    "nodeSprite": "crystal",
+    "nodeHits": 3,
+    "nodeDropsPerHit": 1,
+    "nodeDropsOnBreak": 3
+  }
+}

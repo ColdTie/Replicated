@@ -1,0 +1,9 @@
+{
+  "speed": 78,
+  "accel": 900,
+  "maxHp": 5,
+  "invulnMs": 900,
+  "attack": { "damage": 1, "cooldownMs": 280, "reach": 14, "radius": 17, "knockback": 170 },
+  "lightRadius": 1.0,
+  "feature": [9, 10]
+}
