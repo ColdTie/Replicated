@@ -95,23 +95,37 @@ Steve's ideas for later phases. Do not build these until a phase explicitly pick
 
 ```
 tools/sprites/*.json     sprite source: palette-index grids + legend + animations (font.json = pixel font)
-tools/gen-sprites.mjs    JSON -> public/assets/gen/*.png + manifest.json (tinted sprites rendered per planet)
+tools/gen-sprites.mjs    JSON -> public/assets/gen/*.png + manifest.json
+                         "tinted": one sheet per planet (accent a0-a2, ground g0-g2 roles)
+                         "featured": one sheet per visor color in player.json featureColors (f0/f1 roles)
 tools/screenshot.mjs     build preview + headless Chromium capture -> screenshots/<name>.png
-src/data/*.json          palette, planets, player, enemies, items (all tunables live here)
-src/core/                rng/noise, typed data access, sprite manifest helpers
-src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, enemies, decor, glows
+src/data/*.json          palette, planets, player, enemies, items, structures, backend (all tunables)
+src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
+src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalStore (localStorage)
+src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, enemies, decor, glows,
+                         trees/towers + blockers, fixed base layout (vessel, cradle, build pad)
 src/fx/                  Lighting (multiply darkness RT + additive lights), Atmosphere (sky, stars, fog,
                          dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
-src/entities/            Player, Skitter (enemy), CrystalNode + Shard (Ember resource)
+src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember), Base (pad + Replicator)
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame
-src/scenes/              Boot (loads manifest, anims, font), Planet (world), UI (counter, title card, touch)
+src/ui/overlay.ts        HTML forms over the canvas (sign-in, new profile)
+src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Planet (world, saving) + UI (counter, title, touch)
+supabase/migrations/     schema applied to the "Replicated" Supabase project (keep in sync when changing the DB)
 ```
 
-Sprite legend roles: `a0/a1/a2` = planet accent (dark, mid, light), `f0/f1` = replicant feature color (visor, antenna tip). Feature color currently comes from `src/data/player.json`; drift will swap it per replicant.
+Saving: the shared Ember pool, node damage and structures live in `planet_states` and are written as atomic deltas
+(`apply_planet_delta` RPC) every 4s and when the page is hidden; the server value wins so family members share one
+pool. The replicant row stores position, planet and `traits.awake` (Earth's wake-up intro plays once per replicant).
+Every table is scoped by `galaxy_id` with row level security; `ensure_family_galaxy()` creates the galaxy on first sign-in.
+
+Sprite legend roles: `a0/a1/a2` = planet accent (dark, mid, light), `g0/g1/g2` = planet ground, `f0/f1` = replicant
+feature color (visor, antenna tip, chest core).
 
 Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`.
 
-URL params: `?seed=123` to try another planet layout, `?shot=1` skips the landing intro and stages a screenshot pose (enemies frozen).
+URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
+screenshot pose (enemies frozen; add `&view=base` for the base, `&kid` for kid mode), `?planet=solace`, `?seed=123`,
+`?model=drone`.
 
 ## Progress
 
@@ -134,8 +148,24 @@ Done:
 - New default body "replicant" (`tools/sprites/replicant.json`, 16x20): slim humanoid with a visor band, head fin with a glowing tip, a glowing chest core and a short red cape. The original drone (`tools/sprites/player.json`) is kept and selectable with `?model=drone`. Models are listed in `src/data/player.json`.
 - Move speed raised from 78 to 90.
 
+### Session 2 (2026-10-04): Phase 1, Earth, saves, Replicator
+- Long-term decisions recorded (real-time travel, one family galaxy, peaceful overgrown Earth, light-speed messages).
+- Supabase: schema for galaxies, members, profiles, replicants, planet states, journeys, discovered stars and messages,
+  all with RLS (verified: another family's login sees and changes nothing). Sign-in is one family login per device.
+- Home screen: title, family sign-in form, profile cards with each replicant in its visor color, add profile
+  (name, visor color, kid mode), sign out. `?local` / "play on this device" works offline.
+- Earth is the start planet: teal-green overgrown ground, trees that sway, vine-covered towers, the cradle where the
+  first replicant wakes (visor flickers on), vessel parked at the base.
+- Second enemy: Hopper (crouches, shows a landing ring, hops; only hittable on the ground).
+- Base: build pad glows when the shared pool has 25 Embers; stand on it and press action to build the Replicator.
+- Saves: Embers, crystal damage (regrows after 30 min), Replicator, replicant position and awake state.
+- Kid mode: no Ember counter, no dying (sparkle back to base).
+- Verified headless: create profiles, wake, mine 27 Embers, build, reload and resume with everything restored; no errors.
+- Screenshots: `screenshots/phase1-*.png`.
+
 Not done / next:
-- Not yet confirmed on the iPad.
+- Not yet confirmed on the iPad. Cloud sign-in not yet tested by Steve (needs the family login created).
+- Phase 2: the Replicator makes a drifted copy that stays as an NPC; launch the vessel; star map of real stars;
+  real-time journeys.
 - No audio yet. Phase 0 skipped it; add in Phase 3 (or earlier), starting only after the first tap.
 - Rock outcrops still have stair-step edges (no full autotiling). Fine for placeholder art.
-- Then Phase 1: second enemy type, base area plus Replicator placement, Supabase profiles and saves.
