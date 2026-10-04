@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { HomeScene } from './scenes/HomeScene';
 import { PlanetScene } from './scenes/PlanetScene';
+import { StarMapScene } from './scenes/StarMapScene';
+import { TravelScene } from './scenes/TravelScene';
 import { UIScene } from './scenes/UIScene';
 
 const game = new Phaser.Game({
@@ -16,7 +18,7 @@ const game = new Phaser.Game({
   physics: { default: 'arcade', arcade: { debug: false } },
   input: { activePointers: 3, gamepad: true },
   render: { antialias: false, powerPreference: 'high-performance' },
-  scene: [BootScene, HomeScene, PlanetScene, UIScene],
+  scene: [BootScene, HomeScene, PlanetScene, UIScene, TravelScene, StarMapScene],
 });
 
 (window as unknown as { __game: Phaser.Game }).__game = game;

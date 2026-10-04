@@ -112,9 +112,14 @@ src/audio/Sound.ts       procedural WebAudio: every sound effect and the generat
 src/entities/            ... Spitter + Spore (reflectable), Ruin (machine core -> sealed door -> module), Wildlife
                          (Grazer you pet, bird Flock that scatters, Butterflies by day), Npc (drifted copies), Gear
 src/core/drift.ts        replication drift (visor, headgear, trail, stats) from src/data/drift.json
+src/world/galaxy.ts      real stars (src/data/stars.json, built by tools/build-stars.mjs), distances, travel time and
+                         fuel (src/data/travel.json), the planet each star gets (biomes.json + the star's light)
+src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star), launch or look-only
+src/scenes/TravelScene   departure orbit (procedural pixel globe), warp, real-time cruise + ETA, visits, arrival
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame
 src/ui/overlay.ts        HTML forms over the canvas (sign-in, new profile)
 src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Planet (world, saving) + UI (counter, title, touch)
+                         Planet <-> StarMap (overlay) -> Travel -> Planet (arrival); Home goes to Travel while in flight
 supabase/migrations/     schema applied to the "Replicated" Supabase project (keep in sync when changing the DB)
 ```
 
@@ -137,7 +142,8 @@ gamepad B/L1/R2, swipe on the right side. M or the speaker icon (top right) mute
 URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
 screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond|ruin` for other spots, `&kid` for kid mode),
 `?planet=solace`, `?seed=123`, `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
-`?low` (force low-detail mode; also switches on by itself under 40 fps).
+`?low` (force low-detail mode; also switches on by itself under 40 fps), `?fast` (travel minutes become seconds),
+`?shot=1&star=tau-ceti` (preview the world at another star, as a hologram visit).
 
 ## Progress
 
@@ -216,7 +222,27 @@ Plan agreed with Steve: M1 visuals, M2 feel, M3 Replicate, M4 Leaving Earth (spa
 - Migration 0005: `apply_planet_delta` shallow-merges any top-level key (nodes/doors still merge per key).
 - `?shot=1&view=replicate` stages a birth; `&copies=4` adds made-up copies for screenshots. Screenshots `m3-*.png`.
 
+### Session 3c (2026-10-04): Milestone 4, Leaving Earth
+- 44 real stars (Sun-centered x/y/z in light years from RA/Dec/distance) in `src/data/stars.json`; beacons are the far
+  stars nearest four tetrahedral directions at 38 ly: Fomalhaut, Pollux, Arcturus, Capella (25 to 43 ly).
+- Stand on the ring below the vessel and press action. You can only leave a planet that has a copy on it (someone
+  stays behind); otherwise the vessel buzzes and a ghost copy blinks by the Replicator. The star map opens: drag to
+  turn, pinch or scroll to zoom, tap a star; it shows distance, real travel time and fuel (Embers from this planet).
+- Travel time (`src/data/travel.json`): 45 min * (ly / 4.37) ^ 2.5, so Alpha Centauri 45 min, 12 ly about 10 hours,
+  beacons 3 to 10 days. Fuel 10 + 2 per ly. `?fast` makes minutes seconds for testing.
+- Launch: the replicant hops in, liftoff with thrusters and shake, then space: the planet from orbit (procedural
+  pixel globe, Earth with ice caps and the base glowing on the night side), the ship pulls away, warp.
+- In flight: streaking stars, route bar and "ARRIVES IN ..." (real time; kid mode shows only the bar), the star map
+  (look only, shows every family ship in flight), and visits: tap a settled planet to walk around it as a hologram
+  (cyan, flickering; nothing about your own position is saved; the vessel ring takes you back to the ship).
+- Arrival (live or the next time you open the game): the destination planet grows, the ship lands (landing intro),
+  the star joins `discovered_stars`. Planets around other stars come from `src/data/biomes.json` (verdant, frost,
+  dune, spore, ember, moon), picked by the star id, tinted by the star's light (red dwarfs are red). Beacon systems
+  get three times the crystals. Each biome has its own tinted sprite sheets.
+- Store: `journeys` rows (start, active, complete), `discovered_stars`, replicant `status` = `in_transit`.
+- `node tools/playtest-travel.mjs` runs map, launch, warp, arrival and landing headless and saves `screenshots/m4-*.png`.
+
 Not done / next:
 - Milestone 1 leftovers: rounded autotiled rock edges, bloom, a guardian mini-boss in the largest ruin.
-- Milestone 4 (Leaving Earth) as planned.
+- Beacon landmark (something special to find at a beacon), FTL comms, messages, Spark handoff (Phase 3).
 - Not yet confirmed on the iPad. Cloud sign-in not yet tested by Steve (needs the family login created).

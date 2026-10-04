@@ -46,6 +46,25 @@ export interface PlanetSave {
   data: PlanetData;
 }
 
+export interface Journey {
+  id: string;
+  replicant_id: string;
+  from_star: string;
+  to_star: string;
+  departs_at: string; // ISO time
+  arrives_at: string;
+}
+
+/** Every replicant in the galaxy, for the star map (who is where). */
+export interface ReplicantSummary {
+  id: string;
+  name: string;
+  profile_id: string | null;
+  status: ReplicantSave['status'];
+  star_id: string;
+  traits: ReplicantSave['traits'];
+}
+
 export interface GameStore {
   readonly mode: 'cloud' | 'local';
   listProfiles(): Promise<Profile[]>;
@@ -57,6 +76,16 @@ export interface GameStore {
   /** Copies (NPC replicants) living on a planet. */
   listNpcs(star: string, planetIndex: number): Promise<ReplicantSave[]>;
   createReplicant(r: Omit<ReplicantSave, 'id'>): Promise<ReplicantSave>;
+  /** Launch: records the journey and marks the replicant in transit. */
+  startJourney(r: ReplicantSave, toStar: string, arrivesAt: Date): Promise<Journey>;
+  /** The replicant's current journey, if it is in transit. */
+  activeJourney(r: ReplicantSave): Promise<Journey | null>;
+  /** Arrival: the replicant is now at the new star, and the family has discovered it. */
+  completeJourney(r: ReplicantSave, j: Journey, planetIndex: number): Promise<void>;
+  /** All journeys still flying (any family member), for the star map. */
+  openJourneys(): Promise<Journey[]>;
+  listReplicants(): Promise<ReplicantSummary[]>;
+  discoveredStars(): Promise<string[]>;
   /** Atomic: adds emberDelta to the shared pool, merges node states, replaces structures if given. */
   applyPlanetDelta(star: string, planetIndex: number, emberDelta: number, data: PlanetData): Promise<PlanetSave | null>;
   signOut(): Promise<void>;
@@ -83,6 +112,8 @@ interface LocalDb {
   profiles: Profile[];
   replicants: ReplicantSave[];
   planets: Record<string, PlanetSave>;
+  journeys: Journey[];
+  discovered: string[];
 }
 
 export class LocalStore implements GameStore {
@@ -93,7 +124,7 @@ export class LocalStore implements GameStore {
   constructor(private persist = true) {
     let db: LocalDb | null = null;
     try { db = persist ? JSON.parse(localStorage.getItem(this.key) ?? 'null') : null; } catch { db = null; }
-    this.db = db ?? { profiles: [], replicants: [], planets: {} };
+    this.db = { profiles: [], replicants: [], planets: {}, journeys: [], discovered: ['sol'], ...(db ?? {}) };
   }
 
   private flush() {
@@ -119,6 +150,41 @@ export class LocalStore implements GameStore {
     }
     return { ...r, traits: { ...r.traits } };
   }
+
+  async startJourney(r: ReplicantSave, toStar: string, arrivesAt: Date) {
+    const j: Journey = { id: uuid(), replicant_id: r.id, from_star: r.star_id, to_star: toStar, departs_at: new Date().toISOString(), arrives_at: arrivesAt.toISOString() };
+    this.db.journeys.push(j);
+    r.status = 'in_transit';
+    await this.saveReplicant(r);
+    return { ...j };
+  }
+
+  async activeJourney(r: ReplicantSave) {
+    if (r.status !== 'in_transit') return null;
+    const j = this.db.journeys.filter((x) => x.replicant_id === r.id).sort((a, b) => b.departs_at.localeCompare(a.departs_at))[0];
+    return j ? { ...j } : null;
+  }
+
+  async completeJourney(r: ReplicantSave, j: Journey, planetIndex: number) {
+    r.status = 'active';
+    r.star_id = j.to_star;
+    r.planet_index = planetIndex;
+    r.pos_x = null; r.pos_y = null;
+    await this.saveReplicant(r);
+    if (!this.db.discovered.includes(j.to_star)) this.db.discovered.push(j.to_star);
+    this.flush();
+  }
+
+  async openJourneys() {
+    const flying = new Set(this.db.replicants.filter((r) => r.status === 'in_transit').map((r) => r.id));
+    return this.db.journeys.filter((j) => flying.has(j.replicant_id)).map((j) => ({ ...j }));
+  }
+
+  async listReplicants() {
+    return this.db.replicants.map((r) => ({ id: r.id, name: r.name, profile_id: r.profile_id, status: r.status ?? 'active', star_id: r.star_id, traits: { ...r.traits } }));
+  }
+
+  async discoveredStars() { return [...this.db.discovered]; }
 
   async listNpcs(star: string, planetIndex: number) {
     return this.db.replicants.filter((r) => r.status === 'npc' && r.star_id === star && r.planet_index === planetIndex)
@@ -245,8 +311,58 @@ export class CloudStore implements GameStore {
     return data as ReplicantSave;
   }
 
+  async startJourney(r: ReplicantSave, toStar: string, arrivesAt: Date) {
+    const { data, error } = await this.sb.from('journeys').insert({
+      galaxy_id: this.galaxyId, replicant_id: r.id, from_star: r.star_id, to_star: toStar, arrives_at: arrivesAt.toISOString(),
+    }).select('id,replicant_id,from_star,to_star,departs_at,arrives_at').single();
+    if (error) throw error;
+    r.status = 'in_transit';
+    await this.saveReplicant(r);
+    return data as Journey;
+  }
+
+  async activeJourney(r: ReplicantSave) {
+    if (r.status !== 'in_transit') return null;
+    const { data, error } = await this.sb.from('journeys').select('id,replicant_id,from_star,to_star,departs_at,arrives_at')
+      .eq('replicant_id', r.id).order('departs_at', { ascending: false }).limit(1);
+    if (error) throw error;
+    return (data[0] as Journey | undefined) ?? null;
+  }
+
+  async completeJourney(r: ReplicantSave, j: Journey, planetIndex: number) {
+    r.status = 'active';
+    r.star_id = j.to_star;
+    r.planet_index = planetIndex;
+    r.pos_x = null; r.pos_y = null;
+    await this.saveReplicant(r);
+    const { error } = await this.sb.from('discovered_stars')
+      .upsert({ galaxy_id: this.galaxyId, star_id: j.to_star, discovered_by: r.id }, { onConflict: 'galaxy_id,star_id', ignoreDuplicates: true });
+    if (error) throw error;
+  }
+
+  async openJourneys() {
+    const { data, error } = await this.sb.from('journeys')
+      .select('id,replicant_id,from_star,to_star,departs_at,arrives_at,replicants!inner(status)')
+      .eq('replicants.status', 'in_transit');
+    if (error) throw error;
+    return (data as unknown as (Journey & { replicants: unknown })[]).map(({ replicants: _r, ...j }) => j);
+  }
+
+  async listReplicants() {
+    const { data, error } = await this.sb.from('replicants').select('id,name,profile_id,status,star_id,traits');
+    if (error) throw error;
+    return data as ReplicantSummary[];
+  }
+
+  async discoveredStars() {
+    const { data, error } = await this.sb.from('discovered_stars').select('star_id');
+    if (error) throw error;
+    return ['sol', ...(data as { star_id: string }[]).map((d) => d.star_id)];
+  }
+
   async saveReplicant(r: ReplicantSave) {
     const { error } = await this.sb.from('replicants').update({
+      status: r.status ?? 'active',
       traits: r.traits, star_id: r.star_id, planet_index: r.planet_index, pos_x: r.pos_x, pos_y: r.pos_y, updated_at: new Date().toISOString(),
     }).eq('id', r.id);
     if (error) throw error;
