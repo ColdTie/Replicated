@@ -1,0 +1,40 @@
+{
+  "size": [
+    5,
+    5
+  ],
+  "tinted": false,
+  "legend": {
+    ".": null,
+    "p": 29,
+    "P": 28,
+    "k": 25,
+    "y": 11
+  },
+  "animations": {
+    "fly": {
+      "fps": 10,
+      "frames": [
+        0,
+        1
+      ],
+      "repeat": -1
+    }
+  },
+  "frames": [
+    [
+      "pp.pp",
+      "pykyp",
+      ".PkP.",
+      "pP.Pp",
+      "....."
+    ],
+    [
+      "..k..",
+      ".pkp.",
+      ".PkP.",
+      "..k..",
+      "....."
+    ]
+  ]
+}

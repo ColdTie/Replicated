@@ -1,0 +1,24 @@
+{
+  "size": [
+    7,
+    6
+  ],
+  "tinted": false,
+  "legend": {
+    ".": null,
+    "r": 8,
+    "R": 26,
+    "w": 19
+  },
+  "animations": {},
+  "frames": [
+    [
+      ".rr.rr.",
+      "rwrrrRr",
+      "rrrrrRr",
+      ".rrrRr.",
+      "..rRr..",
+      "...r..."
+    ]
+  ]
+}

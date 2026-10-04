@@ -1,5 +1,5 @@
 {
-  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures. The first planet is the default start. intro: 'wake' (Earth cradle) or 'land' (vessel descends). ground = [dark, base, speckle] floor colors (default [25, 24, 23]).",
+  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures. The first planet is the default start. intro: 'wake' (Earth cradle) or 'land' (vessel descends). ground = [dark, base, speckle] floor colors (default [25, 24, 23]). dayCycle: lighting follows the device clock (src/data/daycycle.json). weather: real-hour rain. ponds: number of ponds. flowers: chance per open tile. wildlife: peaceful creatures (grazers can be petted).",
   "planets": [
     {
       "id": "earth",
@@ -30,7 +30,8 @@
       "resourceNodes": 16,
       "enemies": {
         "skitter": 5,
-        "hopper": 6
+        "hopper": 6,
+        "spitter": 3
       },
       "decorDensity": 0.11,
       "sporeRate": 2,
@@ -41,7 +42,16 @@
         25,
         15,
         14
-      ]
+      ],
+      "dayCycle": true,
+      "weather": true,
+      "ponds": 5,
+      "flowers": 0.03,
+      "wildlife": {
+        "grazers": 6,
+        "birds": 10,
+        "butterflies": 8
+      }
     },
     {
       "id": "solace",
@@ -68,7 +78,8 @@
       "ruins": 3,
       "resourceNodes": 16,
       "enemies": {
-        "skitter": 9
+        "skitter": 9,
+        "spitter": 3
       },
       "decorDensity": 0.07,
       "sporeRate": 3,
@@ -76,7 +87,14 @@
       "planetIndex": 1,
       "intro": "land",
       "trees": 0,
-      "towers": 0
+      "towers": 0,
+      "dayCycle": false,
+      "weather": false,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 0
+      }
     }
   ]
 }

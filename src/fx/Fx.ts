@@ -51,11 +51,12 @@ export class Fx {
     this.debrisEmitter.explode(n, x, y);
   }
 
-  slash(x: number, y: number, dir: Phaser.Math.Vector2) {
+  slash(x: number, y: number, dir: Phaser.Math.Vector2, scale = 1, backhand = false) {
     const s = this.scene.add.sprite(Math.round(x), Math.round(y), 'slash').setDepth(6150).setBlendMode(Phaser.BlendModes.ADD);
     const left = dir.x < -0.01;
-    // slash art faces right; mirror for left so the arc sweeps naturally
-    s.setRotation(left ? Math.atan2(dir.y, dir.x) + Math.PI : Math.atan2(dir.y, dir.x)).setFlipX(left);
+    // slash art faces right; mirror for left so the arc sweeps naturally. The second combo hit sweeps back.
+    s.setRotation(left ? Math.atan2(dir.y, dir.x) + Math.PI : Math.atan2(dir.y, dir.x)).setFlipX(left).setFlipY(backhand).setScale(scale);
+    if (scale > 1) s.setTint(0xffe2b8);
     s.play(anim('slash', 'slash'));
     s.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => s.destroy());
   }

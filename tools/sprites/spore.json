@@ -1,0 +1,42 @@
+{
+  "size": [
+    6,
+    6
+  ],
+  "tinted": false,
+  "legend": {
+    ".": null,
+    "e": 8,
+    "y": 11,
+    "W": 19,
+    "O": 10
+  },
+  "animations": {
+    "spin": {
+      "fps": 10,
+      "frames": [
+        0,
+        1
+      ],
+      "repeat": -1
+    }
+  },
+  "frames": [
+    [
+      "..ee..",
+      ".eyye.",
+      "eyWWye",
+      "eyWWye",
+      ".eyye.",
+      "..ee.."
+    ],
+    [
+      "..OO..",
+      ".Oyye.",
+      "eyyWyO",
+      "OyWyye",
+      ".eyyO.",
+      "..ee.."
+    ]
+  ]
+}

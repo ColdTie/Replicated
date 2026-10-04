@@ -20,3 +20,8 @@ const game = new Phaser.Game({
 });
 
 (window as unknown as { __game: Phaser.Game }).__game = game;
+
+// Handles for headless tests and debugging
+import { sound } from './audio/Sound';
+import { session } from './core/session';
+Object.assign(window, { __sound: sound, __session: session });

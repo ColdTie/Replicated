@@ -1,0 +1,109 @@
+{
+  "size": [
+    16,
+    16
+  ],
+  "tinted": true,
+  "legend": {
+    ".": null,
+    "o": 25,
+    "d": "a0",
+    "m": "a1",
+    "l": "a2",
+    "e": 8,
+    "y": 11,
+    "W": 19
+  },
+  "animations": {
+    "idle": {
+      "fps": 2,
+      "frames": [
+        0,
+        1
+      ],
+      "repeat": -1
+    },
+    "windup": {
+      "fps": 12,
+      "frames": [
+        2,
+        3
+      ],
+      "repeat": -1
+    }
+  },
+  "frames": [
+    [
+      "................",
+      "................",
+      "................",
+      ".....oooooo.....",
+      "....omllllmo....",
+      "...omllllllmo...",
+      "..omllllllllmo..",
+      "..omlmoooomlmo..",
+      "..omloeeeeolmo..",
+      "..ommloeeolmmo..",
+      "...ommmmmmmmo...",
+      "....oddddddo....",
+      ".....oddddo.....",
+      "..ood.oddo.doo..",
+      ".odddooddoodddo.",
+      "..oooooooooooo.."
+    ],
+    [
+      "................",
+      "................",
+      "................",
+      "......oooooo....",
+      ".....omllllmo...",
+      "....omllllllmo..",
+      "...omllllllllmo.",
+      "...omlmoooomlmo.",
+      "...omloeeeeolmo.",
+      "...ommloeeolmmo.",
+      "...ommmmmmmmo...",
+      "....oddddddo....",
+      ".....oddddo.....",
+      "..ood.oddo.doo..",
+      ".odddooddoodddo.",
+      "..oooooooooooo.."
+    ],
+    [
+      "................",
+      "................",
+      "................",
+      ".....oooooo.....",
+      "....omllllmo....",
+      "...omllllllmo...",
+      "..omllllllllmo..",
+      "..omlmoooomlmo..",
+      "..omloyyyyolmo..",
+      "..ommloyyolmmo..",
+      "...ommmmmmmmo...",
+      "....oddddddo....",
+      ".....oddddo.....",
+      "..ood.oddo.doo..",
+      ".odddooddoodddo.",
+      "..oooooooooooo.."
+    ],
+    [
+      "................",
+      "................",
+      "................",
+      ".....oooooo.....",
+      "....omllllmo....",
+      "...omllllllmo...",
+      "..omllllllllmo..",
+      "..omlmoooomlmo..",
+      "..omloWWWWolmo..",
+      "..ommloWWolmmo..",
+      "...ommmmmmmmo...",
+      "....oddddddo....",
+      ".....oddddo.....",
+      "..ood.oddo.doo..",
+      ".odddooddoodddo.",
+      "..oooooooooooo.."
+    ]
+  ]
+}

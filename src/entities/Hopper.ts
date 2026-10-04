@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
 import { PALETTE, type HopperDef } from '../core/data';
 import type { Light } from '../fx/Lighting';
@@ -93,6 +94,7 @@ export class Hopper implements Enemy {
     this.sprite.setFlipX(v.x < 0);
     this.marker.setPosition(this.to.x, this.to.y).setVisible(true).setScale(1.4).setAlpha(0);
     this.scene.tweens.add({ targets: this.marker, scale: 1, alpha: 1, duration: this.def.windupMs, ease: 'Quad.easeIn' });
+    sound.windup();
   }
 
   private jump(time: number, tx: number, ty: number, attack: boolean) {
@@ -108,6 +110,13 @@ export class Hopper implements Enemy {
     this.aggressive = attack;
     this.sprite.play(anim(this.texKey, 'air'));
     squash(this.scene, this.sprite, 0.7, 1.35, 90);
+    if (this.near()) sound.hop();
+  }
+
+  /** Only make noise when the player could see it. */
+  private near() {
+    const p = this.scene.player;
+    return Math.hypot(p.x - this.x, p.y - this.y) < 160;
   }
 
   private land(time: number) {
@@ -116,6 +125,7 @@ export class Hopper implements Enemy {
     this.sprite.play(anim(this.texKey, 'idle'));
     squash(this.scene, this.sprite, 1.4, 0.65, 120);
     this.scene.fx.dust(this.x, this.y + 2, 4);
+    if (this.near()) sound.land();
     const p = this.scene.player;
     if (this.aggressive && p.alive && Math.hypot(p.x - this.x, p.y - this.y) < this.def.landRadius) {
       p.hurt(this.x, this.y, this.def.contactDamage);
@@ -143,6 +153,7 @@ export class Hopper implements Enemy {
     this.marker.setVisible(false);
     const x = this.x, y = this.y;
     this.scene.fx.debris(x, y - 5, 12);
+    this.scene.onEnemyKilled(this);
     this.scene.time.delayedCall(110, () => {
       for (let i = 0; i < (this.def.drops.ember ?? 0); i++) this.scene.spawnShard(x, y, dir);
     });

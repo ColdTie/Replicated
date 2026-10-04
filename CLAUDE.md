@@ -107,6 +107,10 @@ src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, ene
 src/fx/                  Lighting (multiply darkness RT + additive lights), Atmosphere (sky, stars, fog,
                          dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
 src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember), Base (pad + Replicator)
+src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
+src/audio/Sound.ts       procedural WebAudio: every sound effect and the generative ambient music (no audio files)
+src/entities/            ... Spitter + Spore (reflectable), Ruin (machine core -> sealed door -> module), Wildlife
+                         (Grazer you pet, bird Flock that scatters, Butterflies by day)
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame
 src/ui/overlay.ts        HTML forms over the canvas (sign-in, new profile)
 src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Planet (world, saving) + UI (counter, title, touch)
@@ -121,11 +125,18 @@ Every table is scoped by `galaxy_id` with row level security; `ensure_family_gal
 Sprite legend roles: `a0/a1/a2` = planet accent (dark, mid, light), `g0/g1/g2` = planet ground, `f0/f1` = replicant
 feature color (visor, antenna tip, chest core).
 
-Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`.
+Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`,
+`node tools/playtest.mjs` (scripted headless playtest of the ruin puzzle, dash, combo, spore reflect, petting),
+`node tools/fps.mjs "<query>"` (headless frame rate; software GL, only for comparing builds).
+
+Controls: move WASD/arrows/left stick/left-side touch drag. Attack Space/J/Enter/Z, left click, gamepad A/X/R1, tap right
+side (three quick attacks = heavy combo finisher; presses during the cooldown are buffered). Dash Shift/K/X, right click,
+gamepad B/L1/R2, swipe on the right side. M or the speaker icon (top right) mutes.
 
 URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
-screenshot pose (enemies frozen; add `&view=base` for the base, `&kid` for kid mode), `?planet=solace`, `?seed=123`,
-`?model=drone`.
+screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond|ruin` for other spots, `&kid` for kid mode),
+`?planet=solace`, `?seed=123`, `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
+`?low` (force low-detail mode; also switches on by itself under 40 fps).
 
 ## Progress
 
@@ -168,7 +179,30 @@ Done:
 - Health regenerates (1 hp every 2.5s after 4s without a hit; `regen` in `src/data/player.json`). The player light
   keeps a higher floor at low health so a hurt replicant no longer fades into the darkness and looks see-through.
 
+### Session 3 (2026-10-04): Milestones 1 and 2 ("Living Earth" visuals, "Feel" gameplay)
+Plan agreed with Steve: M1 visuals, M2 feel, M3 Replicate, M4 Leaving Earth (space travel). Target device: iPad 9th gen.
+- Sound: all procedural (WebAudio). Footsteps per surface (grass, stone, water), swings, hits, crystal chimes in a
+  pentatonic scale, rising pickup notes, hurt, dash, enemy calls, build, door, upgrade, rain bed, thunder, and a slow
+  generative pad that drops lower and sparser at night. Starts on first tap; `navigator.audioSession` set to playback.
+  Volumes and the chord progression live in `src/data/sound.json`.
+- Day and night follow the device clock (`src/data/daycycle.json`): pink dawn, sunny day with drifting sunbeams, amber
+  dusk, dark night with stars and fireflies. Rain is rolled per real hour (same for the whole family), with ripples and
+  lightning at night. Earth only (`dayCycle`, `weather` in planets.json).
+- Dash with visor-colored afterimages and invulnerability; 3-hit combo (third swing is heavy: bigger arc, 2 damage,
+  more knockback); input buffering; the camera leans ahead of movement; slow motion on the last kill of a fight.
+- Living world: grass, reeds and flowers bend as you or a grazer walk through and sway in the wind; ponds (shallow,
+  slow you down, splash, glints, your reflection); lily pads, reeds, flowers. Grazers (moss deer) can be petted (hop +
+  hearts; in kid mode they follow you for a while). Bird flocks scatter when you get close. Butterflies by day.
+- Ruins are now a wordless puzzle: hit the broken machine, a glowing core (same color as the sealed door) pops out and
+  follows you, bring it to the door and it opens; inside floats a module (light, dash or swing +20% for the replicant
+  who takes it, stored in `traits.mods`). Door state is shared per planet (`planet_states.data.doors`, migration 0004).
+- Spitter: rooted spore plant that swells and spits slow spores; hit a spore to bat it back for 2 damage.
+- Performance: `?fps` counter, auto low-detail mode (drops sunbeams and firefly lights) under 40 fps.
+- Screenshots: `screenshots/m1-*.png` (day, dusk, night, rain, pond day/night, ruin).
+
 Not done / next:
+- Milestone 1 leftovers: rounded autotiled rock edges, bloom, a guardian mini-boss in the largest ruin.
+- Milestone 3 (Replicate) and Milestone 4 (Leaving Earth) as planned.
 - Not yet confirmed on the iPad. Cloud sign-in not yet tested by Steve (needs the family login created).
 - Phase 2: the Replicator makes a drifted copy that stays as an NPC; launch the vessel; star map of real stars;
   real-time journeys.

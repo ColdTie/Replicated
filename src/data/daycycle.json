@@ -1,0 +1,69 @@
+{
+  "_doc": "Real-time day and night for planets with dayCycle. Keys are local device hours. ambient = darkness layer color (white = full daylight), sky = tint over the sky gradient, night = 0 day .. 1 night (stars, fireflies, music). rain: chance per real hour that it rains (same for the whole family), nightDarker: extra darkening while raining. sunLift: strength of the warm additive daylight.",
+  "keys": [
+    {
+      "hour": 0,
+      "ambient": "3c4070",
+      "sky": "4a5590",
+      "night": 1
+    },
+    {
+      "hour": 5,
+      "ambient": "464878",
+      "sky": "50609c",
+      "night": 1
+    },
+    {
+      "hour": 6.5,
+      "ambient": "c4909c",
+      "sky": "ffa0b8",
+      "night": 0.4
+    },
+    {
+      "hour": 8,
+      "ambient": "f0ecd8",
+      "sky": "f0f4ff",
+      "night": 0
+    },
+    {
+      "hour": 12,
+      "ambient": "fffaec",
+      "sky": "ffffff",
+      "night": 0
+    },
+    {
+      "hour": 17,
+      "ambient": "f4e4c4",
+      "sky": "fff0d0",
+      "night": 0
+    },
+    {
+      "hour": 19,
+      "ambient": "d08a62",
+      "sky": "ff9a6a",
+      "night": 0.3
+    },
+    {
+      "hour": 20.5,
+      "ambient": "6e5c8c",
+      "sky": "8a6aa8",
+      "night": 0.8
+    },
+    {
+      "hour": 22,
+      "ambient": "40446f",
+      "sky": "4e5a94",
+      "night": 1
+    },
+    {
+      "hour": 24,
+      "ambient": "3c4070",
+      "sky": "4a5590",
+      "night": 1
+    }
+  ],
+  "rainChance": 0.2,
+  "rainDarken": 0.82,
+  "fireflies": 14,
+  "sunLift": 0.09
+}

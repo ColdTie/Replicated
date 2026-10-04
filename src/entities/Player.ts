@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { anim, featureTex } from '../core/assets';
 import { PALETTE, PLAYER } from '../core/data';
 import { isKid, session } from '../core/session';
+import { sound } from '../audio/Sound';
 import type { Light } from '../fx/Lighting';
 import type { InputFrame } from '../input/Controls';
 import type { PlanetScene } from '../scenes/PlanetScene';
@@ -36,6 +37,16 @@ export class Player {
   private nextRegenAt = 0;
   private attackReadyAt = 0;
   private attackingUntil = 0;
+  private lastAttackAt = -Infinity;
+  /** An attack pressed during the cooldown fires as soon as it ends (so mashing never drops a swing) */
+  private attackBufferedUntil = 0;
+  private combo = 0;
+  private dashUntil = 0;
+  private dashReadyAt = 0;
+  private nextAfterimage = 0;
+  private dashDir = new Phaser.Math.Vector2();
+  /** Visor color, used for the dash trail */
+  readonly featureColor: number;
   private stepTimer = 0;
   private dead = false;
 
@@ -46,7 +57,9 @@ export class Player {
     this.body.setDrag(0, 0);
     this.shadow = scene.add.image(x, y, 'shadow').setAlpha(0.45).setTint(PALETTE[25]).setDepth(50);
     const model = pickModel();
-    this.key = featureTex(model.sprite, session.replicant?.traits.feature ?? session.profile?.feature_color ?? PLAYER.feature[1]);
+    const feature = session.replicant?.traits.feature ?? session.profile?.feature_color ?? PLAYER.feature[1];
+    this.featureColor = PALETTE[feature];
+    this.key = featureTex(model.sprite, feature);
     this.headY = model.headY;
     this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1);
     this.sprite.play(anim(this.key, 'idle'));
@@ -66,11 +79,19 @@ export class Player {
   update(time: number, dt: number, input: InputFrame) {
     if (this.dead) { this.syncVisuals(); return; }
     const moving = !this.locked && (input.x !== 0 || input.y !== 0);
-    const speed = PLAYER.speed;
+    const speed = PLAYER.speed * (this.scene.surfaceAt(this.x, this.y + 2) === 'water' ? 0.72 : 1);
     const tx = this.locked ? 0 : input.x * speed, ty = this.locked ? 0 : input.y * speed;
     const a = (PLAYER.accel * dt) / 1000;
     const v = this.body.velocity;
-    if (time > this.attackingUntil - 60) {
+    const dashing = time < this.dashUntil;
+    if (dashing) {
+      const sp = PLAYER.dash.speed * this.mod('dash');
+      v.set(this.dashDir.x * sp, this.dashDir.y * sp);
+      if (time > this.nextAfterimage) {
+        this.nextAfterimage = time + PLAYER.dash.afterimageEveryMs;
+        this.afterimage();
+      }
+    } else if (time > this.attackingUntil - 60) {
       v.x = approach(v.x, tx, a);
       v.y = approach(v.y, ty, a);
     } else {
@@ -90,15 +111,23 @@ export class Player {
     }
     this.sprite.setFlipX(this.facing < 0);
 
-    if (moving) {
+    if (moving && !dashing) {
       this.stepTimer -= dt;
       if (this.stepTimer <= 0) {
         this.stepTimer = 170;
-        this.scene.fx.dust(this.x - this.facing * 3, this.y + 2, 2);
+        const surface = this.scene.surfaceAt(this.x, this.y);
+        if (surface === 'water') this.scene.splash(this.x, this.y + 2, false);
+        else this.scene.fx.dust(this.x - this.facing * 3, this.y + 2, 2);
+        sound.step(surface);
       }
     }
 
-    if (!this.locked && input.attack && time >= this.attackReadyAt && !this.scene.tryInteract()) this.attack(time);
+    if (!this.locked && input.dash && time >= this.dashReadyAt) this.dash(time, input);
+    if (input.attack) this.attackBufferedUntil = time + 200;
+    if (!this.locked && time < this.attackBufferedUntil && time >= this.attackReadyAt) {
+      this.attackBufferedUntil = 0;
+      if (!this.scene.tryInteract()) this.attack(time);
+    }
 
     // Out of danger for a moment: health slowly comes back
     const { delayMs, everyMs } = PLAYER.regen;
@@ -106,6 +135,7 @@ export class Player {
       if (this.nextRegenAt > 0) {
         this.hp += 1;
         this.scene.fx.sparks(this.x, this.y - 8, WARM, 4);
+        sound.regen();
       }
       this.nextRegenAt = time + everyMs;
     }
@@ -114,18 +144,29 @@ export class Player {
     // so far that the body sinks into the darkness.
     const frac = this.hp / PLAYER.maxHp;
     const low = frac <= 0.4 ? 0.15 * (0.5 + 0.5 * Math.sin(time / 90)) : 0;
-    this.light.radius = (60 + 40 * frac) * PLAYER.lightRadius;
+    this.light.radius = (60 + 40 * frac) * PLAYER.lightRadius * this.mod('light');
     this.light.intensity = 0.8 + 0.2 * frac - low;
     this.glow.setAlpha((0.08 + 0.14 * frac) * (1 - low)).setScale(0.6 + 0.4 * frac);
 
-    // invulnerability blink
-    this.sprite.setVisible(time > this.invulnUntil || Math.floor(time / 70) % 2 === 0);
+    // invulnerability blink (not while dashing: the trail already shows it)
+    this.sprite.setVisible(dashing || time > this.invulnUntil || Math.floor(time / 70) % 2 === 0);
     this.syncVisuals();
   }
 
+  /** Multiplier from collected modules (ruins): light, dash, swing. */
+  mod(kind: 'light' | 'dash' | 'swing') {
+    const mods = session.replicant?.traits.mods ?? [];
+    return 1 + mods.filter((m) => m === kind).length * 0.2;
+  }
+
   private attack(time: number) {
-    this.attackReadyAt = time + PLAYER.attack.cooldownMs;
-    this.attackingUntil = time + 150;
+    // Combo: attacks in quick succession chain up to a heavy third swing
+    this.combo = time - this.lastAttackAt < PLAYER.attack.comboWindowMs && this.combo < 3 ? this.combo + 1 : 1;
+    const heavy = this.combo === 3;
+    this.lastAttackAt = time;
+    this.attackReadyAt = time + (heavy ? PLAYER.attack.heavy.cooldownMs : PLAYER.attack.cooldownMs);
+    this.attackingUntil = time + (heavy ? 220 : 150);
+    this.dashUntil = 0;
     // gentle auto-aim: if standing still, swing toward the nearest target in reach
     const target = this.scene.nearestTarget(this.x, this.y, 46);
     if (target && this.body.velocity.length() < 10) {
@@ -133,18 +174,48 @@ export class Player {
       if (Math.abs(this.aim.x) > 0.2) this.facing = Math.sign(this.aim.x);
     }
     this.sprite.play(anim(this.key, 'attack'), true);
-    this.body.velocity.x += this.aim.x * 60;
-    this.body.velocity.y += this.aim.y * 60;
-    const { reach, radius } = PLAYER.attack;
-    const hx = this.x + this.aim.x * reach, hy = this.y - 5 + this.aim.y * reach;
-    this.scene.fx.slash(hx, hy, this.aim);
-    squash(this.scene, this.sprite, 1.2, 0.85, 90);
-    this.scene.resolveAttack(hx, hy, radius, this.aim);
+    const lunge = heavy ? 130 : 60;
+    this.body.velocity.x += this.aim.x * lunge;
+    this.body.velocity.y += this.aim.y * lunge;
+    const { reach } = PLAYER.attack;
+    const radius = PLAYER.attack.radius * this.mod('swing') * (heavy ? PLAYER.attack.heavy.radiusScale : 1);
+    const r = reach * (heavy ? 1.2 : 1);
+    const hx = this.x + this.aim.x * r, hy = this.y - 5 + this.aim.y * r;
+    this.scene.fx.slash(hx, hy, this.aim, heavy ? 1.45 : 1, this.combo === 2);
+    if (heavy) squash(this.scene, this.sprite, 1.35, 0.75, 120);
+    else squash(this.scene, this.sprite, 1.2, 0.85, 90);
+    sound.swing(heavy);
+    this.scene.resolveAttack(hx, hy, radius, this.aim, heavy);
+  }
+
+  private dash(time: number, input: InputFrame) {
+    const d = input.dashDir ?? (input.x || input.y ? { x: input.x, y: input.y } : { x: this.aim.x, y: this.aim.y });
+    this.dashDir.set(d.x, d.y);
+    if (this.dashDir.lengthSq() < 0.01) this.dashDir.set(this.facing, 0);
+    this.dashDir.normalize();
+    this.aim.copy(this.dashDir);
+    if (Math.abs(this.dashDir.x) > 0.15) this.facing = Math.sign(this.dashDir.x);
+    this.dashUntil = time + PLAYER.dash.ms;
+    this.dashReadyAt = time + PLAYER.dash.cooldownMs;
+    this.attackingUntil = 0;
+    this.nextAfterimage = 0;
+    this.scene.fx.dust(this.x, this.y + 2, 6);
+    squash(this.scene, this.sprite, 1.4, 0.7, 100);
+    sound.dash();
+  }
+
+  get dashing() { return this.scene.time.now < this.dashUntil; }
+
+  private afterimage() {
+    const s = this.sprite;
+    const ghost = this.scene.add.image(s.x, s.y, s.texture.key, s.frame.name).setOrigin(0.5, 1).setFlipX(s.flipX)
+      .setTintFill(this.featureColor).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.55).setDepth(s.depth - 1);
+    this.scene.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
   }
 
   hurt(fromX: number, fromY: number, damage: number) {
     const now = this.scene.time.now;
-    if (this.dead || this.locked || now < this.invulnUntil) return;
+    if (this.dead || this.locked || now < this.invulnUntil || now < this.dashUntil) return;
     this.invulnUntil = now + PLAYER.invulnMs;
     this.hp = Math.max(0, this.hp - damage);
     this.lastHurtAt = now;
@@ -152,6 +223,7 @@ export class Player {
     const dir = new Phaser.Math.Vector2(this.x - fromX, this.y - fromY).normalize();
     this.body.velocity.set(dir.x * 190, dir.y * 190);
     this.sprite.play(anim(this.key, 'hurt'), true);
+    sound.hurt();
     flashWhite(this.scene, this.sprite, 90);
     squash(this.scene, this.sprite, 0.75, 1.25, 110);
     this.scene.hitStop(100);

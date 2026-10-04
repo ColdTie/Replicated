@@ -36,6 +36,10 @@ export class Lighting {
     return light;
   }
 
+  setAmbient(c: number) {
+    this.ambient = c;
+  }
+
   remove(l: Light) {
     this.lights.delete(l);
   }

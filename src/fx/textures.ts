@@ -145,3 +145,49 @@ export function makePixel(scene: Phaser.Scene) {
 export function rgb(c: number): [number, number, number] {
   return [(c >> 16) & 255, (c >> 8) & 255, c & 255];
 }
+
+/** Tileable soft diagonal light shafts for daytime sunbeams. */
+export function makeRays(scene: Phaser.Scene, key = 'rays', size = 256) {
+  canvasTexture(scene, key, size, size, (img) => {
+    const shafts = [[20, 22], [70, 10], [110, 30], [170, 14], [205, 24]];
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      // distance across the 45 degree shafts; x + y wraps cleanly so the texture tiles without a seam
+      const u = (x + y) % size;
+      let v = 0;
+      for (const [c, w] of shafts) {
+        const d = Math.min(Math.abs(u - c), size - Math.abs(u - c)) / w;
+        if (d < 1) v = Math.max(v, (1 - d * d));
+      }
+      const q = Math.min(1, Math.floor(v * 4 + dither(x, y)) / 4);
+      const i = (y * size + x) * 4;
+      img.data[i] = 255; img.data[i + 1] = 240; img.data[i + 2] = 200;
+      img.data[i + 3] = Math.round(q * 255);
+    }
+  });
+}
+
+/** Small textures for weather and water: a rain streak and a ripple ring. */
+export function makeWeatherBits(scene: Phaser.Scene) {
+  if (!scene.textures.exists('drop')) {
+    canvasTexture(scene, 'drop', 2, 6, (img) => {
+      for (let y = 0; y < 6; y++) {
+        const x = y < 3 ? 1 : 0;
+        const i = (y * 2 + x) * 4;
+        img.data[i] = 200; img.data[i + 1] = 220; img.data[i + 2] = 255;
+        img.data[i + 3] = 120 + y * 20;
+      }
+    });
+  }
+  if (!scene.textures.exists('ring')) {
+    canvasTexture(scene, 'ring', 11, 5, (img) => {
+      for (let y = 0; y < 5; y++) for (let x = 0; x < 11; x++) {
+        const d = Math.hypot((x + 0.5 - 5.5) / 5.5, (y + 0.5 - 2.5) / 2.5);
+        if (d > 0.72 && d < 1.02) {
+          const i = (y * 11 + x) * 4;
+          img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+          img.data[i + 3] = 255;
+        }
+      }
+    });
+  }
+}

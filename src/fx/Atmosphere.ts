@@ -4,9 +4,10 @@ import { PALETTE, hex, type PlanetDef } from '../core/data';
 import { makeFog, makeSky, makeStars } from './textures';
 
 export class Atmosphere {
-  private starsFar: Phaser.GameObjects.TileSprite;
-  private starsNear: Phaser.GameObjects.TileSprite;
-  private fog: Phaser.GameObjects.TileSprite;
+  readonly sky: Phaser.GameObjects.Image;
+  readonly starsFar: Phaser.GameObjects.TileSprite;
+  readonly starsNear: Phaser.GameObjects.TileSprite;
+  readonly fog: Phaser.GameObjects.TileSprite;
   private dust: Phaser.GameObjects.Particles.ParticleEmitter;
   private spores: Phaser.GameObjects.Particles.ParticleEmitter;
   private t = 0;
@@ -21,7 +22,7 @@ export class Atmosphere {
     makeStars(scene, `stars.near.${planet.id}`, 160, 18, planet.seed + 9, accentLight);
     makeFog(scene, `fog.${planet.id}`, 192, planet.seed);
 
-    scene.add.image(0, 0, `sky.${planet.id}`).setOrigin(0).setScrollFactor(0).setDepth(-1000);
+    this.sky = scene.add.image(0, 0, `sky.${planet.id}`).setOrigin(0).setScrollFactor(0).setDepth(-1000);
     this.starsFar = scene.add.tileSprite(0, 0, w, h, `stars.far.${planet.id}`).setOrigin(0).setScrollFactor(0).setDepth(-990);
     this.starsNear = scene.add.tileSprite(0, 0, w, h, `stars.near.${planet.id}`).setOrigin(0).setScrollFactor(0).setDepth(-980);
     this.fog = scene.add.tileSprite(0, 0, w + 4, h + 4, `fog.${planet.id}`).setOrigin(0).setScrollFactor(0)

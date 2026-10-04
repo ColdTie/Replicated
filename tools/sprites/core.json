@@ -1,0 +1,59 @@
+{
+  "size": [
+    10,
+    8
+  ],
+  "tinted": false,
+  "legend": {
+    ".": null,
+    "o": 6,
+    "O": 9,
+    "Y": 10,
+    "W": 11,
+    "w": 19
+  },
+  "animations": {
+    "pulse": {
+      "fps": 6,
+      "frames": [
+        0,
+        1,
+        2,
+        1
+      ],
+      "repeat": -1
+    }
+  },
+  "frames": [
+    [
+      "...oooo...",
+      "..oYYYYo..",
+      ".oYWWYYOo.",
+      ".oYWwWYOo.",
+      ".oYYWYYOo.",
+      ".oYYYYOOo.",
+      "..oOOOOo..",
+      "...oooo..."
+    ],
+    [
+      "...oooo...",
+      "..oYYYYo..",
+      ".oYWWYYOo.",
+      ".oYWWWYOo.",
+      ".oYYWYYOo.",
+      ".oYYYYOOo.",
+      "..oOOOOo..",
+      "...oooo..."
+    ],
+    [
+      "...oooo...",
+      "..oYYYYo..",
+      ".oYYWWYOo.",
+      ".oYYWwYOo.",
+      ".oYYYWYOo.",
+      ".oYYYYOOo.",
+      "..oOOOOo..",
+      "...oooo..."
+    ]
+  ]
+}
