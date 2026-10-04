@@ -54,8 +54,8 @@ No final art yet. Generate placeholder sprites with a Node script that writes pi
 ## Phase plan
 
 - **Phase 0, vertical slice** (do this first, nothing else): one planet, one player, movement, one enemy, one resource, the lighting and particle look from the brief, touch controls, deployed to GitHub Pages and confirmed on the iPad. It should already feel polished. Take a screenshot (headless Chromium via Playwright) and save it to `screenshots/` after each milestone so Steve can review the look in chat.
-- **Phase 1:** full loop steps 1 to 3 plus Supabase profiles and saves.
-- **Phase 2:** steps 4 and 5.
+- **Phase 1:** full loop steps 1 to 3 plus Supabase profiles and saves. Start on Earth (hand-tuned, peaceful and overgrown) instead of a random planet. Design the Supabase schema for the shared galaxy from day one (see Long-term decisions), even though travel comes in Phase 2.
+- **Phase 2:** steps 4 and 5. Travel uses real-world time; the star map shows real nearby stars.
 - **Phase 3:** step 6, kid mode polish, sound, family playtest fixes.
 
 ## Out of scope
@@ -69,6 +69,16 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 - Ask before adding any dependency beyond Phaser, Vite, TypeScript, supabase js, pngjs, and Playwright.
 - Update the Progress section below at the end of every session.
 - When something needs Steve (keys, account creation, testing on the iPad), stop and give a short numbered list.
+
+## Long-term decisions (agreed with Steve, 2026-10-04)
+
+These shape the data model now, even where the feature comes later.
+
+- **Travel runs on real-world time.** Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
+- **One shared galaxy for the family.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that the three profiles share. Store a `galaxy_id` on everything so more families could get their own galaxy later. No strangers, no public play.
+- **Earth is the start.** Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly for a 5 year old. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
+- **Messages travel at light speed until FTL comms exist.** A message between replicants in different systems arrives after a delay based on distance (scaled like travel). Building or finding the FTL comms device makes messages from that system instant.
+- **Stars are real.** The galaxy is real nearby stars (positions relative to the Sun). Each star's planets are generated from a seed derived from the star's id. Beacon systems sit at fixed, symmetrical points around the Sun, snapped to the nearest real star.
 
 ## Backlog: long-term vision (recorded 2026-10-04, not scheduled)
 
@@ -125,7 +135,7 @@ Done:
 - Move speed raised from 78 to 90.
 
 Not done / next:
-- Not yet confirmed on the iPad or confirmed on the iPad (needs Steve: enable Pages and merge to `main`).
+- Not yet confirmed on the iPad.
 - No audio yet. Phase 0 skipped it; add in Phase 3 (or earlier), starting only after the first tap.
 - Rock outcrops still have stair-step edges (no full autotiling). Fine for placeholder art.
 - Then Phase 1: second enemy type, base area plus Replicator placement, Supabase profiles and saves.
