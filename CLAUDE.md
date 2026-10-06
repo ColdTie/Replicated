@@ -388,3 +388,14 @@ Not done / next:
 ### Session 5g (2026-10-06): faster pickups
 - Embers reach you about 25% sooner: shards may start flying after 340 ms instead of 450, from 55 px away instead
   of 44, and fly 25% harder (`pickupDelayMs`, `magnetRange`, `magnetPull` in `src/data/items.json`).
+
+### Session 5h (2026-10-06): painted rock, the core that got stuck
+- Rock outcrops are painted like the floors (`src/world/rockPaint.ts`, styles under `rock` in `src/data/floor.json`):
+  one full-color image per planet over the wall tiles (which stay for collision). Tops are relief-shaded noise in
+  the biome's rock ramp with contour cracks, a lit rim along the top and left edges and a dark outline on the
+  right; moss (Earth, Verdant), snow (Frost) or dust gathers in the hollows; ember rock splits into plates with
+  glowing seams. Where an outcrop ends, the cell below shows its front face with a lit lip, streaks and strata,
+  darkening to the ground. Ruins keep their stone tiles. `screenshots/rock-*.png`.
+- The ruin core could land inside a wall (always 10 px right and below the machine) where you could not get within
+  reach, so it sat there forever (Steve's screenshot). It now lands on the first open floor spot around the
+  machine, drifts toward you when you come within 44 px, and is picked up from 20 px instead of 14.
