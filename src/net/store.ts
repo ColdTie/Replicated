@@ -29,7 +29,8 @@ export interface ReplicantSave {
 }
 
 export interface NodeState { hits: number; at: number }
-export interface StructureSave { type: string; x: number; y: number; at: number }
+/** A built thing on a planet: the Replicator, or something a copy raised (by = its replicant id, tint = palette index, variant = sprite frame). */
+export interface StructureSave { type: string; x: number; y: number; at: number; by?: string; tint?: number; variant?: number }
 export interface DoorState { open: boolean; taken?: boolean }
 export interface PlanetData {
   nodes?: Record<string, NodeState>;
@@ -38,6 +39,8 @@ export interface PlanetData {
   /** When the copies' offline gathering was last counted (ms epoch) */
   npcTick?: number;
   structures?: StructureSave[];
+  /** The copies' shared building effort not yet spent */
+  village?: { work: number };
 }
 export interface PlanetSave {
   star_id: string;
@@ -60,6 +63,8 @@ export interface Journey {
   replicant_id: string;
   from_star: string;
   to_star: string;
+  from_planet: number;  // planet_index left behind
+  to_planet: number;    // planet_index the ship lands on
   departs_at: string; // ISO time
   arrives_at: string;
 }
@@ -71,6 +76,7 @@ export interface ReplicantSummary {
   profile_id: string | null;
   status: ReplicantSave['status'];
   star_id: string;
+  planet_index: number;
   traits: ReplicantSave['traits'];
 }
 
@@ -86,11 +92,11 @@ export interface GameStore {
   listNpcs(star: string, planetIndex: number): Promise<ReplicantSave[]>;
   createReplicant(r: Omit<ReplicantSave, 'id'>): Promise<ReplicantSave>;
   /** Launch: records the journey and marks the replicant in transit. */
-  startJourney(r: ReplicantSave, toStar: string, arrivesAt: Date): Promise<Journey>;
+  startJourney(r: ReplicantSave, toStar: string, toPlanet: number, arrivesAt: Date): Promise<Journey>;
   /** The replicant's current journey, if it is in transit. */
   activeJourney(r: ReplicantSave): Promise<Journey | null>;
   /** Arrival: the replicant is now at the new star, and the family has discovered it. */
-  completeJourney(r: ReplicantSave, j: Journey, planetIndex: number): Promise<void>;
+  completeJourney(r: ReplicantSave, j: Journey): Promise<void>;
   /** All journeys still flying (any family member), for the star map. */
   openJourneys(): Promise<Journey[]>;
   listReplicants(): Promise<ReplicantSummary[]>;
@@ -160,8 +166,11 @@ export class LocalStore implements GameStore {
     return { ...r, traits: { ...r.traits } };
   }
 
-  async startJourney(r: ReplicantSave, toStar: string, arrivesAt: Date) {
-    const j: Journey = { id: uuid(), replicant_id: r.id, from_star: r.star_id, to_star: toStar, departs_at: new Date().toISOString(), arrives_at: arrivesAt.toISOString() };
+  async startJourney(r: ReplicantSave, toStar: string, toPlanet: number, arrivesAt: Date) {
+    const j: Journey = {
+      id: uuid(), replicant_id: r.id, from_star: r.star_id, to_star: toStar, from_planet: r.planet_index, to_planet: toPlanet,
+      departs_at: new Date().toISOString(), arrives_at: arrivesAt.toISOString(),
+    };
     this.db.journeys.push(j);
     r.status = 'in_transit';
     await this.saveReplicant(r);
@@ -174,10 +183,10 @@ export class LocalStore implements GameStore {
     return j ? capJourney({ ...j }) : null;
   }
 
-  async completeJourney(r: ReplicantSave, j: Journey, planetIndex: number) {
+  async completeJourney(r: ReplicantSave, j: Journey) {
     r.status = 'active';
     r.star_id = j.to_star;
-    r.planet_index = planetIndex;
+    r.planet_index = j.to_planet;
     r.pos_x = null; r.pos_y = null;
     await this.saveReplicant(r);
     if (!this.db.discovered.includes(j.to_star)) this.db.discovered.push(j.to_star);
@@ -190,7 +199,7 @@ export class LocalStore implements GameStore {
   }
 
   async listReplicants() {
-    return this.db.replicants.map((r) => ({ id: r.id, name: r.name, profile_id: r.profile_id, status: r.status ?? 'active', star_id: r.star_id, traits: { ...r.traits } }));
+    return this.db.replicants.map((r) => ({ id: r.id, name: r.name, profile_id: r.profile_id, status: r.status ?? 'active', star_id: r.star_id, planet_index: r.planet_index, traits: { ...r.traits } }));
   }
 
   async discoveredStars() { return [...this.db.discovered]; }
@@ -239,6 +248,7 @@ export class LocalStore implements GameStore {
 // ---------------------------------------------------------------- cloud
 
 const REPLICANT_COLS = 'id,profile_id,parent_id,generation,name,model,traits,stats,status,star_id,planet_index,pos_x,pos_y';
+const JOURNEY_COLS = 'id,replicant_id,from_star,to_star,from_planet,to_planet,departs_at,arrives_at';
 
 let clientPromise: Promise<SupabaseClient> | null = null;
 
@@ -320,10 +330,11 @@ export class CloudStore implements GameStore {
     return data as ReplicantSave;
   }
 
-  async startJourney(r: ReplicantSave, toStar: string, arrivesAt: Date) {
+  async startJourney(r: ReplicantSave, toStar: string, toPlanet: number, arrivesAt: Date) {
     const { data, error } = await this.sb.from('journeys').insert({
-      galaxy_id: this.galaxyId, replicant_id: r.id, from_star: r.star_id, to_star: toStar, arrives_at: arrivesAt.toISOString(),
-    }).select('id,replicant_id,from_star,to_star,departs_at,arrives_at').single();
+      galaxy_id: this.galaxyId, replicant_id: r.id, from_star: r.star_id, to_star: toStar, from_planet: r.planet_index, to_planet: toPlanet,
+      arrives_at: arrivesAt.toISOString(),
+    }).select(JOURNEY_COLS).single();
     if (error) throw error;
     r.status = 'in_transit';
     await this.saveReplicant(r);
@@ -332,17 +343,17 @@ export class CloudStore implements GameStore {
 
   async activeJourney(r: ReplicantSave) {
     if (r.status !== 'in_transit') return null;
-    const { data, error } = await this.sb.from('journeys').select('id,replicant_id,from_star,to_star,departs_at,arrives_at')
+    const { data, error } = await this.sb.from('journeys').select(JOURNEY_COLS)
       .eq('replicant_id', r.id).order('departs_at', { ascending: false }).limit(1);
     if (error) throw error;
     const j = data[0] as Journey | undefined;
     return j ? capJourney(j) : null;
   }
 
-  async completeJourney(r: ReplicantSave, j: Journey, planetIndex: number) {
+  async completeJourney(r: ReplicantSave, j: Journey) {
     r.status = 'active';
     r.star_id = j.to_star;
-    r.planet_index = planetIndex;
+    r.planet_index = j.to_planet;
     r.pos_x = null; r.pos_y = null;
     await this.saveReplicant(r);
     const { error } = await this.sb.from('discovered_stars')
@@ -352,14 +363,14 @@ export class CloudStore implements GameStore {
 
   async openJourneys() {
     const { data, error } = await this.sb.from('journeys')
-      .select('id,replicant_id,from_star,to_star,departs_at,arrives_at,replicants!inner(status)')
+      .select(`${JOURNEY_COLS},replicants!inner(status)`)
       .eq('replicants.status', 'in_transit');
     if (error) throw error;
     return (data as unknown as (Journey & { replicants: unknown })[]).map(({ replicants: _r, ...j }) => capJourney(j));
   }
 
   async listReplicants() {
-    const { data, error } = await this.sb.from('replicants').select('id,name,profile_id,status,star_id,traits');
+    const { data, error } = await this.sb.from('replicants').select('id,name,profile_id,status,star_id,planet_index,traits');
     if (error) throw error;
     return data as ReplicantSummary[];
   }

@@ -7,6 +7,7 @@ import itemsJson from '../data/items.json';
 import structuresJson from '../data/structures.json';
 import backendJson from '../data/backend.json';
 import dayJson from '../data/daycycle.json';
+import villageJson from '../data/village.json';
 
 export interface PlanetDef {
   id: string;
@@ -35,6 +36,8 @@ export interface PlanetDef {
   flowers?: number;
   wildlife?: { grazers: number; birds: number; butterflies: number };
   weather?: boolean;
+  /** Polar caps seen from orbit: size 0..1 of the way from equator to pole, colors = [edge, core] palette indexes. Missing = none. */
+  poles?: { size: number; colors: [number, number] };
 }
 
 export type SkitterDef = (typeof enemiesJson)['skitter'];
@@ -50,6 +53,7 @@ export const ITEMS = itemsJson;
 export const STRUCTURES = structuresJson;
 export const BACKEND = backendJson;
 export const DAYCYCLE = dayJson;
+export const VILLAGE = villageJson;
 
 export const hex = (s: string) => parseInt(s, 16);
 export const accentColor = (p: PlanetDef, i: 0 | 1 | 2) => PALETTE[p.accent[i]];

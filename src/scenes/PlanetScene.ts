@@ -1,13 +1,15 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
-import { BACKEND, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
+import { BACKEND, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, VILLAGE, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
 import { DRIFT, replicate, stat } from '../core/drift';
 import { session } from '../core/session';
 import { Base } from '../entities/Base';
 import type { Enemy } from '../entities/Enemy';
 import { Hopper } from '../entities/Hopper';
 import { Npc } from '../entities/Npc';
+import { Village } from '../entities/Village';
+import { planetAt } from '../world/system';
 import { Player, squash } from '../entities/Player';
 import { CrystalNode, Shard } from '../entities/Resources';
 import { Ruin } from '../entities/Ruin';
@@ -23,7 +25,7 @@ import { Controls } from '../input/Controls';
 import type { DoorState, NodeState, PlanetData, PlanetSave, ReplicantSave } from '../net/store';
 import { paintGround } from '../world/groundPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
-import { TRAVEL, distanceLy, fuelFor, planetFor, travelMs } from '../world/galaxy';
+import { TRAVEL, distanceLy, fuelFor, planetFor, starById, travelMs } from '../world/galaxy';
 import type { StarMapData } from './StarMapScene';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
@@ -53,6 +55,7 @@ export class PlanetScene extends Phaser.Scene {
   spores: Spore[] = [];
   ruins: Ruin[] = [];
   npcs: Npc[] = [];
+  village!: Village;
   embers = 0;
   env!: Environment;
 
@@ -85,7 +88,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  private pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village'] } = { embers: 0, nodes: {}, doors: {} };
   private replicating = false;
   /** Hologram visit while the replicant's ship is flying elsewhere: no position saves, no launching */
   visit: { star: string; planetIndex: number } | null = null;
@@ -141,6 +144,39 @@ export class PlanetScene extends Phaser.Scene {
   get baseCenter() { return this.map.base.center; }
   /** Where copies bring their Embers */
   get replicatorSpot() { return { x: this.base.x, y: this.base.y }; }
+  get vesselPos() { return { x: this.vessel.x, y: this.vessel.y }; }
+
+  /** Tells the UI where we are and who lives here (you and the copies), for the corner label. */
+  announceLocation() {
+    const star = starById(this.planet.star);
+    const sp = planetAt(this.planet.star, this.planet.planetIndex);
+    const place = sp?.moon ? `${this.planet.name} - ${sp.name}` : `${this.planet.name} - ${star?.name ?? '?'}`;
+    const who: { name: string; color: number }[] = [];
+    const me = session.replicant;
+    if (me && !this.visit) who.push({ name: me.name.toUpperCase(), color: PALETTE[me.traits.feature ?? PLAYER.feature[1]] });
+    for (const n of this.npcs) who.push({ name: n.data.name.toUpperCase(), color: PALETTE[n.data.traits.feature ?? PLAYER.feature[1]] });
+    this.game.events.emit('location', place, who);
+  }
+
+  /** True when a point is inside a wall, a solid (tree, structure) or a crystal node. */
+  blockedAt(x: number, y: number) {
+    if (!this.isWalkable(x, y)) return true;
+    for (const z of this.solids.getChildren() as Phaser.GameObjects.Zone[]) if (z.getBounds().contains(x, y)) return true;
+    for (const n of this.nodes) if (n.alive && n.zone.getBounds().contains(x, y)) return true;
+    return false;
+  }
+
+  /** Walkable ground with no solid (tree, wall, structure) in a w x h box around the point. */
+  isClear(x: number, y: number, w: number, h: number) {
+    for (const [ox, oy] of [[0, 0], [-w / 2, 0], [w / 2, 0], [0, -h / 2], [0, h / 2]]) {
+      if (!this.isWalkable(x + ox, y + oy) || ['void', 'water'].includes(this.surfaceAt(x + ox, y + oy))) return false;
+    }
+    const box = new Phaser.Geom.Rectangle(x - w / 2, y - h / 2, w, h);
+    for (const z of this.solids.getChildren() as Phaser.GameObjects.Zone[]) {
+      if (Phaser.Geom.Intersects.RectangleToRectangle(box, z.getBounds())) return false;
+    }
+    return true;
+  }
 
   private build(save: PlanetSave | null, npcRows: ReplicantSave[] = []) {
     session.planet = save;
@@ -217,7 +253,9 @@ export class PlanetScene extends Phaser.Scene {
     }
     const built = !!save?.data.structures?.some((s) => s.type === 'replicator');
     this.base = new Base(this, b.pad.x, b.pad.y, built);
+    this.village = new Village(this, save?.data.structures, save?.data.village?.work);
     this.spawnNpcs(npcRows, save);
+    this.announceLocation();
 
     // Resources (restoring chipped/broken crystals; they regrow after a while) and creatures
     const regrowMs = BACKEND.nodeRegrowMinutes * 60_000;
@@ -387,9 +425,7 @@ export class PlanetScene extends Phaser.Scene {
     const pl = this.player;
     const c = this.cradle!;
     c.setFrame(0);
-    pl.locked = true;
-    pl.sprite.setVisible(false);
-    pl.light.intensity = 0;
+    pl.hide(); // nothing of the replicant shows until the cradle opens
     this.cameras.main.fadeIn(1400, 24, 20, 37);
     const lid = this.lighting.add({ x: c.x, y: c.y - 8, radius: 40, color: PALETTE[18], intensity: 0 });
     this.tweens.add({ targets: lid, intensity: 1, duration: 900, yoyo: true, hold: 500, delay: 600 });
@@ -398,10 +434,12 @@ export class PlanetScene extends Phaser.Scene {
       this.fx.sparks(c.x, c.y - 8, PALETTE[18], 12);
       this.shake(120, 0.004);
       pl.setPosition(c.x, c.y - 2);
-      pl.sprite.setVisible(true).setTint(0x404060);
+      pl.show();
+      pl.light.active = false;
+      pl.sprite.setTint(0x404060);
       // visor flickers on: dark, flash, dark, on
-      const steps = [[0, 0.15], [140, 0], [260, 0.6], [360, 0.2], [520, 1]];
-      for (const [t, v] of steps) this.time.delayedCall(t, () => { pl.light.intensity = v; if (v > 0.5) pl.sprite.clearTint(); });
+      const steps = [[0, 0], [140, 0], [260, 1], [360, 0], [520, 1]];
+      for (const [t, v] of steps) this.time.delayedCall(t, () => { pl.light.active = v > 0.5; if (v > 0.5) pl.sprite.clearTint(); });
     });
     this.time.delayedCall(2500, () => {
       const hop = { t: 0 };
@@ -442,8 +480,7 @@ export class PlanetScene extends Phaser.Scene {
     const ly = this.vessel.y;
     this.vessel.y = ly - 190;
     shadow.setScale(0.6, 0.5).setAlpha(0.1);
-    this.player.sprite.setVisible(false);
-    this.player.locked = true;
+    this.player.hide(); // nothing of the replicant on the ground until it hops out
     this.cameras.main.centerOn(this.vessel.x, ly);
     light.intensity = 0.5;
     glow.setAlpha(0.1);
@@ -483,7 +520,8 @@ export class PlanetScene extends Phaser.Scene {
   private hopOut() {
     const pl = this.player;
     const sx = this.vessel.x, sy = this.vessel.y - 6, ex = this.vessel.x, ey = this.vessel.y + 14;
-    pl.sprite.setVisible(true);
+    pl.setPosition(sx, sy);
+    pl.show();
     const hop = { t: 0 };
     this.tweens.add({
       targets: hop, t: 1, duration: 380, ease: 'Linear',
@@ -568,6 +606,8 @@ export class PlanetScene extends Phaser.Scene {
         .setFillStyle(PALETTE[9], ready && on ? 0.3 : 0);
     }
     for (const n of this.npcs) n.update(time, dt);
+    if (!this.shot && !this.visit) this.village.update(time, dt, this.npcs.reduce((a, n) => a + stat(n.data, 'gather'), 0));
+    else this.village.update(time, 0, 0);
     this.watchFps(time);
     this.env.update(dt);
     this.lighting.update(dt);
@@ -614,7 +654,7 @@ export class PlanetScene extends Phaser.Scene {
     // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
     if (this.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
     if (p.npcTick !== undefined) this.npcTickAt = Date.now();
-    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && p.npcTick === undefined) return;
+    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && p.npcTick === undefined) return;
     this.pending = { embers: 0, nodes: {}, doors: {} };
     this.saving = true;
     try {
@@ -622,6 +662,7 @@ export class PlanetScene extends Phaser.Scene {
       if (Object.keys(p.doors).length) data.doors = p.doors;
       if (p.npcTick !== undefined) data.npcTick = p.npcTick;
       if (p.structures) data.structures = p.structures;
+      if (p.village) data.village = p.village;
       const row = await st.applyPlanetDelta(this.planet.star, this.planet.planetIndex, p.embers, data);
       if (row) {
         this.embers = row.embers + this.pending.embers;
@@ -635,6 +676,7 @@ export class PlanetScene extends Phaser.Scene {
       this.pending.doors = { ...p.doors, ...this.pending.doors };
       this.pending.npcTick ??= p.npcTick;
       this.pending.structures ??= p.structures;
+      this.pending.village ??= p.village;
     } finally {
       this.saving = false;
     }
@@ -688,8 +730,7 @@ export class PlanetScene extends Phaser.Scene {
     sound.build();
     this.base.build(this.player.x, this.player.y, () => {
       this.player.locked = false;
-      this.pending.structures = [...(session.planet?.data.structures ?? []).filter((s) => s.type !== 'replicator'),
-        { type: 'replicator', x: this.base.x, y: this.base.y, at: Date.now() }];
+      this.village.addStructure({ type: 'replicator', x: this.base.x, y: this.base.y, at: Date.now() });
       void this.flushPlanet();
     });
     return true;
@@ -728,8 +769,9 @@ export class PlanetScene extends Phaser.Scene {
     const data: StarMapData = {
       mode: 'launch',
       from: this.planet.star,
+      fromPlanet: this.planet.planetIndex,
       embers: this.embers,
-      onLaunch: (to) => this.launch(to),
+      onLaunch: (to, planet) => this.launch(to, planet),
       onClose: () => { this.player.locked = false; this.scene.resume(); },
     };
     this.scene.pause();
@@ -748,7 +790,7 @@ export class PlanetScene extends Phaser.Scene {
   }
 
   /** Fuel paid, the replicant hops in, the vessel lifts off, then the flight begins. */
-  private launch(to: string) {
+  private launch(to: string, toPlanet: number) {
     this.scene.resume();
     const ly = distanceLy(this.planet.star, to);
     const fuel = fuelFor(ly);
@@ -765,11 +807,11 @@ export class PlanetScene extends Phaser.Scene {
     this.tweens.add({
       targets: hop, t: 1, duration: 360,
       onUpdate: () => { pl.setPosition(sx + (ex - sx) * hop.t, sy + (ey - sy) * hop.t); pl.sprite.y -= Math.sin(hop.t * Math.PI) * 12; },
-      onComplete: () => { pl.sprite.setVisible(false); pl.hide(); this.liftOff(to, ly); },
+      onComplete: () => { pl.hide(); this.liftOff(to, toPlanet, ly); },
     });
   }
 
-  private liftOff(to: string, ly: number) {
+  private liftOff(to: string, toPlanet: number, ly: number) {
     const v = this.vessel;
     const thrust = this.add.particles(0, 0, 'px', {
       lifespan: { min: 200, max: 500 }, speedY: { min: 60, max: 140 }, speedX: { min: -20, max: 20 },
@@ -788,8 +830,11 @@ export class PlanetScene extends Phaser.Scene {
     const arrivesAt = new Date(Date.now() + travelMs(ly));
     const r = session.replicant, st = session.store;
     const journeyP = r && st && !this.shot
-      ? st.startJourney(r, to, arrivesAt)
-      : Promise.resolve({ id: 'local', replicant_id: r?.id ?? '', from_star: this.planet.star, to_star: to, departs_at: new Date().toISOString(), arrives_at: arrivesAt.toISOString() });
+      ? st.startJourney(r, to, toPlanet, arrivesAt)
+      : Promise.resolve({
+        id: 'local', replicant_id: r?.id ?? '', from_star: this.planet.star, to_star: to, from_planet: this.planet.planetIndex, to_planet: toPlanet,
+        departs_at: new Date().toISOString(), arrives_at: arrivesAt.toISOString(),
+      });
     this.time.delayedCall(3200, () => {
       journeyP.then((journey) => this.scene.start('travel', { journey, depart: true }))
         .catch((e) => {
@@ -831,6 +876,7 @@ export class PlanetScene extends Phaser.Scene {
     this.time.delayedCall(1700, () => {
       const npc = new Npc(this, { ...row, id: 'pending' }, bx, by);
       this.npcs.push(npc);
+      this.announceLocation();
       sound.birth();
       npc.playBirth(() => {
         pl.locked = false;
@@ -878,7 +924,10 @@ export class PlanetScene extends Phaser.Scene {
     this.pending.npcTick = now;
     if (!tick) return;
     const hours = Math.min(DRIFT.offlineCapHours, Math.max(0, (now - tick) / 3_600_000));
-    const rate = this.npcs.reduce((s, n) => s + stat(n.data, 'gather'), 0) * DRIFT.gatherPerHour;
+    const gatherSum = this.npcs.reduce((s, n) => s + stat(n.data, 'gather'), 0);
+    const rate = gatherSum * DRIFT.gatherPerHour;
+    // building effort banks up the same way; the copies spend it in front of you once you land
+    this.village.addWork(Math.min(VILLAGE.offlineCapHours, hours) * VILLAGE.workPerHour * gatherSum);
     const gained = Math.floor(rate * hours);
     if (gained <= 0) return;
     this.embers += gained;

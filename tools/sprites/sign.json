@@ -1,0 +1,76 @@
+{
+ "size": [
+  16,
+  16
+ ],
+ "tinted": false,
+ "legend": {
+  ".": null,
+  "k": 25,
+  "H": 21,
+  "Y": 10,
+  "R": 22,
+  "r": 23,
+  "C": 18,
+  "c": 17,
+  "e": 26,
+  "p": 29
+ },
+ "animations": {},
+ "frames": [
+  [
+   "................",
+   "..kkkkkkkkkkkk..",
+   ".kHHHHHHHHHHHHk.",
+   ".kHHHHHYHHHHHHk.",
+   ".kHHHHHYYHHHHHk.",
+   ".kHHYYYYYYYHHHk.",
+   ".kHHHHHYYHHHHHk.",
+   ".kHHHHHYHHHHHHk.",
+   ".kHHHHHHHHHHHHk.",
+   "..kkkkkRrkkkkk..",
+   ".......Rr.......",
+   ".......Rr.......",
+   ".......Rr.......",
+   ".......Rr.......",
+   "......kRrk......",
+   "................"
+  ],
+  [
+   "................",
+   "..kkkkkkkkkkkk..",
+   ".kHHHHHHHHHHHHk.",
+   ".kHHHHHCHHHHHHk.",
+   ".kHHHHCCCHHHHHk.",
+   ".kHHHCCcCCHHHHk.",
+   ".kHHHHCcCHHHHHk.",
+   ".kHHHHHcHHHHHHk.",
+   ".kHHHHHHHHHHHHk.",
+   "..kkkkkRrkkkkk..",
+   ".......Rr.......",
+   ".......Rr.......",
+   ".......Rr.......",
+   ".......Rr.......",
+   "......kRrk......",
+   "................"
+  ],
+  [
+   "................",
+   "..kkkkkkkkkkkk..",
+   ".kHHHHHHHHHHHHk.",
+   ".kHHHppHppHHHHk.",
+   ".kHHpeeepeepHHk.",
+   ".kHHHeeeeeeHHHk.",
+   ".kHHHHeeeeHHHHk.",
+   ".kHHHHHeeHHHHHk.",
+   ".kHHHHHHHHHHHHk.",
+   "..kkkkkRrkkkkk..",
+   ".......Rr.......",
+   ".......Rr.......",
+   ".......Rr.......",
+   ".......Rr.......",
+   "......kRrk......",
+   "................"
+  ]
+ ]
+}

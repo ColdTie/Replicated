@@ -3,15 +3,16 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, featureTex } from '../core/assets';
-import { PALETTE, PLAYER } from '../core/data';
+import { PALETTE, PLAYER, VILLAGE } from '../core/data';
 import { DRIFT, stat } from '../core/drift';
 import type { Light } from '../fx/Lighting';
 import type { ReplicantSave } from '../net/store';
 import type { PlanetScene } from '../scenes/PlanetScene';
 import { Gear } from './Gear';
+import type { BuildJob } from './Village';
 import { squash } from './Player';
 
-type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born';
+type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer';
 type Pt = { x: number; y: number };
 
 export class Npc {
@@ -31,6 +32,8 @@ export class Npc {
   private nextSparkle = 0;
   private swings = 0;
   private mineAt: Pt | null = null;
+  private job: BuildJob | null = null;
+  private nextBuild: number;
   /** hop height, added on top of the walking position */
   z = 0;
 
@@ -46,6 +49,8 @@ export class Npc {
     // a small warm light: copies are "ours", like the base
     this.light = scene.lighting.add({ x, y, radius: 34 * stat(data, 'light'), color: 0xffe2b8, intensity: 0.75 });
     this.nextTrip = scene.time.now + DRIFT.tripMs * (0.5 + Math.random()) / stat(data, 'gather');
+    // copies get to work soon after you arrive, one after another
+    this.nextBuild = scene.time.now + 3500 + Math.random() * 5000;
     this.sync();
   }
 
@@ -121,8 +126,34 @@ export class Npc {
         if (this.target && this.walkTo(this.target, dt)) {
           if (this.state === 'carry') this.deliver(time);
           else if (this.mineAt) { this.state = 'mine'; this.swings = 0; this.until = time; }
+          else if (this.job) { this.state = 'hammer'; this.swings = 0; this.until = time; this.scene.village.showGhost(this.job, 0); }
           else { this.state = 'idle'; this.until = time + 800 + Math.random() * 2500; }
-        } else if (!this.target) this.state = 'idle';
+        } else if (!this.target) {
+          if (this.job) { this.scene.village.release(this.job); this.job = null; this.nextBuild = time + 5000; }
+          this.state = 'idle';
+        }
+        break;
+      case 'hammer':
+        if (time > this.until) {
+          const job = this.job!;
+          if (this.swings >= VILLAGE.hammerSwings) {
+            this.scene.village.complete(job);
+            this.job = null;
+            if (dp < 220) sound.build();
+            this.hop();
+            this.state = 'idle';
+            this.until = time + 1500;
+            this.nextBuild = time + 4000 + Math.random() * 6000;
+            break;
+          }
+          this.swings++;
+          this.until = time + VILLAGE.hammerMs;
+          this.sprite.play(anim(this.key, 'attack'), true);
+          this.sprite.setFlipX(job.x < this.x);
+          this.scene.fx.sparks(job.x + (Math.random() - 0.5) * 8, job.y - 6 - Math.random() * 10, job.tint !== undefined ? PALETTE[job.tint] : PALETTE[10], 3);
+          this.scene.village.showGhost(job, this.swings / VILLAGE.hammerSwings);
+          if (dp < 160) sound.hit();
+        }
         break;
       case 'mine':
         if (time > this.until) {
@@ -137,9 +168,10 @@ export class Npc {
     }
 
     const moving = this.state === 'walk' || this.state === 'carry';
-    if (this.state !== 'mine' || time > this.until - 300) {
+    const working = this.state === 'mine' || this.state === 'hammer';
+    if (!working || time > this.until - 300) {
       const want = anim(this.key, moving ? 'walk' : 'idle');
-      if (this.sprite.anims.currentAnim?.key !== want && this.state !== 'mine') this.sprite.play(want);
+      if (this.sprite.anims.currentAnim?.key !== want && !working) this.sprite.play(want);
     }
     // trail: little sparkles in the copy's own color when it walks
     if (moving && time > this.nextSparkle) {
@@ -151,6 +183,18 @@ export class Npc {
 
   private think(time: number) {
     const base = this.scene.baseCenter;
+    // something to build? (the pool has the work, the ring has room)
+    if (time > this.nextBuild) {
+      const job = this.scene.village.requestJob(this);
+      if (job) {
+        this.job = job;
+        this.mineAt = null;
+        this.target = { x: job.x + (this.x < job.x ? -13 : 13), y: job.y + 4 };
+        this.state = 'walk';
+        return;
+      }
+      this.nextBuild = time + 9000 + Math.random() * 6000;
+    }
     // time for a trip: go mine the nearest healthy crystal near the base
     if (time > this.nextTrip) {
       this.nextTrip = time + DRIFT.tripMs / stat(this.data, 'gather');

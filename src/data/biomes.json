@@ -1,8 +1,9 @@
 {
-  "_doc": "World types for planets around other stars. A star's id picks one (seeded). Same fields as planets.json minus star/seed/name; the star's light (travel.json starLight) tints ambient and sky. Each biome gets its own tinted sprite sheets at build time.",
+  "_doc": "World types for planets around other stars. A star's id picks one (seeded). Same fields as planets.json minus star/seed/name; the star's light (travel.json starLight) tints ambient and sky. Each biome gets its own tinted sprite sheets at build time. poles = polar caps seen from orbit: size (0..1 of the way from equator to pole) and [edge, core] palette colors; leave out for none (moon).",
   "biomes": [
     {
       "id": "verdant", "subtitle": "WILD AND GREEN",
+      "poles": { "size": 0.25, "colors": [20, 19] },
       "accent": [13, 12, 11], "ground": [25, 14, 13], "ambient": "7a9a8a",
       "sky": ["181425", "193c3e", "3e8948", "fee761"],
       "size": [96, 72], "islandRadius": 0.88, "rockThreshold": 0.63, "ruins": 3, "resourceNodes": 18,
@@ -11,6 +12,7 @@
     },
     {
       "id": "frost", "subtitle": "COLD AND QUIET",
+      "poles": { "size": 0.46, "colors": [20, 19] },
       "accent": [16, 17, 18], "ground": [25, 23, 21], "ambient": "8a9ac8",
       "sky": ["181425", "262b44", "124e89", "c0cbdc"],
       "size": [92, 70], "islandRadius": 0.86, "rockThreshold": 0.58, "ruins": 3, "resourceNodes": 16,
@@ -19,6 +21,7 @@
     },
     {
       "id": "dune", "subtitle": "DRY AND OLD",
+      "poles": { "size": 0.14, "colors": [3, 2] },
       "accent": [5, 1, 3], "ground": [6, 5, 31], "ambient": "b08a7a",
       "sky": ["181425", "3e2731", "733e39", "e4a672"],
       "size": [100, 72], "islandRadius": 0.9, "rockThreshold": 0.6, "ruins": 5, "resourceNodes": 16,
@@ -27,6 +30,7 @@
     },
     {
       "id": "spore", "subtitle": "SOFT AND STRANGE",
+      "poles": { "size": 0.2, "colors": [29, 30] },
       "accent": [27, 28, 29], "ground": [25, 24, 27], "ambient": "6a5f94",
       "sky": ["181425", "262b44", "68386c", "f6757a"],
       "size": [96, 72], "islandRadius": 0.86, "rockThreshold": 0.6, "ruins": 3, "resourceNodes": 16,
@@ -35,6 +39,7 @@
     },
     {
       "id": "ember", "subtitle": "HOT AND RESTLESS",
+      "poles": { "size": 0.16, "colors": [6, 5] },
       "accent": [7, 0, 9], "ground": [25, 6, 5], "ambient": "b07a68",
       "sky": ["181425", "3e2731", "a22633", "f77622"],
       "size": [92, 70], "islandRadius": 0.84, "rockThreshold": 0.56, "ruins": 2, "resourceNodes": 22,
