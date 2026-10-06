@@ -289,4 +289,5 @@ Not done / next:
 Not done / next:
 - Rock tops are still the old speckled tiles; painting them the same way would match the new floors.
 - Not yet confirmed on the iPad (paint time and memory on the iPad 9th gen in particular).
-
+- Fix: ships launched before the 5 second change (still on the old real-time schedule) now also arrive 5 seconds after
+  departure (`capJourney` in `src/net/store.ts`).

@@ -2,6 +2,7 @@
 // localStorage for offline play, screenshots and development (?local).
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { BACKEND, PLAYER } from '../core/data';
+import TRAVEL from '../data/travel.json';
 
 export interface Profile {
   id: string;
@@ -44,6 +45,14 @@ export interface PlanetSave {
   seed: number;
   embers: number;
   data: PlanetData;
+}
+
+/** With fixed-length trips on (travel.json fixedSeconds), ships already flying on the old real-time schedule arrive
+ * that many seconds after they left too. */
+function capJourney<J extends Journey>(j: J): J {
+  if (!(TRAVEL.fixedSeconds > 0)) return j;
+  const cap = Date.parse(j.departs_at) + TRAVEL.fixedSeconds * 1000;
+  return Date.parse(j.arrives_at) > cap ? { ...j, arrives_at: new Date(cap).toISOString() } : j;
 }
 
 export interface Journey {
@@ -162,7 +171,7 @@ export class LocalStore implements GameStore {
   async activeJourney(r: ReplicantSave) {
     if (r.status !== 'in_transit') return null;
     const j = this.db.journeys.filter((x) => x.replicant_id === r.id).sort((a, b) => b.departs_at.localeCompare(a.departs_at))[0];
-    return j ? { ...j } : null;
+    return j ? capJourney({ ...j }) : null;
   }
 
   async completeJourney(r: ReplicantSave, j: Journey, planetIndex: number) {
@@ -177,7 +186,7 @@ export class LocalStore implements GameStore {
 
   async openJourneys() {
     const flying = new Set(this.db.replicants.filter((r) => r.status === 'in_transit').map((r) => r.id));
-    return this.db.journeys.filter((j) => flying.has(j.replicant_id)).map((j) => ({ ...j }));
+    return this.db.journeys.filter((j) => flying.has(j.replicant_id)).map((j) => capJourney({ ...j }));
   }
 
   async listReplicants() {
@@ -326,7 +335,8 @@ export class CloudStore implements GameStore {
     const { data, error } = await this.sb.from('journeys').select('id,replicant_id,from_star,to_star,departs_at,arrives_at')
       .eq('replicant_id', r.id).order('departs_at', { ascending: false }).limit(1);
     if (error) throw error;
-    return (data[0] as Journey | undefined) ?? null;
+    const j = data[0] as Journey | undefined;
+    return j ? capJourney(j) : null;
   }
 
   async completeJourney(r: ReplicantSave, j: Journey, planetIndex: number) {
@@ -345,7 +355,7 @@ export class CloudStore implements GameStore {
       .select('id,replicant_id,from_star,to_star,departs_at,arrives_at,replicants!inner(status)')
       .eq('replicants.status', 'in_transit');
     if (error) throw error;
-    return (data as unknown as (Journey & { replicants: unknown })[]).map(({ replicants: _r, ...j }) => j);
+    return (data as unknown as (Journey & { replicants: unknown })[]).map(({ replicants: _r, ...j }) => capJourney(j));
   }
 
   async listReplicants() {
