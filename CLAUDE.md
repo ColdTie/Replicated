@@ -69,6 +69,9 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 - Ask before adding any dependency beyond Phaser, Vite, TypeScript, supabase js, pngjs, and Playwright.
 - Update the Progress section below at the end of every session.
 - When something needs Steve (keys, account creation, testing on the iPad), stop and give a short numbered list.
+- One lead session at a time (agreed 2026-10-06). Start every session with `git fetch origin main` and build on the
+  latest `main`; check open PRs and `supabase/migrations/` against the live migration list before changing the
+  database. Never re-implement something that is already on `main`.
 
 ## Long-term decisions (agreed with Steve, 2026-10-04)
 
@@ -245,4 +248,15 @@ Plan agreed with Steve: M1 visuals, M2 feel, M3 Replicate, M4 Leaving Earth (spa
 Not done / next:
 - Milestone 1 leftovers: rounded autotiled rock edges, bloom, a guardian mini-boss in the largest ruin.
 - Beacon landmark (something special to find at a beacon), FTL comms, messages, Spark handoff (Phase 3).
-- Not yet confirmed on the iPad. Cloud sign-in not yet tested by Steve (needs the family login created).
+- Not yet confirmed on the iPad.
+
+### Session 4 (2026-10-06): consolidation, single lead
+- A parallel session had built its own Phase 2 (copies, star map, travel) on a separate branch at the same time as
+  Milestones 3 and 4 landed on `main`. That branch was dropped (PR #7 closed); `main` is the one true version and this
+  session is now the lead.
+- The dropped branch had applied one database migration (`planet_delta_merge_keys`) before 0004/0005; those replaced
+  it, so the live `apply_planet_delta` is the 0005 version (verified). Recorded as `0003b_*.sql` (history only).
+- Verified on `main`: build passes, `tools/playtest.mjs` (ruin, dash, combo, spitter, copies, petting) and
+  `tools/playtest-travel.mjs` (map, launch, warp, arrival, landing) pass with no errors; every table, column and RPC the
+  client uses exists in the live database; Supabase advisors show only expected notes.
+- Live data: Steve's family login exists, one profile, one copy made on Earth.
