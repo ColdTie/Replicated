@@ -58,6 +58,7 @@ export class Player {
   private dead = false;
   private nextDamageFx = 0;
   private hurtFlashUntil = 0;
+  private lowHpFlickerUntil = 0;
 
   constructor(private scene: PlanetScene, x: number, y: number) {
     this.zone = scene.add.zone(x, y, 8, 5);
@@ -170,16 +171,25 @@ export class Player {
         const puff = this.scene.add.image(sx, sy, 'px').setTint(PALETTE[22]).setAlpha(0.55).setDepth(6090).setScale(1.2);
         this.scene.tweens.add({ targets: puff, y: sy - 10, alpha: 0, scale: 2.2, duration: 700, ease: 'Sine.easeOut', onComplete: () => puff.destroy() });
       }
-      if (frac <= 0.4 && Math.random() < 0.5 && !this.hologram) {
-        this.sprite.setTint(0xff6a6a);
-        this.scene.time.delayedCall(60, () => { if (!this.hologram && this.scene.time.now > this.hurtFlashUntil) this.sprite.clearTint(); });
-      }
+      if (frac <= 0.4 && Math.random() < 0.5) this.lowHpFlickerUntil = time + 60;
     }
 
-    // invulnerability blink (not while dashing: the trail already shows it)
-    this.sprite.setVisible(!this.hidden && (dashing || time > this.invulnUntil || Math.floor(time / 70) % 2 === 0));
+    // The body is always solid: never hidden, never faded. Invulnerability after a hit shows as an opaque red
+    // pulse (not while dashing: the trail already shows it), low health as a quick red flicker.
+    this.sprite.setVisible(!this.hidden);
+    this.applyTint(time, dashing);
     if (this.hologram) this.sprite.setAlpha(Math.random() < 0.04 ? 0.5 : 0.85);
     this.syncVisuals();
+  }
+
+  /** One place decides the body tint so no effect can leave the sprite in a half state. */
+  private applyTint(time: number, dashing: boolean) {
+    const s = this.sprite;
+    if (time < this.hurtFlashUntil) { s.setTintFill(0xffffff); return; }
+    if (!dashing && !this.hologram && time < this.invulnUntil && Math.floor(time / 70) % 2 === 0) { s.setTint(0xff8080); return; }
+    if (time < this.lowHpFlickerUntil && !this.hologram) { s.setTint(0xff6a6a); return; }
+    if (this.hologram) { s.setTint(0x9fe8ff); return; }
+    s.clearTint();
   }
 
   /**
@@ -306,8 +316,8 @@ export class Player {
     this.body.velocity.set(dir.x * 190, dir.y * 190);
     this.sprite.play(anim(this.key, 'hurt'), true);
     sound.hurt();
-    this.hurtFlashUntil = now + 100;
-    flashWhite(this.scene, this.sprite, 90);
+    this.hurtFlashUntil = now + 90;
+    this.sprite.setTintFill(0xffffff);
     squash(this.scene, this.sprite, 0.75, 1.25, 110);
     this.scene.hitStop(100);
     this.scene.shake(140, 0.006);
