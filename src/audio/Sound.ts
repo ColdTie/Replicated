@@ -269,7 +269,7 @@ class SoundEngine {
       src.connect(f).connect(this.rainGain).connect(this.musicBus);
       src.start();
     }
-    this.rainGain.gain.setTargetAtTime(level * 0.18, this.ctx.currentTime, 1.5);
+    this.rainGain.gain.setTargetAtTime(level * SOUND.rain, this.ctx.currentTime, 1.5);
   }
 
   /** Slow generative pad with sparse plucks. Brighter by day, sparser and lower at night. */

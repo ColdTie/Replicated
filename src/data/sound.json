@@ -1,8 +1,9 @@
 {
-  "_doc": "Volumes 0..1. chords = MIDI notes of the ambient pad progression, one chord every chordSeconds.",
+  "_doc": "Volumes 0..1 (rain = loudness of the rain bed at full rain). chords = MIDI notes of the ambient pad progression, one chord every chordSeconds.",
   "master": 0.8,
   "sfx": 0.9,
   "music": 0.7,
+  "rain": 0.108,
   "chordSeconds": 9,
   "chords": [
     [50, 57, 62, 66],

@@ -61,16 +61,23 @@ export class CrystalNode {
   }
 }
 
-/** Ember shard pickup: pops out, bobs, gets pulled toward the player. */
+/** Ember shard pickup: pops out, bobs, then flies to the player once close. In flight it shimmers in a shifting
+ *  rainbow and passes through anything in the way; just before it reaches you it glitches like a bad teleport
+ *  (jitter, flicker, a red/cyan split and static pixels). */
 export class Shard {
   readonly sprite: Phaser.GameObjects.Sprite;
   private glow: Phaser.GameObjects.Image;
+  private ghosts: Phaser.GameObjects.Image[];
   private light: Light;
   private readyAt: number;
   private vx = 0;
   private vy = 0;
   private z = 0;
   private vz = 0;
+  /** once a shard starts flying to the player it keeps going, through walls, until collected */
+  private homing = false;
+  private hue = Math.random() * 360;
+  private nextStatic = 0;
   collected = false;
   x: number;
   y: number;
@@ -85,6 +92,8 @@ export class Shard {
     this.sprite = scene.add.sprite(x, y, 'shard').setOrigin(0.5, 0.5);
     this.sprite.play({ key: anim('shard', 'twinkle'), startFrame: Math.floor(Math.random() * 6) });
     this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.3).setScale(0.35).setDepth(6100);
+    // chromatic-split ghosts, only shown during the glitch right before pickup
+    this.ghosts = [0xff3060, 0x30f0ff].map((c) => scene.add.image(x, y, 'shard').setTintFill(c).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(6140));
     this.light = scene.lighting.add({ x, y, radius: 16, color: PALETTE[9], intensity: 0.7 });
     this.readyAt = scene.time.now + 450;
   }
@@ -92,34 +101,103 @@ export class Shard {
   update(time: number, dt: number) {
     const s = dt / 1000;
     const p = this.scene.player;
-    // bounce on the ground
-    if (this.z > 0 || this.vz > 0) {
-      this.vz -= 320 * s;
-      this.z = Math.max(0, this.z + this.vz * s);
-      if (this.z === 0) { this.vz = Math.abs(this.vz) > 30 ? -this.vz * 0.4 : 0; }
-    }
     const dx = p.x - this.x, dy = p.y - 4 - this.y, d = Math.hypot(dx, dy);
-    if (time > this.readyAt && p.alive && d < EMBER.magnetRange) {
-      const pull = 1400 * s;
+    if (!this.homing && time > this.readyAt && p.alive && d < EMBER.magnetRange) this.homing = true;
+    if (this.homing && !p.alive) this.homing = false;
+
+    if (this.homing) {
+      // fly: rise a little off the ground and home in, ignoring walls, rocks and trees
+      this.vz = 0;
+      this.z += (6 - this.z) * Math.min(1, s * 10);
+      const pull = EMBER.magnetPull * s;
       this.vx = (this.vx + (dx / d) * pull) * 0.9;
       this.vy = (this.vy + (dy / d) * pull) * 0.9;
+      this.x += this.vx * s;
+      this.y += this.vy * s;
       if (d < 7) { this.collect(); return; }
     } else {
+      // bounce on the ground and slide to a stop
+      if (this.z > 0 || this.vz > 0) {
+        this.vz -= 320 * s;
+        this.z = Math.max(0, this.z + this.vz * s);
+        if (this.z === 0) { this.vz = Math.abs(this.vz) > 30 ? -this.vz * 0.4 : 0; }
+      }
       this.vx *= Math.pow(0.02, s);
       this.vy *= Math.pow(0.02, s);
+      const nx = this.x + this.vx * s, ny = this.y + this.vy * s;
+      if (this.scene.isWalkable(nx, this.y)) this.x = nx; else this.vx *= -0.5;
+      if (this.scene.isWalkable(this.x, ny)) this.y = ny; else this.vy *= -0.5;
     }
-    const nx = this.x + this.vx * s, ny = this.y + this.vy * s;
-    if (this.scene.isWalkable(nx, this.y)) this.x = nx; else this.vx *= -0.5;
-    if (this.scene.isWalkable(this.x, ny)) this.y = ny; else this.vy *= -0.5;
-    const bob = this.z === 0 && this.vz === 0 ? Math.sin(time / 260 + this.x) * 1.5 + 2 : 0;
-    const ry = Math.round(this.y - this.z - bob);
-    this.sprite.setPosition(Math.round(this.x), ry).setDepth(100 + this.y);
-    this.glow.setPosition(Math.round(this.x), ry);
-    this.light.x = this.x; this.light.y = ry;
+
+    const bob = !this.homing && this.z === 0 && this.vz === 0 ? Math.sin(time / 260 + this.x) * 1.5 + 2 : 0;
+    let rx = Math.round(this.x), ry = Math.round(this.y - this.z - bob);
+    this.sprite.setDepth(100 + this.y + (this.homing ? 30 : 0));
+
+    if (this.homing) this.glitchLook(time, d, rx, ry);
+    else {
+      this.sprite.clearTint().setAlpha(1).setScale(1);
+      for (const g of this.ghosts) g.setAlpha(0);
+    }
+    if (this.homing && d < 26) {
+      // teleport jitter right before pickup
+      const t = 1 - d / 26;
+      rx += Math.round((Math.random() * 2 - 1) * (1 + 2 * t));
+      ry += Math.round((Math.random() * 2 - 1) * t);
+    }
+    this.sprite.setPosition(rx, ry);
+    this.glow.setPosition(rx, ry);
+    this.light.x = rx; this.light.y = ry;
+  }
+
+  /** Shifting rainbow while flying; static, flicker and a red/cyan split once it is close. */
+  private glitchLook(time: number, d: number, x: number, y: number) {
+    this.hue = (this.hue + 7) % 360;
+    const c = (h: number) => Phaser.Display.Color.HSVToRGB(((h % 360) + 360) % 360 / 360, 0.75, 1) as Phaser.Types.Display.ColorObject;
+    const col = (h: number) => Phaser.Display.Color.GetColor(c(h).r, c(h).g, c(h).b);
+    // each corner a different hue: a weird oily rainbow that rolls across the shard
+    this.sprite.setTint(col(this.hue), col(this.hue + 90), col(this.hue + 270), col(this.hue + 180));
+    this.glow.setTint(col(this.hue)).setAlpha(0.4);
+    this.light.color = col(this.hue);
+
+    const t = Math.max(0, 1 - d / 26);
+    if (t <= 0) {
+      this.sprite.setAlpha(1).setScale(1);
+      for (const g of this.ghosts) g.setAlpha(0);
+      return;
+    }
+    // flicker in and out, stretch sideways like a scanline tear
+    this.sprite.setAlpha(Math.random() < 0.3 * t ? 0.25 : 1);
+    this.sprite.setScale(1 + Math.random() * 0.9 * t, 1 - 0.35 * t);
+    const split = Math.round(1 + 4 * t);
+    this.ghosts[0].setPosition(x - split, y).setAlpha(0.55 * t).setScale(this.sprite.scaleX, this.sprite.scaleY);
+    this.ghosts[1].setPosition(x + split, y).setAlpha(0.55 * t).setScale(this.sprite.scaleX, this.sprite.scaleY);
+    // static: single rainbow pixels crackling around it
+    if (time > this.nextStatic) {
+      this.nextStatic = time + 35;
+      for (let i = 0; i < 1 + Math.round(2 * t); i++) {
+        const px = this.scene.add.rectangle(x + Math.round((Math.random() - 0.5) * 14), y + Math.round((Math.random() - 0.5) * 10), 1, 1, col(this.hue + Math.random() * 360))
+          .setDepth(6150).setBlendMode(Phaser.BlendModes.ADD);
+        this.scene.tweens.add({ targets: px, alpha: 0, duration: 90 + Math.random() * 80, onComplete: () => px.destroy() });
+      }
+    }
+  }
+
+  /** The "arrives through the teleporter" flash at the player. */
+  private teleportFlash() {
+    const sc = this.scene, x = Math.round(this.x), y = Math.round(this.y - this.z);
+    const line = sc.add.rectangle(x, y, 6, 1, 0xffffff).setDepth(6160).setBlendMode(Phaser.BlendModes.ADD);
+    sc.tweens.add({ targets: line, scaleX: 3.5, alpha: 0, duration: 140, ease: 'Quad.easeOut', onComplete: () => line.destroy() });
+    for (let i = 0; i < 6; i++) {
+      const h = (this.hue + i * 60) % 360;
+      const c = Phaser.Display.Color.HSVToRGB(h / 360, 0.75, 1) as Phaser.Types.Display.ColorObject;
+      const px = sc.add.rectangle(x, y, 1, 1, Phaser.Display.Color.GetColor(c.r, c.g, c.b)).setDepth(6160).setBlendMode(Phaser.BlendModes.ADD);
+      sc.tweens.add({ targets: px, x: x + (Math.random() - 0.5) * 18, y: y + (Math.random() - 0.5) * 6, alpha: 0, duration: 160, onComplete: () => px.destroy() });
+    }
   }
 
   private collect() {
     this.collected = true;
+    this.teleportFlash();
     this.scene.collectShard(this.x, this.y);
     this.destroy();
   }
@@ -127,6 +205,7 @@ export class Shard {
   destroy() {
     this.sprite.destroy();
     this.glow.destroy();
+    for (const g of this.ghosts) g.destroy();
     this.scene.lighting.remove(this.light);
   }
 }
