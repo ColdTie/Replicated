@@ -103,7 +103,8 @@ tools/gen-sprites.mjs    JSON -> public/assets/gen/*.png + manifest.json
                          "tinted": one sheet per planet (accent a0-a2, ground g0-g2 roles)
                          "featured": one sheet per visor color in player.json featureColors (f0/f1 roles)
 tools/screenshot.mjs     build preview + headless Chromium capture -> screenshots/<name>.png
-src/data/*.json          palette, planets, player, enemies, items, structures, backend (all tunables)
+src/data/*.json          palette, planets, player, enemies, items, structures, backend, village (all tunables)
+src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by tools/build-stars.mjs; edit the catalog there)
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
 src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalStore (localStorage)
 src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, enemies, decor, glows,
@@ -120,10 +121,17 @@ src/audio/Sound.ts       procedural WebAudio: every sound effect and the generat
 src/entities/            ... Spitter + Spore (reflectable), Ruin (machine core -> sealed door -> module), Wildlife
                          (Grazer you pet, bird Flock that scatters, Butterflies by day), Npc (drifted copies), Gear
 src/core/drift.ts        replication drift (visor, headgear, trail, stats) from src/data/drift.json
-src/world/galaxy.ts      real stars (src/data/stars.json, built by tools/build-stars.mjs), distances, travel time and
-                         fuel (src/data/travel.json), the planet each star gets (biomes.json + the star's light)
-src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star), launch or look-only
-src/scenes/TravelScene   departure orbit (procedural pixel globe, polar caps from `poles`), warp, real-time cruise + ETA, visits, arrival
+src/world/galaxy.ts      star lookup, distances, travel time and fuel (src/data/travel.json), planetFor(star, index):
+                         the world you land on (Earth from planets.json, else the system planet or a giant's moon)
+src/world/system.ts      a star's planets in orbit order: confirmed ones from the catalog, else generated from the star
+                         id; temperature from orbit + spectral class -> biome, seed, size; planet 1 of settled stars
+                         keeps its pre-system biome (LEGACY_WORLDS)
+src/fx/Globe.ts          pixel planet from orbit: land/sea + polar caps (`poles`), or banded gas/ice giants
+src/entities/Village.ts  what copies build around the base (lamps, signs, flags, gardens, huts, totems): shared work
+                         pool, taste per copy, free-spot search, ghost + hammering, saved in planet_states structures
+src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star, tap again for its system: planets as live globes
+                         on temperature-tinted orbits, tap one to pick it), launch or look-only
+src/scenes/TravelScene   departure orbit (globe, giant behind a moon), warp, real-time cruise + ETA, visits, arrival
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame
 src/ui/overlay.ts        HTML forms over the canvas (sign-in, new profile)
 src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Planet (world, saving) + UI (counter, title, touch)
@@ -131,10 +139,12 @@ src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Plan
 supabase/migrations/     schema applied to the "Replicated" Supabase project (keep in sync when changing the DB)
 ```
 
-Saving: the shared Ember pool, node damage and structures live in `planet_states` and are written as atomic deltas
+Saving: the shared Ember pool, node damage, structures (Replicator and the copies' builds) and the copies' banked
+building work live in `planet_states` and are written as atomic deltas
 (`apply_planet_delta` RPC) every 4s and when the page is hidden; the server value wins so family members share one
 pool. The replicant row stores position, planet and `traits.awake` (Earth's wake-up intro plays once per replicant).
-Every table is scoped by `galaxy_id` with row level security; `ensure_family_galaxy()` creates the galaxy on first sign-in.
+Journeys store `from_planet` / `to_planet` (migration 0006). Every table is scoped by `galaxy_id` with row level
+security; `ensure_family_galaxy()` creates the galaxy on first sign-in.
 
 Sprite legend roles: `a0/a1/a2` = planet accent (dark, mid, light), `g0/g1/g2` = planet ground, `f0/f1` = replicant
 feature color (visor, antenna tip, chest core).
@@ -151,7 +161,7 @@ URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` sk
 screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond|ruin` for other spots, `&kid` for kid mode),
 `?planet=solace`, `?seed=123`, `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
 `?low` (force low-detail mode; also switches on by itself under 40 fps), `?fast` (travel minutes become seconds),
-`?shot=1&star=tau-ceti` (preview the world at another star, as a hologram visit).
+`?shot=1&star=tau-ceti&pi=2` (preview planet 2 of another star, as a hologram visit).
 
 ## Progress
 
@@ -324,3 +334,40 @@ Not done / next:
   (the per-frame health glow had been overwriting its intensity). Verified headless: nothing of the player is drawn
   during the descent, everything is back after the hop. `screenshots/landing-descent.png`.
 - `window.__Globe` exposes the globe renderer so headless scripts can draw every world side by side.
+
+### Session 5e (2026-10-06): a real galaxy, planets per star, a village that builds itself (Steve: "wow me")
+- Catalog (`tools/build-stars.mjs`): 123 real stars out to ~50 ly (plus a few bright landmarks), 59 of them with
+  their confirmed planets (141 in all) as astronomers list them: letter, kind (rock / super-Earth / ice giant /
+  gas giant), orbital period, habitable zone, IAU names where they exist (Dimidium, Thestias, Quijote, Galileo...).
+  The solar system is in too: Mercury, Venus, Mars, and the giants' moons Europa, Titan, Miranda and Triton are
+  destinations. Beacons stay pinned to Fomalhaut, Pollux, Arcturus and Capella. Values are a hand-authored snapshot
+  (the archive hosts are blocked from this environment); say the word to correct any entry.
+- Systems (`src/world/system.ts`): every star has 1 to 8 planets in orbit order; unknown stars get 1 to 4 generated
+  ones. Temperature from orbit and spectral class picks the biome (hot: ember/moon, temperate: verdant/spore/dune,
+  cold: frost/moon); around a giant you land on its moon. Planet 1 of every star the family had settled keeps its old
+  biome and seed (`LEGACY_WORLDS`), so Steve's worlds at Regulus, Pollux, Fomalhaut and Achird are unchanged.
+- Journeys carry `from_planet` / `to_planet` (migration 0006, applied live). Hops inside a system cost base fuel; in
+  real-time mode they take `inSystemMinutes` (travel.json).
+- Star map: tap a star, tap again (or the info panel) for its system: the star glows in the middle, planets turn on
+  orbits tinted by temperature (red / green / blue), each a live spinning globe (giants banded, with a circling
+  moon), labels white for confirmed worlds and grey for uncharted ones. Tap a planet for its kind, "confirmed by
+  astronomers" or "uncharted", trip time and fuel, then launch. Galaxy view: stars out of fuel range dim, stars with
+  known planets show pips (green when one is in the habitable zone), labels never overlap. Zoom 0.25x to 6x.
+- Travel: leaving or reaching a moon shows the giant looming behind it.
+- Village (`src/entities/Village.ts`, `src/data/village.json`): copies build lamps (warm light), signs (arrow /
+  crystal / heart pictograms), flags in their own trail color, glowing gardens, huts (lit window, chimney smoke) and
+  totems. Work banks up while nobody is there (1.6 per copy-hour, 12 h cap, same clock as the Embers) into the
+  planet's shared pool (`planet_states.data.village.work`); when you land, the copies spend it in front of you: pick a
+  project by taste (each copy's id weights the list; the village avoids too many of one thing), walk to a free spot
+  in a ring around the base near the other builds, a ghost outline brightens with each of 5 hammer blows, then the
+  build pops up with dust and its light fades in. Up to 6 builds per copy. Saved in `data.structures` with builder,
+  tint and variant; the whole family sees the same village.
+- Verified headless: build, both playtests, map/system captures (`screenshots/map-*.png`), five copies raising a
+  village from a banked pool (`screenshots/village-*.png`).
+
+Not done / next:
+- Signs and huts are decoration only; "enter a hut", a sign that points at the nearest crystal, and copies that tend
+  their gardens (regrow nearby nodes faster) would make the village matter.
+- The Haiku-powered copy personalities (what to build, two-word sign text) wait on Steve's Anthropic key and a
+  Supabase Edge Function (see chat 2026-10-06).
+- Still not confirmed on the iPad.

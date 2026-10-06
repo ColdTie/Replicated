@@ -29,7 +29,8 @@ export interface ReplicantSave {
 }
 
 export interface NodeState { hits: number; at: number }
-export interface StructureSave { type: string; x: number; y: number; at: number }
+/** A built thing on a planet: the Replicator, or something a copy raised (by = its replicant id, tint = palette index, variant = sprite frame). */
+export interface StructureSave { type: string; x: number; y: number; at: number; by?: string; tint?: number; variant?: number }
 export interface DoorState { open: boolean; taken?: boolean }
 export interface PlanetData {
   nodes?: Record<string, NodeState>;
@@ -38,6 +39,8 @@ export interface PlanetData {
   /** When the copies' offline gathering was last counted (ms epoch) */
   npcTick?: number;
   structures?: StructureSave[];
+  /** The copies' shared building effort not yet spent */
+  village?: { work: number };
 }
 export interface PlanetSave {
   star_id: string;

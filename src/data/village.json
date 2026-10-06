@@ -1,0 +1,78 @@
+{
+  "_doc": "What the copies build around the base while you are away, and while you watch. work = effort units. Each copy earns workPerHour (times its gather stat) per real hour counted from planet_states.data.npcTick, up to offlineCapHours, into the planet's shared work pool (data.village.work); liveWorkPerHour accrues while someone plays. A copy with enough pooled work picks a project by taste (its id hash weights the project weights), walks to a free spot ringMin..ringMax px from the base (minSpacing px from other builds), hammers hammerSwings times and the build appears; builds are saved in data.structures with the builder (by), tint and variant. maxPerCopy builds per copy. light = light the build casts (palette color). tint = painted in the builder's trail color. variants = pictogram frames (sign). solid = [w, h] blocking box. smoke = chimney puffs.",
+  "workPerHour": 1.6,
+  "offlineCapHours": 12,
+  "liveWorkPerHour": 1.6,
+  "maxPerCopy": 6,
+  "minSpacing": 22,
+  "ringMin": 44,
+  "ringMax": 125,
+  "hammerSwings": 5,
+  "hammerMs": 420,
+  "projects": {
+    "lamp": {
+      "sprite": "lamp",
+      "work": 2,
+      "weight": 3,
+      "light": {
+        "radius": 48,
+        "color": 10,
+        "intensity": 0.8,
+        "flicker": 0.15
+      },
+      "anim": "flicker"
+    },
+    "sign": {
+      "sprite": "sign",
+      "work": 1,
+      "weight": 2,
+      "variants": 3
+    },
+    "flag": {
+      "sprite": "flag",
+      "work": 1,
+      "weight": 2,
+      "tint": true,
+      "anim": "wave"
+    },
+    "garden": {
+      "sprite": "garden",
+      "work": 2,
+      "weight": 3,
+      "light": {
+        "radius": 28,
+        "color": 18,
+        "intensity": 0.45
+      },
+      "anim": "sway",
+      "sparkle": true
+    },
+    "hut": {
+      "sprite": "hut",
+      "work": 4,
+      "weight": 2,
+      "light": {
+        "radius": 44,
+        "color": 9,
+        "intensity": 0.7,
+        "flicker": 0.08
+      },
+      "solid": [
+        26,
+        8
+      ],
+      "smoke": true
+    },
+    "totem": {
+      "sprite": "totem",
+      "work": 3,
+      "weight": 1,
+      "light": {
+        "radius": 30,
+        "color": 18,
+        "intensity": 0.5,
+        "flicker": 0.2
+      }
+    }
+  }
+}
