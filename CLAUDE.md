@@ -399,3 +399,11 @@ Not done / next:
 - The ruin core could land inside a wall (always 10 px right and below the machine) where you could not get within
   reach, so it sat there forever (Steve's screenshot). It now lands on the first open floor spot around the
   machine, drifts toward you when you come within 44 px, and is picked up from 20 px instead of 14.
+
+### Session 5i (2026-10-06): the body stays solid (Steve: "the model starts looking see-through")
+- After a hit the replicant used to be hidden every other 70 ms for the 0.9 s invulnerability window, which on a
+  real display looks like a half-transparent body. The sprite is now never hidden or faded while alive: the hit
+  is a white flash, invulnerability an opaque red pulse (skipped while dashing, where the trail shows it), low
+  health a quick red flicker. One `applyTint` pass per frame in `src/entities/Player.ts` decides the tint, so no
+  delayed call can leave the body in a half state (the hologram tint survives it too).
+- `screenshots/hurt-before-{1,2}.png` vs `hurt-after-{2,3}.png` (frame 2 before: glow and sparks, no body).
