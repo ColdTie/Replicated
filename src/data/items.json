@@ -2,12 +2,13 @@
   "ember": {
     "sprite": "shard",
     "glow": "f77622",
-    "magnetRange": 44,
+    "magnetRange": 55,
     "nodeSprite": "crystal",
     "nodeHits": 3,
     "nodeDropsPerHit": 2,
     "nodeDropsOnBreak": 4,
-    "magnetPull": 1540
+    "magnetPull": 1925,
+    "pickupDelayMs": 340
   },
-  "_doc": "ember.magnetPull: how hard a shard is pulled toward you once it starts flying to you (1400 = original speed)."
+  "_doc": "ember.magnetPull: how hard a shard is pulled toward you once it starts flying to you (1400 = original speed; 1925 = Steve's +25% on 2026-10-06). magnetRange: how close you must be for a shard to start flying. pickupDelayMs: how long a shard bounces before it may fly."
 }

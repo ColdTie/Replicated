@@ -368,8 +368,8 @@ Not done / next:
 Not done / next:
 - Signs and huts are decoration only; "enter a hut", a sign that points at the nearest crystal, and copies that tend
   their gardens (regrow nearby nodes faster) would make the village matter.
-- The Haiku-powered copy personalities (what to build, two-word sign text) wait on Steve's Anthropic key and a
-  Supabase Edge Function (see chat 2026-10-06).
+- Decided 2026-10-06: no AI for the copies after all (Steve). The village stays fully procedural; "LLM driven NPC
+  dialogue" stays out of scope.
 - Still not confirmed on the iPad.
 
 ### Session 5f (2026-10-06): feel fixes from Steve's play
@@ -384,3 +384,7 @@ Not done / next:
 - Top-left label under the Ember counter: "MARS - SOL" (or "TITAN - SATURN" on a moon) and the replicants living
   here, you first, each name in its visor color (`location` event, `UIScene.showLocation`; updates when a copy is
   born).
+
+### Session 5g (2026-10-06): faster pickups
+- Embers reach you about 25% sooner: shards may start flying after 340 ms instead of 450, from 55 px away instead
+  of 44, and fly 25% harder (`pickupDelayMs`, `magnetRange`, `magnetPull` in `src/data/items.json`).
