@@ -24,6 +24,7 @@ import { makeVignette } from '../fx/textures';
 import { Controls } from '../input/Controls';
 import type { DoorState, NodeState, PlanetData, PlanetSave, ReplicantSave } from '../net/store';
 import { paintGround } from '../world/groundPaint';
+import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
 import { TRAVEL, distanceLy, fuelFor, planetFor, starById, travelMs } from '../world/galaxy';
 import type { StarMapData } from './StarMapScene';
@@ -196,6 +197,7 @@ export class PlanetScene extends Phaser.Scene {
     // Floor: one painted image for the whole planet (src/world/groundPaint.ts); the tilemap keeps water and walls
     // (the walls layer also holds invisible collision over the void)
     this.addPaintedGround(p.id, this.seed ?? p.seed);
+    this.addPaintedRock(p.id, this.seed ?? p.seed);
     const tm = this.make.tilemap({ tileWidth: 16, tileHeight: 16, width: m.w, height: m.h });
     const ts = tm.addTilesetImage('tiles', tex('tiles', p.id), 16, 16, 0, 0)!;
     const waterOnly = m.ground.map((row, y) => row.map((t, x) => (m.cells[y * m.w + x] === Cell.Water ? t : -1)));
@@ -348,14 +350,25 @@ export class PlanetScene extends Phaser.Scene {
     this.add.image(0, 0, key).setOrigin(0).setDepth(DEPTH.ground - 1);
   }
 
-  /** 1px rims on the sides of rock and ruins so outcrops read as raised shapes, not flat blocks. */
+  /** Rock outcrops: one painted image over the wall tiles (which stay for collision). */
+  private addPaintedRock(styleId: string, seed: number) {
+    const g = paintRock(this.map, styleId, seed);
+    const key = 'rock';
+    if (this.textures.exists(key)) this.textures.remove(key);
+    const ct = this.textures.createCanvas(key, g.width, g.height)!;
+    ct.getContext().putImageData(new ImageData(g.data, g.width, g.height), 0, 0);
+    ct.refresh();
+    this.add.image(0, 0, key).setOrigin(0).setDepth(DEPTH.walls + 0.5);
+  }
+
+  /** 1px rims on the sides of ruins so they read as raised shapes, not flat blocks (rock paints its own edges). */
   private drawRockEdges() {
     const m = this.map;
     const at = (x: number, y: number) => (x < 0 || y < 0 || x >= m.w || y >= m.h ? Cell.Void : m.cells[y * m.w + x]);
     const solid = (c: number) => c === Cell.Rock || c === Cell.Ruin;
     const g = this.add.graphics().setDepth(DEPTH.walls + 1);
     for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
-      if (!solid(at(x, y))) continue;
+      if (at(x, y) !== Cell.Ruin) continue;
       const face = !solid(at(x, y + 1));
       if (!solid(at(x - 1, y)) && at(x - 1, y) !== Cell.Void) {
         g.fillStyle(PALETTE[face ? 22 : 21]).fillRect(x * 16, y * 16, 1, 16);

@@ -79,7 +79,7 @@ export class Ruin {
     this.coreGlow?.destroy();
     this.coreGlow = undefined;
     const sx = this.machinePos.x, sy = this.machinePos.y - 8;
-    const tx = sx + 10, ty = this.machinePos.y + 10;
+    const { x: tx, y: ty } = this.landingSpot();
     this.core = this.scene.add.sprite(sx, sy, 'core').play('core:pulse').setDepth(6090);
     this.coreGlow = this.scene.add.image(sx, sy, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.3).setScale(0.6).setDepth(6100);
     this.coreLight = this.scene.lighting.add({ x: sx, y: sy, radius: 40, color: PALETTE[10], intensity: 0.9 });
@@ -92,6 +92,16 @@ export class Ruin {
     return true;
   }
 
+  /** Where the core falls: the first open floor spot around the machine, never inside a wall. */
+  private landingSpot() {
+    const m = this.machinePos;
+    for (const [ox, oy] of [[10, 10], [-10, 10], [14, 2], [-14, 2], [0, 14], [10, -2], [-10, -2], [0, 4]]) {
+      const x = m.x + ox, y = m.y + oy;
+      if (this.scene.isWalkable(x, y) && !this.scene.blockedAt(x, y) && this.scene.isWalkable(x, y + 6)) return { x, y };
+    }
+    return { x: m.x, y: m.y + 4 };
+  }
+
   private placeCore(x: number, y: number) {
     this.core?.setPosition(Math.round(x), Math.round(y));
     this.coreGlow?.setPosition(x, y);
@@ -102,7 +112,8 @@ export class Ruin {
   dropCore() {
     if (this.coreState === 'carried' && this.core) {
       this.coreState = 'ground';
-      this.placeCore(this.machinePos.x + 10, this.machinePos.y + 10);
+      const spot = this.landingSpot();
+      this.placeCore(spot.x, spot.y);
     }
   }
 
@@ -110,7 +121,10 @@ export class Ruin {
     const pl = this.scene.player;
     if (this.core && this.coreState === 'ground') {
       this.core.y += Math.sin(time / 300) * 0.05;
-      if (pl.alive && Math.hypot(pl.x - this.core.x, pl.y - 6 - this.core.y) < 14) {
+      // the core wants to be picked up: when you come near it drifts toward you, so a bad spot never strands it
+      const dx = pl.x - this.core.x, dy = pl.y - 6 - this.core.y, d = Math.hypot(dx, dy);
+      if (pl.alive && d < 44 && d > 4) this.placeCore(this.core.x + (dx / d) * 0.6, this.core.y + (dy / d) * 0.6);
+      if (pl.alive && d < 20) {
         this.coreState = 'carried';
         sound.coreHum();
         squash(this.scene, this.core, 1.4, 0.7, 100);

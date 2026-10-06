@@ -1,66 +1,404 @@
 {
-  "_doc": "Painted floor per planet or biome id (src/world/groundPaint.ts). kind picks the surface detail: grass (blades, clover, flowers, leaves), snow (wind ridges, ice glints, sparkle), sand (ripples), spore (spongy pores, glowing specks), basalt (cracked plates with glowing seams), regolith (craters). soil = bare ground ramp dark to light, cover = what grows or lies on it (grass, snow, moss, ash), coverage = 0..1 how much of the floor it covers. detail = extra colors for the kind (blades, flowers, glow seams, specks). stone = ruin floor slabs. pebbles = per 10,000 px. relief = how strongly bumps are shaded.",
+  "_doc": "Painted floor per planet or biome id (src/world/groundPaint.ts). kind picks the surface detail: grass (blades, clover, flowers, leaves), snow (wind ridges, ice glints, sparkle), sand (ripples), spore (spongy pores, glowing specks), basalt (cracked plates with glowing seams), regolith (craters). soil = bare ground ramp dark to light, cover = what grows or lies on it (grass, snow, moss, ash), coverage = 0..1 how much of the floor it covers. detail = extra colors for the kind (blades, flowers, glow seams, specks). stone = ruin floor slabs. pebbles = per 10,000 px. relief = how strongly bumps are shaded. rock = painted outcrops (src/world/rockPaint.ts): ramp dark to light, cover (moss/snow in the hollows) + coverage, seams (glowing plate joints), cracks (contour crack density), relief (slope shading).",
   "default": "earth",
   "styles": {
     "earth": {
-      "kind": "grass", "relief": 7, "coverage": 0.72, "pebbles": 5,
-      "soil": ["15201f", "22312c", "313f33", "434d3b"],
-      "cover": ["15332c", "1c4433", "26573a", "357042", "4d8c48"],
-      "detail": ["1a4030", "2b6640", "46874a", "6cab57"],
-      "flowers": ["e4e8d4", "fee761", "f6757a", "c0cbdc"],
-      "leaves": ["5a3a34", "8a5a44", "3e6a3c"],
-      "stone": ["232a40", "323b58", "434e6e", "56627f"]
+      "kind": "grass",
+      "relief": 7,
+      "coverage": 0.72,
+      "pebbles": 5,
+      "soil": [
+        "15201f",
+        "22312c",
+        "313f33",
+        "434d3b"
+      ],
+      "cover": [
+        "15332c",
+        "1c4433",
+        "26573a",
+        "357042",
+        "4d8c48"
+      ],
+      "detail": [
+        "1a4030",
+        "2b6640",
+        "46874a",
+        "6cab57"
+      ],
+      "flowers": [
+        "e4e8d4",
+        "fee761",
+        "f6757a",
+        "c0cbdc"
+      ],
+      "leaves": [
+        "5a3a34",
+        "8a5a44",
+        "3e6a3c"
+      ],
+      "stone": [
+        "232a40",
+        "323b58",
+        "434e6e",
+        "56627f"
+      ],
+      "rock": {
+        "ramp": [
+          "161a2c",
+          "232a44",
+          "354061",
+          "4f5f84",
+          "7284a4",
+          "9aa9c4"
+        ],
+        "cover": [
+          "1f4a30",
+          "2d6a3c",
+          "4a8c48"
+        ],
+        "coverage": 0.42,
+        "cracks": 1,
+        "relief": 6
+      }
     },
     "verdant": {
-      "kind": "grass", "relief": 7, "coverage": 0.8, "pebbles": 4,
-      "soil": ["15201a", "203021", "2e4129", "3e5231"],
-      "cover": ["17392a", "21502f", "2f6a35", "45883f", "64a54c"],
-      "detail": ["1e4a2c", "357a3c", "5aa04a", "88c45e"],
-      "flowers": ["fee761", "ead4aa", "f6757a", "2ce8f5"],
-      "leaves": ["6a4a30", "3e8948"],
-      "stone": ["232a40", "323b58", "434e6e", "56627f"]
+      "kind": "grass",
+      "relief": 7,
+      "coverage": 0.8,
+      "pebbles": 4,
+      "soil": [
+        "15201a",
+        "203021",
+        "2e4129",
+        "3e5231"
+      ],
+      "cover": [
+        "17392a",
+        "21502f",
+        "2f6a35",
+        "45883f",
+        "64a54c"
+      ],
+      "detail": [
+        "1e4a2c",
+        "357a3c",
+        "5aa04a",
+        "88c45e"
+      ],
+      "flowers": [
+        "fee761",
+        "ead4aa",
+        "f6757a",
+        "2ce8f5"
+      ],
+      "leaves": [
+        "6a4a30",
+        "3e8948"
+      ],
+      "stone": [
+        "232a40",
+        "323b58",
+        "434e6e",
+        "56627f"
+      ],
+      "rock": {
+        "ramp": [
+          "151a2a",
+          "212842",
+          "323d5e",
+          "4b5b80",
+          "6c80a0",
+          "94a4c0"
+        ],
+        "cover": [
+          "245a30",
+          "3a7c3a",
+          "5aa04a"
+        ],
+        "coverage": 0.5,
+        "cracks": 1,
+        "relief": 6
+      }
     },
     "frost": {
-      "kind": "snow", "relief": 9, "coverage": 0.7, "pebbles": 3,
-      "soil": ["24406a", "325a88", "4a7aa8", "6c9cc8"],
-      "cover": ["7d8db0", "97a6c6", "b1bfda", "cbd6ea", "e2e9f5"],
-      "detail": ["ffffff", "e4f4ff", "9fe6f5"],
-      "stone": ["2a3658", "3a4a70", "4e6088", "6a7ea2"]
+      "kind": "snow",
+      "relief": 9,
+      "coverage": 0.7,
+      "pebbles": 3,
+      "soil": [
+        "24406a",
+        "325a88",
+        "4a7aa8",
+        "6c9cc8"
+      ],
+      "cover": [
+        "7d8db0",
+        "97a6c6",
+        "b1bfda",
+        "cbd6ea",
+        "e2e9f5"
+      ],
+      "detail": [
+        "ffffff",
+        "e4f4ff",
+        "9fe6f5"
+      ],
+      "stone": [
+        "2a3658",
+        "3a4a70",
+        "4e6088",
+        "6a7ea2"
+      ],
+      "rock": {
+        "ramp": [
+          "1a2440",
+          "283862",
+          "3c527f",
+          "5a74a0",
+          "809ac0",
+          "b0c4de"
+        ],
+        "cover": [
+          "b8c6e0",
+          "dbe5f3",
+          "f4f8fe"
+        ],
+        "coverage": 0.55,
+        "cracks": 0.7,
+        "relief": 7
+      }
     },
     "dune": {
-      "kind": "sand", "relief": 6, "coverage": 0.55, "pebbles": 3,
-      "soil": ["3a2430", "4e3034", "65403a", "7c5240"],
-      "cover": ["5e3a34", "774c3c", "905f45", "a87452", "c08a62"],
-      "detail": ["3e2731", "d8a878"],
-      "stone": ["3a2a34", "4e3a40", "66504e", "806862"]
+      "kind": "sand",
+      "relief": 6,
+      "coverage": 0.55,
+      "pebbles": 3,
+      "soil": [
+        "3a2430",
+        "4e3034",
+        "65403a",
+        "7c5240"
+      ],
+      "cover": [
+        "5e3a34",
+        "774c3c",
+        "905f45",
+        "a87452",
+        "c08a62"
+      ],
+      "detail": [
+        "3e2731",
+        "d8a878"
+      ],
+      "stone": [
+        "3a2a34",
+        "4e3a40",
+        "66504e",
+        "806862"
+      ],
+      "rock": {
+        "ramp": [
+          "2c1a24",
+          "4a2c34",
+          "6a4040",
+          "8a5a4c",
+          "aa7860",
+          "c89878"
+        ],
+        "cover": [
+          "b88a66",
+          "d0a880"
+        ],
+        "coverage": 0.25,
+        "cracks": 1.2,
+        "relief": 5
+      }
     },
     "spore": {
-      "kind": "spore", "relief": 8, "coverage": 0.6, "pebbles": 1,
-      "soil": ["16112a", "211938", "2d2248", "3b2d5a"],
-      "cover": ["2a1d4a", "38285e", "4a3472", "5e4386", "74569a"],
-      "detail": ["120e22", "8a6ab8", "b55088", "2ce8f5", "f6757a"],
-      "stone": ["231e3c", "302a50", "403866", "52487c"]
+      "kind": "spore",
+      "relief": 8,
+      "coverage": 0.6,
+      "pebbles": 1,
+      "soil": [
+        "16112a",
+        "211938",
+        "2d2248",
+        "3b2d5a"
+      ],
+      "cover": [
+        "2a1d4a",
+        "38285e",
+        "4a3472",
+        "5e4386",
+        "74569a"
+      ],
+      "detail": [
+        "120e22",
+        "8a6ab8",
+        "b55088",
+        "2ce8f5",
+        "f6757a"
+      ],
+      "stone": [
+        "231e3c",
+        "302a50",
+        "403866",
+        "52487c"
+      ],
+      "rock": {
+        "ramp": [
+          "140f26",
+          "221a40",
+          "32285a",
+          "483a78",
+          "62508f",
+          "8070a8"
+        ],
+        "cover": [
+          "5e4386",
+          "8a6ab8"
+        ],
+        "coverage": 0.35,
+        "cracks": 0.8,
+        "relief": 6
+      }
     },
     "ember": {
-      "kind": "basalt", "relief": 8, "coverage": 0.35, "pebbles": 2,
-      "soil": ["150d12", "21141a", "2e1c20", "3d2628"],
-      "cover": ["2c2628", "3a3234", "4a4042", "5c5052"],
-      "detail": ["5a1820", "a22633", "e43b44", "f77622", "feae34"],
-      "stone": ["221a20", "30262a", "403236", "524044"]
+      "kind": "basalt",
+      "relief": 8,
+      "coverage": 0.35,
+      "pebbles": 2,
+      "soil": [
+        "150d12",
+        "21141a",
+        "2e1c20",
+        "3d2628"
+      ],
+      "cover": [
+        "2c2628",
+        "3a3234",
+        "4a4042",
+        "5c5052"
+      ],
+      "detail": [
+        "5a1820",
+        "a22633",
+        "e43b44",
+        "f77622",
+        "feae34"
+      ],
+      "stone": [
+        "221a20",
+        "30262a",
+        "403236",
+        "524044"
+      ],
+      "rock": {
+        "ramp": [
+          "0f080c",
+          "1c1014",
+          "2c1c20",
+          "40282a",
+          "583836",
+          "6e4a44"
+        ],
+        "seams": [
+          "5a1820",
+          "a22633",
+          "f77622",
+          "feae34"
+        ],
+        "cracks": 0,
+        "relief": 6
+      }
     },
     "moon": {
-      "kind": "regolith", "relief": 8, "coverage": 0.4, "pebbles": 6,
-      "soil": ["1c2034", "262c44", "333a56", "424a68"],
-      "cover": ["2a3048", "363e5a", "444d6c", "566080", "6a7594"],
-      "detail": ["8b9bb4"],
-      "stone": ["262c44", "343c58", "444e6e", "586384"]
+      "kind": "regolith",
+      "relief": 8,
+      "coverage": 0.4,
+      "pebbles": 6,
+      "soil": [
+        "1c2034",
+        "262c44",
+        "333a56",
+        "424a68"
+      ],
+      "cover": [
+        "2a3048",
+        "363e5a",
+        "444d6c",
+        "566080",
+        "6a7594"
+      ],
+      "detail": [
+        "8b9bb4"
+      ],
+      "stone": [
+        "262c44",
+        "343c58",
+        "444e6e",
+        "586384"
+      ],
+      "rock": {
+        "ramp": [
+          "181c30",
+          "262c46",
+          "383f5c",
+          "4f5876",
+          "6a7592",
+          "8c97b0"
+        ],
+        "cracks": 1.1,
+        "relief": 8
+      }
     },
     "solace": {
-      "kind": "regolith", "relief": 7, "coverage": 0.5, "pebbles": 4,
-      "soil": ["17142a", "211d38", "2d2746", "3a3256"],
-      "cover": ["231c3a", "2e2448", "3c2e58", "4c3a6a", "5e487c"],
-      "detail": ["b55088", "68386c", "f6757a"],
-      "stone": ["262b44", "343a58", "444b6c", "566082"]
+      "kind": "regolith",
+      "relief": 7,
+      "coverage": 0.5,
+      "pebbles": 4,
+      "soil": [
+        "17142a",
+        "211d38",
+        "2d2746",
+        "3a3256"
+      ],
+      "cover": [
+        "231c3a",
+        "2e2448",
+        "3c2e58",
+        "4c3a6a",
+        "5e487c"
+      ],
+      "detail": [
+        "b55088",
+        "68386c",
+        "f6757a"
+      ],
+      "stone": [
+        "262b44",
+        "343a58",
+        "444b6c",
+        "566082"
+      ],
+      "rock": {
+        "ramp": [
+          "16122a",
+          "241e42",
+          "352c5c",
+          "4c4078",
+          "665a94",
+          "8478ac"
+        ],
+        "cover": [
+          "68386c",
+          "8a4a84"
+        ],
+        "coverage": 0.3,
+        "cracks": 1,
+        "relief": 6
+      }
     }
   }
 }
