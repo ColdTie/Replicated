@@ -1,5 +1,6 @@
 {
-  "_doc": "Real-time travel. Trip minutes = minutesAtRef * (lightYears / refLy) ^ exponent: Alpha Centauri about 45 minutes, 12 ly about 10 hours, a beacon (25-43 ly) about 3 to 10 days. fuel (Embers from the planet you leave) = fuelBase + fuelPerLy * lightYears. needCopy: someone has to stay behind, so you can only launch from a planet that has at least one copy. ?fast in the URL turns minutes into seconds for testing.",
+  "_doc": "Real-time travel. Trip minutes = minutesAtRef * (lightYears / refLy) ^ exponent: Alpha Centauri about 45 minutes, 12 ly about 10 hours, a beacon (25-43 ly) about 3 to 10 days. fuel (Embers from the planet you leave) = fuelBase + fuelPerLy * lightYears. needCopy: someone has to stay behind, so you can only launch from a planet that has at least one copy. ?fast in the URL turns minutes into seconds for testing. fixedSeconds: when above 0, every trip takes exactly that many seconds (Steve asked for 5 s trips on 2026-10-06); set it to 0 to bring back real-time travel.",
+  "fixedSeconds": 5,
   "minutesAtRef": 45,
   "refLy": 4.37,
   "exponent": 2.5,

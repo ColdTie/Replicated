@@ -19,8 +19,9 @@ export function distanceLy(a: string, b: string) {
   return Math.hypot(s.x - t.x, s.y - t.y, s.z - t.z);
 }
 
-/** Trip length in milliseconds (?fast: minutes become seconds). */
+/** Trip length in milliseconds. fixedSeconds > 0 makes every trip that long; otherwise real time (?fast: minutes become seconds). */
 export function travelMs(ly: number) {
+  if (TRAVEL.fixedSeconds > 0) return TRAVEL.fixedSeconds * 1000;
   const minutes = TRAVEL.minutesAtRef * Math.pow(ly / TRAVEL.refLy, TRAVEL.exponent);
   const fast = new URLSearchParams(location.search).has('fast');
   return Math.round(minutes * (fast ? 1000 : 60_000));
