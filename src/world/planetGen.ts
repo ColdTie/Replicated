@@ -117,20 +117,47 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     decor.push({ frame: DECOR.pillar, x: (rx + rw - 2) * 16 + 8, y: (ry + rh - 2) * 16 + 15 });
   }
 
-  // 5. Keep only floor reachable from the landing site
-  const seen = new Uint8Array(w * h);
-  const stack = [idx(cx, cy)];
-  seen[idx(cx, cy)] = 1;
-  while (stack.length) {
-    const i = stack.pop()!;
-    const x = i % w, y = (i / w) | 0;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const nx = x + dx, ny = y + dy;
-      if (at(nx, ny) !== Cell.Floor || seen[idx(nx, ny)]) continue;
-      seen[idx(nx, ny)] = 1;
-      stack.push(idx(nx, ny));
+  // 5. Keep only floor reachable from the landing site. Rocky worlds (ember, moon) could wall the
+  // landing site into a tiny pocket and the conversion below then turned the whole rest of the island
+  // to rock (Fomalhaut was 138 walkable tiles). If the reachable area is too small, carve winding
+  // canyons out from the center through the rock and check again.
+  const flood = () => {
+    const seen = new Uint8Array(w * h);
+    const stack = [idx(cx, cy)];
+    seen[idx(cx, cy)] = 1;
+    let reached = 0;
+    while (stack.length) {
+      const i = stack.pop()!;
+      reached++;
+      const x = i % w, y = (i / w) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (at(nx, ny) !== Cell.Floor || seen[idx(nx, ny)]) continue;
+        seen[idx(nx, ny)] = 1;
+        stack.push(idx(nx, ny));
+      }
     }
+    return { seen, reached };
+  };
+  let flooded = flood();
+  const rc = mulberry32(seed ^ 0xca0e);
+  for (let round = 0; round < 4 && flooded.reached < w * h * 0.3; round++) {
+    for (let sp = 0; sp < 5; sp++) {
+      let px = cx + 0.5, py = cy + 0.5;
+      let a = ((sp + round * 0.5) / 5) * Math.PI * 2 + rc() * 0.9;
+      for (let step = 0; step < Math.max(w, h); step++) {
+        px += Math.cos(a); py += Math.sin(a);
+        a += (fbm(px * 0.13, py * 0.13, seed + 55 + round * 31) - 0.5) * 1.1;
+        const xi = Math.round(px), yi = Math.round(py);
+        if (xi < 3 || yi < 3 || xi >= w - 3 || yi >= h - 4 || at(xi, yi) === Cell.Void) break;
+        for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (at(xi + dx, yi + dy) === Cell.Rock) cells[idx(xi + dx, yi + dy)] = Cell.Floor;
+        }
+      }
+    }
+    flooded = flood();
   }
+  const seen = flooded.seen;
   for (let i = 0; i < cells.length; i++) if (cells[i] === Cell.Floor && !seen[i]) cells[i] = Cell.Rock;
 
   // 6. Tile frames
