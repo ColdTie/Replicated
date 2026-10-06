@@ -11,6 +11,7 @@ export class UIScene extends Phaser.Scene {
   private counter!: Phaser.GameObjects.Container;
   private counterText!: Phaser.GameObjects.BitmapText;
   private counterFade?: Phaser.Time.TimerEvent;
+  private location?: Phaser.GameObjects.Container;
   private stickBase!: Phaser.GameObjects.Arc;
   private stickKnob!: Phaser.GameObjects.Arc;
   private actionBtn!: Phaser.GameObjects.Container;
@@ -34,9 +35,12 @@ export class UIScene extends Phaser.Scene {
     this.game.events.on('embers', this.onEmbers, this);
     this.counterText.setText(String((this.scene.get('planet') as unknown as { embers: number }).embers ?? 0));
     this.game.events.on('titlecard', this.titleCard, this);
+    this.game.events.on('location', this.showLocation, this);
+    (this.scene.get('planet') as unknown as { announceLocation?: () => void }).announceLocation?.(); // the planet announced before this layer existed
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('embers', this.onEmbers, this);
       this.game.events.off('titlecard', this.titleCard, this);
+      this.game.events.off('location', this.showLocation, this);
     });
 
     // Touch controls: floating stick on the left half, big action button on the right
@@ -142,6 +146,19 @@ export class UIScene extends Phaser.Scene {
     this.tweens.add({ targets: this.counter, scale: { from: 1.25, to: 1 }, duration: 160, ease: 'Back.easeOut' });
     this.counterFade?.remove();
     this.counterFade = this.time.delayedCall(2500, () => this.tweens.add({ targets: this.counter, alpha: 0.35, duration: 600 }));
+  }
+
+  /** Top left, under the counter: "MARS - SOL" and the replicants living here, each in its visor color. */
+  private showLocation(place: string, who: { name: string; color: number }[]) {
+    this.location?.destroy();
+    const y0 = isKid() ? 5 : 16;
+    const items: Phaser.GameObjects.GameObject[] = [this.add.bitmapText(0, 0, 'pixel', place).setTint(PALETTE[20])];
+    who.slice(0, 7).forEach((w, i) => {
+      items.push(this.add.rectangle(1, 11 + i * 8 + 3, 3, 3, w.color).setOrigin(0, 0.5));
+      items.push(this.add.bitmapText(7, 11 + i * 8, 'pixel', w.name).setTint(w.color).setAlpha(0.85));
+    });
+    if (who.length > 7) items.push(this.add.bitmapText(7, 11 + 7 * 8, 'pixel', `+${who.length - 7}`).setTint(PALETTE[21]));
+    this.location = this.add.container(7, y0, items).setAlpha(0.6).setDepth(10);
   }
 
   private titleCard(name: string, subtitle: string) {

@@ -11,7 +11,7 @@
       "headY": -6
     }
   },
-  "speed": 90,
+  "speed": 99,
   "accel": 1000,
   "maxHp": 5,
   "invulnMs": 900,
@@ -35,8 +35,8 @@
     }
   },
   "dash": {
-    "speed": 270,
-    "ms": 150,
+    "speed": 290,
+    "ms": 170,
     "cooldownMs": 420,
     "afterimageEveryMs": 22
   },

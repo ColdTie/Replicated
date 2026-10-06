@@ -371,3 +371,16 @@ Not done / next:
 - The Haiku-powered copy personalities (what to build, two-word sign text) wait on Steve's Anthropic key and a
   Supabase Edge Function (see chat 2026-10-06).
 - Still not confirmed on the iPad.
+
+### Session 5f (2026-10-06): feel fixes from Steve's play
+- Damage no longer fades the replicant into the dark. The light stays at full strength and only shrinks a little;
+  instead the glow and light turn from warm to red as hp drops, and a hurt body sheds red and yellow sparks and
+  grey smoke (faster when low) with a brief red flicker. `Player.update` in `src/entities/Player.ts`.
+- 10% faster (`speed` 90 -> 99) and a longer dash (`dash.speed` 270 -> 290, `dash.ms` 150 -> 170: about 49 px
+  instead of 40) in `src/data/player.json`.
+- Corner help: when you push into the edge of a tree, rock, node or building and one side of it is open, the body
+  eases that way and slips around instead of sticking (`Player.slideAroundCorners`, `PlanetScene.blockedAt`).
+  Verified headless: pushing diagonally into a 24x10 blocker now gets past it.
+- Top-left label under the Ember counter: "MARS - SOL" (or "TITAN - SATURN" on a moon) and the replicants living
+  here, you first, each name in its visor color (`location` event, `UIScene.showLocation`; updates when a copy is
+  born).

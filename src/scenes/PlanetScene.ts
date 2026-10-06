@@ -9,6 +9,7 @@ import type { Enemy } from '../entities/Enemy';
 import { Hopper } from '../entities/Hopper';
 import { Npc } from '../entities/Npc';
 import { Village } from '../entities/Village';
+import { planetAt } from '../world/system';
 import { Player, squash } from '../entities/Player';
 import { CrystalNode, Shard } from '../entities/Resources';
 import { Ruin } from '../entities/Ruin';
@@ -24,7 +25,7 @@ import { Controls } from '../input/Controls';
 import type { DoorState, NodeState, PlanetData, PlanetSave, ReplicantSave } from '../net/store';
 import { paintGround } from '../world/groundPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
-import { TRAVEL, distanceLy, fuelFor, planetFor, travelMs } from '../world/galaxy';
+import { TRAVEL, distanceLy, fuelFor, planetFor, starById, travelMs } from '../world/galaxy';
 import type { StarMapData } from './StarMapScene';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
@@ -145,6 +146,26 @@ export class PlanetScene extends Phaser.Scene {
   get replicatorSpot() { return { x: this.base.x, y: this.base.y }; }
   get vesselPos() { return { x: this.vessel.x, y: this.vessel.y }; }
 
+  /** Tells the UI where we are and who lives here (you and the copies), for the corner label. */
+  announceLocation() {
+    const star = starById(this.planet.star);
+    const sp = planetAt(this.planet.star, this.planet.planetIndex);
+    const place = sp?.moon ? `${this.planet.name} - ${sp.name}` : `${this.planet.name} - ${star?.name ?? '?'}`;
+    const who: { name: string; color: number }[] = [];
+    const me = session.replicant;
+    if (me && !this.visit) who.push({ name: me.name.toUpperCase(), color: PALETTE[me.traits.feature ?? PLAYER.feature[1]] });
+    for (const n of this.npcs) who.push({ name: n.data.name.toUpperCase(), color: PALETTE[n.data.traits.feature ?? PLAYER.feature[1]] });
+    this.game.events.emit('location', place, who);
+  }
+
+  /** True when a point is inside a wall, a solid (tree, structure) or a crystal node. */
+  blockedAt(x: number, y: number) {
+    if (!this.isWalkable(x, y)) return true;
+    for (const z of this.solids.getChildren() as Phaser.GameObjects.Zone[]) if (z.getBounds().contains(x, y)) return true;
+    for (const n of this.nodes) if (n.alive && n.zone.getBounds().contains(x, y)) return true;
+    return false;
+  }
+
   /** Walkable ground with no solid (tree, wall, structure) in a w x h box around the point. */
   isClear(x: number, y: number, w: number, h: number) {
     for (const [ox, oy] of [[0, 0], [-w / 2, 0], [w / 2, 0], [0, -h / 2], [0, h / 2]]) {
@@ -234,6 +255,7 @@ export class PlanetScene extends Phaser.Scene {
     this.base = new Base(this, b.pad.x, b.pad.y, built);
     this.village = new Village(this, save?.data.structures, save?.data.village?.work);
     this.spawnNpcs(npcRows, save);
+    this.announceLocation();
 
     // Resources (restoring chipped/broken crystals; they regrow after a while) and creatures
     const regrowMs = BACKEND.nodeRegrowMinutes * 60_000;
@@ -854,6 +876,7 @@ export class PlanetScene extends Phaser.Scene {
     this.time.delayedCall(1700, () => {
       const npc = new Npc(this, { ...row, id: 'pending' }, bx, by);
       this.npcs.push(npc);
+      this.announceLocation();
       sound.birth();
       npc.playBirth(() => {
         pl.locked = false;

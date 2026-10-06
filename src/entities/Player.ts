@@ -10,6 +10,8 @@ import type { InputFrame } from '../input/Controls';
 import type { PlanetScene } from '../scenes/PlanetScene';
 
 const WARM = PALETTE[10];
+const WARM_RGB = Phaser.Display.Color.IntegerToColor(0xffe2b8);
+const HURT_RGB = Phaser.Display.Color.IntegerToColor(PALETTE[8]);
 
 type ModelId = keyof typeof PLAYER.models;
 
@@ -54,6 +56,8 @@ export class Player {
   private hidden = false;
   private stepTimer = 0;
   private dead = false;
+  private nextDamageFx = 0;
+  private hurtFlashUntil = 0;
 
   constructor(private scene: PlanetScene, x: number, y: number) {
     this.zone = scene.add.zone(x, y, 8, 5);
@@ -107,6 +111,7 @@ export class Player {
     if (moving) {
       this.aim.set(input.x, input.y).normalize();
       if (Math.abs(input.x) > 0.15) this.facing = Math.sign(input.x);
+      if (!dashing) this.slideAroundCorners(input, dt);
     }
 
     if (time > this.attackingUntil) {
@@ -147,18 +152,57 @@ export class Player {
       this.nextRegenAt = time + everyMs;
     }
 
-    // Health is the glow: smaller and dimmer as hp drops, flickering when low. The light never drops
-    // so far that the body sinks into the darkness.
+    // Health shows as damage, not as fading: the glow and light turn from warm to red as hp drops, the light
+    // only shrinks a little, and a hurt body sheds sparks and smoke (faster the worse it is) with a red flicker.
     const frac = this.hp / PLAYER.maxHp;
-    const low = frac <= 0.4 ? 0.15 * (0.5 + 0.5 * Math.sin(time / 90)) : 0;
-    this.light.radius = (60 + 40 * frac) * PLAYER.lightRadius * this.mod('light') * stat(session.replicant, 'light');
-    this.light.intensity = 0.8 + 0.2 * frac - low;
-    this.glow.setAlpha((0.08 + 0.14 * frac) * (1 - low)).setScale(0.6 + 0.4 * frac);
+    const hurt = 1 - frac;
+    this.light.radius = (80 + 20 * frac) * PLAYER.lightRadius * this.mod('light') * stat(session.replicant, 'light');
+    this.light.intensity = 1;
+    const col = Phaser.Display.Color.Interpolate.ColorWithColor(WARM_RGB, HURT_RGB, 100, Math.round(hurt * 100));
+    const colNum = Phaser.Display.Color.GetColor(col.r, col.g, col.b);
+    this.light.color = this.hologram ? 0x9fe8ff : colNum;
+    this.glow.setTint(colNum).setAlpha(0.14 + 0.1 * hurt).setScale(0.8 + 0.2 * hurt);
+    if (hurt > 0 && !this.dead && time > this.nextDamageFx) {
+      this.nextDamageFx = time + (frac <= 0.4 ? 180 : 700) / (0.5 + hurt);
+      const sx = this.x + (Math.random() - 0.5) * 8, sy = this.y - 4 - Math.random() * 10;
+      if (Math.random() < 0.6) this.scene.fx.sparks(sx, sy, Math.random() < 0.5 ? PALETTE[8] : PALETTE[11], 2);
+      else {
+        const puff = this.scene.add.image(sx, sy, 'px').setTint(PALETTE[22]).setAlpha(0.55).setDepth(6090).setScale(1.2);
+        this.scene.tweens.add({ targets: puff, y: sy - 10, alpha: 0, scale: 2.2, duration: 700, ease: 'Sine.easeOut', onComplete: () => puff.destroy() });
+      }
+      if (frac <= 0.4 && Math.random() < 0.5 && !this.hologram) {
+        this.sprite.setTint(0xff6a6a);
+        this.scene.time.delayedCall(60, () => { if (!this.hologram && this.scene.time.now > this.hurtFlashUntil) this.sprite.clearTint(); });
+      }
+    }
 
     // invulnerability blink (not while dashing: the trail already shows it)
     this.sprite.setVisible(!this.hidden && (dashing || time > this.invulnUntil || Math.floor(time / 70) % 2 === 0));
     if (this.hologram) this.sprite.setAlpha(Math.random() < 0.04 ? 0.5 : 0.85);
     this.syncVisuals();
+  }
+
+  /**
+   * Pushing into the edge of a tree, rock or building: if one side of what you are pressing against is open,
+   * ease the body that way so you slip around the corner instead of sticking to it.
+   */
+  private slideAroundCorners(input: InputFrame, dt: number) {
+    const b = this.body;
+    const hit = { l: b.blocked.left || b.touching.left, r: b.blocked.right || b.touching.right, u: b.blocked.up || b.touching.up, d: b.blocked.down || b.touching.down };
+    const step = 70 * dt / 1000;
+    const half = b.halfHeight + 2, halfW = b.halfWidth + 2;
+    if ((hit.l && input.x < 0) || (hit.r && input.x > 0)) {
+      const px = this.x + (hit.l ? -1 : 1) * (halfW + 4);
+      const upFree = !this.scene.blockedAt(px, this.y - half - 3), downFree = !this.scene.blockedAt(px, this.y + half + 3);
+      if (upFree && !downFree && input.y <= 0.3) b.y -= step;
+      else if (downFree && !upFree && input.y >= -0.3) b.y += step;
+    }
+    if ((hit.u && input.y < 0) || (hit.d && input.y > 0)) {
+      const py = this.y + (hit.u ? -1 : 1) * (half + 4);
+      const leftFree = !this.scene.blockedAt(this.x - halfW - 3, py), rightFree = !this.scene.blockedAt(this.x + halfW + 3, py);
+      if (leftFree && !rightFree && input.x <= 0.3) b.x -= step;
+      else if (rightFree && !leftFree && input.x >= -0.3) b.x += step;
+    }
   }
 
   /** Multiplier from collected modules (ruins): light, dash, swing. */
@@ -262,6 +306,7 @@ export class Player {
     this.body.velocity.set(dir.x * 190, dir.y * 190);
     this.sprite.play(anim(this.key, 'hurt'), true);
     sound.hurt();
+    this.hurtFlashUntil = now + 100;
     flashWhite(this.scene, this.sprite, 90);
     squash(this.scene, this.sprite, 0.75, 1.25, 110);
     this.scene.hitStop(100);
