@@ -476,7 +476,9 @@ export class StarMapScene extends Phaser.Scene {
       if (this.discovered.has(s.id)) return 2;
       return 3 + (s.planets ? 0 : 1) + Math.min(1, s.ly / 60);
     };
-    const taken: Phaser.Geom.Rectangle[] = [];
+    const { width: w } = this.scale;
+    // the title and the corner buttons are off limits for labels
+    const taken: Phaser.Geom.Rectangle[] = [new Phaser.Geom.Rectangle(w / 2 - 50, 0, 100, 22), new Phaser.Geom.Rectangle(w - 34, 0, 34, 30), new Phaser.Geom.Rectangle(0, 0, 34, 30)];
     const sorted = [...this.projected].sort((a, b) => priority(a) - priority(b));
     for (const p of sorted) {
       const s = p.star;
@@ -489,7 +491,7 @@ export class StarMapScene extends Phaser.Scene {
         this.labels.set(s.id, label);
       }
       const r = radii.get(s.id) ?? 1;
-      const rect = new Phaser.Geom.Rectangle(p.sx - label.width / 2 - 2, p.sy + r + 4, label.width + 4, 8);
+      const rect = new Phaser.Geom.Rectangle(p.sx - label.width / 2 - 3, p.sy + r + 3, label.width + 6, 11);
       if (pr >= 2 && taken.some((t) => Phaser.Geom.Intersects.RectangleToRectangle(t, rect))) { label.setVisible(false); continue; }
       taken.push(rect);
       const found = this.discovered.has(s.id);
