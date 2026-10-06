@@ -14,7 +14,7 @@
       "accent": [16, 17, 18], "ground": [25, 23, 21], "ambient": "8a9ac8",
       "sky": ["181425", "262b44", "124e89", "c0cbdc"],
       "size": [92, 70], "islandRadius": 0.86, "rockThreshold": 0.58, "ruins": 3, "resourceNodes": 16,
-      "enemies": { "skitter": 7, "hopper": 3 }, "decorDensity": 0.06, "sporeRate": 1,
+      "enemies": { "skitter": 7, "hopper": 3 }, "decorDensity": 0.1, "sporeRate": 1,
       "trees": 0, "towers": 0, "ponds": 3, "flowers": 0, "wildlife": { "grazers": 3, "birds": 4, "butterflies": 0 }
     },
     {
@@ -22,7 +22,7 @@
       "accent": [5, 1, 3], "ground": [6, 5, 31], "ambient": "b08a7a",
       "sky": ["181425", "3e2731", "733e39", "e4a672"],
       "size": [100, 72], "islandRadius": 0.9, "rockThreshold": 0.6, "ruins": 5, "resourceNodes": 16,
-      "enemies": { "skitter": 8, "spitter": 4 }, "decorDensity": 0.05, "sporeRate": 0.5,
+      "enemies": { "skitter": 8, "spitter": 4 }, "decorDensity": 0.09, "sporeRate": 0.5,
       "trees": 0, "towers": 2, "ponds": 0, "flowers": 0, "wildlife": { "grazers": 0, "birds": 6, "butterflies": 0 }
     },
     {
@@ -38,7 +38,7 @@
       "accent": [7, 0, 9], "ground": [25, 6, 5], "ambient": "b07a68",
       "sky": ["181425", "3e2731", "a22633", "f77622"],
       "size": [92, 70], "islandRadius": 0.84, "rockThreshold": 0.56, "ruins": 2, "resourceNodes": 22,
-      "enemies": { "skitter": 9, "hopper": 4, "spitter": 2 }, "decorDensity": 0.05, "sporeRate": 2,
+      "enemies": { "skitter": 9, "hopper": 4, "spitter": 2 }, "decorDensity": 0.1, "sporeRate": 2,
       "trees": 0, "towers": 0, "ponds": 0, "flowers": 0, "wildlife": { "grazers": 0, "birds": 0, "butterflies": 0 }
     },
     {
@@ -46,7 +46,7 @@
       "accent": [22, 21, 20], "ground": [25, 24, 23], "ambient": "8a8fa8",
       "sky": ["181425", "181425", "262b44", "3a4466"],
       "size": [88, 66], "islandRadius": 0.85, "rockThreshold": 0.55, "ruins": 4, "resourceNodes": 14,
-      "enemies": { "skitter": 5, "hopper": 3 }, "decorDensity": 0.04, "sporeRate": 0.3,
+      "enemies": { "skitter": 5, "hopper": 3 }, "decorDensity": 0.09, "sporeRate": 0.3,
       "trees": 0, "towers": 0, "ponds": 0, "flowers": 0, "wildlife": { "grazers": 0, "birds": 0, "butterflies": 0 }
     }
   ]

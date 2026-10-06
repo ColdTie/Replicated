@@ -291,3 +291,14 @@ Not done / next:
 - Not yet confirmed on the iPad (paint time and memory on the iPad 9th gen in particular).
 - Fix: ships launched before the 5 second change (still on the old real-time schedule) now also arrive 5 seconds after
   departure (`capJourney` in `src/net/store.ts`).
+
+### Session 5b (2026-10-06): supplies on new worlds (Steve: "barren, can't afford a copy")
+- Every planet now grows a starter cluster of 3 crystal nodes 8 to 13 tiles from the landing site (placed last in
+  `planetGen.ts` with its own rng, appended to the end of `nodes`, so existing layouts and saved node damage keep
+  their indexes).
+- Nodes are richer: 2 Embers per hit, 4 on break (8 per node, was 5) in `src/data/items.json`; they regrow after
+  10 minutes instead of 30 (`src/data/backend.json`). Enemies drop one more Ember each (`src/data/enemies.json`).
+- Sparse biomes (frost, dune, ember, moon) get roughly double the decor density so they read less empty.
+- A copy costs ~4 nodes of mining now; Replicator + copy + fuel on a fresh world is reachable in one short session.
+- Verified: build, both playtests pass; screenshots `supplies-ember-base.png`, `supplies-earth-base.png`.
+

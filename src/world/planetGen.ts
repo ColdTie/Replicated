@@ -268,6 +268,23 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     }
   }
 
+  // 10. Starter crystals: a small cluster just outside the base so no landing ever feels barren.
+  // Placed last with its own rng and appended to the end of `nodes`, so existing planets keep their
+  // layout and saved node damage (indexed by position in `nodes`) stays valid.
+  {
+    const r3 = mulberry32(seed ^ 0x51a7);
+    const starters: Point[] = [];
+    for (let attempt = 0; attempt < 400 && starters.length < 3; attempt++) {
+      const a = r3() * Math.PI * 2, d = 8 + r3() * 5;
+      const x = Math.round(cx + Math.cos(a) * d), y = Math.round(cy + Math.sin(a) * d);
+      if (x < 2 || y < 2 || x >= w - 2 || y >= h - 2 || !isOpen(x, y) || ruinFloor[idx(x, y)]) continue;
+      if (!farFrom(x, y, starters, 3) || !farFrom(x, y, taken, 2) || !farFrom(x, y, nodes, 4)) continue;
+      starters.push({ x, y });
+    }
+    taken.push(...starters);
+    nodes.push(...starters);
+  }
+
   const c = { x: cx * 16 + 8, y: cy * 16 + 8 };
   const base = {
     center: c,
