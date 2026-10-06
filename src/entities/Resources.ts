@@ -95,7 +95,7 @@ export class Shard {
     // chromatic-split ghosts, only shown during the glitch right before pickup
     this.ghosts = [0xff3060, 0x30f0ff].map((c) => scene.add.image(x, y, 'shard').setTintFill(c).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(6140));
     this.light = scene.lighting.add({ x, y, radius: 16, color: PALETTE[9], intensity: 0.7 });
-    this.readyAt = scene.time.now + 450;
+    this.readyAt = scene.time.now + EMBER.pickupDelayMs;
   }
 
   update(time: number, dt: number) {
