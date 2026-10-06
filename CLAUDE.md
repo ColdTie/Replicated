@@ -260,3 +260,7 @@ Not done / next:
   `tools/playtest-travel.mjs` (map, launch, warp, arrival, landing) pass with no errors; every table, column and RPC the
   client uses exists in the live database; Supabase advisors show only expected notes.
 - Live data: Steve's family login exists, one profile, one copy made on Earth.
+- Steve's feedback (loves the pickup and attack sounds): rain 40% quieter (`rain` in `src/data/sound.json`, 0.18 ->
+  0.108); Ember shards fly 10% faster (`magnetPull` in `src/data/items.json`), commit once they start flying and pass
+  through rocks, trees and walls (no more getting stuck); in flight they shimmer in a rolling rainbow and right before
+  pickup glitch like a teleport (jitter, flicker, red/cyan split, static pixels, a white scanline flash on arrival).
