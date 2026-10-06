@@ -69,6 +69,9 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 - Ask before adding any dependency beyond Phaser, Vite, TypeScript, supabase js, pngjs, and Playwright.
 - Update the Progress section below at the end of every session.
 - When something needs Steve (keys, account creation, testing on the iPad), stop and give a short numbered list.
+- Small fixes and feel tweaks go straight to `main` without asking (Steve, 2026-10-06: "if there is a fix like this
+  you need to just push it"): verify (build, playtest), open the PR and merge it so Pages deploys. Ask first only for
+  database changes, new dependencies, or anything that changes what the game is.
 - One lead session at a time (agreed 2026-10-06). Start every session with `git fetch origin main` and build on the
   latest `main`; check open PRs and `supabase/migrations/` against the live migration list before changing the
   database. Never re-implement something that is already on `main`.
