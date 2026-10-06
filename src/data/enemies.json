@@ -12,7 +12,7 @@
     "cooldownMs": 700,
     "contactDamage": 1,
     "drops": {
-      "ember": 2
+      "ember": 3
     },
     "respawnMs": 25000,
     "kind": "skitter"
@@ -30,7 +30,7 @@
     "contactDamage": 1,
     "landRadius": 14,
     "drops": {
-      "ember": 1
+      "ember": 2
     },
     "respawnMs": 30000
   },
@@ -45,7 +45,7 @@
     "shotLifeMs": 2600,
     "contactDamage": 1,
     "drops": {
-      "ember": 2
+      "ember": 3
     },
     "respawnMs": 40000
   }

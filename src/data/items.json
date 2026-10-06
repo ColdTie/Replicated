@@ -5,8 +5,8 @@
     "magnetRange": 44,
     "nodeSprite": "crystal",
     "nodeHits": 3,
-    "nodeDropsPerHit": 1,
-    "nodeDropsOnBreak": 3,
+    "nodeDropsPerHit": 2,
+    "nodeDropsOnBreak": 4,
     "magnetPull": 1540
   },
   "_doc": "ember.magnetPull: how hard a shard is pulled toward you once it starts flying to you (1400 = original speed)."
