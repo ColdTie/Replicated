@@ -302,3 +302,13 @@ Not done / next:
 - A copy costs ~4 nodes of mining now; Replicator + copy + fuel on a fresh world is reachable in one short session.
 - Verified: build, both playtests pass; screenshots `supplies-ember-base.png`, `supplies-earth-base.png`.
 
+### Session 5c (2026-10-06): Fomalhaut was a closet (Steve got walled in)
+- On rocky biomes the landing site could be sealed inside a small rock pocket, and "keep only reachable floor" then
+  turned the entire rest of the island to rock. Fomalhaut, the beacon Steve flew to, generated with 138 walkable
+  tiles (2% of the map) and 4 crystal nodes.
+- `planetGen.ts` now measures the reachable area after the flood fill and, while it is under 30% of the map, carves
+  winding canyons out from the landing site through the rock (up to 4 rounds of 5 spokes, own rng) and refloods.
+  Fomalhaut: 2,246 walkable tiles and 69 nodes. Every star's world is now at least ~33% walkable; worlds that were
+  already open are untouched.
+- Verified: build and both playtests pass; all 44 star worlds checked. Screenshot `fomalhaut-fixed.png`.
+
