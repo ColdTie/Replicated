@@ -5,10 +5,10 @@ import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { PALETTE, type PlanetDef } from '../core/data';
 import { isKid, session } from '../core/session';
-import { valueNoise } from '../core/rng';
-import { rgb } from '../fx/textures';
+import { Globe } from '../fx/Globe';
 import type { Journey } from '../net/store';
-import { TRAVEL, formatDuration, planetFor, starById } from '../world/galaxy';
+import { formatDuration, planetFor, starById } from '../world/galaxy';
+import { planetAt } from '../world/system';
 import type { StarMapData } from './StarMapScene';
 
 export interface TravelData { journey: Journey; depart?: boolean }
@@ -27,6 +27,9 @@ export class TravelScene extends Phaser.Scene {
   private globeImg?: Phaser.GameObjects.Image;
   private dest?: Globe;
   private destImg?: Phaser.GameObjects.Image;
+  private giantImg?: Phaser.GameObjects.Image;
+  private destGiant?: Globe;
+  private destGiantImg?: Phaser.GameObjects.Image;
   private eta!: Phaser.GameObjects.BitmapText;
   private ui!: Phaser.GameObjects.Container;
   private arriving = false;
@@ -43,6 +46,7 @@ export class TravelScene extends Phaser.Scene {
     this.streaks = [];
     this.globe = undefined; this.dest = undefined;
     this.globeImg = undefined; this.destImg = undefined;
+    this.giantImg = undefined; this.destGiant = undefined; this.destGiantImg = undefined;
   }
 
   create() {
@@ -55,14 +59,24 @@ export class TravelScene extends Phaser.Scene {
       this.streaks.push({ x: Math.random() * w, y: Math.random() * h, speed: [8, 20, 45][layer] * (0.8 + Math.random() * 0.4), layer });
     }
 
-    const from = planetFor(this.j.from_star, this.j.from_star === 'sol' ? 3 : TRAVEL.landedPlanetIndex);
-    const to = planetFor(this.j.to_star, TRAVEL.landedPlanetIndex);
+    const from = planetFor(this.j.from_star, this.j.from_planet);
+    const to = planetFor(this.j.to_star, this.j.to_planet);
+    const fromSp = planetAt(this.j.from_star, this.j.from_planet), toSp = planetAt(this.j.to_star, this.j.to_planet);
     if (this.depart && from) {
-      this.globe = new Globe(this, 'globe.from', 120, from, this.j.from_star === 'sol');
+      // leaving a moon: the giant it orbits fills the corner behind it
+      if (fromSp?.moon) {
+        new Globe(this, 'globe.from.giant', 220, from, { kind: fromSp.kind, temp: fromSp.temp });
+        this.giantImg = this.add.image(w * 0.08, h * 0.95, 'globe.from.giant');
+      }
+      this.globe = new Globe(this, 'globe.from', fromSp?.moon ? 70 : 120, from, { earth: from.id === 'earth' });
       this.globeImg = this.add.image(w * 0.3, h * 0.62, 'globe.from');
     }
     if (to) {
-      this.dest = new Globe(this, 'globe.to', 120, to, false);
+      if (toSp?.moon) {
+        this.destGiant = new Globe(this, 'globe.to.giant', 160, to, { kind: toSp.kind, temp: toSp.temp });
+        this.destGiantImg = this.add.image(w * 0.86, h * 0.45, 'globe.to.giant').setScale(0.02).setAlpha(0);
+      }
+      this.dest = new Globe(this, 'globe.to', toSp?.moon ? 60 : 120, to, { earth: to.id === 'earth' });
       this.destImg = this.add.image(w * 0.86, h * 0.45, 'globe.to').setScale(0.02).setAlpha(0);
     }
 
@@ -73,7 +87,7 @@ export class TravelScene extends Phaser.Scene {
     this.ship = this.add.sprite(w * 0.38, h * 0.5, 'vessel').play('vessel:idle');
 
     // Bottom: route bar with the ship marker and the time left
-    const fromName = starById(this.j.from_star)?.name ?? '?', toName = starById(this.j.to_star)?.name ?? '?';
+    const fromName = from?.name ?? starById(this.j.from_star)?.name ?? '?', toName = to?.name ?? starById(this.j.to_star)?.name ?? '?';
     this.eta = this.add.bitmapText(w / 2, h - 34, 'pixel', '').setOrigin(0.5, 0).setTint(PALETTE[20]);
     const left = this.add.bitmapText(14, h - 18, 'pixel', fromName).setTint(PALETTE[21]);
     const right = this.add.bitmapText(w - 14, h - 18, 'pixel', toName).setOrigin(1, 0).setTint(PALETTE[11]);
@@ -98,13 +112,14 @@ export class TravelScene extends Phaser.Scene {
     let reps;
     try { reps = await st.listReplicants(); } catch { return; }
     // planets with someone living there (copies or family) can be visited as a hologram while you fly
-    const stars = [...new Set(reps.filter((r) => r.status !== 'in_transit').map((r) => r.star_id))].slice(0, 4);
-    stars.forEach((sid, i) => {
-      const p = planetFor(sid, sid === 'sol' ? 3 : TRAVEL.landedPlanetIndex);
+    const where = new Map<string, [string, number]>();
+    for (const r of reps) if (r.status !== 'in_transit') where.set(`${r.star_id}:${r.planet_index}`, [r.star_id, r.planet_index]);
+    [...where.values()].slice(0, 4).forEach(([sid, pi], i) => {
+      const p = planetFor(sid, pi);
       if (!p || !this.scene.isActive()) return;
       const x = 22 + i * 34, y = 22;
-      const key = `globe.visit.${sid}`;
-      new Globe(this, key, 22, p, sid === 'sol');
+      const key = `globe.visit.${sid}.${pi}`;
+      new Globe(this, key, 22, p, { earth: p.id === 'earth' });
       const icon = this.add.image(0, 0, key);
       const ring = this.add.circle(0, 0, 13, 0x000000, 0).setStrokeStyle(1, PALETTE[9], 0.8);
       const name = this.add.bitmapText(0, 15, 'pixel', p.name.split(' ')[0]).setOrigin(0.5, 0).setTint(PALETTE[21]);
@@ -125,7 +140,7 @@ export class TravelScene extends Phaser.Scene {
   private openMap() {
     this.scene.pause();
     const data: StarMapData = {
-      mode: 'view', from: this.j.from_star, journey: this.j,
+      mode: 'view', from: this.j.from_star, fromPlanet: this.j.from_planet, journey: this.j,
       onClose: () => this.scene.resume(),
     };
     this.scene.launch('starmap', data);
@@ -137,10 +152,11 @@ export class TravelScene extends Phaser.Scene {
     this.ship.setPosition(w * 0.3, h * 0.62).setScale(0.3);
     this.tweens.add({ targets: this.ship, x: w * 0.38, y: h * 0.5, scale: 1, duration: 2600, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: this.globeImg, x: w * 0.1, y: h * 0.85, scale: 0.6, duration: 4500, ease: 'Sine.easeIn' });
+    if (this.giantImg) this.tweens.add({ targets: this.giantImg, x: -60, y: h * 1.1, scale: 0.7, duration: 4500, ease: 'Sine.easeIn' });
     this.time.delayedCall(2600, () => {
       sound.dash();
       this.tweens.add({ targets: this, warp: 1, duration: 1800, ease: 'Quad.easeIn' });
-      this.tweens.add({ targets: this.globeImg, alpha: 0, x: -80, duration: 1500, ease: 'Quad.easeIn' });
+      this.tweens.add({ targets: [this.globeImg, this.giantImg].filter(Boolean), alpha: 0, x: -80, duration: 1500, ease: 'Quad.easeIn' });
       this.time.delayedCall(1500, () => {
         this.cameras.main.flash(250, 200, 230, 255);
         this.tweens.add({ targets: this.ui, alpha: 1, duration: 800 });
@@ -156,7 +172,11 @@ export class TravelScene extends Phaser.Scene {
     this.tweens.add({ targets: this, warp: 0.05, duration: 1500, ease: 'Quad.easeOut' });
     this.tweens.add({ targets: this.ui, alpha: 0, duration: 600 });
     this.destImg?.setAlpha(1);
-    this.tweens.add({ targets: this.destImg, scale: 1.6, x: w * 0.62, y: h * 0.55, duration: 3200, ease: 'Sine.easeInOut' });
+    if (this.destGiantImg) {
+      this.destGiantImg.setAlpha(1);
+      this.tweens.add({ targets: this.destGiantImg, scale: 1.5, x: w * 0.8, y: h * 0.3, duration: 3200, ease: 'Sine.easeInOut' });
+      this.tweens.add({ targets: this.destImg, scale: 1.3, x: w * 0.5, y: h * 0.62, duration: 3200, ease: 'Sine.easeInOut' });
+    } else this.tweens.add({ targets: this.destImg, scale: 1.6, x: w * 0.62, y: h * 0.55, duration: 3200, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: this.ship, x: w * 0.6, y: h * 0.52, scale: 0.15, duration: 3200, ease: 'Sine.easeIn' });
     this.time.delayedCall(3000, () => {
       this.cameras.main.fadeOut(500, 24, 20, 37);
@@ -166,11 +186,10 @@ export class TravelScene extends Phaser.Scene {
 
   private async land() {
     const r = session.replicant, st = session.store;
-    const planetIndex = this.j.to_star === 'sol' ? 3 : TRAVEL.landedPlanetIndex;
     if (r && st) {
-      try { await st.completeJourney(r, this.j, planetIndex); } catch (e) { console.warn('arrival save failed', e); }
+      try { await st.completeJourney(r, this.j); } catch (e) { console.warn('arrival save failed', e); }
     } else if (r) {
-      r.status = 'active'; r.star_id = this.j.to_star; r.planet_index = planetIndex; r.pos_x = null; r.pos_y = null;
+      r.status = 'active'; r.star_id = this.j.to_star; r.planet_index = this.j.to_planet; r.pos_x = null; r.pos_y = null;
     }
     this.scene.start('planet', { arrival: true });
   }
@@ -196,7 +215,7 @@ export class TravelScene extends Phaser.Scene {
     if (this.t > this.nextGlobeAt) {
       this.nextGlobeAt = this.t + 1 / 12;
       this.globe?.draw(this.t * 0.05);
-      if (this.arriving) this.dest?.draw(this.t * 0.05);
+      if (this.arriving) { this.dest?.draw(this.t * 0.05); this.destGiant?.draw(this.t * 0.02); }
     }
     // time left
     const now = Date.now();
@@ -216,63 +235,3 @@ export class TravelScene extends Phaser.Scene {
     if (left <= 0 && this.warp >= 0.99 && this.ui.alpha >= 0.99) this.arrive();
   }
 }
-
-/** A pixel planet seen from space: shaded sphere with drifting land, polar caps sized and colored per world (`poles`), and a warm light where the base is. */
-class Globe {
-  private ct: Phaser.Textures.CanvasTexture;
-  private img: ImageData;
-  private sea: number[][]; private land: number[][]; private cap: number[][]; private poleSize: number;
-
-  constructor(scene: Phaser.Scene, readonly key: string, readonly size: number, p: PlanetDef, private earth: boolean) {
-    if (scene.textures.exists(key)) scene.textures.remove(key);
-    this.ct = scene.textures.createCanvas(key, size, size)!;
-    this.img = this.ct.getContext().createImageData(size, size);
-    const acc = p.accent.map((i) => rgb(PALETTE[i]));
-    const gr = (p.ground ?? [25, 24, 23]).map((i) => rgb(PALETTE[i]));
-    this.sea = earth ? [rgb(PALETTE[15]), rgb(PALETTE[16])] : [gr[0], gr[1]];
-    this.land = earth ? [rgb(PALETTE[14]), rgb(PALETTE[13]), rgb(PALETTE[12])] : [acc[0], acc[1], acc[2]];
-    this.cap = (p.poles?.colors ?? [20, 19]).map((i) => rgb(PALETTE[i]));
-    this.poleSize = p.poles?.size ?? 0;
-    this.draw(0);
-  }
-
-  draw(rot: number) {
-    const n = this.size, c = n / 2, d = this.img.data;
-    const lx = -0.6, ly = -0.35, lz = 0.72; // light from the upper left
-    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-      const i = (y * n + x) * 4;
-      const nx = (x + 0.5 - c) / c, ny = (y + 0.5 - c) / c;
-      const r2 = nx * nx + ny * ny;
-      if (r2 > 1) { d[i + 3] = 0; continue; }
-      const nz = Math.sqrt(1 - r2);
-      // rotate the surface point around the vertical axis
-      const cr = Math.cos(rot * Math.PI * 2), sr = Math.sin(rot * Math.PI * 2);
-      const px = nx * cr + nz * sr, pz = -nx * sr + nz * cr;
-      const h = valueNoise(px * 2.2 + 10, ny * 2.2 + pz * 1.7 + 10, 7) * 0.65 + valueNoise(px * 5 + 3, ny * 5 + pz * 4, 9) * 0.35;
-      // true latitude (0 equator .. 1 pole); the cap edge wanders with the terrain noise
-      const lat = Math.asin(Math.min(1, Math.abs(ny))) / (Math.PI / 2);
-      const capEdge = 1 - this.poleSize + (h - 0.5) * 0.22;
-      let col: number[];
-      if (this.poleSize > 0 && lat > capEdge) col = this.cap[lat > capEdge + 0.07 && h < 0.68 ? 1 : 0];
-      else if (h > 0.52) col = this.land[h > 0.66 ? 2 : h > 0.58 ? 1 : 0];
-      else col = this.sea[h > 0.42 ? 1 : 0];
-      const lambert = Math.max(0, nx * lx + ny * ly + nz * lz);
-      // banded, dithered light so it matches the pixel look
-      const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5][(y & 3) * 4 + (x & 3)] / 16;
-      const band = Math.min(4, Math.floor(lambert * 4 + bayer));
-      let k = [0.18, 0.4, 0.65, 0.85, 1][band];
-      // rim haze
-      if (r2 > 0.88) k = Math.max(k, 0.35);
-      let r = col[0] * k, g = col[1] * k, b = col[2] * k;
-      if (r2 > 0.88) { r += 20; g += 40; b += 70; }
-      // the base: a warm light on the night side of Earth
-      if (this.earth && lambert < 0.15 && Math.abs(px - 0.2) < 0.05 && Math.abs(ny - 0.15) < 0.05) { r = 254; g = 174; b = 52; }
-      d[i] = Math.min(255, r); d[i + 1] = Math.min(255, g); d[i + 2] = Math.min(255, b); d[i + 3] = 255;
-    }
-    this.ct.getContext().putImageData(this.img, 0, 0);
-    this.ct.refresh();
-  }
-}
-
-// playtest hook: tools/*.mjs render every world's globe side by side
-(window as unknown as { __Globe: typeof Globe }).__Globe = Globe;

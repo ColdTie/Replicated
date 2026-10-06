@@ -205,7 +205,7 @@ export class HomeScene extends Phaser.Scene {
       session.replicant.status = 'active';
     }
     this.scene.start('planet', {
-      visit: params.get('star') ? { star: params.get('star')!, planetIndex: 1 } : undefined,
+      visit: params.get('star') ? { star: params.get('star')!, planetIndex: Number(params.get('pi') ?? 1) } : undefined,
       planetId: params.get('planet') ?? undefined,
       seed: params.get('seed') ? Number(params.get('seed')) : undefined,
       shot: params.has('shot'),

@@ -4,8 +4,9 @@ import STARS from '../data/stars.json';
 import TRAVEL from '../data/travel.json';
 import { PLANETS, hex, type PlanetDef } from '../core/data';
 import { rgb } from '../fx/textures';
+import { planetAt, systemFor, type CatalogPlanet } from './system';
 
-export interface Star { id: string; name: string; cls: string; ly: number; x: number; y: number; z: number; beacon?: boolean }
+export interface Star { id: string; name: string; cls: string; ly: number; x: number; y: number; z: number; beacon?: boolean; planets?: CatalogPlanet[] }
 
 export const STAR_LIST = STARS.stars as Star[];
 export const BEACONS = STARS.beacons;
@@ -22,7 +23,8 @@ export function distanceLy(a: string, b: string) {
 /** Trip length in milliseconds. fixedSeconds > 0 makes every trip that long; otherwise real time (?fast: minutes become seconds). */
 export function travelMs(ly: number) {
   if (TRAVEL.fixedSeconds > 0) return TRAVEL.fixedSeconds * 1000;
-  const minutes = TRAVEL.minutesAtRef * Math.pow(ly / TRAVEL.refLy, TRAVEL.exponent);
+  // a hop between planets of the same star is a short trip, not a free one
+  const minutes = ly < 0.01 ? TRAVEL.inSystemMinutes : TRAVEL.minutesAtRef * Math.pow(ly / TRAVEL.refLy, TRAVEL.exponent);
   const fast = new URLSearchParams(location.search).has('fast');
   return Math.round(minutes * (fast ? 1000 : 60_000));
 }
@@ -40,12 +42,6 @@ export function formatDuration(ms: number) {
   return hh ? `${d} DAYS ${hh} H` : `${d} DAYS`;
 }
 
-function hashId(id: string) {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
-
 function mix(a: string, b: string, t: number) {
   const x = rgb(hex(a)), y = rgb(hex(b));
   return x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
@@ -57,22 +53,24 @@ export function starLight(cls: string): [string, number] {
   return table[cls[0]] ?? table.G;
 }
 
-/** The planet you land on at a star: a hand-made one from planets.json, else one generated from the star's id. */
+/** The world you land on: a hand-made one from planets.json (Earth), else the system's planet (or a giant's moon). */
 export function planetFor(starId: string, planetIndex: number): PlanetDef | undefined {
   const fixed = PLANETS.find((p) => p.star === starId && p.planetIndex === planetIndex);
   if (fixed) return fixed;
   const star = starById(starId);
   if (!star) return undefined;
-  const seed = hashId(star.id);
-  const biome = BIOMES.biomes[seed % BIOMES.biomes.length];
+  const sp = planetAt(starId, planetIndex) ?? systemFor(starId)[0];
+  if (!sp) return undefined;
+  const biome = BIOMES.biomes.find((b) => b.id === sp.biome) ?? BIOMES.biomes[0];
   const [light, k] = starLight(star.cls);
+  const subtitle = star.beacon ? 'A BEACON BURNS HERE' : sp.moon ? `MOON OF ${sp.name}` : biome.subtitle;
   const def = {
     ...structuredClone(biome),
-    name: star.name,
-    subtitle: star.beacon ? 'A BEACON BURNS HERE' : biome.subtitle,
+    name: sp.landing,
+    subtitle,
     star: star.id,
-    planetIndex,
-    seed: seed % 100000,
+    planetIndex: sp.index,
+    seed: sp.seed,
     ambient: mix(biome.ambient, light, k),
     sky: biome.sky.map((c, i) => (i === 0 ? c : mix(c, light, k * 0.6))),
     intro: 'land',
@@ -82,6 +80,11 @@ export function planetFor(starId: string, planetIndex: number): PlanetDef | unde
   // Beacon systems hold enormous resources
   if (star.beacon) def.resourceNodes *= 3;
   return def;
+}
+
+/** The planet a ship lands on at a star when none was chosen: Earth at Sol, else the first planet. */
+export function defaultPlanetIndex(starId: string) {
+  return starId === 'sol' ? 3 : TRAVEL.landedPlanetIndex;
 }
 
 export const BIOME_LIST = BIOMES.biomes;

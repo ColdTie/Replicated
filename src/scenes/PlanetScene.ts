@@ -728,8 +728,9 @@ export class PlanetScene extends Phaser.Scene {
     const data: StarMapData = {
       mode: 'launch',
       from: this.planet.star,
+      fromPlanet: this.planet.planetIndex,
       embers: this.embers,
-      onLaunch: (to) => this.launch(to),
+      onLaunch: (to, planet) => this.launch(to, planet),
       onClose: () => { this.player.locked = false; this.scene.resume(); },
     };
     this.scene.pause();
@@ -748,7 +749,7 @@ export class PlanetScene extends Phaser.Scene {
   }
 
   /** Fuel paid, the replicant hops in, the vessel lifts off, then the flight begins. */
-  private launch(to: string) {
+  private launch(to: string, toPlanet: number) {
     this.scene.resume();
     const ly = distanceLy(this.planet.star, to);
     const fuel = fuelFor(ly);
@@ -765,11 +766,11 @@ export class PlanetScene extends Phaser.Scene {
     this.tweens.add({
       targets: hop, t: 1, duration: 360,
       onUpdate: () => { pl.setPosition(sx + (ex - sx) * hop.t, sy + (ey - sy) * hop.t); pl.sprite.y -= Math.sin(hop.t * Math.PI) * 12; },
-      onComplete: () => { pl.hide(); this.liftOff(to, ly); },
+      onComplete: () => { pl.hide(); this.liftOff(to, toPlanet, ly); },
     });
   }
 
-  private liftOff(to: string, ly: number) {
+  private liftOff(to: string, toPlanet: number, ly: number) {
     const v = this.vessel;
     const thrust = this.add.particles(0, 0, 'px', {
       lifespan: { min: 200, max: 500 }, speedY: { min: 60, max: 140 }, speedX: { min: -20, max: 20 },
@@ -788,8 +789,11 @@ export class PlanetScene extends Phaser.Scene {
     const arrivesAt = new Date(Date.now() + travelMs(ly));
     const r = session.replicant, st = session.store;
     const journeyP = r && st && !this.shot
-      ? st.startJourney(r, to, arrivesAt)
-      : Promise.resolve({ id: 'local', replicant_id: r?.id ?? '', from_star: this.planet.star, to_star: to, departs_at: new Date().toISOString(), arrives_at: arrivesAt.toISOString() });
+      ? st.startJourney(r, to, toPlanet, arrivesAt)
+      : Promise.resolve({
+        id: 'local', replicant_id: r?.id ?? '', from_star: this.planet.star, to_star: to, from_planet: this.planet.planetIndex, to_planet: toPlanet,
+        departs_at: new Date().toISOString(), arrives_at: arrivesAt.toISOString(),
+      });
     this.time.delayedCall(3200, () => {
       journeyP.then((journey) => this.scene.start('travel', { journey, depart: true }))
         .catch((e) => {
