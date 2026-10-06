@@ -227,7 +227,19 @@ export class Player {
     this.glow.setVisible(false);
     this.shadow.setVisible(false);
     this.gear?.image.setVisible(false);
+    this.sprite.setVisible(false);
     this.hidden = true;
+  }
+
+  /** Back out of the vessel or the cradle: light, glow and shadow return (the caller unlocks when its intro ends). */
+  show() {
+    this.hidden = false;
+    this.light.active = true;
+    this.glow.setVisible(true);
+    this.shadow.setVisible(true);
+    this.gear?.image.setVisible(true);
+    this.sprite.setVisible(true);
+    this.syncVisuals();
   }
 
   get dashing() { return this.scene.time.now < this.dashUntil; }

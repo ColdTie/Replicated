@@ -217,11 +217,11 @@ export class TravelScene extends Phaser.Scene {
   }
 }
 
-/** A pixel planet seen from space: shaded sphere with drifting land, ice caps, and a warm light where the base is. */
+/** A pixel planet seen from space: shaded sphere with drifting land, polar caps sized and colored per world (`poles`), and a warm light where the base is. */
 class Globe {
   private ct: Phaser.Textures.CanvasTexture;
   private img: ImageData;
-  private sea: number[][]; private land: number[][]; private cap: number[];
+  private sea: number[][]; private land: number[][]; private cap: number[][]; private poleSize: number;
 
   constructor(scene: Phaser.Scene, readonly key: string, readonly size: number, p: PlanetDef, private earth: boolean) {
     if (scene.textures.exists(key)) scene.textures.remove(key);
@@ -231,7 +231,8 @@ class Globe {
     const gr = (p.ground ?? [25, 24, 23]).map((i) => rgb(PALETTE[i]));
     this.sea = earth ? [rgb(PALETTE[15]), rgb(PALETTE[16])] : [gr[0], gr[1]];
     this.land = earth ? [rgb(PALETTE[14]), rgb(PALETTE[13]), rgb(PALETTE[12])] : [acc[0], acc[1], acc[2]];
-    this.cap = rgb(PALETTE[20]);
+    this.cap = (p.poles?.colors ?? [20, 19]).map((i) => rgb(PALETTE[i]));
+    this.poleSize = p.poles?.size ?? 0;
     this.draw(0);
   }
 
@@ -248,9 +249,11 @@ class Globe {
       const cr = Math.cos(rot * Math.PI * 2), sr = Math.sin(rot * Math.PI * 2);
       const px = nx * cr + nz * sr, pz = -nx * sr + nz * cr;
       const h = valueNoise(px * 2.2 + 10, ny * 2.2 + pz * 1.7 + 10, 7) * 0.65 + valueNoise(px * 5 + 3, ny * 5 + pz * 4, 9) * 0.35;
-      const lat = Math.abs(ny);
+      // true latitude (0 equator .. 1 pole); the cap edge wanders with the terrain noise
+      const lat = Math.asin(Math.min(1, Math.abs(ny))) / (Math.PI / 2);
+      const capEdge = 1 - this.poleSize + (h - 0.5) * 0.22;
       let col: number[];
-      if (lat > 0.82 - h * 0.1) col = this.cap;
+      if (this.poleSize > 0 && lat > capEdge) col = this.cap[lat > capEdge + 0.07 && h < 0.68 ? 1 : 0];
       else if (h > 0.52) col = this.land[h > 0.66 ? 2 : h > 0.58 ? 1 : 0];
       else col = this.sea[h > 0.42 ? 1 : 0];
       const lambert = Math.max(0, nx * lx + ny * ly + nz * lz);
@@ -270,3 +273,6 @@ class Globe {
     this.ct.refresh();
   }
 }
+
+// playtest hook: tools/*.mjs render every world's globe side by side
+(window as unknown as { __Globe: typeof Globe }).__Globe = Globe;

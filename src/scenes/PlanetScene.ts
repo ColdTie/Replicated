@@ -387,9 +387,7 @@ export class PlanetScene extends Phaser.Scene {
     const pl = this.player;
     const c = this.cradle!;
     c.setFrame(0);
-    pl.locked = true;
-    pl.sprite.setVisible(false);
-    pl.light.intensity = 0;
+    pl.hide(); // nothing of the replicant shows until the cradle opens
     this.cameras.main.fadeIn(1400, 24, 20, 37);
     const lid = this.lighting.add({ x: c.x, y: c.y - 8, radius: 40, color: PALETTE[18], intensity: 0 });
     this.tweens.add({ targets: lid, intensity: 1, duration: 900, yoyo: true, hold: 500, delay: 600 });
@@ -398,10 +396,12 @@ export class PlanetScene extends Phaser.Scene {
       this.fx.sparks(c.x, c.y - 8, PALETTE[18], 12);
       this.shake(120, 0.004);
       pl.setPosition(c.x, c.y - 2);
-      pl.sprite.setVisible(true).setTint(0x404060);
+      pl.show();
+      pl.light.active = false;
+      pl.sprite.setTint(0x404060);
       // visor flickers on: dark, flash, dark, on
-      const steps = [[0, 0.15], [140, 0], [260, 0.6], [360, 0.2], [520, 1]];
-      for (const [t, v] of steps) this.time.delayedCall(t, () => { pl.light.intensity = v; if (v > 0.5) pl.sprite.clearTint(); });
+      const steps = [[0, 0], [140, 0], [260, 1], [360, 0], [520, 1]];
+      for (const [t, v] of steps) this.time.delayedCall(t, () => { pl.light.active = v > 0.5; if (v > 0.5) pl.sprite.clearTint(); });
     });
     this.time.delayedCall(2500, () => {
       const hop = { t: 0 };
@@ -442,8 +442,7 @@ export class PlanetScene extends Phaser.Scene {
     const ly = this.vessel.y;
     this.vessel.y = ly - 190;
     shadow.setScale(0.6, 0.5).setAlpha(0.1);
-    this.player.sprite.setVisible(false);
-    this.player.locked = true;
+    this.player.hide(); // nothing of the replicant on the ground until it hops out
     this.cameras.main.centerOn(this.vessel.x, ly);
     light.intensity = 0.5;
     glow.setAlpha(0.1);
@@ -483,7 +482,8 @@ export class PlanetScene extends Phaser.Scene {
   private hopOut() {
     const pl = this.player;
     const sx = this.vessel.x, sy = this.vessel.y - 6, ex = this.vessel.x, ey = this.vessel.y + 14;
-    pl.sprite.setVisible(true);
+    pl.setPosition(sx, sy);
+    pl.show();
     const hop = { t: 0 };
     this.tweens.add({
       targets: hop, t: 1, duration: 380, ease: 'Linear',
@@ -765,7 +765,7 @@ export class PlanetScene extends Phaser.Scene {
     this.tweens.add({
       targets: hop, t: 1, duration: 360,
       onUpdate: () => { pl.setPosition(sx + (ex - sx) * hop.t, sy + (ey - sy) * hop.t); pl.sprite.y -= Math.sin(hop.t * Math.PI) * 12; },
-      onComplete: () => { pl.sprite.setVisible(false); pl.hide(); this.liftOff(to, ly); },
+      onComplete: () => { pl.hide(); this.liftOff(to, ly); },
     });
   }
 

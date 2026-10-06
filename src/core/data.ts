@@ -35,6 +35,8 @@ export interface PlanetDef {
   flowers?: number;
   wildlife?: { grazers: number; birds: number; butterflies: number };
   weather?: boolean;
+  /** Polar caps seen from orbit: size 0..1 of the way from equator to pole, colors = [edge, core] palette indexes. Missing = none. */
+  poles?: { size: number; colors: [number, number] };
 }
 
 export type SkitterDef = (typeof enemiesJson)['skitter'];

@@ -1,8 +1,9 @@
 {
-  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures. The first planet is the default start. intro: 'wake' (Earth cradle) or 'land' (vessel descends). ground = [dark, base, speckle] floor colors (default [25, 24, 23]). dayCycle: lighting follows the device clock (src/data/daycycle.json). weather: real-hour rain. ponds: number of ponds. flowers: chance per open tile. wildlife: peaceful creatures (grazers can be petted).",
+  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures. The first planet is the default start. intro: 'wake' (Earth cradle) or 'land' (vessel descends). ground = [dark, base, speckle] floor colors (default [25, 24, 23]). dayCycle: lighting follows the device clock (src/data/daycycle.json). weather: real-hour rain. ponds: number of ponds. flowers: chance per open tile. wildlife: peaceful creatures (grazers can be petted). poles: polar caps seen from orbit (size 0..1 from equator to pole, [edge, core] palette colors); leave out for none.",
   "planets": [
     {
       "id": "earth",
+      "poles": { "size": 0.3, "colors": [20, 19] },
       "name": "EARTH",
       "subtitle": "HOME, LONG AGO",
       "star": "sol",
@@ -55,6 +56,7 @@
     },
     {
       "id": "solace",
+      "poles": { "size": 0.2, "colors": [21, 20] },
       "name": "SOLACE",
       "subtitle": "FIRST LANDING",
       "seed": 7741,

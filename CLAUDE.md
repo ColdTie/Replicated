@@ -123,7 +123,7 @@ src/core/drift.ts        replication drift (visor, headgear, trail, stats) from 
 src/world/galaxy.ts      real stars (src/data/stars.json, built by tools/build-stars.mjs), distances, travel time and
                          fuel (src/data/travel.json), the planet each star gets (biomes.json + the star's light)
 src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star), launch or look-only
-src/scenes/TravelScene   departure orbit (procedural pixel globe), warp, real-time cruise + ETA, visits, arrival
+src/scenes/TravelScene   departure orbit (procedural pixel globe, polar caps from `poles`), warp, real-time cruise + ETA, visits, arrival
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame
 src/ui/overlay.ts        HTML forms over the canvas (sign-in, new profile)
 src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Planet (world, saving) + UI (counter, title, touch)
@@ -312,3 +312,15 @@ Not done / next:
   already open are untouched.
 - Verified: build and both playtests pass; all 44 star worlds checked. Screenshot `fomalhaut-fixed.png`.
 
+
+### Session 5d (2026-10-06): poles, landing (Steve's iPad feedback)
+- Globes from orbit had the same flat grey cap on every world, covering 35 degrees of latitude at each pole. Caps are
+  now a per-world tunable `poles` (`size`, `[edge, core]` palette colors) in `planets.json` / `biomes.json`, measured
+  in true latitude, with a wavy edge that follows the terrain noise and two shaded tones: Earth and Verdant get small
+  white ice caps, Frost a big one, Dune salt-pale, Spore pink, Ember dark ash, Moon none. `screenshots/globes-poles.png`.
+- Landing: the replicant was standing on the ground (with its light, glow and shadow) while the vessel was still
+  descending, then jumped to the door. `Player.hide()` now hides everything at once and `Player.show()` brings it
+  back; both the landing and the Earth cradle intro use them, and the cradle's visor flicker toggles the light
+  (the per-frame health glow had been overwriting its intensity). Verified headless: nothing of the player is drawn
+  during the descent, everything is back after the hop. `screenshots/landing-descent.png`.
+- `window.__Globe` exposes the globe renderer so headless scripts can draw every world side by side.
