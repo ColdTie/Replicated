@@ -21,6 +21,7 @@ import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
 import { Controls } from '../input/Controls';
 import type { DoorState, NodeState, PlanetData, PlanetSave, ReplicantSave } from '../net/store';
+import { paintGround } from '../world/groundPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
 import { TRAVEL, distanceLy, fuelFor, planetFor, travelMs } from '../world/galaxy';
 import type { StarMapData } from './StarMapScene';
@@ -156,10 +157,13 @@ export class PlanetScene extends Phaser.Scene {
     this.controls = new Controls(this);
     this.solids = this.physics.add.staticGroup();
 
-    // Tilemap: ground + walls (walls layer also holds invisible collision over the void)
+    // Floor: one painted image for the whole planet (src/world/groundPaint.ts); the tilemap keeps water and walls
+    // (the walls layer also holds invisible collision over the void)
+    this.addPaintedGround(p.id, this.seed ?? p.seed);
     const tm = this.make.tilemap({ tileWidth: 16, tileHeight: 16, width: m.w, height: m.h });
     const ts = tm.addTilesetImage('tiles', tex('tiles', p.id), 16, 16, 0, 0)!;
-    tm.createBlankLayer('ground', ts)!.putTilesAt(m.ground, 0, 0).setDepth(DEPTH.ground);
+    const waterOnly = m.ground.map((row, y) => row.map((t, x) => (m.cells[y * m.w + x] === Cell.Water ? t : -1)));
+    tm.createBlankLayer('ground', ts)!.putTilesAt(waterOnly, 0, 0).setDepth(DEPTH.ground);
     this.walls = tm.createBlankLayer('walls', ts)!.putTilesAt(m.walls, 0, 0).setDepth(DEPTH.walls);
     this.walls.setCollision(COLLIDE_TILES);
     this.drawRockEdges();
@@ -294,6 +298,16 @@ export class PlanetScene extends Phaser.Scene {
     const z = this.add.zone(x, y, w, h);
     this.solids.add(z);
     return z;
+  }
+
+  private addPaintedGround(styleId: string, seed: number) {
+    const g = paintGround(this.map, styleId, seed);
+    const key = 'floor';
+    if (this.textures.exists(key)) this.textures.remove(key);
+    const ct = this.textures.createCanvas(key, g.width, g.height)!;
+    ct.getContext().putImageData(new ImageData(g.data, g.width, g.height), 0, 0);
+    ct.refresh();
+    this.add.image(0, 0, key).setOrigin(0).setDepth(DEPTH.ground - 1);
   }
 
   /** 1px rims on the sides of rock and ruins so outcrops read as raised shapes, not flat blocks. */

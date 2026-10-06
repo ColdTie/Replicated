@@ -77,7 +77,8 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 
 These shape the data model now, even where the feature comes later.
 
-- **Travel runs on real-world time.** Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
+- **Travel runs on real-world time.** (Switched off 2026-10-06 at Steve's request: every trip takes 5 seconds via
+  `fixedSeconds` in `src/data/travel.json`; 0 restores real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
 - **One shared galaxy for the family.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that the three profiles share. Store a `galaxy_id` on everything so more families could get their own galaxy later. No strangers, no public play.
 - **Earth is the start.** Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly for a 5 year old. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
 - **Messages travel at light speed until FTL comms exist.** A message between replicants in different systems arrives after a delay based on distance (scaled like travel). Building or finding the FTL comms device makes messages from that system instant.
@@ -107,6 +108,10 @@ src/core/                rng/noise, typed data access, sprite manifest helpers, 
 src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalStore (localStorage)
 src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, enemies, decor, glows,
                          trees/towers + blockers, fixed base layout (vessel, cradle, build pad)
+src/world/groundPaint.ts painted floor: one full-color image per planet (relief-shaded noise, soil/cover blend,
+                         per-kind detail: grass blades, snow ridges, sand ripples, spore pores, glowing basalt
+                         cracks, craters; pebbles, ruin slabs, wall shadows, pond banks). Styles in src/data/floor.json.
+                         The tilemap now only draws water and walls.
 src/fx/                  Lighting (multiply darkness RT + additive lights), Atmosphere (sky, stars, fog,
                          dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
 src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember), Base (pad + Replicator)
@@ -264,3 +269,24 @@ Not done / next:
   0.108); Ember shards fly 10% faster (`magnetPull` in `src/data/items.json`), commit once they start flying and pass
   through rocks, trees and walls (no more getting stuck); in flight they shimmer in a rolling rainbow and right before
   pickup glitch like a teleport (jitter, flicker, red/cyan split, static pixels, a white scanline flash on arrival).
+
+### Session 5 (2026-10-06): arm, 5 second trips, painted floors
+- Verified Session 4's changes are on `main` (PR #9 merged) and deployed (Pages run succeeded).
+- Replicant body has a second, body-grey front arm on every frame (hangs at idle, swings while walking); the red cape
+  stays as the one red arm. Edited in `tools/sprites/replicant.json`.
+- Every trip now takes 5 seconds: `fixedSeconds: 5` in `src/data/travel.json` overrides the real-time formula (set it
+  to 0 to bring real-time travel back; the long-term decision stands, it is just switched off for now).
+- Floors are painted instead of tiled (`src/world/groundPaint.ts`, styles in `src/data/floor.json`): continuous,
+  full-color, relief-shaded ground with no visible grid. Earth and Verdant get grass blades, clover, flowers, fallen
+  leaves under trees, a worn dirt clearing around the base and grass hanging over the cliff edge; Frost gets snow with
+  wind ridges and glinting ice; Dune gets wind ripples; Spore gets spongy pores and glowing specks; Ember gets cracked
+  basalt plates with glowing lava seams; Moon and Solace get craters. Ruin floors are worn stone slabs with moss in
+  the cracks. Soft shadows under rock walls and damp pond banks. Painted once per planet load (about 0.1 to 0.45 s
+  on a desktop). Stays at the 480x270 pixel canvas.
+- Verified: build, `tools/playtest.mjs` and `tools/playtest-travel.mjs` pass with no errors.
+- Screenshots: `screenshots/floor-*.png` (`floor-before.png` is the old tiled floor for comparison).
+
+Not done / next:
+- Rock tops are still the old speckled tiles; painting them the same way would match the new floors.
+- Not yet confirmed on the iPad (paint time and memory on the iPad 9th gen in particular).
+
