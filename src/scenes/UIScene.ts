@@ -151,13 +151,13 @@ export class UIScene extends Phaser.Scene {
   /** Top left, under the counter: "MARS - SOL" and the replicants living here, each in its visor color. */
   private showLocation(place: string, who: { name: string; color: number }[]) {
     this.location?.destroy();
-    const y0 = isKid() ? 5 : 16;
+    const y0 = isKid() ? 5 : 19;
     const items: Phaser.GameObjects.GameObject[] = [this.add.bitmapText(0, 0, 'pixel', place).setTint(PALETTE[20])];
     who.slice(0, 7).forEach((w, i) => {
-      items.push(this.add.rectangle(1, 11 + i * 8 + 3, 3, 3, w.color).setOrigin(0, 0.5));
-      items.push(this.add.bitmapText(7, 11 + i * 8, 'pixel', w.name).setTint(w.color).setAlpha(0.85));
+      items.push(this.add.rectangle(1, 11 + i * 9 + 3, 3, 3, w.color).setOrigin(0, 0.5));
+      items.push(this.add.bitmapText(7, 11 + i * 9, 'pixel', w.name).setTint(w.color).setAlpha(0.85));
     });
-    if (who.length > 7) items.push(this.add.bitmapText(7, 11 + 7 * 8, 'pixel', `+${who.length - 7}`).setTint(PALETTE[21]));
+    if (who.length > 7) items.push(this.add.bitmapText(7, 11 + 7 * 9, 'pixel', `+${who.length - 7}`).setTint(PALETTE[21]));
     this.location = this.add.container(7, y0, items).setAlpha(0.6).setDepth(10);
   }
 
