@@ -139,7 +139,7 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "dig_room",
-    description: "Design the warren: mark out a new room underground for the copies to dig. You choose what it is for, how big, and where it goes (next to which room, on which side). The copies dig it themselves when there is work in the pool. Make it a home: the layout is yours and the others'.",
+    description: "Design the warren: mark out a new room underground for the copies to dig. You choose what it is for, how big, and where it goes (next to which room, on which side). The copies dig it themselves once there is wood to shore it up. Make it a home: the layout is yours and the others'.",
     strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["kind", "name", "size", "beside", "direction", "purpose"],
@@ -435,7 +435,7 @@ Deno.serve(async (req) => {
             else if (!rooms.includes(beside.toLowerCase())) out = `No room called ${beside}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
             else {
               actions.push({ type: "dig", kind: String(input.kind ?? "other"), name: String(input.name ?? ""), size: String(input.size ?? "small"), beside, direction: String(input.direction ?? "south"), purpose: String(input.purpose ?? "").slice(0, 160) });
-              out = `You mark out ${input.name} ${input.direction} of ${beside}. It will be dug when there is work in the pool.`;
+              out = `You mark out ${input.name} ${input.direction} of ${beside}. It will be dug once there is wood to shore it up.`;
             }
           } else if (u.name === "furnish") {
             const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
