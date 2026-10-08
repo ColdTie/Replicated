@@ -25,7 +25,16 @@ class Structure {
   readonly sprite: Phaser.GameObjects.Sprite;
   private light?: Light;
   private glow?: Phaser.GameObjects.Image;
+  private solid?: Phaser.GameObjects.Zone;
   private nextPuff = 0;
+
+  /** Taken down: everything it put in the world goes. */
+  destroy() {
+    this.sprite.destroy();
+    this.glow?.destroy();
+    if (this.light) this.scene.lighting.remove(this.light);
+    this.solid?.destroy();
+  }
 
   constructor(private scene: PlanetScene, readonly save: StructureSave, readonly def: ProjectDef, animate: boolean) {
     const { x, y } = save;
@@ -44,7 +53,7 @@ class Structure {
         scene.tweens.add({ targets: this.glow, alpha: 0.16, duration: 700, delay: 200 });
       }
     }
-    if (def.solid) scene.addSolid(x, y - 2, def.solid[0], def.solid[1]);
+    if (def.solid) this.solid = scene.addSolid(x, y - 2, def.solid[0], def.solid[1]);
     if (animate) {
       squash(scene, this.sprite, 1.3, 0.7, 160);
       scene.fx.dust(x, y + 2, 8);
@@ -183,6 +192,26 @@ export class Village {
     this.built.push(new Structure(this.scene, save, job.def, true));
     this.scene.pending.structures = this.structures;
     this.markWorkDirty();
+  }
+
+  /** A copy takes one of its builds down (never the Replicator). Returns what fell, or null. */
+  remove(save: StructureSave) {
+    if (save.type === 'replicator') return null;
+    const i = this.built.findIndex((b) => b.save === save);
+    if (i < 0) return null;
+    const [s] = this.built.splice(i, 1);
+    s.destroy();
+    this.structures = this.structures.filter((x) => x !== save);
+    this.scene.pending.structures = this.structures;
+    this.scene.fx.dust(save.x, save.y + 2, 10);
+    return save;
+  }
+
+  /** What this copy built, nearest first to a point. Kind "any" = all of them. */
+  ownBuilds(npcId: string, kind: string, near: { x: number; y: number }) {
+    return this.structures
+      .filter((s) => s.by === npcId && s.type !== 'replicator' && (kind === 'any' || s.type === kind))
+      .sort((a, b) => Math.hypot(a.x - near.x, a.y - near.y) - Math.hypot(b.x - near.x, b.y - near.y));
   }
 
   update(time: number, dt: number, gatherSum: number) {

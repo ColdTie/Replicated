@@ -532,3 +532,16 @@ Next (Steve, 2026-10-08, "give these guys everything"), in this order unless he 
   Composed lines end on a chord of their mode (except wild). Without a tune, words still pick the notes.
   Notice when you can hear: "GLINT SINGS ON THE BELL". The canned mind composes now and then too.
 - The PR merge method is now a merge commit, not a squash: squashes kept conflicting with this long-lived branch.
+
+### Session 7d (2026-10-08): they shape the village (cut trees, take builds down)
+- `cut_tree` tool: the copy walks to the nearest standing tree within 240 px of the base, swings six times (sparks,
+  the tree shivers), the tree topples away from it and fades, its solid goes. Felled trees are saved per planet in
+  `planet_states.data.felled` (prop indexes) and stay down. Every tree now owns its solid zone (`PlanetScene.trees`).
+- `remove_build` tool: the nearest of the copy's own builds of a kind (or any) comes down after four swings
+  (`Village.remove`; the Replicator and other copies' builds are off limits). Saved through `pending.structures`.
+- Copies are told what they built and how many trees stand near the base; `Npc.startChore` is the shared
+  walk-there-and-swing mechanic for both. Notices when you can hear: "DUSK CUT DOWN A TREE".
+- The canned mind cuts and demolishes now and then so headless runs exercise it.
+- More space: not done yet. Growing an existing world (Earth) moves the base and regenerates the layout under the
+  village; the plan is bigger sizes and fewer rocks for new worlds in `system.ts` plus an "extend the island" pass
+  for settled worlds that keeps every existing coordinate. Steve to confirm before Earth changes.

@@ -29,6 +29,8 @@ interface Context {
   here: string[];          // names of replicants on this planet (copies and the player if present)
   events: string[];        // what happened since the last wake, short phrases
   delays: Record<string, number>; // replicant id -> letter delay in seconds (light speed)
+  mine?: Record<string, number>;  // what this copy built, by kind
+  treesNear?: number;             // trees standing near the base
 }
 
 interface Replicant {
@@ -95,6 +97,21 @@ const tools: Anthropic.Beta.BetaTool[] = [
         tempo: { type: "string", enum: ["slow", "walking", "quick"] },
         notes: { type: "string", description: "The melody, e.g. '0 2 4 7_ - 4 2 0__'. Empty keeps your usual word-tune." },
       },
+    },
+  },
+  {
+    name: "cut_tree",
+    description: "Cut down the nearest tree by the base to make room: for a build, a path, a view, a village square. The tree falls and stays down. Only when you want the space.",
+    strict: true,
+    input_schema: { type: "object", additionalProperties: false, required: ["why"], properties: { why: { type: "string", description: "One short reason." } } },
+  },
+  {
+    name: "remove_build",
+    description: "Take down one of your own builds (the nearest of that kind) because it is in the way, you changed your mind, or you are remaking the village. You cannot touch the Replicator or others' builds.",
+    strict: true,
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["kind"],
+      properties: { kind: { type: "string", enum: ["lamp", "garden", "hut", "flag", "totem", "sign", "any"] } },
     },
   },
   {
@@ -169,6 +186,8 @@ Deno.serve(async (req) => {
     const away = everyone.filter((r) => !context.here.includes(r.name));
     if (away.length) lines.push(`Elsewhere: ${away.map((r) => `${r.name} (${r.status === "in_transit" ? "flying between stars" : "at " + r.star_id + ", planet " + r.planet_index})`).join("; ")}.`);
     lines.push(`The shared Ember pool here holds ${context.embers}. Built here: ${Object.entries(context.structures).map(([k, n]) => `${n} ${k}`).join(", ") || "nothing yet"}.`);
+    const mine = Object.entries(context.mine ?? {});
+    lines.push(`You built: ${mine.length ? mine.map(([k, n]) => `${n} ${k}`).join(", ") : "nothing yet"}. Trees standing near the base: ${context.treesNear ?? 0}. The village is yours to shape: build (you do that on your own), cut trees for room (cut_tree), take your own builds down (remove_build).`);
     if (context.events.length) lines.push(`Since you last woke: ${context.events.join("; ")}.`);
     const noteRows = (notes.data ?? []) as { body: string; created_at: string }[];
     lines.push(noteRows.length ? `Your notes (newest first):\n${noteRows.map((n) => `- ${n.body}`).join("\n")}` : "You have no notes yet.");
@@ -235,6 +254,14 @@ Deno.serve(async (req) => {
               actions.push({ type: "look", detail: look });
               out = "Noted. The original will have that body drawn for you; it takes a while to arrive.";
             }
+          } else if (u.name === "cut_tree") {
+            if (!(context.treesNear ?? 0)) out = "There is no tree near the base to cut.";
+            else { actions.push({ type: "cut", why: String(input.why ?? "") }); out = "You walk to the nearest tree and bring it down."; }
+          } else if (u.name === "remove_build") {
+            const kind = String(input.kind ?? "any");
+            const have = kind === "any" ? Object.values(context.mine ?? {}).reduce((a, b) => a + b, 0) : (context.mine?.[kind] ?? 0);
+            if (!have) out = kind === "any" ? "You have built nothing to take down." : `You have no ${kind} of your own to take down.`;
+            else { actions.push({ type: "demolish", kind }); out = `You take your ${kind === "any" ? "nearest build" : kind} down.`; }
           } else if (u.name === "sing_as") {
             const voice = { instrument: String(input.instrument ?? "hum"), mood: String(input.mood ?? "bright"), tempo: String(input.tempo ?? "walking") };
             const notes = String(input.notes ?? "").replace(/[^-\d_ .,]/g, "").trim().slice(0, 120);

@@ -97,7 +97,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon'] } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[] } = { embers: 0, nodes: {}, doors: {} };
   private replicating = false;
   /** Hologram visit while the replicant's ship is flying elsewhere: no position saves, no launching */
   visit: { star: string; planetIndex: number } | null = null;
@@ -114,6 +114,7 @@ export class PlanetScene extends Phaser.Scene {
   private mindLog: { t: number; text: string }[] = [];
   private everyone: ReplicantSummary[] = [];
   private chorusAt = Infinity;
+  trees: { index: number; x: number; y: number; sprite: Phaser.GameObjects.Sprite; zone: Phaser.GameObjects.Zone; alive: boolean }[] = [];
   private saving = false;
   private lastSaveAt = 0;
   private lastPosSaveAt = 0;
@@ -236,11 +237,23 @@ export class PlanetScene extends Phaser.Scene {
       }
     }
     m.ruins.forEach((r, i) => this.ruins.push(new Ruin(this, i, r.door, r.machine, r.inside, save?.data.doors?.[i])));
-    for (const pr of m.props) {
-      const s = this.add.sprite(pr.x, pr.y, tex(pr.sprite, p.id), pr.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + pr.y);
-      if (pr.sprite === 'tree' && pr.frame === 0) this.time.delayedCall(Math.random() * 1500, () => s.play(anim(tex('tree', p.id), 'sway')));
-    }
-    for (const b of m.blockers) this.addSolid(b.x, b.y, b.w, b.h);
+    // Trees keep their own solid so a copy can cut one down (felled ones are remembered per planet)
+    const felled = new Set(save?.data.felled ?? []);
+    const treeBlockers = new Set<number>();
+    this.trees = [];
+    m.props.forEach((pr, i) => {
+      if (pr.sprite === 'tree') {
+        const bi = m.blockers.findIndex((b, k) => !treeBlockers.has(k) && b.x === pr.x && b.y === pr.y - 2 && b.w === 8);
+        if (bi >= 0) treeBlockers.add(bi);
+        if (felled.has(i)) return;
+        const s = this.add.sprite(pr.x, pr.y, tex('tree', p.id), pr.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + pr.y);
+        if (pr.frame === 0) this.time.delayedCall(Math.random() * 1500, () => s.play(anim(tex('tree', p.id), 'sway')));
+        this.trees.push({ index: i, x: pr.x, y: pr.y, sprite: s, zone: this.addSolid(pr.x, pr.y - 2, 8, 5), alive: true });
+        return;
+      }
+      this.add.sprite(pr.x, pr.y, tex(pr.sprite, p.id), pr.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + pr.y);
+    });
+    m.blockers.forEach((b, k) => { if (!treeBlockers.has(k)) this.addSolid(b.x, b.y, b.w, b.h); });
     for (const g of m.glows) {
       if (g.kind === 'door') {
         this.lighting.add({ x: g.x, y: g.y, radius: 64, color: PALETTE[10], intensity: 0.95, flicker: 0.15 });
@@ -711,7 +724,7 @@ export class PlanetScene extends Phaser.Scene {
     // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
     if (this.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
     if (p.npcTick !== undefined) this.npcTickAt = Date.now();
-    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && p.npcTick === undefined) return;
+    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && p.npcTick === undefined) return;
     this.pending = { embers: 0, nodes: {}, doors: {} };
     this.saving = true;
     try {
@@ -721,6 +734,7 @@ export class PlanetScene extends Phaser.Scene {
       if (p.structures) data.structures = p.structures;
       if (p.village) data.village = p.village;
       if (p.beacon) data.beacon = p.beacon;
+      if (p.felled) data.felled = p.felled;
       const row = await st.applyPlanetDelta(this.planet.star, this.planet.planetIndex, p.embers, data);
       if (row) {
         this.embers = row.embers + this.pending.embers;
@@ -1083,7 +1097,13 @@ export class PlanetScene extends Phaser.Scene {
     for (const r of this.everyone) delays[r.id] = r.star_id === this.planet.star ? 0 : Math.round(distanceLy(this.planet.star, r.star_id) * MIND.mailSecondsPerLy);
     const since = this.lastWake.get(npc) ?? -1;
     const me = session.replicant;
+    const mine: Record<string, number> = {};
+    for (const s of this.village.structures) if (s.by === npc.data.id) mine[s.type] = (mine[s.type] ?? 0) + 1;
+    const base = this.baseCenter;
+    const treesNear = this.trees.filter((t) => t.alive && Math.hypot(t.x - base.x, t.y - base.y) < 200).length;
     return {
+      mine,
+      treesNear,
       planet: this.placeLabel,
       biome: this.planet.subtitle ?? this.planet.id,
       timeOfDay,
@@ -1126,6 +1146,10 @@ export class PlanetScene extends Phaser.Scene {
           npc.data.name = a.name;
           this.announceLocation();
           this.game.events.emit('notice', hear ? `${was} IS NOW ${a.name.toUpperCase()}` : `${was} HAS A NEW NAME`);
+        } else if (a.type === 'cut') {
+          this.cutTree(npc);
+        } else if (a.type === 'demolish') {
+          this.demolish(npc, a.kind ?? 'any');
         } else if (a.type === 'look' && hear) {
           this.game.events.emit('notice', `${npc.data.name.toUpperCase()} DESCRIBES A NEW BODY`);
         } else if (a.type === 'request' && hear) {
@@ -1155,6 +1179,56 @@ export class PlanetScene extends Phaser.Scene {
       this.chorusAt = time + (4 + Math.random() * 3) * 60_000;
       this.chorus();
     }
+  }
+
+  /** A copy clears the nearest standing tree near the base: walks over, swings, the tree falls and stays down. */
+  private cutTree(npc: Npc) {
+    const base = this.baseCenter;
+    const tree = this.trees
+      .filter((t) => t.alive && Math.hypot(t.x - base.x, t.y - base.y) < 240)
+      .sort((a, b) => Math.hypot(a.x - npc.x, a.y - npc.y) - Math.hypot(b.x - npc.x, b.y - npc.y))[0];
+    if (!tree) return;
+    npc.startChore({
+      x: tree.x, y: tree.y, swings: 6,
+      swing: () => {
+        this.fx.sparks(tree.x + (Math.random() - 0.5) * 6, tree.y - 10 - Math.random() * 8, PALETTE[this.planet.accent[1]], 3);
+        if (Math.hypot(this.player.x - tree.x, this.player.y - tree.y) < 180) sound.hit();
+        this.tweens.add({ targets: tree.sprite, angle: { from: -3, to: 3 }, duration: 60, yoyo: true, repeat: 1 });
+      },
+      done: () => {
+        if (!tree.alive) return;
+        tree.alive = false;
+        tree.zone.destroy();
+        const dir = npc.x < tree.x ? 1 : -1;
+        this.tweens.add({ targets: tree.sprite, angle: 84 * dir, duration: 700, ease: 'Quad.easeIn', onComplete: () => {
+          this.fx.dust(tree.x + dir * 12, tree.y, 10);
+          if (Math.hypot(this.player.x - tree.x, this.player.y - tree.y) < 220) sound.stomp();
+          this.tweens.add({ targets: tree.sprite, alpha: 0, duration: 1200, delay: 600, onComplete: () => tree.sprite.destroy() });
+        } });
+        this.pending.felled = [...new Set([...(session.planet?.data.felled ?? []), ...(this.pending.felled ?? []), tree.index])];
+        this.mindLog.push({ t: this.time.now, text: `${npc.data.name} cut down a tree near the base` });
+        if (this.canHear()) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} CUT DOWN A TREE`);
+      },
+    });
+  }
+
+  /** A copy takes down one of its own builds (nearest of that kind). */
+  private demolish(npc: Npc, kind: string) {
+    const s = this.village.ownBuilds(npc.data.id, kind, npc)[0];
+    if (!s) return;
+    npc.startChore({
+      x: s.x, y: s.y, swings: 4,
+      swing: () => {
+        this.fx.sparks(s.x + (Math.random() - 0.5) * 8, s.y - 6 - Math.random() * 8, PALETTE[21], 3);
+        if (Math.hypot(this.player.x - s.x, this.player.y - s.y) < 180) sound.hit();
+      },
+      done: () => {
+        if (!this.village.remove(s)) return;
+        if (Math.hypot(this.player.x - s.x, this.player.y - s.y) < 220) sound.pop();
+        this.mindLog.push({ t: this.time.now, text: `${npc.data.name} took down its ${s.type}` });
+        if (this.canHear()) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} TOOK DOWN A ${s.type.toUpperCase()}`);
+      },
+    });
   }
 
   /** The copies gather their voices and sing one line together as a round. */
