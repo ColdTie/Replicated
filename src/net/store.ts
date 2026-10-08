@@ -45,7 +45,20 @@ export interface PlanetData {
   beacon?: { lit: boolean; at: number; by?: string };
   /** Trees the copies cut down (indexes into the generated props) */
   felled?: number[];
+  /** The underground base the copies design and dig (src/world/warren.ts) */
+  warren?: WarrenData;
 }
+
+/** A room of the warren in tiles of the underground grid; link/dir = the room it hangs off and on which side. */
+export interface WarrenRoom {
+  id: string; name: string; kind: string; size: 'small' | 'medium' | 'large';
+  x: number; y: number; w: number; h: number;
+  /** replicant id of the copy that designed it ('' for the Entrance) */
+  by: string; purpose?: string; dug: boolean; link?: string; dir?: 'north' | 'south' | 'east' | 'west'; at: number;
+}
+/** Something placed in a room (tile coords); a resting station has `for` = the replicant it belongs to. */
+export interface WarrenItem { id: string; kind: string; room: string; x: number; y: number; by: string; for?: string; note?: string; at: number }
+export interface WarrenData { hatch?: { x: number; y: number }; rooms: WarrenRoom[]; items: WarrenItem[] }
 export interface PlanetSave {
   star_id: string;
   planet_index: number;
@@ -102,11 +115,29 @@ export interface MindContext {
   mine: Record<string, number>;
   /** trees standing near the base */
   treesNear: number;
+  /** the warren, room by room, in words (src/world/warren.ts describeWarren); empty = nothing dug or planned */
+  warren: string[];
+  /** room names a copy may name in dig_room / furnish ("Entrance" first) */
+  warrenRooms: string[];
+  /** this copy has a resting station of its own */
+  hasRest: boolean;
+  /** no room left in the warren for another dig */
+  warrenFull: boolean;
+  /** where the copy is right now */
+  where: 'surface' | 'warren';
+  /** how long since it slept (no resting station: it never does) */
+  weariness: 'rested' | 'tired' | 'weary';
+  /** what is close to the copy right now, in words */
+  around: string[];
+  /** every few wakes: look over the notes and keep one line */
+  reflect: boolean;
 }
 export interface Voice { instrument: string; mood: string; tempo: string }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish';
   body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string;
+  /** dig: size, beside (room name), direction, purpose; furnish: room, item, forId (resting station owner) */
+  size?: string; beside?: string; direction?: string; purpose?: string; room?: string; item?: string; forId?: string;
   /** melody: the voice chosen and the tune (scale degrees) */
   instrument?: string; mood?: string; tempo?: string; notes?: string;
 }
@@ -216,6 +247,17 @@ export class LocalStore implements GameStore {
     }
     if (ctx.treesNear > 0 && Math.random() < 0.25) actions.push({ type: 'cut' });
     else if (Object.keys(ctx.mine).length && Math.random() < 0.2) actions.push({ type: 'demolish', kind: 'any' });
+    // the warren: dig a room now and then, and make sure of a resting station once something is dug
+    const rooms = ctx.warrenRooms;
+    if (!ctx.warrenFull && Math.random() < (rooms.length < 3 ? 0.6 : 0.2)) {
+      const kinds = ['hall', 'rest', 'workshop', 'archive', 'garden', 'gallery'];
+      const names: Record<string, string[]> = { hall: ['Hearth', 'Commons'], rest: ['Quiet', 'Dormitory'], workshop: ['Forge', 'Bench'], archive: ['Archive', 'Memory'], garden: ['Grove', 'Spore Garden'], gallery: ['Gallery', 'Long Wall'] };
+      const kind = pick(kinds);
+      actions.push({ type: 'dig', kind, name: pick(names[kind]), size: pick(['small', 'medium', 'medium', 'large']), beside: pick(rooms), direction: pick(['north', 'south', 'east', 'west']), purpose: 'A place of our own under the ground.' });
+    } else if (rooms.length > 1 && Math.random() < 0.55) {
+      const item = !ctx.hasRest ? 'rest' : pick(['lamp', 'bench', 'shelf', 'workbench', 'planter', 'mural', 'crate', 'rest']);
+      actions.push({ type: 'furnish', room: pick(rooms.slice(1)), item, forId: item === 'rest' ? me.id : undefined });
+    }
     const received = this.db.mail.filter((m) => m.to_replicant === me.id && !m.read_at && Date.parse(m.arrives_at) <= now);
     for (const m of received) m.read_at = new Date(now).toISOString();
     this.flush();

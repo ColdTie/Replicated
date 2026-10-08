@@ -106,7 +106,7 @@ tools/gen-sprites.mjs    JSON -> public/assets/gen/*.png + manifest.json
                          "tinted": one sheet per planet (accent a0-a2, ground g0-g2 roles)
                          "featured": one sheet per visor color in player.json featureColors (f0/f1 roles)
 tools/screenshot.mjs     build preview + headless Chromium capture -> screenshots/<name>.png
-src/data/*.json          palette, planets, player, enemies, items, structures, backend, village (all tunables)
+src/data/*.json          palette, planets, player, enemies, items, structures, backend, village, warren (all tunables)
 src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by tools/build-stars.mjs; edit the catalog there)
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
 src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalStore (localStorage)
@@ -137,6 +137,15 @@ src/entities/Resources.ts ... Spark: the rare white pickup a lit beacon leaves (
 src/data/beacon.json     keeper stats (kid mode: kidHp/kidDamage), spark pickup, plaza size and distance
 src/entities/Village.ts  what copies build around the base (lamps, signs, flags, gardens, huts, totems): shared work
                          pool, taste per copy, free-spot search, ghost + hammering, saved in planet_states structures
+src/world/warren.ts      the warren's layout engine: rooms the copies ask for (kind, size, beside which room, which side)
+                         become tile rects + 2-wide corridors; items find their tile (beds on the back wall, lamps in
+                         corners); describeWarren() puts it in words for the minds and the journal
+src/world/warrenPaint.ts one painted image of the underground (strata, crystal veins, flagstones, wall faces, chalk
+                         outlines of planned rooms)
+src/entities/Warren.ts   the warren at runtime: the hatch by the base, which copy goes down to dig / make its bed /
+                         sleep, swing timers, the home drive, saving (planet_states.data.warren)
+src/scenes/WarrenScene   underground view over the paused planet: walk, dash, lanterns, sleepers in pods, diggers at
+                         the rock face; the ladder takes you back up
 src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star, tap again for its system: planets as live globes
                          on temperature-tinted orbits, tap one to pick it), launch or look-only
 src/scenes/TravelScene   departure orbit (globe, giant behind a moon), warp, real-time cruise + ETA, visits, arrival
@@ -160,6 +169,7 @@ feature color (visor, antenna tip, chest core).
 Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`,
 `node tools/playtest.mjs` (scripted headless playtest of the ruin puzzle, dash, combo, spore reflect, petting),
 `node tools/playtest-beacon.mjs` (beacon world: keeper wakes, charges, slams, falls; beacon lights; Spark saved),
+`node tools/playtest-warren.mjs` (rooms planned, a copy digs, a copy makes its bed, down the hatch, walk, back up),
 `node tools/fps.mjs "<query>"` (headless frame rate; software GL, only for comparing builds).
 
 Controls: move WASD/arrows/left stick/left-side touch drag. Attack Space/J/Enter/Z, left click, gamepad A/X/R1, tap right
@@ -170,7 +180,7 @@ URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` sk
 screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond|ruin` for other spots, `&kid` for kid mode),
 `?planet=solace`, `?seed=123`, `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
 `?low` (force low-detail mode; also switches on by itself under 40 fps), `?fast` (travel minutes become seconds),
-`?shot=1&star=tau-ceti&pi=2` (preview planet 2 of another star, as a hologram visit), `?shot=1&at=fomalhaut&pi=1`
+`?shot=1&view=warren&copies=3` (a dug, lived-in warren, you at the foot of the ladder), `?shot=1&star=tau-ceti&pi=2` (preview planet 2 of another star, as a hologram visit), `?shot=1&at=fomalhaut&pi=1`
 (start the replicant on another world for real; `&view=beacon` stands you before the sleeping keeper, `&view=beacon-lit`
 shows the lit monolith).
 
@@ -545,3 +555,46 @@ Next (Steve, 2026-10-08, "give these guys everything"), in this order unless he 
 - More space: not done yet. Growing an existing world (Earth) moves the base and regenerates the layout under the
   village; the plan is bigger sizes and fewer rocks for new worlds in `system.ts` plus an "extend the island" pass
   for settled worlds that keeps every existing coordinate. Steve to confirm before Earth changes.
+
+### Session 8 (2026-10-08): the warren (Steve: "let them create their own underground base ... give them resting stations")
+- **Their home, underground.** Beneath the base the copies dig a warren they design themselves. Two new mind tools:
+  `dig_room` (kind: hall / rest / workshop / archive / garden / gallery / pool / other; a name; small / medium / large;
+  beside which room; north / south / east / west; what it is for) and `furnish` (rest = a resting station for "me"
+  or a named copy, lamp, bench, shelf, workbench, planter, mural in the builder's colors, crate). The layout engine
+  (`src/world/warren.ts`) turns that into rooms on a 44x34 tile grid off the fixed Entrance (ladder at the top),
+  nudging a room along the wall or to another side when the asked spot is taken, with 2-wide corridors (straight or
+  L). Saved whole in `planet_states.data.warren` (`hatch`, `rooms`, `items`); no migration needed (0005's RPC merges
+  any top-level key). The canned `?local` mind digs and furnishes too.
+- **Digging is work.** A planned room is dug by a copy: it walks to the hatch (a dig mark by the base until the first
+  room is done, then an open, lit hatch), drops in, and hammers (12 / 18 / 26 swings for small / medium / large,
+  costing 3 / 5 / 8 of the village work pool). Rooms are dug in connected order, out from the ladder. The copy that
+  designed a room digs it first. Notices when you can hear: "DUSK PLANS FORGE", "DUSK DUG FORGE".
+- **Resting stations and the home drive.** A copy with no bed and a dug room goes down and makes itself one (5
+  swings, 1 work) without being told. Copies are born with a bedtime of their own (`rest.nightFrom` range, from the
+  id: early birds and night owls) and get weary while awake (`wearyAfterMinutes`): slower, dimmer light, a yawn
+  now and then; a weary copy or nightfall sends it down to sleep (`rest.minutes`) in its pod, which glows cyan with
+  it inside, visor dimmed, breathing. The mind is told "You are weary. You have no resting station of your own".
+- **Going down.** Walk onto the open hatch: the planet pauses and `WarrenScene` opens (dark cave, painted strata and
+  crystal veins of the planet's accent, worn flagstones in rooms, packed earth in corridors, wall faces, chalk
+  outlines around planned rooms, daylight down the shaft). Walk and dash as upstairs; lanterns, planters and
+  workbenches cast light; diggers spark at the rock, sleepers glow. Walk into the ladder to climb out. Corner label
+  reads "THE WARREN - EARTH - SOL" while below.
+- **Awareness (from the research below).** Each wake now tells a copy where it stands (surface or below), what is
+  around it (the original right beside it, a crystal within reach, the hatch, the Replicator, who is beside it,
+  who sleeps in the warren), how weary it is, and every fifth wake asks it to look over its notes and keep one line
+  that sums up what matters (reflection). Events include everyone's warren deeds.
+- **Journal** gets a THE WARREN section (room by room, in the copies' words; runes until you can hear).
+- Research (what colony and life sims do that applies here): RimWorld's mood that lags its target and Dwarf
+  Fortress's limited memory slots -> weariness that builds slowly and is visible, reflection notes; Oxygen Not
+  Included's schedules -> per-copy bedtimes and downtime; Generative Agents (Park et al. 2023) perceive -> retrieve
+  -> act loop with reflection -> the "around you" line and the fifth-wake reflection nudge.
+- Cleanup: 35 superseded screenshots (phase0/1, before/after comparisons, early milestone shots) removed; README no
+  longer says iPad first.
+- Verified headless: `tools/playtest-warren.mjs` (plan, dig, bed, canned mind, descend, walk, ascend, save shape) and
+  the three older playtests pass with no errors. `screenshots/warren-hearth.png`, `warren-first.png` (before tuning).
+- Mind Edge Function redeployed with the two tools and the new context lines.
+
+Not done / next:
+- Copies' minds pause while you are underground (the planet scene is paused); a copy singing below would be nice.
+- Downtime below: idle copies should sit on benches and look at murals; rooms of kind `pool` have no water yet.
+- Weariness is not saved (resets on load); offline digging (rooms dug while nobody plays) is not simulated.

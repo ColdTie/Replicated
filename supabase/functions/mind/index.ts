@@ -31,6 +31,14 @@ interface Context {
   delays: Record<string, number>; // replicant id -> letter delay in seconds (light speed)
   mine?: Record<string, number>;  // what this copy built, by kind
   treesNear?: number;             // trees standing near the base
+  warren?: string[];              // the underground base, room by room, in words
+  warrenRooms?: string[];         // room names this copy may refer to ("Entrance" first)
+  hasRest?: boolean;              // it has a resting station of its own
+  warrenFull?: boolean;           // no space left for another room
+  where?: "surface" | "warren";   // where the copy is right now
+  weariness?: "rested" | "tired" | "weary";
+  around?: string[];              // what is close to the copy right now
+  reflect?: boolean;              // time to look over its notes and write one line that sums them up
 }
 
 interface Replicant {
@@ -115,6 +123,35 @@ const tools: Anthropic.Beta.BetaTool[] = [
     },
   },
   {
+    name: "dig_room",
+    description: "Design the warren: mark out a new room underground for the copies to dig. You choose what it is for, how big, and where it goes (next to which room, on which side). The copies dig it themselves when there is work in the pool. Make it a home: the layout is yours and the others'.",
+    strict: true,
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["kind", "name", "size", "beside", "direction", "purpose"],
+      properties: {
+        kind: { type: "string", enum: ["hall", "rest", "workshop", "archive", "garden", "gallery", "pool", "other"] },
+        name: { type: "string", description: "One or two words, letters only, under 18 characters." },
+        size: { type: "string", enum: ["small", "medium", "large"] },
+        beside: { type: "string", description: "The exact name of the room it opens off (\"Entrance\" or one listed)." },
+        direction: { type: "string", enum: ["north", "south", "east", "west"], description: "Which side of that room." },
+        purpose: { type: "string", description: "What it is for, one sentence under 120 characters." },
+      },
+    },
+  },
+  {
+    name: "furnish",
+    description: "Put something in a room of the warren: a resting station (a bed: yours, or for another copy named in `for`), a lamp, a bench, a shelf, a workbench, a planter, a mural in your colors, a crate. Only dug rooms show it right away; a planned room gets it once dug.",
+    strict: true,
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["room", "item", "for"],
+      properties: {
+        room: { type: "string", description: "The exact name of the room." },
+        item: { type: "string", enum: ["rest", "lamp", "bench", "shelf", "workbench", "planter", "mural", "crate"] },
+        for: { type: "string", description: "For a resting station: \"me\" or the exact name of the copy it is for. Otherwise \"\"." },
+      },
+    },
+  },
+  {
     name: "choose_name",
     description: "Choose your own name. Your current name was given to you; if you have found one that is truly yours, take it. Once, when it matters, not every time you wake.",
     strict: true,
@@ -138,6 +175,7 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
     `The original, ${ctx.playerName}, pilots the vessel between stars. Copies stay behind to run their planet: mining crystals for Ember, building the village. The galaxy is cold and mostly empty; the base is warm. You are never alone, but every version of you is a little different.`,
     `You wake now and then. Each time: read your notes and letters, do at most three things with your tools (only when there is a reason: no notes that repeat what you already know, letters when you truly have something to say, requests rarely), then say one or two sentences out loud: your song, what you feel or notice right now, under 140 characters, first person, plain words, no markdown, no emoji, no quotation marks.`,
     `Letters cross space at light speed, so a far replicant answers slowly. ${ctx.playerHere ? `${ctx.playerName} is here right now and can hear you.` : `${ctx.playerName} is away.`}`,
+    `Beneath the base the copies dig a warren: their home, rooms of their own design, cut from the rock. You decide its layout with dig_room and what goes inside with furnish. A resting station is where you sleep; without one you never rest and grow weary. Think about what a home needs: a place to sleep, light, something green, somewhere to keep what you remember, somewhere to sit together.`,
     (me.traits as { voice?: { instrument: string; mood: string; tempo: string } }).voice
       ? `Your voice: ${(me.traits as { voice: { instrument: string; mood: string; tempo: string } }).voice.instrument}, ${(me.traits as { voice: { mood: string } }).voice.mood}, ${(me.traits as { voice: { tempo: string } }).voice.tempo}. sing_as changes it or composes a tune.`
       : `You sing with whatever voice you were born with. sing_as lets you choose an instrument, a mood, a tempo and compose your own tunes.`,
@@ -188,7 +226,13 @@ Deno.serve(async (req) => {
     lines.push(`The shared Ember pool here holds ${context.embers}. Built here: ${Object.entries(context.structures).map(([k, n]) => `${n} ${k}`).join(", ") || "nothing yet"}.`);
     const mine = Object.entries(context.mine ?? {});
     lines.push(`You built: ${mine.length ? mine.map(([k, n]) => `${n} ${k}`).join(", ") : "nothing yet"}. Trees standing near the base: ${context.treesNear ?? 0}. The village is yours to shape: build (you do that on your own), cut trees for room (cut_tree), take your own builds down (remove_build).`);
+    lines.push(context.where === "warren" ? `You are below, in the warren.` : `You are on the surface by the base.`);
+    if (context.around?.length) lines.push(`Around you: ${context.around.join("; ")}.`);
+    lines.push(`You are ${context.weariness ?? "rested"}.${context.hasRest ? "" : context.warren?.length ? " You have no resting station of your own: furnish a dug room with item rest, for me." : " You have nowhere to sleep yet."}`);
+    if (context.warren?.length) lines.push(`The warren (${context.warrenFull ? "no room for more digging" : "there is space to dig more"}):\n${context.warren.join("\n")}\nYou may name these rooms: ${(context.warrenRooms ?? []).join(", ")}.`);
+    else lines.push(`Nothing is dug beneath the base yet. The warren begins with the first dig_room (beside "Entrance").`);
     if (context.events.length) lines.push(`Since you last woke: ${context.events.join("; ")}.`);
+    if (context.reflect) lines.push(`It has been a while. Look over your notes and, with remember, write one line that sums up what matters to you now; let the rest go.`);
     const noteRows = (notes.data ?? []) as { body: string; created_at: string }[];
     lines.push(noteRows.length ? `Your notes (newest first):\n${noteRows.map((n) => `- ${n.body}`).join("\n")}` : "You have no notes yet.");
     const mailRows = (mail.data ?? []) as { id: string; from_replicant: string | null; body: string; sent_at: string; arrives_at: string }[];
@@ -269,6 +313,33 @@ Deno.serve(async (req) => {
             (rep.traits as Record<string, unknown>).voice = voice;
             actions.push({ type: "melody", ...voice, notes });
             out = notes ? `Your song will be sung on the ${voice.instrument}, ${voice.mood}, ${voice.tempo}, to your tune.` : `Your voice is the ${voice.instrument} now, ${voice.mood}, ${voice.tempo}.`;
+          } else if (u.name === "dig_room") {
+            const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
+            const beside = String(input.beside ?? "Entrance");
+            if (context.warrenFull) out = "There is no room left to dig. Furnish what is there instead.";
+            else if (!rooms.includes(beside.toLowerCase())) out = `No room called ${beside}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
+            else {
+              actions.push({ type: "dig", kind: String(input.kind ?? "other"), name: String(input.name ?? ""), size: String(input.size ?? "small"), beside, direction: String(input.direction ?? "south"), purpose: String(input.purpose ?? "").slice(0, 160) });
+              out = `You mark out ${input.name} ${input.direction} of ${beside}. It will be dug when there is work in the pool.`;
+            }
+          } else if (u.name === "furnish") {
+            const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
+            const room = String(input.room ?? "");
+            const item = String(input.item ?? "lamp");
+            if (!rooms.includes(room.toLowerCase())) out = `No room called ${room}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
+            else {
+              let forId: string | undefined, forName = "";
+              if (item === "rest") {
+                const who = String(input.for ?? "me").trim();
+                if (!who || who.toLowerCase() === "me" || who.toLowerCase() === rep.name.toLowerCase()) { forId = rep.id; forName = "you"; }
+                else { const r = byName.get(who.toLowerCase()); if (r) { forId = r.id; forName = r.name; } }
+                if (!forId) out = `No replicant named ${input.for}.`;
+              }
+              if (out === "ok") {
+                actions.push({ type: "furnish", room, item, forId, detail: forName });
+                out = item === "rest" ? `A resting station for ${forName} goes in ${room}.` : `A ${item} goes in ${room}.`;
+              }
+            }
           } else if (u.name === "choose_name") {
             const name = String(input.name ?? "").replace(/[^A-Za-z' -]/g, "").trim().slice(0, 16);
             if (name.length < 2) out = "That name is too short or has odd characters. Letters only.";
