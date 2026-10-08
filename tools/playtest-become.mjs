@@ -55,17 +55,18 @@ try {
   await page.waitForFunction((x0) => Math.abs(window.__scene.npcs[0].x - x0) > 6 || window.__scene.npcs[0].state === 'walk', x0, { timeout: 20000 }).catch(() => fail('the copy never moved after becoming'));
   log('moves', await ev(() => window.__scene.npcs[0].state));
 
-  // 2b. needs: hungry with food on the shelves -> it eats; mood and low needs read out
-  const fed = await ev(async () => {
+  // 2b. needs: no food or water; a lonely, aimless copy says so, and finished work lifts purpose
+  const fed = await ev(() => {
     const s = window.__scene; const n = s.npcs[0];
-    n.needs.food = 0.2; n.needs.water = 0.2; s.supplies.food = 3; s.supplies.water = 0; n.nextEat = 0;
-    const before = { low: n.lowNeeds(), mood: n.moodWord };
-    await new Promise((r) => setTimeout(r, 600));
-    return { before, after: { food: Math.round(n.needs.food * 100) / 100, water: Math.round(n.needs.water * 100) / 100, supplyFood: s.supplies.food, low: n.lowNeeds(), mood: n.moodWord } };
+    n.needs.company = 0.1; n.needs.purpose = 0.1;
+    const before = { needs: Object.keys(n.needs), low: n.lowNeeds(), mood: n.moodWord };
+    n.onWorked(true);
+    return { before, after: { purpose: Math.round(n.needs.purpose * 100) / 100, low: n.lowNeeds() } };
   });
   log('needs', JSON.stringify(fed));
-  if (!(fed.after.food > 0.5 && fed.after.supplyFood === 2)) fail('the hungry copy did not eat from the supplies');
-  if (!fed.after.low.some((l) => l.startsWith('thirsty'))) fail('thirst with no water is not reported');
+  if (fed.before.needs.includes('food') || fed.before.needs.includes('water')) fail('copies still have food or water needs');
+  if (!fed.before.low.some((l) => l.startsWith('lonely'))) fail('loneliness is not reported');
+  if (!(fed.after.purpose > 0.5)) fail('finished work did not lift purpose');
 
   // 3. the journal shows what it wants
   const journal = await ev(async () => { await window.__scene.toggleJournal(); const el = document.querySelector('.jn'); const t = el?.textContent ?? ''; return { wants: t.includes('WANTS'), text: t.slice(0, 200) }; });
