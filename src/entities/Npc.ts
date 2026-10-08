@@ -419,11 +419,13 @@ export class Npc {
 
 /** A song bubble: readable words in the pixel font, or runes in the singer's color until the replicant can hear. */
 export function makeBubble(sc: Phaser.Scene, text: string, readable: boolean, color: number, seed: number) {
+  // bubbleScale shrinks the box (padding, width) rather than the font: the 5x7 font drops rows when scaled
+  const k = MIND.bubbleScale;
   const items: Phaser.GameObjects.GameObject[] = [];
   let w: number, h: number;
   if (readable) {
-    const t = sc.add.bitmapText(0, -3, 'pixel', text.toUpperCase()).setMaxWidth(118).setTint(PALETTE[20]).setOrigin(0.5, 1).setCenterAlign();
-    w = t.width + 8; h = t.height + 6;
+    const t = sc.add.bitmapText(0, -3 + Math.round((1 - k) * 4), 'pixel', text.toUpperCase()).setMaxWidth(Math.round(118 * k)).setTint(PALETTE[20]).setOrigin(0.5, 1).setCenterAlign();
+    w = t.width + Math.round(8 * k); h = t.height + Math.round(6 * k);
     items.push(t);
   } else {
     const words = text.split(/\s+/).filter(Boolean).length;
@@ -437,7 +439,7 @@ export function makeBubble(sc: Phaser.Scene, text: string, readable: boolean, co
       const ox = -Math.floor((n * 6) / 2) + i * 6;
       rune.forEach((row, ry) => row.split('').forEach((c, rx) => { if (c === '#') g.fillRect(ox + rx, -9 + ry, 1, 1); }));
     }
-    w = n * 6 + 6; h = 12;
+    w = n * 6 + Math.round(6 * k); h = Math.round(12 * k);
     items.push(g);
   }
   const box = sc.add.rectangle(0, 0, w, h, PALETTE[25], 0.88).setOrigin(0.5, 1).setStrokeStyle(1, color, 0.9);

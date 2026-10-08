@@ -1,10 +1,11 @@
 {
-  "_doc": "Minds of the copies (the mind Edge Function). firstWakeMs: after landing, the first copy wakes; staggerMs between copies; wakeMinutes: how often each copy wakes while you play; mailSecondsPerLy: letters cross space at this speed (same star: instant); bubbleMs: how long a song stays up. canned: what copies say when playing from this device (?local), no model involved.",
+  "_doc": "Minds of the copies (the mind Edge Function). firstWakeMs: after landing, the first copy wakes; staggerMs between copies; wakeMinutes: how often each copy wakes while you play; mailSecondsPerLy: letters cross space at this speed (same star: instant); bubbleMs: how long a song stays up; bubbleScale: song bubbles are this much smaller (padding and max width; the pixel font itself is never scaled, it drops rows). canned: what copies say when playing from this device (?local), no model involved.",
   "firstWakeMs": 6000,
   "staggerMs": 15000,
   "wakeMinutes": 4,
   "mailSecondsPerLy": 60,
   "bubbleMs": 7000,
+  "bubbleScale": 0.9,
   "chorusLines": [
     "We are here. We are many. We are one.",
     "The light is ours, the dark is wide. We hold.",
