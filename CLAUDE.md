@@ -770,5 +770,10 @@ whether they keep it or get to choose again (then the mind's `choose_body` is op
   `patchTraits`).
 - **Ten minutes of life.** `?sim` plays straight in from seeded device storage with the minds asleep (so nothing is
   said or planned for them); `tools/sim-live.mjs` ran each settled planet for ten minutes from a snapshot and the
-  results (rooms dug, beds made, village builds, Ember mined, needs) were written back. Planets whose copies had not
-  planned any rooms only built on the surface: rooms come from their minds, which wake when Steve visits.
+  results (rooms dug, beds made, village builds, Ember mined, needs) were written back with merging SQL. Earth was
+  skipped: Steve was playing it live. Results: 74 new village builds across ten worlds (Regulus 1 -> 17, Eta
+  Cassiopeiae 1 -> 13, Epsilon Eridani 5 -> 16), Moss finished digging Stillroom on Epsilon Eridani, Steve II made
+  its bed in Hearth on Alderamin, about 690 Ember mined, no errors. Planets whose copies had not planned any rooms
+  only built on the surface: rooms come from their minds, which wake when Steve visits.
+- Seen in the sim: copies on every world but Earth arrive near zero company (they drift apart while working and
+  the away hours drain it), so they are all lonely. Seeking each other out when company is low is the next fix.
