@@ -1,6 +1,7 @@
 // Seeded planet surface: a floating island of floor and rock, a few ruins, resource nodes and enemy spawns.
 import type { PlanetDef } from '../core/data';
 import { fbm, mulberry32, randInt, type Rng } from '../core/rng';
+import { BEACON } from '../core/data';
 
 export const enum Cell { Void = 0, Floor = 1, Rock = 2, Ruin = 3, Water = 4 }
 
@@ -39,6 +40,8 @@ export interface PlanetMap {
   ruins: { door: Point; machine: Point; inside: Point }[];
   /** Fixed base layout around the landing site, pixel coords */
   base: { vessel: Point; cradle: Point; pad: Point; center: Point };
+  /** Beacon worlds: the monolith (feet, pixels), where its keeper sleeps, and the stone plaza (tiles) */
+  beacon?: { x: number; y: number; guardian: Point; plaza: { x: number; y: number; w: number; h: number } };
 }
 
 export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
@@ -312,6 +315,58 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     nodes.push(...starters);
   }
 
+  // 11. Beacon worlds: a stone plaza far from the landing site with the dormant monolith at its head and the
+  // keeper asleep in front of it. Placed last (own rng) and it never moves a crystal node, so saved node damage
+  // keeps its indexes; rock inside the plaza is carved away, decor and creatures there are cleared.
+  let beacon: PlanetMap['beacon'];
+  if (def.beacon) {
+    const r4 = mulberry32(seed ^ 0xbeac);
+    const [bw0, bh0] = BEACON.beacon.plaza;
+    let best = null as Point | null, bestScore = -1, bw = bw0, bh = bh0, hw = 0, hh = 0;
+    // crystals may stand on the plaza (beacon worlds are rich), only the monolith and the keeper's lane stay clear
+    const fits = (px: number, py: number) => {
+      if (at(px, py) !== Cell.Floor || !seen[idx(px, py)]) return false;
+      for (let y = py - hh; y <= py + hh; y++) for (let x = px - hw; x <= px + hw; x++) {
+        const c = at(x, y);
+        if (c === Cell.Void || c === Cell.Water || c === Cell.Ruin || ruinFloor[idx(x, y)]) return false;
+        if (Math.abs(x - px) <= 1 && y <= py - hh + 5 && nodes.some((n) => n.x === x && n.y === y)) return false;
+      }
+      return true;
+    };
+    for (const shrink of [0, 2]) {
+      bw = bw0 - shrink; bh = bh0 - shrink; hw = Math.floor(bw / 2); hh = Math.floor(bh / 2);
+      for (let y = hh + 3; y < h - hh - 4; y++) for (let x = hw + 3; x < w - hw - 4; x++) {
+        const d = Math.hypot(x - cx, y - cy);
+        if (d < BEACON.beacon.minFromBase) continue;
+        const score = d + r4() * 6;
+        if (score > bestScore && fits(x, y)) { best = { x, y }; bestScore = score; }
+      }
+      if (best) break;
+    }
+    if (best !== null) {
+      const rect = { x: best.x - hw, y: best.y - hh, w: bw, h: bh };
+      const inside = (px: number, py: number) => px >= rect.x * 16 && px < (rect.x + rect.w) * 16 && py >= rect.y * 16 && py < (rect.y + rect.h) * 16;
+      for (let y = rect.y; y < rect.y + rect.h; y++) for (let x = rect.x; x < rect.x + rect.w; x++) {
+        cells[idx(x, y)] = Cell.Floor;
+        ruinFloor[idx(x, y)] = 1;
+        ground[y][x] = TILE.ruinFloor;
+        walls[y][x] = -1;
+      }
+      for (let i = decor.length - 1; i >= 0; i--) if (inside(decor[i].x, decor[i].y - 1)) decor.splice(i, 1);
+      for (let i = glows.length - 1; i >= 0; i--) if (inside(glows[i].x, glows[i].y + 7)) glows.splice(i, 1);
+      for (let i = props.length - 1; i >= 0; i--) if (inside(props[i].x, props[i].y - 1)) { props.splice(i, 1); blockers.splice(i, 1); }
+      for (let i = enemies.length - 1; i >= 0; i--) if (inside(enemies[i].x * 16 + 8, enemies[i].y * 16 + 8)) enemies.splice(i, 1);
+      const mx = best.x * 16 + 8, my = (rect.y + 2) * 16 + 12;
+      blockers.push({ x: mx, y: my - 5, w: 22, h: 10 });
+      taken.push({ x: best.x, y: rect.y + 1 }, { x: best.x, y: rect.y + 2 });
+      for (const [ox, oy] of [[1, 1], [rect.w - 2, 1], [1, rect.h - 2], [rect.w - 2, rect.h - 2]]) {
+        if (nodes.some((n) => n.x === rect.x + ox && n.y === rect.y + oy)) continue;
+        decor.push({ frame: DECOR.pillar, x: (rect.x + ox) * 16 + 8, y: (rect.y + oy) * 16 + 15 });
+      }
+      beacon = { x: mx, y: my, guardian: { x: mx, y: my + 38 }, plaza: rect };
+    }
+  }
+
   const c = { x: cx * 16 + 8, y: cy * 16 + 8 };
   const base = {
     center: c,
@@ -319,5 +374,5 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     cradle: { x: c.x, y: c.y + 22 },
     pad: { x: c.x + 46, y: c.y + 12 },
   };
-  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, enemies, decor, glows, props, blockers, ruins, base };
+  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, enemies, decor, glows, props, blockers, ruins, base, beacon };
 }

@@ -16,6 +16,7 @@ export interface StarMapData {
   fromPlanet?: number;   // planet the ship is at
   embers?: number;       // fuel available (launch mode)
   journey?: Journey;     // the flight in progress (view mode)
+  lit?: string[];        // beacon stars the family has lit
   onLaunch?: (to: string, planet: number) => void;
   onClose?: () => void;
 }
@@ -223,7 +224,7 @@ export class StarMapScene extends Phaser.Scene {
     const lines: string[] = [];
     const planets = systemFor(s.id);
     if (this.view === 'galaxy') {
-      lines.push(s.name + (s.beacon ? '  - BEACON' : s.id === this.d.from ? '  - YOU ARE HERE' : ''));
+      lines.push(s.name + (s.beacon ? (this.d.lit?.includes(s.id) ? '  - BEACON LIT' : '  - BEACON') : s.id === this.d.from ? '  - YOU ARE HERE' : ''));
       if (!isKid()) {
         if (s.id !== this.d.from) lines.push(`${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
         const known = planets.some((p) => p.real);
@@ -452,8 +453,14 @@ export class StarMapScene extends Phaser.Scene {
         for (let i = 0; i < n; i++) g.fillRect(Math.round(p.sx - n + i * 2), Math.round(p.sy - r - 4), 1, 1);
       }
       if (s.beacon || BEACONS.includes(s.id)) {
+        const lit = !!this.d.lit?.includes(s.id);
         const pulse = 4 + Math.sin(this.t * 3) * 1.5;
-        g.lineStyle(1, PALETTE[11], 0.9);
+        if (lit) {
+          // a lit beacon: filled white diamond and a beam reaching up
+          g.fillStyle(PALETTE[18], 0.25).fillPoints([{ x: p.sx, y: p.sy - pulse - 5 }, { x: p.sx + pulse + 5, y: p.sy }, { x: p.sx, y: p.sy + pulse + 5 }, { x: p.sx - pulse - 5, y: p.sy }], true);
+          g.lineStyle(1, PALETTE[19], 0.5 + 0.4 * Math.sin(this.t * 5)).lineBetween(p.sx, p.sy - pulse - 5, p.sx, p.sy - 34 - pulse * 2);
+        }
+        g.lineStyle(1, lit ? PALETTE[19] : PALETTE[11], 0.9);
         g.strokePoints([{ x: p.sx, y: p.sy - pulse - 3 }, { x: p.sx + pulse + 3, y: p.sy }, { x: p.sx, y: p.sy + pulse + 3 }, { x: p.sx - pulse - 3, y: p.sy }], true);
       }
       const people = settled.get(s.id) ?? 0;
@@ -496,7 +503,7 @@ export class StarMapScene extends Phaser.Scene {
       taken.push(rect);
       const found = this.discovered.has(s.id);
       label.setPosition(Math.round(p.sx), Math.round(p.sy + r + 5)).setVisible(true)
-        .setTint(this.selected?.id === s.id ? PALETTE[19] : s.beacon ? PALETTE[11] : found ? PALETTE[21] : PALETTE[22]);
+        .setTint(this.selected?.id === s.id ? PALETTE[19] : s.beacon ? (this.d.lit?.includes(s.id) ? PALETTE[18] : PALETTE[11]) : found ? PALETTE[21] : PALETTE[22]);
     }
   }
 }

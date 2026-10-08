@@ -130,6 +130,11 @@ src/world/system.ts      a star's planets in orbit order: confirmed ones from th
                          id; temperature from orbit + spectral class -> biome, seed, size; planet 1 of settled stars
                          keeps its pre-system biome (LEGACY_WORLDS)
 src/fx/Globe.ts          pixel planet from orbit: land/sea + polar caps (`poles`), or banded gas/ice giants
+src/entities/Guardian.ts the beacon keeper (Enemy): sleeps by the monolith, wakes when you come close, chases, charges
+                         (stuns itself on walls: wide open) and slams (ring telegraph); dies into the Spark
+src/entities/Beacon.ts   the monolith: dormant, or lit for good (lens, seams, sky beam, motes) once its keeper falls
+src/entities/Resources.ts ... Spark: the rare white pickup a lit beacon leaves (replicants.traits.sparks)
+src/data/beacon.json     keeper stats (kid mode: kidHp/kidDamage), spark pickup, plaza size and distance
 src/entities/Village.ts  what copies build around the base (lamps, signs, flags, gardens, huts, totems): shared work
                          pool, taste per copy, free-spot search, ghost + hammering, saved in planet_states structures
 src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star, tap again for its system: planets as live globes
@@ -154,6 +159,7 @@ feature color (visor, antenna tip, chest core).
 
 Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`,
 `node tools/playtest.mjs` (scripted headless playtest of the ruin puzzle, dash, combo, spore reflect, petting),
+`node tools/playtest-beacon.mjs` (beacon world: keeper wakes, charges, slams, falls; beacon lights; Spark saved),
 `node tools/fps.mjs "<query>"` (headless frame rate; software GL, only for comparing builds).
 
 Controls: move WASD/arrows/left stick/left-side touch drag. Attack Space/J/Enter/Z, left click, gamepad A/X/R1, tap right
@@ -164,7 +170,9 @@ URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` sk
 screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond|ruin` for other spots, `&kid` for kid mode),
 `?planet=solace`, `?seed=123`, `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
 `?low` (force low-detail mode; also switches on by itself under 40 fps), `?fast` (travel minutes become seconds),
-`?shot=1&star=tau-ceti&pi=2` (preview planet 2 of another star, as a hologram visit).
+`?shot=1&star=tau-ceti&pi=2` (preview planet 2 of another star, as a hologram visit), `?shot=1&at=fomalhaut&pi=1`
+(start the replicant on another world for real; `&view=beacon` stands you before the sleeping keeper, `&view=beacon-lit`
+shows the lit monolith).
 
 ## Progress
 
@@ -410,3 +418,34 @@ Not done / next:
   health a quick red flicker. One `applyTint` pass per frame in `src/entities/Player.ts` decides the tint, so no
   delayed call can leave the body in a half state (the hologram tint survives it too).
 - `screenshots/hurt-before-{1,2}.png` vs `hurt-after-{2,3}.png` (frame 2 before: glow and sparks, no body).
+
+### Session 6 (2026-10-08): beacons have a reason (Steve picked "a reason to reach a beacon")
+- Planet 1 of each beacon star (Fomalhaut, Pollux, Arcturus, Capella; `PlanetDef.beacon` set by `planetFor`) now holds
+  a stone plaza far from the landing site (`planetGen.ts` step 11, own rng, appended last: crystal node indexes are
+  untouched, crystals may stand on the plaza, rock inside it is carved away, decor and creatures there are cleared;
+  11x9 tiles, 9x7 if nothing bigger fits) with four pillars, the dormant monolith (`tools/sprites/beacon.json`,
+  32x48) at its head and the keeper asleep in front of it. Title subtitle reads "A BEACON SLEEPS HERE" until lit.
+- The keeper (`tools/sprites/guardian.json`, 32x32, tinted by the planet accent; `src/entities/Guardian.ts`;
+  tunables in `src/data/beacon.json`): a stone sentinel with one eye and ember seams. Walk up (66 px) and it wakes
+  (roar, rumble, eye lights). It walks at you; at range it crouches with a bright eye and charges (2 damage; if it
+  runs into a wall it is stunned for 1.5 s and takes double damage: dash out of its way), up close it crouches with a
+  ring on the ground and slams (hurts within the ring). 14 hp (8 in kid mode, where it hits for 1); your hits barely
+  move it; its eye dims as it weakens. It is hit from a bit further than small enemies (`Enemy.reach`).
+- When it falls (slow motion, rumble, crumbles into debris) the monolith lights for good: white flash, "BEACON LIT"
+  card, the lens burns white, cyan seams pulse, a beam climbs into the sky and motes rise, with a 150 px light.
+  Saved as `planet_states.data.beacon = { lit, at, by }` (the 0005 RPC already merges any top-level key; the local
+  store now does too). A lit beacon has no keeper on later visits.
+- The Spark (`tools/sprites/spark.json`): pops out where the keeper fell, hovers and twinkles, flies to you from 48 px.
+  Counted on your replicant (`traits.sparks`, saved at once) and shown as a white star next to the Ember counter
+  once you have one (hidden in kid mode). This is the resource Phase 3's handoff will spend; nothing spends it yet.
+- Star map: lit beacons show a filled white diamond with a beam and a cyan label ("- BEACON LIT"); `GameStore.litBeacons()`
+  lists them (cloud: `data->beacon->>lit`). The planet loads them on arrival and passes them to the map.
+- New sounds: roar, stomp, slam, the keeper crumbling, the beacon igniting (boom then a climbing chord), the Spark.
+- Verified headless (`tools/playtest-beacon.mjs` on Fomalhaut): wake, charge, wall stun, slam, death, beacon lit,
+  Spark collected and counted, beacon delta saved and listed; the two older playtests still pass.
+  Screenshots `screenshots/beacon-*.png`, `map-beacon-lit.png`.
+
+Not done / next:
+- Spark handoff (Phase 3, step 6): spend a Spark at the Replicator to awaken a copy for another family member.
+- Steve's worlds at Fomalhaut and Pollux are already settled: the plaza appears on them now (nothing of theirs moves).
+- Not yet seen on the iPad: the keeper fight on touch (swipe to dash out of a charge).

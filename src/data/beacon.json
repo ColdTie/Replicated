@@ -1,0 +1,39 @@
+{
+  "_doc": "Beacon worlds (planet 1 of Fomalhaut, Pollux, Arcturus, Capella) hold a dormant monolith on a stone plaza, guarded by a sleeping keeper. Wake it, beat it, and the beacon lights for good (planet_states.data.beacon) and drops the family's first Spark. guardian: hp (kidHp in kid mode), walking speeds, wakeRange = how close you must come to wake it, senseRange = how far it chases, charge = a telegraphed rush that stuns it against a wall (stunDamageScale = damage multiplier while stunned), slam = a jump whose landing hurts within slamRadius. knockbackScale: how much your hits push it (it is heavy). spark: pickup timing. beacon: plaza size in tiles and how far from the base it is placed.",
+  "guardian": {
+    "sprite": "guardian",
+    "hp": 14,
+    "kidHp": 8,
+    "speed": 34,
+    "chaseSpeed": 58,
+    "wakeRange": 66,
+    "senseRange": 230,
+    "chargeRange": 125,
+    "chargeMinRange": 46,
+    "chargeWindupMs": 640,
+    "chargeSpeed": 250,
+    "chargeMs": 560,
+    "stunMs": 1500,
+    "stunDamageScale": 2,
+    "slamRange": 44,
+    "slamWindupMs": 500,
+    "slamAirMs": 480,
+    "slamRadius": 36,
+    "contactDamage": 1,
+    "chargeDamage": 2,
+    "kidDamage": 1,
+    "restMs": 700,
+    "knockbackScale": 0.15
+  },
+  "spark": {
+    "sprite": "spark",
+    "pickupDelayMs": 900,
+    "magnetRange": 48,
+    "magnetPull": 900
+  },
+  "beacon": {
+    "sprite": "beacon",
+    "plaza": [11, 9],
+    "minFromBase": 22
+  }
+}

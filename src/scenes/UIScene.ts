@@ -1,7 +1,7 @@
 // Screen-space layer: ember counter, landing title card, and touch controls.
 import Phaser from 'phaser';
 import { PALETTE } from '../core/data';
-import { isKid } from '../core/session';
+import { isKid, session } from '../core/session';
 import { touch } from '../input/Controls';
 import { sound } from '../audio/Sound';
 
@@ -11,6 +11,8 @@ export class UIScene extends Phaser.Scene {
   private counter!: Phaser.GameObjects.Container;
   private counterText!: Phaser.GameObjects.BitmapText;
   private counterFade?: Phaser.Time.TimerEvent;
+  private sparkCounter!: Phaser.GameObjects.Container;
+  private sparkText!: Phaser.GameObjects.BitmapText;
   private location?: Phaser.GameObjects.Container;
   private stickBase!: Phaser.GameObjects.Arc;
   private stickKnob!: Phaser.GameObjects.Arc;
@@ -32,6 +34,13 @@ export class UIScene extends Phaser.Scene {
     // Kid mode: no numbers on screen; collected embers still float up and fill the shared base
     this.counter.setVisible(!isKid());
 
+    // Sparks (rare): a white star next to the Embers, only once the family has one
+    const sparkIcon = this.add.image(0, 0, 'spark', 0).setOrigin(0, 0).setScale(0.75);
+    this.sparkText = this.add.bitmapText(14, 5, 'pixel', '0').setTint(PALETTE[18]);
+    this.sparkCounter = this.add.container(44, 3, [sparkIcon, this.sparkText]).setAlpha(0.6).setVisible(false);
+    this.onSparks(session.replicant?.traits.sparks ?? 0, true);
+    this.game.events.on('sparks', this.onSparks, this);
+
     this.game.events.on('embers', this.onEmbers, this);
     this.counterText.setText(String((this.scene.get('planet') as unknown as { embers: number }).embers ?? 0));
     this.game.events.on('titlecard', this.titleCard, this);
@@ -39,6 +48,7 @@ export class UIScene extends Phaser.Scene {
     (this.scene.get('planet') as unknown as { announceLocation?: () => void }).announceLocation?.(); // the planet announced before this layer existed
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('embers', this.onEmbers, this);
+      this.game.events.off('sparks', this.onSparks, this);
       this.game.events.off('titlecard', this.titleCard, this);
       this.game.events.off('location', this.showLocation, this);
     });
@@ -146,6 +156,15 @@ export class UIScene extends Phaser.Scene {
     this.tweens.add({ targets: this.counter, scale: { from: 1.25, to: 1 }, duration: 160, ease: 'Back.easeOut' });
     this.counterFade?.remove();
     this.counterFade = this.time.delayedCall(2500, () => this.tweens.add({ targets: this.counter, alpha: 0.35, duration: 600 }));
+  }
+
+  private onSparks(n: number, quiet = false) {
+    this.sparkText.setText(String(n));
+    this.sparkCounter.setVisible(n > 0 && !isKid());
+    if (quiet) return;
+    this.sparkCounter.setAlpha(1);
+    this.tweens.add({ targets: this.sparkCounter, scale: { from: 1.4, to: 1 }, duration: 220, ease: 'Back.easeOut' });
+    this.time.delayedCall(3000, () => this.tweens.add({ targets: this.sparkCounter, alpha: 0.6, duration: 600 }));
   }
 
   /** Top left, under the counter: "MARS - SOL" and the replicants living here, each in its visor color. */

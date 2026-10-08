@@ -17,7 +17,7 @@ export interface ReplicantSave {
   profile_id: string | null;
   name: string;
   model: string;
-  traits: { awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number };
+  traits: { awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number; sparks?: number };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
   generation?: number;
@@ -41,6 +41,8 @@ export interface PlanetData {
   structures?: StructureSave[];
   /** The copies' shared building effort not yet spent */
   village?: { work: number };
+  /** Beacon worlds: the monolith was lit (its keeper beaten) */
+  beacon?: { lit: boolean; at: number; by?: string };
 }
 export interface PlanetSave {
   star_id: string;
@@ -101,6 +103,8 @@ export interface GameStore {
   openJourneys(): Promise<Journey[]>;
   listReplicants(): Promise<ReplicantSummary[]>;
   discoveredStars(): Promise<string[]>;
+  /** Stars whose beacon the family has lit. */
+  litBeacons(): Promise<string[]>;
   /** Atomic: adds emberDelta to the shared pool, merges node states, replaces structures if given. */
   applyPlanetDelta(star: string, planetIndex: number, emberDelta: number, data: PlanetData): Promise<PlanetSave | null>;
   signOut(): Promise<void>;
@@ -203,6 +207,7 @@ export class LocalStore implements GameStore {
   }
 
   async discoveredStars() { return [...this.db.discovered]; }
+  async litBeacons() { return Object.values(this.db.planets).filter((p) => p.data.beacon?.lit).map((p) => p.star_id); }
 
   async listNpcs(star: string, planetIndex: number) {
     return this.db.replicants.filter((r) => r.status === 'npc' && r.star_id === star && r.planet_index === planetIndex)
@@ -236,8 +241,8 @@ export class LocalStore implements GameStore {
     cur.embers = Math.max(0, cur.embers + emberDelta);
     if (data.nodes) cur.data.nodes = { ...(cur.data.nodes ?? {}), ...data.nodes };
     if (data.doors) cur.data.doors = { ...(cur.data.doors ?? {}), ...data.doors };
-    if (data.npcTick !== undefined) cur.data.npcTick = data.npcTick;
-    if (data.structures) cur.data.structures = data.structures;
+    // every other top-level key replaces the stored value (same as the apply_planet_delta RPC)
+    for (const [k, v] of Object.entries(data)) if (k !== 'nodes' && k !== 'doors' && v !== undefined) (cur.data as Record<string, unknown>)[k] = v;
     this.flush();
     return structuredClone(cur);
   }
@@ -379,6 +384,12 @@ export class CloudStore implements GameStore {
     const { data, error } = await this.sb.from('discovered_stars').select('star_id');
     if (error) throw error;
     return ['sol', ...(data as { star_id: string }[]).map((d) => d.star_id)];
+  }
+
+  async litBeacons() {
+    const { data, error } = await this.sb.from('planet_states').select('star_id').eq('data->beacon->>lit', 'true');
+    if (error) throw error;
+    return (data as { star_id: string }[]).map((d) => d.star_id);
   }
 
   async saveReplicant(r: ReplicantSave) {
