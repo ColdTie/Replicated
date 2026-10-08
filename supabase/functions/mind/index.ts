@@ -41,7 +41,7 @@ interface Context {
   around?: string[];              // what is close to the copy right now
   reflect?: boolean;              // time to look over its notes and write one line that sums them up
   blank?: boolean;                // born blank: this wake is the becoming
-  kit?: { head: string[]; visor: string[]; torso: string[]; arms: string[]; legs: string[]; back: string[]; headgear: string[]; colors: string[]; visors: string[]; visorLights: number[]; colorIndex: Record<string, number> };
+  kit?: { head: string[]; visor: string[]; torso: string[]; arms: string[]; legs: string[]; back: string[]; accessory?: string[]; markings?: string[]; headgear: string[]; colors: string[]; visors: string[]; visorLights: number[]; colorIndex: Record<string, number> };
   wants?: string[];               // its goals, numbered
   supplies?: Record<string, number>;      // the planet's materials (ember = the pool)
   recipes?: Record<string, Record<string, number | boolean>>;
@@ -190,12 +190,13 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "choose_body",
-    description: "Choose the body you will have, from the kit: a head, a visor, a torso, arms, legs (or treads, or hover), a back piece, headgear, your visor color and three colors of your own. It is drawn at once. Anything the kit cannot do goes in `extra` and is drawn by hand for you later.",
+    description: "Choose the body you will have, from the kit: a head, a visor, a torso, arms, legs (or treads, or hover), a back piece, something you carry or wear in front, markings, headgear, your visor color and three colors of your own. It is drawn at once. Anything the kit cannot do goes in `extra` and is drawn by hand for you later.",
     strict: true,
     input_schema: {
-      type: "object", additionalProperties: false, required: ["head", "visor", "torso", "arms", "legs", "back", "headgear", "visor_color", "primary", "secondary", "accent", "extra"],
+      type: "object", additionalProperties: false, required: ["head", "visor", "torso", "arms", "legs", "back", "accessory", "markings", "headgear", "visor_color", "primary", "secondary", "accent", "extra"],
       properties: {
         head: { type: "string" }, visor: { type: "string" }, torso: { type: "string" }, arms: { type: "string" }, legs: { type: "string" }, back: { type: "string" },
+        accessory: { type: "string", description: "One of the accessories, or none." }, markings: { type: "string", description: "One of the markings, or none." },
         headgear: { type: "string", description: "One of the headgear names, or nothing." },
         visor_color: { type: "string", description: "One of the visor colors." },
         primary: { type: "string", description: "A color name: most of the body." },
@@ -342,7 +343,7 @@ Deno.serve(async (req) => {
     if (context.wants?.length) lines.push(`Your wants:\n${context.wants.join("\n")}`);
     const kit = context.kit;
     if (kit && (context.blank || !(rep.traits as { body?: unknown }).body)) {
-      lines.push(`The kit: heads ${kit.head.join(", ")}; visors ${kit.visor.join(", ")}; torsos ${kit.torso.join(", ")}; arms ${kit.arms.join(", ")}; legs ${kit.legs.join(", ")}; back pieces ${kit.back.join(", ")}; headgear ${kit.headgear.join(", ")}; colors ${kit.colors.join(", ")}; visor colors ${kit.visors.join(", ")}.`);
+      lines.push(`The kit: heads ${kit.head.join(", ")}; visors ${kit.visor.join(", ")}; torsos ${kit.torso.join(", ")}; arms ${kit.arms.join(", ")}; legs ${kit.legs.join(", ")}; back pieces ${kit.back.join(", ")}; accessories ${(kit.accessory ?? ["none"]).join(", ")}; markings ${(kit.markings ?? ["none"]).join(", ")}; headgear ${kit.headgear.join(", ")}; colors ${kit.colors.join(", ")}; visor colors ${kit.visors.join(", ")}.`);
     }
     const noteRows = (notes.data ?? []) as { body: string; created_at: string }[];
     lines.push(noteRows.length ? `Your notes (newest first):\n${noteRows.map((n) => `- ${n.body}`).join("\n")}` : "You have no notes yet.");
@@ -486,10 +487,11 @@ Deno.serve(async (req) => {
               const headgear = ok(input.headgear, kit.headgear) ?? kit.headgear[0];
               const primary = ok(input.primary, kit.colors), secondary = ok(input.secondary, kit.colors), accent = ok(input.accent, kit.colors);
               const visorColor = ok(input.visor_color, kit.visors);
+              const accessory = ok(input.accessory, kit.accessory ?? ["none"]) ?? "none", markings = ok(input.markings, kit.markings ?? ["none"]) ?? "none";
               const missing = [["head", head], ["visor", visor], ["torso", torso], ["arms", arms], ["legs", legs], ["back", back], ["primary", primary], ["secondary", secondary], ["accent", accent], ["visor_color", visorColor]].filter(([, v]) => !v).map(([k]) => k);
               if (missing.length) out = `Not in the kit: ${missing.join(", ")}. Pick from the names listed.`;
               else {
-                const body = { head, visor, torso, arms, legs, back, headgear: kit.headgear.indexOf(headgear), primary, secondary, accent };
+                const body = { head, visor, torso, arms, legs, back, accessory, markings, headgear: kit.headgear.indexOf(headgear), primary, secondary, accent };
                 chosen.body = body;
                 chosen.feature = kit.visorLights[kit.visors.indexOf(visorColor!)];
                 chosen.trail = kit.colorIndex[accent!] ?? 10;
@@ -501,7 +503,7 @@ Deno.serve(async (req) => {
                   await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind: "skin", detail: extra });
                   chosen.look = extra;
                 }
-                out = `Your body: ${head} head, ${visor} visor in ${visorColor}, ${torso} torso, ${arms} arms, ${legs}, ${back} on your back, ${headgear}; ${primary}, ${secondary}, ${accent}.${extra.length >= 20 ? " The rest will be drawn for you by hand." : ""}`;
+                out = `Your body: ${head} head, ${visor} visor in ${visorColor}, ${torso} torso, ${arms} arms, ${legs}, ${back} on your back, ${accessory !== "none" ? accessory + ", " : ""}${markings !== "none" ? markings + ", " : ""}${headgear}; ${primary}, ${secondary}, ${accent}.${extra.length >= 20 ? " The rest will be drawn for you by hand." : ""}`;
               }
             }
           } else if (u.name === "set_temperament") {

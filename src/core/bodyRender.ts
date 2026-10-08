@@ -9,6 +9,8 @@ export interface BodySpec {
   headgear: number;
   /** named colors from parts.json colors */
   primary: string; secondary: string; accent: string;
+  /** something carried or worn in front (satchel, sash, lantern...) and marks on the body; 'none' when absent */
+  accessory?: string; markings?: string;
 }
 
 type RGB = [number, number, number];
@@ -26,6 +28,10 @@ export interface PartsKit {
   arms: { shoulders: [number, number][]; poses: Record<string, [number, number][]>; variants: Record<string, { width: number; hand: number; color: string }> };
   legs: { hips: [number, number][]; poses: Record<string, [number, number][]>; variants: Record<string, { kind: string; width?: number; color?: string; stretch?: number; anchor?: [number, number]; rows?: string[]; roll?: boolean; float?: boolean }> };
   back: { variants: Record<string, { anchor: [number, number]; poses: Record<string, string[]> }> };
+  accessory?: { variants: Record<string, { anchor?: [number, number]; hand?: boolean; offset?: [number, number]; rows: string[] }> };
+  markings?: { variants: Record<string, [number, number, string][]> };
+  /** grid chars with a fixed palette color */
+  fixed?: Record<string, number>;
 }
 
 export interface RenderedBody {
@@ -53,12 +59,14 @@ export function normalizeSpec(kit: PartsKit, spec: Partial<BodySpec> | undefined
     primary: color(spec?.primary, base.primary),
     secondary: color(spec?.secondary, base.secondary),
     accent: color(spec?.accent, base.accent),
+    accessory: pick(spec?.accessory, kit.accessory?.variants ?? {}, base.accessory ?? 'none'),
+    markings: pick(spec?.markings, kit.markings?.variants ?? {}, base.markings ?? 'none'),
   };
 }
 
 /** A short stable key for a spec + visor color (texture cache). */
 export function bodyKey(spec: BodySpec, feature: [number, number]) {
-  return `body:${spec.head}.${spec.visor}.${spec.torso}.${spec.arms}.${spec.legs}.${spec.back}.${spec.primary}.${spec.secondary}.${spec.accent}.f${feature[0]}-${feature[1]}`;
+  return `body:${spec.head}.${spec.visor}.${spec.torso}.${spec.arms}.${spec.legs}.${spec.back}.${spec.accessory ?? 'none'}.${spec.markings ?? 'none'}.${spec.primary}.${spec.secondary}.${spec.accent}.f${feature[0]}-${feature[1]}`;
 }
 
 export function renderBody(kit: PartsKit, spec: BodySpec, feature: [number, number], palette: RGB[]): RenderedBody {
@@ -68,6 +76,7 @@ export function renderBody(kit: PartsKit, spec: BodySpec, feature: [number, numb
   const data = new Uint8ClampedArray(width * H * 4);
   const anchors: [number, number][] = [];
   const colorOf: Record<string, number> = {
+    ...(kit.fixed ?? {}),
     b: kit.colors[spec.primary], B: kit.colors[spec.secondary], c: kit.colors[spec.accent], k: 23,
     V: feature[0], v: feature[1], W: 19,
   };
@@ -75,6 +84,9 @@ export function renderBody(kit: PartsKit, spec: BodySpec, feature: [number, numb
   kit.poses.forEach((pose, fi) => {
     const ox = fi * W;
     const solid = new Uint8Array(W * H);           // 1 where a body pixel is
+    const body = new Uint8Array(W * H);            // 1 where something other than the back piece is
+    let drawingBack = true;
+    const bodyOver = (x: number, y: number) => !!body[y * W + x];
     const put = (x: number, y: number, ch: string, hurt = false) => {
       if (ch === '.' || ch === ' ') return;
       if (x < 0 || y < 0 || x >= W || y >= H) return;
@@ -86,6 +98,7 @@ export function renderBody(kit: PartsKit, spec: BodySpec, feature: [number, numb
       const i = ((y * width) + ox + x) * 4;
       data[i] = r; data[i + 1] = g; data[i + 2] = b; data[i + 3] = 255;
       solid[y * W + x] = 1;
+      if (!drawingBack) body[y * W + x] = 1;
     };
     const grid = (rows: string[], ax: number, ay: number, hurt = false) => {
       rows.forEach((row, ry) => { for (let rx = 0; rx < row.length; rx++) put(ax + rx, ay + ry, row[rx], hurt); });
@@ -105,6 +118,9 @@ export function renderBody(kit: PartsKit, spec: BodySpec, feature: [number, numb
       const rows = back.poses[pose.back] ?? back.poses.still ?? [];
       grid(rows, back.anchor[0] + dx, back.anchor[1] + bob);
     }
+    // what the back piece covers, so markings stay on the body itself
+    const backOnly = Uint8Array.from(solid);
+    drawingBack = false;
 
     // legs: lines from hip to foot, or a block (treads roll, hover floats)
     const legs = kit.legs.variants[spec.legs];
@@ -139,6 +155,16 @@ export function renderBody(kit: PartsKit, spec: BodySpec, feature: [number, numb
       });
     }
 
+    // something carried or worn in front: at an anchor, or at the right hand of this pose
+    const acc = kit.accessory?.variants[spec.accessory ?? 'none'];
+    if (acc?.rows.length) {
+      if (acc.hand && arms && arms.width > 0) {
+        const ap = kit.arms.poses[pose.arms] ?? kit.arms.poses.hang;
+        const [sx, sy] = kit.arms.shoulders[1], [hx, hy] = ap[1], [ox, oy] = acc.offset ?? [0, 0];
+        grid(acc.rows, sx + dx + hx + ox, sy + bob + hy + oy);
+      } else if (acc.anchor) grid(acc.rows, acc.anchor[0] + dx, acc.anchor[1] + bob);
+    }
+
     // head and visor
     const head = kit.head.variants[spec.head];
     if (head) grid(head, kit.head.anchor[0] + dx, kit.head.anchor[1] + bob);
@@ -151,6 +177,12 @@ export function renderBody(kit: PartsKit, spec: BodySpec, feature: [number, numb
       }
     }
     anchors.push(anchor);
+
+    // markings: only where there is body
+    for (const [mx, my, ch] of kit.markings?.variants[spec.markings ?? 'none'] ?? []) {
+      const x = mx + dx, y = my + bob;
+      if (x >= 0 && y >= 0 && x < W && y < H && solid[y * W + x] && !(backOnly[y * W + x] && !bodyOver(x, y))) put(x, y, ch);
+    }
 
     // outline: every empty pixel touching the figure
     const [or, og, ob] = palette[OUTLINE];

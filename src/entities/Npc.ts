@@ -128,7 +128,7 @@ export class Npc {
     if (!st || this.scene.shot || this.data.id.startsWith('fake') || this.data.id === 'pending') return;
     this.data.traits.needs = { ...this.needs };
     this.data.traits.weary = Math.round(this.weary * 100) / 100;
-    st.saveReplicant(this.data).catch(() => undefined);
+    st.patchTraits(this.data.id, { needs: this.data.traits.needs, weary: this.data.traits.weary }, this.below ? undefined : { x: this.x, y: this.y }).catch(() => undefined);
   }
 
   /** Born blank: grey, dim and still by the Replicator until its first wake makes it itself. */

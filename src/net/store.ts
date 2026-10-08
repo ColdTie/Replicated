@@ -174,7 +174,7 @@ export interface MindContext {
   /** born blank and not yet itself: this wake is the becoming */
   blank: boolean;
   /** the parts kit on offer (names), for the becoming */
-  kit: { head: string[]; visor: string[]; torso: string[]; arms: string[]; legs: string[]; back: string[]; headgear: string[]; colors: string[]; visors: string[]; visorLights: number[]; colorIndex: Record<string, number> };
+  kit: { head: string[]; visor: string[]; torso: string[]; arms: string[]; legs: string[]; back: string[]; accessory: string[]; markings: string[]; headgear: string[]; colors: string[]; visors: string[]; visorLights: number[]; colorIndex: Record<string, number> };
   /** its goals so far, numbered */
   wants: string[];
   /** the planet's materials (ember = the pool) and what things cost */
@@ -195,7 +195,7 @@ export interface MindContext {
   inventory: Record<string, number>;
 }
 export interface Voice { instrument: string; mood: string; tempo: string }
-export interface Body { head: string; visor: string; torso: string; arms: string; legs: string; back: string; headgear: number; primary: string; secondary: string; accent: string }
+export interface Body { head: string; visor: string; torso: string; arms: string; legs: string; back: string; headgear: number; primary: string; secondary: string; accent: string; accessory?: string; markings?: string }
 export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: 'solitary' | 'friendly' | 'clingy'; work: 'builder' | 'wanderer' | 'balanced'; bedtime: 'early' | 'late' | 'even'; risk: 'careful' | 'bold' }
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
@@ -229,6 +229,9 @@ export interface GameStore {
   /** The profile's active replicant, created on first play. */
   loadReplicant(profile: Profile): Promise<ReplicantSave>;
   saveReplicant(r: ReplicantSave): Promise<void>;
+  /** Merges only these traits keys (and the position) into a copy's row, so a game opened earlier never undoes a
+   * body, voice or name chosen since (migration 0009). */
+  patchTraits(id: string, traits: Partial<ReplicantSave['traits']>, pos?: { x: number; y: number }): Promise<void>;
   loadPlanet(star: string, planetIndex: number, seed: number): Promise<PlanetSave>;
   /** Copies (NPC replicants) living on a planet. */
   listNpcs(star: string, planetIndex: number): Promise<ReplicantSave[]>;
@@ -306,7 +309,7 @@ export class LocalStore implements GameStore {
       const names = ['Ash', 'Wren', 'Pip', 'Moth', 'Ferro', 'Lark', 'Rime', 'Quill', 'Sable', 'Tin', 'Vale', 'Nock'];
       const traits: ReplicantSave['traits'] = {
         ...me.traits, blank: false,
-        body: { head: pick(k.head), visor: pick(k.visor), torso: pick(k.torso), arms: pick(k.arms), legs: pick(k.legs), back: pick(k.back), headgear: Math.floor(Math.random() * k.headgear.length), primary: pick(k.colors), secondary: pick(k.colors), accent: pick(k.colors) },
+        body: { head: pick(k.head), visor: pick(k.visor), torso: pick(k.torso), arms: pick(k.arms), legs: pick(k.legs), back: pick(k.back), accessory: pick(k.accessory), markings: pick(k.markings), headgear: Math.floor(Math.random() * k.headgear.length), primary: pick(k.colors), secondary: pick(k.colors), accent: pick(k.colors) },
         voice: { instrument: pick(['hum', 'bell', 'flute', 'glass', 'pluck', 'horn', 'chime']), mood: pick(['bright', 'soft', 'sad', 'dreamy', 'ancient']), tempo: pick(['slow', 'walking', 'quick']) },
         temperament: { pace: pick(['slow', 'steady', 'quick']), sociability: pick(['solitary', 'friendly', 'clingy']), work: pick(['builder', 'wanderer', 'balanced']), bedtime: pick(['early', 'late', 'even']), risk: pick(['careful', 'bold']) },
         wants: [{ text: pick(['A room of my own under the stone.', 'To see the far side of the island.', 'A garden that glows at night.']), category: pick(['build', 'explore', 'tend']), done: false, at: now }],
@@ -449,6 +452,14 @@ export class LocalStore implements GameStore {
     this.db.replicants.push(row);
     this.flush();
     return structuredClone(row);
+  }
+
+  async patchTraits(id: string, traits: Partial<ReplicantSave['traits']>, pos?: { x: number; y: number }) {
+    const r = this.db.replicants.find((x) => x.id === id);
+    if (!r) return;
+    r.traits = { ...r.traits, ...traits };
+    if (pos) { r.pos_x = Math.round(pos.x); r.pos_y = Math.round(pos.y); }
+    this.flush();
   }
 
   async saveReplicant(r: ReplicantSave) {
@@ -627,6 +638,11 @@ export class CloudStore implements GameStore {
       status: r.status ?? 'active',
       traits: r.traits, star_id: r.star_id, planet_index: r.planet_index, pos_x: r.pos_x, pos_y: r.pos_y, updated_at: new Date().toISOString(),
     }).eq('id', r.id);
+    if (error) throw error;
+  }
+
+  async patchTraits(id: string, traits: Partial<ReplicantSave['traits']>, pos?: { x: number; y: number }) {
+    const { error } = await this.sb.rpc('merge_replicant_traits', { p_id: id, p_traits: traits, p_pos_x: pos ? Math.round(pos.x) : null, p_pos_y: pos ? Math.round(pos.y) : null });
     if (error) throw error;
   }
 

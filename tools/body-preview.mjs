@@ -18,14 +18,15 @@ let seed = 7;
 const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 4294967296; };
 const pick = (o) => { const k = Object.keys(o).filter((x) => !x.startsWith('_')); return k[Math.floor(rnd() * k.length)]; };
 
-const specs = [
-  { name: 'default', spec: normalizeSpec(kit, kit.defaults), feature: player.feature },
-  { name: 'blank', spec: normalizeSpec(kit, kit.blank), feature: [23, 22] },
-];
-for (let k = 0; k < random; k++) {
+const pairOf = (light) => player.featureColors.find((f) => f[1] === light) ?? [light, light];
+const fileArg = process.argv.indexOf('--file');
+const specs = fileArg > 0
+  ? JSON.parse(fs.readFileSync(process.argv[fileArg + 1], 'utf8')).bodies.map((b) => ({ name: b.name, spec: normalizeSpec(kit, b.body), feature: pairOf(b.feature) }))
+  : [{ name: 'default', spec: normalizeSpec(kit, kit.defaults), feature: player.feature }, { name: 'blank', spec: normalizeSpec(kit, kit.blank), feature: [23, 22] }];
+for (let k = 0; k < (fileArg > 0 ? 0 : random); k++) {
   const spec = normalizeSpec(kit, {
     head: pick(kit.head.variants), visor: pick(kit.visor.variants), torso: pick(kit.torso.variants), arms: pick(kit.arms.variants),
-    legs: pick(kit.legs.variants), back: pick(kit.back.variants), headgear: Math.floor(rnd() * 7),
+    legs: pick(kit.legs.variants), back: pick(kit.back.variants), accessory: pick(kit.accessory.variants), markings: pick(kit.markings.variants), headgear: Math.floor(rnd() * 7),
     primary: pick(kit.colors), secondary: pick(kit.colors), accent: pick(kit.colors),
   });
   specs.push({ name: `random ${k + 1}`, spec, feature: player.featureColors[Math.floor(rnd() * player.featureColors.length)] });
@@ -49,5 +50,6 @@ for (const r of rendered) {
   oy += r.height * scale + pad;
 }
 fs.mkdirSync(path.join(root, 'screenshots'), { recursive: true });
-fs.writeFileSync(path.join(root, 'screenshots/bodies.png'), PNG.sync.write(sheet));
-console.log(`bodies: ${specs.map((s) => `${s.name} = ${Object.values(s.spec).join('/')}`).join('\n')}\n-> screenshots/bodies.png`);
+const outArg = process.argv.indexOf('--out');
+fs.writeFileSync(path.join(root, outArg > 0 ? process.argv[outArg + 1] : 'screenshots/bodies.png'), PNG.sync.write(sheet));
+console.log(`-> ${outArg > 0 ? process.argv[outArg + 1] : 'screenshots/bodies.png'}\nbodies: ${specs.map((s) => `${s.name} = ${Object.values(s.spec).join('/')}`).join('\n')}`);

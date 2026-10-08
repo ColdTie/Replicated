@@ -11,9 +11,13 @@ const [, , seedPath, outPath] = process.argv;
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? Number(process.argv[i + 1]) : d; };
 const minutes = arg('minutes', 10), parallel = arg('parallel', 4);
 const planets = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
-const port = 4190;
+const port = arg('port', 4197);
 const server = spawn('npx', ['vite', 'preview', '--outDir', 'dist-sim', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true });
-for (;;) { try { if ((await fetch(`http://localhost:${port}/Replicated/`)).ok) break; } catch {} await new Promise((r) => setTimeout(r, 200)); }
+for (let i = 0; ; i++) {
+  try { if ((await fetch(`http://localhost:${port}/Replicated/`)).ok) break; } catch {}
+  if (i > 150 || server.exitCode !== null) { console.log(`preview server did not start on ${port} (try --port)`); process.exit(1); }
+  await new Promise((r) => setTimeout(r, 200));
+}
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
 const PLAYER_ID = '3b7c94da-3313-4fb6-8948-a54c1d3e710f';
 const results = [];
@@ -33,15 +37,19 @@ async function simulate(p) {
     journeys: [], discovered: ['sol'], notes: [], mail: [], requests: [],
   };
   await page.addInitScript((d) => { if (!localStorage.getItem('replicated.local.v1')) localStorage.setItem('replicated.local.v1', d); }, JSON.stringify(db));
+  const say = (...a) => console.log(`  [${p.star}]`, ...a);
   await page.goto(`http://localhost:${port}/Replicated/?sim&low&hour=13`);
+  say('loading');
   await page.waitForFunction(() => !!window.__scene?.player && window.__scene.npcs?.length >= 0 && !!window.__scene.warren, null, { timeout: 60000 });
   const before = await page.evaluate(() => { const s = window.__scene; return { rooms: s.warren.data.rooms.filter((r) => r.dug).length, planned: s.warren.data.rooms.length, items: s.warren.data.items.length, entrance: s.warren.opened, structures: s.village.structures.length, buildings: s.buildings.list.length, embers: s.embers }; });
+  say('loaded', JSON.stringify(before));
   const t0 = Date.now();
   while (Date.now() - t0 < minutes * 60_000) {
     await page.waitForTimeout(Math.min(30_000, minutes * 60_000));
     // keep the original standing by the base, out of the fights
     await page.evaluate(() => { const s = window.__scene; if (!s.player.alive) return; const c = s.baseCenter; if (Math.hypot(s.player.x - c.x, s.player.y - c.y) > 80) s.player.setPosition(c.x + 30, c.y + 60); s.player.hp = 5; });
   }
+  say('wrapping up', errors.length, 'errors');
   // everyone back up, needs written, the planet flushed
   const out = await page.evaluate(async () => {
     const s = window.__scene, st = window.__session.store;
@@ -53,7 +61,7 @@ async function simulate(p) {
     s.pending.buildings = structuredClone(s.buildings.list);
     s.pending.structures = s.village.structures;
     s.pending.village = { work: Math.round(s.village.work * 100) / 100 };
-    await s.flushPlanet();
+    await Promise.race([s.flushPlanet(), new Promise((r) => setTimeout(r, 3000))]);
     await new Promise((r) => setTimeout(r, 500));
     const after = { rooms: s.warren.data.rooms.filter((r) => r.dug).length, planned: s.warren.data.rooms.length, items: s.warren.data.items.length, entrance: s.warren.opened, structures: s.village.structures.length, buildings: s.buildings.list.length, embers: s.embers, supplies: s.supplies, felled: (s.pending.felled ?? window.__session.planet?.data.felled ?? []).length };
     return { after, log: s.mindLog.map((e) => e.text) };

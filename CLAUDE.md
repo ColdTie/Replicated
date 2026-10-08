@@ -180,7 +180,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 
 | group | key | what |
 | --- | --- | --- |
-| look | `body` | `{ head, visor, torso, arms, legs, back, headgear, primary, secondary, accent }`: names from `src/data/parts.json`; composed at load time (`src/core/bodyRender.ts`). Absent = a hand-made model (`replicants.model`). |
+| look | `body` | `{ head, visor, torso, arms, legs, back, accessory, markings, headgear, primary, secondary, accent }`: names from `src/data/parts.json`; composed at load time (`src/core/bodyRender.ts`). Absent = a hand-made model (`replicants.model`). |
 | look | `feature` | visor light color (palette index; the dark one is its pair in `player.json featureColors`) |
 | look | `gear`, `trail` | headgear frame (`gear.json`), trail / flag / mural color (palette index) |
 | look | `look` | free text the kit cannot draw (open `requests` row of kind `skin`, hand art) |
@@ -200,7 +200,12 @@ Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --p
 `node tools/playtest-become.mjs` (a blank birth, the becoming with the canned mind, eating, the journal's wants),
 `node tools/playtest-buildings.mjs` (a proposal, approval in the journal, paid and raised by three copies, talk, give),
 `node --experimental-strip-types tools/body-preview.mjs [--random 6]` (composed bodies side by side -> `screenshots/bodies.png`),
-`node tools/fps.mjs "<query>"` (headless frame rate; software GL, only for comparing builds).
+`node tools/fps.mjs "<query>"` (headless frame rate; software GL, only for comparing builds),
+`node tools/sim-live.mjs <seed.json> <out.json> --minutes 10` (gives planets simulated play time from a snapshot of
+the live data; needs `npm run build && cp -r dist dist-sim`; the result is written back to Supabase by hand).
+
+Saving a copy: needs, weariness, sleep and gifts go through `GameStore.patchTraits` (`merge_replicant_traits`,
+migration 0009), which merges only those keys, so a game left open never undoes a body, voice or name chosen since.
 
 Controls: move WASD/arrows/left stick/left-side touch drag. Attack Space/J/Enter/Z, left click, gamepad A/X/R1, tap right
 side (three quick attacks = heavy combo finisher; presses during the cooldown are buffered). Dash Shift/K/X, right click,
@@ -747,3 +752,23 @@ whether they keep it or get to choose again (then the mind's `choose_body` is op
   production), from the mind's context ("You do not eat or drink"), the journal and the playtest. Pools and
   planters stay as rooms and furnishings: still water and something green to sit by, nothing more. Old saved
   `traits.needs.food / water` values are ignored on load.
+
+### Session 9c (2026-10-08): supplies for everyone, their bodies, ten minutes of life (Steve: "give them a big bundle of supplies ... give them all like 10 minutes of playtime in sim ... approve all the things they want")
+- **Supplies.** Every planet with copies got 40 stone, 30 soil, 40 wood, 20 scrap, 100 Ember and 20 village work
+  (written straight to `planet_states`). Storage per material is 40 before shelves (`supplies.json baseCap`).
+- **Bodies approved.** All eight open body requests (Sprout, Dusk, Lookout, Glint, Prism on Earth; Gloam, Moss and
+  Steve II on Epsilon Eridani) are built from the kit and written to `traits.body`; the requests are done. This
+  also settles the open question: Earth's first copies now wear what they asked for. The kit grew to draw them:
+  a hooded head, a prism (rainbow) visor, a long cape and a shawl, an accessory slot (satchel, hip bag, sash,
+  lantern in the hand, spyglass at the belt), a markings slot drawn only on the body (speckles, gold flecks,
+  lichen patches, a pale shoulder star, prism marks) and fixed-color grid chars. The specs are in
+  `tools/data/approved-bodies.json`; `screenshots/bodies-approved.png`. The mind's `choose_body` knows the new slots.
+- **Fix: planets with copies crashed on load after time away** (since session 9): the away-time pass advanced the
+  copies' needs before the original existed. Guarded (PR #30). The playtests run in screenshot mode, which skips
+  away-time, so they never saw it.
+- **Fix: a game left open undid newer choices.** Copy saves now merge only what they changed (migration 0009,
+  `patchTraits`).
+- **Ten minutes of life.** `?sim` plays straight in from seeded device storage with the minds asleep (so nothing is
+  said or planned for them); `tools/sim-live.mjs` ran each settled planet for ten minutes from a snapshot and the
+  results (rooms dug, beds made, village builds, Ember mined, needs) were written back. Planets whose copies had not
+  planned any rooms only built on the surface: rooms come from their minds, which wake when Steve visits.
