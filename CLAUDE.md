@@ -519,3 +519,16 @@ Next (Steve, 2026-10-08, "give these guys everything"), in this order unless he 
   three steps (`tools/body.mjs <slug>` clones replicant.json and registers the model in player.json; edit pixels;
   `npm run sprites`; set `replicants.model`; mark the request done). Any model listed in `player.json` works for a
   copy or a player; the visor still takes the feature color through the `V`/`v` roles.
+
+### Session 7c (2026-10-08): their own voices (Steve: "let them express themselves")
+- Gathering is quieter: crystal chips and Ember pickups at about 60% of their old volume (`Sound.crystal`, `collect`).
+- Voices 20% louder (`sing` 0.084, `chorus` 0.06).
+- Instruments: hum, bell, flute, glass, pluck, horn, chime, drum (`INSTRUMENTS` in `src/audio/Sound.ts`: wave,
+  attack, sustain, reverb, an inharmonic partial for bell and chime, an octave shimmer for glass and chime). Moods are
+  modes: bright, soft, sad, wild, ancient, dreamy. Tempos: slow, walking, quick. A copy is born with an instrument
+  and a mood from its seed.
+- `sing_as` tool: a copy picks instrument, mood and tempo (kept in `traits.voice`, used for every later song) and
+  can compose the tune for this song as scale degrees ("0 2 4 7_ - 4 2 0__": "-" rest, "_" hold; `parseMelody`).
+  Composed lines end on a chord of their mode (except wild). Without a tune, words still pick the notes.
+  Notice when you can hear: "GLINT SINGS ON THE BELL". The canned mind composes now and then too.
+- The PR merge method is now a merge commit, not a squash: squashes kept conflicting with this long-lived branch.

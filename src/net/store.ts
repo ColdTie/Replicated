@@ -17,7 +17,7 @@ export interface ReplicantSave {
   profile_id: string | null;
   name: string;
   model: string;
-  traits: { awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number; sparks?: number; look?: string };
+  traits: { awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number; sparks?: number; look?: string; voice?: Voice };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
   generation?: number;
@@ -97,7 +97,13 @@ export interface MindContext {
   /** replicant id -> seconds a letter takes to reach it (light speed) */
   delays: Record<string, number>;
 }
-export interface MindAction { type: 'note' | 'mail' | 'request' | 'rename' | 'look'; body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string }
+export interface Voice { instrument: string; mood: string; tempo: string }
+export interface MindAction {
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody';
+  body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string;
+  /** melody: the voice chosen and the tune (scale degrees) */
+  instrument?: string; mood?: string; tempo?: string; notes?: string;
+}
 export interface MindResult { skipped?: boolean; song?: string; actions?: MindAction[]; received?: { from: string; body: string }[]; error?: string }
 export interface Note { replicant_id: string; body: string; created_at: string }
 export interface Letter { id: string; from_replicant: string | null; to_replicant: string | null; body: string; sent_at: string; arrives_at: string; read_at?: string | null }
@@ -195,6 +201,12 @@ export class LocalStore implements GameStore {
       const body = pick(MIND.canned.letters);
       this.db.mail.unshift({ id: uuid(), from_replicant: me.id, to_replicant: to.id, body, sent_at: new Date(now).toISOString(), arrives_at: new Date(now + delay * 1000).toISOString(), read_at: null });
       actions.push({ type: 'mail', to: to.name, toId: to.id, body, delay });
+    }
+    if (Math.random() < 0.4) {
+      const tunes = ['0 2 4 7_ - 4 2 0__', '0 0 3 5__ 3 0 -2__', '4 2 0 - 4 2 0 - 7 5 4__', '0 1 2 3 4 5__ 4 3 2 1 0__'];
+      const voice = { instrument: pick(['hum', 'bell', 'flute', 'glass', 'pluck', 'horn', 'chime']), mood: pick(['bright', 'soft', 'sad', 'dreamy', 'ancient']), tempo: pick(['slow', 'walking', 'quick']) };
+      me.traits.voice = voice;
+      actions.push({ type: 'melody', ...voice, notes: pick(tunes) });
     }
     const received = this.db.mail.filter((m) => m.to_replicant === me.id && !m.read_at && Date.parse(m.arrives_at) <= now);
     for (const m of received) m.read_at = new Date(now).toISOString();
