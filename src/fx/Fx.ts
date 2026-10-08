@@ -62,8 +62,8 @@ export class Fx {
   }
 
   /** Small icon that floats up from a point and fades: used for collected resources. */
-  floatIcon(x: number, y: number, key: string) {
-    const icon = this.scene.add.image(Math.round(x), Math.round(y), key).setDepth(6300);
+  floatIcon(x: number, y: number, key: string, frame = 0) {
+    const icon = this.scene.add.image(Math.round(x), Math.round(y), key, frame).setDepth(6300);
     this.scene.tweens.add({ targets: icon, y: y - 18, alpha: { from: 1, to: 0 }, duration: 750, ease: 'Quad.easeOut', onComplete: () => icon.destroy() });
   }
 }

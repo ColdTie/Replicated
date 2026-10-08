@@ -150,6 +150,16 @@ export class Warren {
     this.scene.markSupplies();
   }
 
+  /** Lamps and murals in dug rooms: lamps stretch the copies' waking hours, murals lift their mood. */
+  get lampCount() {
+    const dug = new Set(['entrance', ...this.data.rooms.filter((r) => r.dug).map((r) => r.id)]);
+    return this.data.items.filter((i) => i.kind === 'lamp' && dug.has(i.room)).length;
+  }
+  get muralCount() {
+    const dug = new Set(['entrance', ...this.data.rooms.filter((r) => r.dug).map((r) => r.id)]);
+    return this.data.items.filter((i) => i.kind === 'mural' && dug.has(i.room)).length;
+  }
+
   get hasWorkbench() {
     const dug = new Set(['entrance', ...this.data.rooms.filter((r) => r.dug).map((r) => r.id)]);
     return this.data.items.some((i) => i.kind === 'workbench' && dug.has(i.room));
@@ -184,6 +194,8 @@ export class Warren {
     if (hours <= 0.05) return;
     for (const [m, perHour] of Object.entries(this.production())) this.add(m, perHour * hours);
     if (!this.scene.npcs.length) return;
+    // the copies got hungry, thirsty and lonely meanwhile, and ate what there was
+    for (const n of this.scene.npcs) n.advanceNeeds(hours, 0);
     let dug = 0;
     if (!this.data.entrance!.dug && hours >= 0.25) { this.data.entrance!.dug = true; this.add('stone', SUPPLIES.entrance.yield.stone); this.add('soil', SUPPLIES.entrance.yield.soil); dug++; }
     for (const r of [...this.planned].sort((a, b) => a.at - b.at)) {
@@ -414,6 +426,7 @@ export class Warren {
         this.view?.onSwing(b);
         if (b.swings >= WARREN.digSwings[room.size]) {
           this.completeRoom(room, b.npc);
+          b.npc.onWorked();
           this.afterWork(b);
         }
       } else if (b.task === 'furnish') {
@@ -422,7 +435,7 @@ export class Warren {
         b.nextSwingAt = this.clock + WARREN.swingMs;
         this.view?.onSwing(b);
         if (b.swings >= 5) {
-          this.furnish(b.npc, { type: 'furnish', item: 'rest', room: b.room!.name, forId: b.npc.data.id });
+          if (this.furnish(b.npc, { type: 'furnish', item: 'rest', room: b.room!.name, forId: b.npc.data.id })) b.npc.onWorked();
           this.afterWork(b);
         }
       } else if (this.clock >= b.until) {

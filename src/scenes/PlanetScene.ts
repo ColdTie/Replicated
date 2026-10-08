@@ -1252,6 +1252,8 @@ export class PlanetScene extends Phaser.Scene {
       hasWorkbench: this.warren.hasWorkbench,
       entranceDug: this.warren.opened,
       shortages: this.warren.shortages(),
+      needs: npc.lowNeeds(),
+      mood: npc.moodWord,
       wants: (npc.data.traits.wants ?? []).map((w, i) => `${i + 1}. ${w.text} (${w.category}${w.done ? ', done' : ''})`),
       planet: this.placeLabel,
       biome: this.planet.subtitle ?? this.planet.id,
@@ -1339,7 +1341,9 @@ export class PlanetScene extends Phaser.Scene {
           this.mindLog.push({ t: this.mindClock, text: `${was} became itself: it is ${npc.data.name} now` });
           this.game.events.emit('notice', hear ? `${was.toUpperCase()} IS ${npc.data.name.toUpperCase()} NOW` : `${was.toUpperCase()} HAS BECOME ITSELF`);
         } else if (a.type === 'wants' && a.wants) {
+          const before = (npc.data.traits.wants ?? []).filter((w) => w.done).length;
           npc.data.traits.wants = a.wants;
+          if (a.wants.filter((w) => w.done).length > before) { npc.onWorked(true); this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} got something it wanted` }); }
         } else if (a.type === 'dig') {
           this.warren.dig(npc, a);
         } else if (a.type === 'furnish') {
@@ -1455,7 +1459,9 @@ export class PlanetScene extends Phaser.Scene {
     for (const r of this.everyone) names[r.id] = r.name;
     if (session.replicant) names[session.replicant.id] = session.replicant.name;
     const nameOf = (id: string) => names[id] ?? this.npcs.find((n) => n.data.id === id)?.data.name ?? 'someone';
-    openJournal({ place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j, warren: this.warren.data.rooms.length ? describeWarren(this.warren.data, null, nameOf) : [], supplies: this.npcs.length ? this.warren.describeSupplies() : undefined, shortages: this.warren.shortages() });
+    const feelings: Record<string, string> = {};
+    for (const n of this.npcs) feelings[n.data.id] = `${n.moodWord}${n.lowNeeds().length ? ': ' + n.lowNeeds().join(', ') : ''}`;
+    openJournal({ place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j, feelings, warren: this.warren.data.rooms.length ? describeWarren(this.warren.data, null, nameOf) : [], supplies: this.npcs.length ? this.warren.describeSupplies() : undefined, shortages: this.warren.shortages() });
   }
 
   /** Copies bring in what they gathered while you were away: a stream of Embers into the Replicator. */

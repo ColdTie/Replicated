@@ -29,6 +29,8 @@ export interface ReplicantSave {
     body?: Body;
     temperament?: Temperament;
     wants?: Want[];
+    /** 0 empty .. 1 full (src/data/needs.json); rest is 1 - weary */
+    needs?: { food: number; water: number; company: number; purpose: number };
   };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
@@ -165,6 +167,9 @@ export interface MindContext {
   entranceDug: boolean;
   /** what waits on what ("Hearth waits for 2 more wood") */
   shortages: string[];
+  /** how it feels: low needs in words, and the mood they add up to */
+  needs: string[];
+  mood: 'content' | 'low' | 'bleak';
 }
 export interface Voice { instrument: string; mood: string; tempo: string }
 export interface Body { head: string; visor: string; torso: string; arms: string; legs: string; back: string; headgear: number; primary: string; secondary: string; accent: string }

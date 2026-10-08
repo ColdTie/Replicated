@@ -72,6 +72,8 @@ export interface JournalView {
   supplies?: string;
   /** what waits on what */
   shortages?: string[];
+  /** mood and low needs per copy id */
+  feelings?: Record<string, string>;
 }
 
 let open: HTMLElement | null = null;
@@ -99,6 +101,7 @@ export function openJournal(v: JournalView) {
     const t = c.traits.temperament;
     if (c.traits.blank) parts.push(`<p class="mute">${v.canHear ? 'Not yet itself. It has not chosen.' : runes('not yet itself')}</p>`);
     else if (t) parts.push(`<p class="mute">${show(`${t.pace}, ${t.sociability}, ${t.work === 'balanced' ? 'works and wanders' : t.work}, ${t.bedtime} to bed, ${t.risk}`)}</p>`);
+    if (v.feelings?.[c.id]) parts.push(`<p class="mute">${show(v.feelings[c.id])}</p>`);
     const wants = c.traits.wants ?? [];
     if (wants.length) {
       parts.push(`<div class="k">WANTS</div>`);

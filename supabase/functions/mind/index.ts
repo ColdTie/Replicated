@@ -49,6 +49,8 @@ interface Context {
   hasWorkbench?: boolean;
   entranceDug?: boolean;
   shortages?: string[];
+  needs?: string[];               // low needs in words
+  mood?: "content" | "low" | "bleak";
 }
 
 interface Replicant {
@@ -301,6 +303,7 @@ Deno.serve(async (req) => {
     lines.push(context.where === "warren" ? `You are below, in the warren.` : `You are on the surface by the base.`);
     if (context.around?.length) lines.push(`Around you: ${context.around.join("; ")}.`);
     lines.push(`You are ${context.weariness ?? "rested"}.${context.hasRest ? "" : context.warren?.length ? " You have no resting station of your own: furnish a dug room with item rest, for me." : " You have nowhere to sleep yet."}`);
+    lines.push(`You feel ${context.mood ?? "content"}${context.needs?.length ? `: ${context.needs.join(", ")}` : ""}. (Food comes from planters and gardens, water from a pool, company from the others and the original, purpose from finished work and wants met. A low need is a good reason for a want.)`);
     if (context.warren?.length) lines.push(`The warren (${context.warrenFull ? "no room for more digging" : "there is space to dig more"}):\n${context.warren.join("\n")}\nYou may name these rooms: ${(context.warrenRooms ?? []).join(", ")}.`);
     else lines.push(`Nothing is dug beneath the base yet. The warren begins with the first dig_room (beside "Entrance").`);
     if (context.supplies) {
