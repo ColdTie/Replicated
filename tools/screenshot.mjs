@@ -1,5 +1,6 @@
 // Headless Chromium screenshot of the built game for review in chat.
 // Usage: npm run build && node tools/screenshot.mjs [--name phase0] [--query "shot=1"] [--wait 2500] [--size 960x540]
+//        [--eval "<js run in the page after load, before the wait>"]
 // Starts `vite preview`, opens the game, waits, saves screenshots/<name>.png, and fails on page errors.
 
 import { spawn } from 'node:child_process';
@@ -17,6 +18,7 @@ const name = arg('name', 'latest');
 const query = arg('query', 'shot=1');
 const wait = Number(arg('wait', '2500'));
 const [vw, vh] = arg('size', '1440x810').split('x').map(Number);
+const evalJs = arg('eval', '');
 const port = 4179;
 
 const server = spawn('npx', ['vite', 'preview', '--port', String(port), '--strictPort'], { cwd: root, stdio: 'ignore', detached: true });
@@ -36,6 +38,7 @@ try {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto(`http://localhost:${port}/Replicated/?${query}`);
   await page.waitForFunction(() => !!window.__scene, null, { timeout: 15000 });
+  if (evalJs) { await page.waitForTimeout(1500); await page.evaluate(evalJs); }
   await page.waitForTimeout(wait);
   fs.mkdirSync(path.join(root, 'screenshots'), { recursive: true });
   const out = path.join(root, 'screenshots', `${name}.png`);

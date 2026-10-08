@@ -45,12 +45,14 @@ export class UIScene extends Phaser.Scene {
     this.counterText.setText(String((this.scene.get('planet') as unknown as { embers: number }).embers ?? 0));
     this.game.events.on('titlecard', this.titleCard, this);
     this.game.events.on('location', this.showLocation, this);
+    this.game.events.on('notice', this.notice, this);
     (this.scene.get('planet') as unknown as { announceLocation?: () => void }).announceLocation?.(); // the planet announced before this layer existed
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('embers', this.onEmbers, this);
       this.game.events.off('sparks', this.onSparks, this);
       this.game.events.off('titlecard', this.titleCard, this);
       this.game.events.off('location', this.showLocation, this);
+      this.game.events.off('notice', this.notice, this);
     });
 
     // Touch controls: floating stick on the left half, big action button on the right
@@ -178,6 +180,21 @@ export class UIScene extends Phaser.Scene {
     });
     if (who.length > 7) items.push(this.add.bitmapText(7, 11 + 7 * 9, 'pixel', `+${who.length - 7}`).setTint(PALETTE[21]));
     this.location = this.add.container(7, y0, items).setAlpha(0.6).setDepth(10);
+  }
+
+  /** A short one-line notice ("STEVE GETS +20% DASH") that rises in and fades, lower middle of the screen. */
+  private notice(text: string) {
+    const { width, height } = this.scale;
+    const y = height * 0.72;
+    const label = this.add.bitmapText(width / 2, y + 6, 'pixel', text).setOrigin(0.5).setTint(PALETTE[11]).setAlpha(0).setDepth(20);
+    const lineW = label.width / 2 + 8;
+    const lines = this.add.graphics().setAlpha(0).setDepth(20);
+    lines.fillStyle(PALETTE[9], 1).fillRect(width / 2 - lineW - 14, y + 6, 10, 1).fillRect(width / 2 + lineW + 4, y + 6, 10, 1);
+    this.tweens.add({ targets: [label, lines], alpha: 1, y: '-=6', duration: 350, ease: 'Sine.easeOut' });
+    this.tweens.add({
+      targets: [label, lines], alpha: 0, delay: 2600, duration: 700, ease: 'Sine.easeIn',
+      onComplete: () => { label.destroy(); lines.destroy(); },
+    });
   }
 
   private titleCard(name: string, subtitle: string) {

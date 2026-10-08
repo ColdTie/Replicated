@@ -460,3 +460,11 @@ Not done / next:
 - Vessel cue: whenever the ship is off screen, a small ship icon with a warm chevron sits on the edge of the screen in
   its direction (fades in and out over 0.35 s, gentle pulse; hidden while you are inside the ship). `PlanetScene.
   updateVesselCue`. `screenshots/vessel-cue.png`.
+
+### Session 6c (2026-10-08): shorter dash, module notice
+- Dash is 30% shorter: `dash.ms` 170 -> 120 in `src/data/player.json` (about 35 px instead of 49; speed unchanged).
+- Taking a ruin module shows a one-line notice, "STEVE GETS +20% DASH" (your replicant's name, the kind: LIGHT,
+  DASH or SWING), lower middle of the screen, rising in and fading after 2.6 s (`notice` game event,
+  `UIScene.notice`). The pixel font gained a `%` glyph (`tools/sprites/font.json`).
+- `tools/screenshot.mjs --eval "<js>"` runs a snippet in the page before the capture. `screenshots/module-notice.png`.
+
