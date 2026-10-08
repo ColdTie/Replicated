@@ -7,6 +7,51 @@ type Wave = OscillatorType;
 const PENTA = [0, 2, 4, 7, 9]; // major pentatonic steps
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
+// --- the copies' instruments, moods and tempos (a copy picks its own with the sing_as tool) ---
+export type Instrument = 'hum' | 'bell' | 'flute' | 'glass' | 'pluck' | 'horn' | 'chime' | 'drum';
+export type Mood = 'bright' | 'soft' | 'sad' | 'wild' | 'ancient' | 'dreamy';
+export type Tempo = 'slow' | 'walking' | 'quick';
+const INSTRUMENTS: Record<Instrument, { wave: Wave; attack: number; sustain: number; rev: number; gain: number; partial?: number; octave?: boolean }> = {
+  hum: { wave: 'sine', attack: 0.06, sustain: 1.1, rev: 0.6, gain: 1 },
+  bell: { wave: 'sine', attack: 0.004, sustain: 1.6, rev: 0.85, gain: 0.9, partial: 2.76 },
+  flute: { wave: 'triangle', attack: 0.07, sustain: 1, rev: 0.5, gain: 0.95 },
+  glass: { wave: 'sine', attack: 0.02, sustain: 1.8, rev: 0.95, gain: 0.8, octave: true },
+  pluck: { wave: 'triangle', attack: 0.003, sustain: 0.45, rev: 0.35, gain: 1.1 },
+  horn: { wave: 'square', attack: 0.04, sustain: 1, rev: 0.5, gain: 0.42 },
+  chime: { wave: 'sine', attack: 0.003, sustain: 0.7, rev: 0.9, gain: 0.7, partial: 4, octave: true },
+  drum: { wave: 'sine', attack: 0.002, sustain: 0.25, rev: 0.3, gain: 1.3 },
+};
+const INSTRUMENT_NAMES = Object.keys(INSTRUMENTS) as Instrument[];
+/** Scale degrees -> semitones. Degree 0 is home; past the last step the mode repeats an octave up. */
+const MOODS: Record<Mood, number[]> = {
+  bright: [0, 2, 4, 7, 9],
+  soft: [0, 2, 5, 7, 9],
+  sad: [0, 3, 5, 7, 10],
+  wild: [0, 2, 4, 6, 7, 11],
+  ancient: [0, 2, 3, 7, 8],
+  dreamy: [0, 4, 7, 11, 14],
+};
+const MOOD_NAMES = Object.keys(MOODS) as Mood[];
+const TEMPOS: Record<Tempo, number> = { slow: 0.44, walking: 0.3, quick: 0.19 };
+
+export interface SingOpts {
+  pan?: number; harmony?: boolean; delay?: number; vol?: number; melodySeed?: number; rootOffset?: number;
+  instrument?: Instrument; mood?: Mood; tempo?: Tempo;
+  /** a composed melody: scale degrees separated by spaces, "-" a rest, "_" after a degree holds it, e.g. "0 2 4 7_ - 4 2 0_" */
+  notes?: string;
+}
+
+/** "0 2 4_ - 7" -> notes with beats; null degree = rest. Up to 32 notes. */
+export function parseMelody(notes: string): { deg: number | null; beats: number }[] {
+  const out: { deg: number | null; beats: number }[] = [];
+  for (const tok of notes.trim().split(/[\s,]+/).slice(0, 32)) {
+    const m = /^(-?\d{1,2})(_*)$/.exec(tok);
+    if (m) out.push({ deg: Math.max(-14, Math.min(21, Number(m[1]))), beats: 1 + m[2].length });
+    else if (/^-+$|^\.+$/.test(tok)) out.push({ deg: null, beats: tok.length });
+  }
+  return out;
+}
+
 class SoundEngine {
   ctx: AudioContext | null = null;
   private master!: GainNode;
@@ -161,9 +206,9 @@ class SoundEngine {
   crystal() {
     if (!this.ready('crystal', 30)) return;
     const n = 76 + PENTA[Math.floor(Math.random() * 5)] + 12 * Math.floor(Math.random() * 2);
-    this.tone(midi(n), 0.9, { type: 'sine', vol: 0.12, rev: 0.6 });
-    this.tone(midi(n) * 2.76, 0.4, { type: 'sine', vol: 0.04, rev: 0.6 });
-    this.noise(0.03, { type: 'highpass', freq: 5000, vol: 0.12 });
+    this.tone(midi(n), 0.9, { type: 'sine', vol: 0.07, rev: 0.6 });
+    this.tone(midi(n) * 2.76, 0.4, { type: 'sine', vol: 0.025, rev: 0.6 });
+    this.noise(0.03, { type: 'highpass', freq: 5000, vol: 0.07 });
   }
 
   collect() {
@@ -173,8 +218,8 @@ class SoundEngine {
     this.lastCollect = now;
     const s = this.collectStreak;
     const n = 79 + PENTA[s % 5] + 12 * Math.floor(s / 5);
-    this.tone(midi(n), 0.25, { type: 'triangle', vol: 0.12, rev: 0.4 });
-    this.tone(midi(n + 12), 0.15, { type: 'sine', vol: 0.06, delay: 0.04, rev: 0.4 });
+    this.tone(midi(n), 0.25, { type: 'triangle', vol: 0.075, rev: 0.4 });
+    this.tone(midi(n + 12), 0.15, { type: 'sine', vol: 0.035, delay: 0.04, rev: 0.4 });
   }
 
   hurt() {
@@ -217,26 +262,38 @@ class SoundEngine {
 
   private lastSong = { at: 0, root: 0 };
 
-  /** Who a copy sounds like, all from its seed: register, timbre, a pentatonic mode, and whether an octave shimmer rides on top. */
+  /** Who a copy sounds like, all from its seed: register, an instrument, a mode, and whether an octave shimmer rides on top. */
   private voice(seed: number) {
     let s = (seed >>> 0) || 1;
     const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-    const modes = [[0, 2, 4, 7, 9], [0, 3, 5, 7, 10], [0, 2, 5, 7, 9], [0, 4, 7, 11, 14], [0, 2, 3, 7, 8]];
     const root = 64 + Math.floor(rnd() * 14);
-    const wave = (['sine', 'triangle', 'sine', 'square'] as Wave[])[Math.floor(rnd() * 4)];
-    const mode = modes[Math.floor(rnd() * modes.length)].concat([12, 14]);
-    return { root, wave, mode, shimmer: rnd() < 0.5 };
+    const instrument = INSTRUMENT_NAMES[Math.floor(rnd() * INSTRUMENT_NAMES.length)];
+    const mood = MOOD_NAMES[Math.floor(rnd() * MOOD_NAMES.length)];
+    return { root, instrument, mood, shimmer: rnd() < 0.5 };
+  }
+
+  /** One note on an instrument. */
+  private play(inst: Instrument, freq: number, dur: number, t: number, vol: number, pan?: number) {
+    const i = INSTRUMENTS[inst];
+    this.tone(freq, dur * i.sustain + 0.15, { type: i.wave, vol: vol * i.gain, delay: t, attack: i.attack, rev: i.rev, pan });
+    if (i.partial) this.tone(freq * i.partial, dur * 0.5, { type: 'sine', vol: vol * i.gain * 0.3, delay: t, attack: i.attack, rev: i.rev, pan });
+    if (i.octave) this.tone(freq * 2, dur * i.sustain * 0.8, { type: 'sine', vol: vol * i.gain * 0.22, delay: t + 0.02, rev: 0.8, pan });
   }
 
   /**
-   * A copy's song. The voice comes from its seed; the words pick the notes (each word hashes to a degree of the
-   * voice's mode, longer words hold longer), so the same sentence always sings the same tune. A sentence ends on
-   * a chord. A copy that answers within a few seconds sings a harmony, a third or a fifth above the last voice.
-   * Returns the length of the phrase in seconds.
+   * A copy's song. The voice comes from its seed (or from what the copy chose with sing_as: instrument, mood,
+   * tempo). With a composed melody the notes are its own; otherwise the words pick them (each word hashes to a
+   * degree of the mode, longer words hold longer), so the same sentence always sings the same tune. A line ends on
+   * a chord of its mode. A copy that answers within a few seconds sings a harmony, a third or a fifth above the
+   * last voice. Returns the length of the phrase in seconds.
    */
-  sing(seed: number, text = '', opts: { pan?: number; harmony?: boolean; delay?: number; vol?: number; melodySeed?: number; rootOffset?: number } = {}) {
+  sing(seed: number, text = '', opts: SingOpts = {}) {
     if (!this.ctx || this.ctx.state !== 'running' || this.muted) return 0;
     const v = this.voice(seed);
+    const inst = opts.instrument && opts.instrument in INSTRUMENTS ? opts.instrument : v.instrument;
+    const moodName = opts.mood && opts.mood in MOODS ? opts.mood : v.mood;
+    const mode = MOODS[moodName];
+    const beat = TEMPOS[opts.tempo ?? 'walking'] ?? TEMPOS.walking;
     const words = (text || 'la la la.').split(/\s+/).filter(Boolean).slice(0, 14);
     const now = performance.now();
     const answering = opts.harmony ?? (now - this.lastSong.at < 6000);
@@ -245,21 +302,38 @@ class SoundEngine {
     if (!answering) this.lastSong = { at: now, root };
     else this.lastSong.at = now;
     let t = opts.delay ?? 0;
-    const vol = (opts.vol ?? 0.07) * (v.wave === 'square' ? 0.45 : 1);
-    let h = (opts.melodySeed ?? seed) >>> 0;
-    words.forEach((w) => {
-      for (const c of w) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-      const deg = v.mode[h % v.mode.length];
-      const dur = 0.16 + Math.min(7, w.length) * 0.045;
-      this.tone(midi(root + deg), dur + 0.2, { type: v.wave, vol, delay: t, attack: 0.02, rev: 0.55, pan: opts.pan });
-      if (v.shimmer) this.tone(midi(root + deg + 12), dur, { type: 'sine', vol: vol * 0.22, delay: t + 0.02, rev: 0.7, pan: opts.pan });
-      t += dur;
-      if (/[.!?]$/.test(w)) {
-        const low = deg > 7 ? deg - 12 : deg;
-        [0, 4, 7].forEach((s, k) => this.tone(midi(root + low + s), 1.1, { type: k ? 'sine' : v.wave, vol: vol * 0.6, delay: t + k * 0.04, attack: 0.06, rev: 0.85, pan: opts.pan }));
-        t += 0.55;
-      } else if (/,$/.test(w)) t += 0.18;
-    });
+    const vol = opts.vol ?? 0.084;
+    const semis = (deg: number) => mode[((deg % mode.length) + mode.length) % mode.length] + 12 * Math.floor(deg / mode.length);
+    let lastDeg = 0;
+    const melody = opts.notes ? parseMelody(opts.notes) : null;
+    if (melody && melody.length) {
+      for (const n of melody) {
+        const dur = beat * n.beats;
+        if (n.deg !== null) { this.play(inst, midi(root + semis(n.deg)), dur, t, vol, opts.pan); lastDeg = n.deg; }
+        t += dur;
+      }
+    } else {
+      let h = (opts.melodySeed ?? seed) >>> 0;
+      words.forEach((w) => {
+        for (const c of w) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+        const deg = h % (mode.length + 2);
+        const dur = beat * (0.6 + Math.min(7, w.length) * 0.14);
+        this.play(inst, midi(root + semis(deg)), dur, t, vol, opts.pan);
+        lastDeg = deg;
+        t += dur;
+        if (/[.!?]$/.test(w)) {
+          const chord = [0, mode[2] ?? 4, mode[4] ?? 7].map((s) => s + 12 * Math.floor(semis(lastDeg) / 12));
+          chord.forEach((s, k) => this.tone(midi(root + s), 1.1, { type: k ? 'sine' : INSTRUMENTS[inst].wave, vol: vol * 0.55, delay: t + k * 0.04, attack: 0.06, rev: 0.85, pan: opts.pan }));
+          t += 0.55;
+        } else if (/,$/.test(w)) t += 0.18;
+      });
+    }
+    if (melody && melody.length && moodName !== 'wild') {
+      // the composed line ends on a chord of its mode
+      const chord = [0, mode[2] ?? 4, mode[4] ?? 7].map((s) => s + 12 * Math.floor(semis(lastDeg) / 12));
+      chord.forEach((s, k) => this.tone(midi(root + s), 1.3, { type: k ? 'sine' : INSTRUMENTS[inst].wave, vol: vol * 0.5, delay: t + k * 0.04, attack: 0.08, rev: 0.9, pan: opts.pan }));
+      t += 0.6;
+    }
     return t;
   }
 
@@ -267,7 +341,7 @@ class SoundEngine {
    * Several copies sing one phrase together as a round: the same tune in every voice, each entering a beat
    * later on its own note of the chord, spread across the stereo field, and a long chord to end on.
    */
-  chorus(seeds: number[], text: string) {
+  chorus(seeds: number[], text: string, opts: SingOpts = {}) {
     if (!this.ctx || this.ctx.state !== 'running' || this.muted) return 0;
     const lead = seeds[0] ?? 1;
     const base = this.voice(lead).root;
@@ -275,10 +349,10 @@ class SoundEngine {
     let longest = 0;
     seeds.slice(0, 6).forEach((seed, i) => {
       const pan = seeds.length > 1 ? -0.6 + (1.2 * i) / (seeds.length - 1) : 0;
-      const len = this.sing(seed, text, { pan, delay: i * 0.5, harmony: false, vol: 0.05, melodySeed: lead, rootOffset: base - this.voice(seed).root + chord[i] });
+      const len = this.sing(seed, text, { ...opts, pan, delay: i * 0.5, harmony: false, vol: 0.06, melodySeed: lead, rootOffset: base - this.voice(seed).root + chord[i], mood: opts.mood ?? this.voice(lead).mood });
       longest = Math.max(longest, len + i * 0.5);
     });
-    [0, 4, 7, 12, 16, 19].forEach((s, k) => this.tone(midi(base + s), 2.8, { type: k % 2 ? 'sine' : 'triangle', vol: 0.055, delay: longest + 0.1 + k * 0.06, attack: 0.35, rev: 0.9 }));
+    [0, 4, 7, 12, 16, 19].forEach((s, k) => this.tone(midi(base + s), 2.8, { type: k % 2 ? 'sine' : 'triangle', vol: 0.066, delay: longest + 0.1 + k * 0.06, attack: 0.35, rev: 0.9 }));
     this.lastSong = { at: performance.now(), root: base };
     return longest + 3;
   }

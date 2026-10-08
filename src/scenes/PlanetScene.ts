@@ -1111,7 +1111,12 @@ export class PlanetScene extends Phaser.Scene {
       if (res.error) { console.warn('mind:', res.error); return; }
       const hear = this.canHear();
       if (res.received?.length) npc.receiveLetter();
-      if (res.song) this.time.delayedCall(res.received?.length ? 900 : 0, () => npc.sing(res.song!, hear));
+      const melody = res.actions?.find((a) => a.type === 'melody');
+      if (melody) {
+        npc.data.traits.voice = { instrument: melody.instrument ?? 'hum', mood: melody.mood ?? 'bright', tempo: melody.tempo ?? 'walking' };
+        if (hear) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} SINGS ON THE ${String(melody.instrument).toUpperCase()}`);
+      }
+      if (res.song) this.time.delayedCall(res.received?.length ? 900 : 0, () => npc.sing(res.song!, hear, { notes: melody?.notes || undefined }));
       for (const a of res.actions ?? []) {
         if (a.type === 'mail') {
           const to = this.npcs.find((n) => n.data.id === a.toId);
@@ -1121,6 +1126,8 @@ export class PlanetScene extends Phaser.Scene {
           npc.data.name = a.name;
           this.announceLocation();
           this.game.events.emit('notice', hear ? `${was} IS NOW ${a.name.toUpperCase()}` : `${was} HAS A NEW NAME`);
+        } else if (a.type === 'look' && hear) {
+          this.game.events.emit('notice', `${npc.data.name.toUpperCase()} DESCRIBES A NEW BODY`);
         } else if (a.type === 'request' && hear) {
           this.game.events.emit('notice', `${npc.data.name.toUpperCase()} ASKS FOR ${String(a.kind ?? '').toUpperCase()}`);
         }

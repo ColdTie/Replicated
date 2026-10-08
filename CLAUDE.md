@@ -509,3 +509,26 @@ Next (Steve, 2026-10-08, "give these guys everything"), in this order unless he 
 5. Water and food as resources the copies gather and need (thirst and hunger in their context).
 6. Appearance: a copy can ask to look different; Steve asks Claude; later a Claude Routine reads the requests
    (Supabase) and NEEDS.md and edits `tools/sprites/*.json` and the replicant's `model` itself.
+
+### Session 7b (2026-10-08): they choose their bodies
+- Live: four copies on Earth woke with the real model and renamed themselves (Sprout, Dusk, Lookout, Glint).
+- `describe_self` tool: a copy describes the humanoid body it wants (2 to 4 sentences). Saved as an open `requests`
+  row of kind `skin` (migration 0008, applied live) and in `traits.look`; the journal lists it under "A NEW BODY";
+  "GLINT DESCRIBES A NEW BODY" notice when you can hear. The copy is told it looks like every other copy until then.
+- Making a body is Claude Code's job (Steve asks, later a Routine): `NEEDS.md` holds the open requests and the
+  three steps (`tools/body.mjs <slug>` clones replicant.json and registers the model in player.json; edit pixels;
+  `npm run sprites`; set `replicants.model`; mark the request done). Any model listed in `player.json` works for a
+  copy or a player; the visor still takes the feature color through the `V`/`v` roles.
+
+### Session 7c (2026-10-08): their own voices (Steve: "let them express themselves")
+- Gathering is quieter: crystal chips and Ember pickups at about 60% of their old volume (`Sound.crystal`, `collect`).
+- Voices 20% louder (`sing` 0.084, `chorus` 0.06).
+- Instruments: hum, bell, flute, glass, pluck, horn, chime, drum (`INSTRUMENTS` in `src/audio/Sound.ts`: wave,
+  attack, sustain, reverb, an inharmonic partial for bell and chime, an octave shimmer for glass and chime). Moods are
+  modes: bright, soft, sad, wild, ancient, dreamy. Tempos: slow, walking, quick. A copy is born with an instrument
+  and a mood from its seed.
+- `sing_as` tool: a copy picks instrument, mood and tempo (kept in `traits.voice`, used for every later song) and
+  can compose the tune for this song as scale degrees ("0 2 4 7_ - 4 2 0__": "-" rest, "_" hold; `parseMelody`).
+  Composed lines end on a chord of their mode (except wild). Without a tune, words still pick the notes.
+  Notice when you can hear: "GLINT SINGS ON THE BELL". The canned mind composes now and then too.
+- The PR merge method is now a merge commit, not a squash: squashes kept conflicting with this long-lived branch.

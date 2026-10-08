@@ -1,7 +1,7 @@
 // A copy left behind to run the planet. It wanders the base, mines nearby crystals, carries Embers back to the
 // Replicator, and greets you when you come close. Its drift (visor, headgear, trail) tells it apart at a glance.
 import Phaser from 'phaser';
-import { sound } from '../audio/Sound';
+import { sound, type Instrument, type Mood, type Tempo } from '../audio/Sound';
 import { anim, featureTex } from '../core/assets';
 import { MIND, PALETTE, PLAYER, VILLAGE } from '../core/data';
 import { DRIFT, stat } from '../core/drift';
@@ -267,11 +267,15 @@ export class Npc {
    * hear them; before that the words are runes in the copy's trail color. `silent` shows the bubble without the song
    * (the chorus plays its own sound).
    */
-  sing(text: string, readable: boolean, opts: { silent?: boolean; harmony?: boolean } = {}) {
+  sing(text: string, readable: boolean, opts: { silent?: boolean; harmony?: boolean; notes?: string } = {}) {
     const sc = this.scene;
     const p = sc.player;
     const dp = Math.hypot(p.x - this.x, p.y - this.y);
-    const len = opts.silent ? 2 : (dp < 260 ? sound.sing(this.voiceSeed, text, { harmony: opts.harmony, pan: Math.max(-0.7, Math.min(0.7, (this.x - p.x) / 200)) }) : 0);
+    const v = this.data.traits.voice;
+    const len = opts.silent ? 2 : (dp < 260 ? sound.sing(this.voiceSeed, text, {
+      harmony: opts.harmony, pan: Math.max(-0.7, Math.min(0.7, (this.x - p.x) / 200)), notes: opts.notes,
+      instrument: v?.instrument as Instrument | undefined, mood: v?.mood as Mood | undefined, tempo: v?.tempo as Tempo | undefined,
+    }) : 0);
     if (this.state === 'idle' || this.state === 'walk' || this.state === 'greet') {
       this.state = 'greet';
       this.until = sc.time.now + Math.max(900, len * 1000);
