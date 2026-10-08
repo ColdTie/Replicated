@@ -25,7 +25,7 @@ try {
     const s = window.__scene;
     const r = s.warren.dig(s.npcs[0], { type: 'dig', kind: 'hall', name: 'Hearth', size: 'small', beside: 'Entrance', direction: 'south', purpose: 'A place to meet.' });
     const r2 = s.warren.dig(s.npcs[1], { type: 'dig', kind: 'garden', name: 'Grove', size: 'medium', beside: 'Hearth', direction: 'east', purpose: 'Green.' });
-    const none = s.warren.dig(s.npcs[1], { type: 'dig', kind: 'hall', name: 'Nowhere', size: 'large', beside: 'Mars', direction: 'north', purpose: '' });
+    const none = s.warren.dig(s.npcs[1], { type: 'dig', kind: 'pool', name: 'Still', size: 'medium', beside: 'Mars', direction: 'north', purpose: '' });
     return { r: r && { name: r.name, x: r.x, y: r.y, w: r.w, h: r.h, dir: r.dir, link: r.link, dug: r.dug }, r2: r2 && { name: r2.name, dir: r2.dir, link: r2.link }, fallbackAnchor: none && none.link, rooms: s.warren.data.rooms.length, hatch: s.warren.hatch, opened: s.warren.opened };
   });
   log('planned', JSON.stringify(planned));
@@ -57,14 +57,31 @@ try {
   if (!mind.warren.length || !mind.rooms.includes('Entrance')) fail('mind context lacks the warren');
   if (!mind.acts.includes('dig') && !mind.acts.includes('furnish')) fail('the canned mind never dug or furnished');
 
-  // 5. down the hatch
-  await page.waitForFunction(() => window.__scene.warren.below.size === 0, null, { timeout: 30000 }).catch(() => log('note: a copy is still below'));
+  // 5. down the hatch, with a copy at work below so we can watch it walk there (the pool room gets dug by hand)
+  await ev(() => { const s = window.__scene; const pool = s.warren.data.rooms.find((r) => r.kind === 'pool'); if (pool) pool.dug = true; s.village.work = 40; });
+  await page.waitForFunction(() => [...window.__scene.warren.below.values()].some((b) => b.task === 'dig' || b.task === 'furnish'), null, { timeout: 30000 }).catch(() => log('note: nobody is working below right now'));
   await ev(() => { const s = window.__scene; s.player.locked = false; s.hatchReadyAt = 0; s.player.setPosition(s.warren.hatch.x, s.warren.hatch.y); });
   await page.waitForFunction(() => !!window.__warren && window.__warren.scene.isActive(), null, { timeout: 8000 }).catch(() => fail('warren scene did not open'));
   await page.waitForTimeout(600);
-  const under = await ev(() => { const w = window.__warren; return { me: { x: Math.round(w.me.x), y: Math.round(w.me.y) }, copies: w.copies.size, items: w.items.size, planetPaused: window.__scene.scene.isPaused(), ladder: w.ladder }; });
+  const under = await ev(() => { const w = window.__warren; return { me: { x: Math.round(w.me.x), y: Math.round(w.me.y) }, copies: w.copies.size, items: w.items.size, planetPaused: window.__scene.scene.isPaused(), ladder: w.ladder, water: [...w.cells].filter((c) => c === 3).length, walking: [...w.copies.values()].map((v) => ({ who: v.b.npc.data.name, task: v.b.task, path: v.w.path.length, settled: v.settled })) }; });
   log('underground', JSON.stringify(under));
   if (!under.planetPaused) fail('planet kept running while below');
+  if (!under.water) fail('the pool room has no water');
+  if (under.copies && !under.walking.some((c) => c.path > 0 || c.settled)) fail('a copy below neither walks nor works');
+  // the copy walks its path to the rock face and the minds keep ticking while we are below
+  const clock0 = await ev(() => window.__scene.mindClock);
+  await page.waitForFunction(() => [...window.__warren.copies.values()].every((v) => v.settled), null, { timeout: 20000 }).catch(() => fail('a copy never reached its spot'));
+  log('settled', await ev(() => JSON.stringify([...window.__warren.copies.values()].map((v) => ({ who: v.b.npc.data.name, task: v.b.task, at: [Math.round(v.w.x), Math.round(v.w.y)], arrived: v.b.arrived })))));
+  const sung = await ev(() => { const w = window.__warren; const v = [...w.copies.values()][0]; if (!v) return 'nobody'; w.sing(v.b.npc, 'The stone remembers us.', true, {}); return !!v.bubble; });
+  // shot mode keeps the minds asleep; let them tick for a moment to prove the clock runs from down here
+  await ev(() => { window.__scene.shot = false; });
+  await page.waitForTimeout(400);
+  const clock1 = await ev(() => { window.__scene.shot = true; return window.__scene.mindClock; });
+  log('sang below', sung, 'mind clock advanced', clock1 > clock0);
+  if (!(clock1 > clock0)) fail('minds did not tick underground');
+  const pathLen = await ev(() => { const w = window.__warren; const r = w.warren.data.rooms.find((x) => x.dug); return w.findPath({ x: w.ladder.x, y: w.ladder.y + 20 }, { x: (r.x + r.w / 2) * 16, y: (r.y + r.h / 2) * 16 }).length; });
+  log('path from the ladder to the first room', pathLen, 'waypoints');
+  if (pathLen < 4) fail('no path through the corridor');
   // walk: hold S for a bit, must move down inside the Entrance, then stop at rock
   const y0 = under.me.y;
   await page.keyboard.down('KeyS'); await page.waitForTimeout(900); await page.keyboard.up('KeyS');

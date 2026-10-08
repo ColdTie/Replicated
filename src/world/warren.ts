@@ -9,7 +9,7 @@ export const DIRS: Dir[] = ['north', 'south', 'east', 'west'];
 export type RoomSize = keyof typeof WARREN.sizes;
 export type ItemKind = keyof typeof WARREN.items;
 
-export const CAVE = { rock: 0, floor: 1, planned: 2 } as const;
+export const CAVE = { rock: 0, floor: 1, planned: 2, water: 3 } as const;
 export const GRID_W = WARREN.grid[0], GRID_H = WARREN.grid[1];
 
 const ENTRANCE_ID = 'entrance';
@@ -169,9 +169,10 @@ export function placeItem(d: WarrenData, ask: FurnishAsk, now = Date.now()): War
     for (const t of corridorTiles(r, a)) for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) mouths.add(`${t.x + dx},${t.y + dy}`);
   }
   const ladder = ladderTile();
+  const cells = buildCells(d);
   for (const s of spotsFor(room, ask.kind)) {
     const k = `${s.x},${s.y}`;
-    if (taken.has(k) || mouths.has(k)) continue;
+    if (taken.has(k) || mouths.has(k) || cells[s.y * GRID_W + s.x] === CAVE.water) continue;
     if (room.id === ENTRANCE_ID && Math.abs(s.x - ladder.x) <= 1 && s.y <= ladder.y + 1) continue;
     return { id: `i${now.toString(36)}${d.items.length}`, kind: ask.kind, room: room.id, x: s.x, y: s.y, by: ask.by, for: ask.for, note: ask.note?.slice(0, 120), at: now };
   }
@@ -189,7 +190,12 @@ export function buildCells(d: WarrenData): Uint8Array {
     const a = rooms.find((x) => x.id === r.link);
     if (a) for (const t of corridorTiles(r, a)) set(t.x, t.y, v);
   }
-  // planned beats rock, dug beats planned: a dug room's corridor through a planned area reads as dug
+  // planned beats rock, dug beats planned: a dug room's corridor through a planned area reads as dug.
+  // A dug pool room holds still water inside a one-tile walkway.
+  for (const r of rooms) {
+    if (!r.dug || r.kind !== 'pool' || r.w < 4 || r.h < 4) continue;
+    for (let y = r.y + 1; y < r.y + r.h - 1; y++) for (let x = r.x + 1; x < r.x + r.w - 1; x++) cells[y * GRID_W + x] = CAVE.water;
+  }
   return cells;
 }
 
@@ -217,6 +223,21 @@ export function describeWarren(d: WarrenData, me: string | null, nameOf: (id: st
   return lines;
 }
 
+/** Where a copy stands to dig a planned room: on the dug side, at the mouth of the corridor that will lead in. */
+export function digSpot(d: WarrenData, room: WarrenRoom): { x: number; y: number } {
+  const rooms = allRooms(d);
+  const anchor = rooms.find((r) => r.id === room.link) ?? entranceRoom();
+  const inside = (t: { x: number; y: number }) => t.x >= anchor.x && t.x < anchor.x + anchor.w && t.y >= anchor.y && t.y < anchor.y + anchor.h;
+  const path = corridorTiles(room, anchor);
+  for (const t of path.slice(0, 2)) {
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      const c = { x: t.x + dx, y: t.y + dy };
+      if (inside(c)) return c;
+    }
+  }
+  return { x: anchor.x + Math.floor(anchor.w / 2), y: anchor.y + Math.floor(anchor.h / 2) };
+}
+
 /** The resting station that belongs to this replicant, if any. */
 export function restOf(d: WarrenData, id: string) {
   return d.items.find((i) => i.kind === 'rest' && i.for === id);
@@ -233,7 +254,8 @@ export function demoWarren(copies: string[], now = Date.now()): WarrenData {
   const hall = add({ kind: 'hall', name: 'Hearth', size: 'medium', beside: 'Entrance', dir: 'south', purpose: 'Where we meet when the light is low.' }, true, 1);
   add({ kind: 'workshop', name: 'Forge', size: 'small', beside: 'Hearth', dir: 'east', purpose: 'Tools and the hum of work.' }, true, 2);
   add({ kind: 'garden', name: 'Grove', size: 'medium', beside: 'Hearth', dir: 'west', purpose: 'Something green under the stone.' }, true, 3);
-  add({ kind: 'archive', name: 'Memory', size: 'large', beside: 'Hearth', dir: 'south', purpose: 'Every note we ever kept.' }, false, 4);
+  add({ kind: 'pool', name: 'Still', size: 'medium', beside: 'Forge', dir: 'south', purpose: 'Water that does not move. We watch it.' }, true, 4);
+  add({ kind: 'archive', name: 'Memory', size: 'large', beside: 'Hearth', dir: 'south', purpose: 'Every note we ever kept.' }, false, 5);
   const put = (ask: FurnishAsk, t: number) => { const i = placeItem(d, ask, now + t); if (i) d.items.push(i); };
   copies.forEach((id, k) => put({ room: hall?.name, kind: 'rest', by: id, for: id }, 10 + k));
   put({ room: 'Hearth', kind: 'lamp', by: copies[0] ?? '' }, 20);
@@ -246,5 +268,7 @@ export function demoWarren(copies: string[], now = Date.now()): WarrenData {
   put({ room: 'Grove', kind: 'planter', by: copies[0] ?? '' }, 27);
   put({ room: 'Grove', kind: 'bench', by: copies[0] ?? '' }, 28);
   put({ room: 'Entrance', kind: 'lamp', by: copies[0] ?? '' }, 29);
+  put({ room: 'Still', kind: 'bench', by: copies[0] ?? '' }, 30);
+  put({ room: 'Still', kind: 'lamp', by: copies[0] ?? '' }, 31);
   return d;
 }

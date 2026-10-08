@@ -594,7 +594,28 @@ Next (Steve, 2026-10-08, "give these guys everything"), in this order unless he 
   the three older playtests pass with no errors. `screenshots/warren-hearth.png`, `warren-first.png` (before tuning).
 - Mind Edge Function redeployed with the two tools and the new context lines.
 
+### Session 8b (2026-10-08): life below ("keep poking away")
+- **Minds keep ticking underground.** The copies' clock (`PlanetScene.mindClock`, `tickMinds(dt)`) is advanced by the
+  warren view while the planet is paused, so wakes, notes and letters continue while you are below; a copy that
+  sings down there shows its bubble over its head in the warren and its voice pans to where it stands
+  (`WarrenView.sing`, `makeBubble` shared with the surface). Events are stamped on that clock, so what happens while
+  you are below reaches the next wake. The chorus waits until you are back up.
+- **They walk.** Copies come down the ladder and walk the corridors to their work (breadth-first over the dug tiles,
+  `WarrenScene.findPath`): a digger stands at the mouth of the corridor that will lead into the room it is cutting
+  (`digSpot`), on the dug side, sparks flying toward the rock; swings only count once it has arrived. Copies that
+  were already below when you come down are where they should be.
+- **Downtime.** After digging, making a bed or sleeping, a copy usually lingers 14 to 34 s by a bench, a mural, the
+  planters, a workbench or a shelf before climbing out (`linger`, told to its mind as "the bench in Hearth you are
+  resting by").
+- **Sleep that sticks.** A copy goes to bed at its own bedtime, when weary, or after `everyMinutes`, and never twice
+  within 60% of that, so it no longer bobs up and down all night. Waking rested is saved on its row
+  (`traits.weary = 0`, `traits.sleptAt`); a copy with a bed comes back rested after you were away, one without keeps
+  its weariness.
+- **Pools.** A dug `pool` room holds still water inside a one-tile walkway (`CAVE.water`: deep teal, slow ripples, a
+  pale lip, a cool light over it); items keep to the walkway; you cannot walk into it.
+- `?shot=1&view=warren` now includes a pool; `screenshots/warren-pool.png`. `tools/playtest-warren.mjs` also checks
+  water, paths through corridors, a song below and the mind clock advancing underground. All four playtests pass.
+
 Not done / next:
-- Copies' minds pause while you are underground (the planet scene is paused); a copy singing below would be nice.
-- Downtime below: idle copies should sit on benches and look at murals; rooms of kind `pool` have no water yet.
-- Weariness is not saved (resets on load); offline digging (rooms dug while nobody plays) is not simulated.
+- Offline digging (rooms dug while nobody plays) is not simulated; digs happen in front of you from banked work.
+- The live model has not yet driven `dig_room` / `furnish` with Steve's copies; watch the journal's THE WARREN.
