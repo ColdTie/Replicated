@@ -42,6 +42,8 @@
   },
   "_dashDoc": "Dash: Shift/K/X, right mouse button, gamepad B/L1, or swipe on the right half of a touch screen. Invulnerable while dashing.",
   "lightRadius": 1.0,
+  "shake": 1.0,
+  "_shakeDoc": "Camera shake multiplier for every shake in the game (0 = none). Normal hits never shake; the heavy finisher, taking damage, landings and the keeper do.",
   "feature": [
     9,
     10

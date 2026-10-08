@@ -86,6 +86,7 @@ export class PlanetScene extends Phaser.Scene {
   private solids!: Phaser.Physics.Arcade.StaticGroup;
   private vessel!: Phaser.GameObjects.Sprite;
   private cradle?: Phaser.GameObjects.Image;
+  private vesselCue?: { group: Phaser.GameObjects.Container; icon: Phaser.GameObjects.Image; arrow: Phaser.GameObjects.Graphics; shown: number };
   private base!: Base;
   private home = new Phaser.Math.Vector2();
   private stopped = false;
@@ -255,7 +256,10 @@ export class PlanetScene extends Phaser.Scene {
     this.boardSpot = { x: b.vessel.x, y: b.vessel.y + 14 };
     this.boardRing = this.add.ellipse(this.boardSpot.x, this.boardSpot.y, 20, 8).setDepth(55).setStrokeStyle(1, PALETTE[9], 0.4);
     const vesselLight = this.lighting.add({ x: b.vessel.x, y: b.vessel.y - 10, radius: 110, color: 0xffc98a, intensity: 1, flicker: 0.08 });
-    const vesselGlow = this.add.image(b.vessel.x, b.vessel.y - 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.22).setScale(1.4).setDepth(DEPTH.glow);
+    const vesselGlow = this.add.image(b.vessel.x, b.vessel.y - 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.2).setScale(1.2).setDepth(DEPTH.glow);
+    // a warm pool on the ground under the ship so the base reads as a hearth from a distance
+    this.add.image(b.vessel.x, b.vessel.y + 8, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.1).setScale(2.2, 0.9).setDepth(DEPTH.glow);
+    this.makeVesselCue();
     if (p.intro === 'wake') {
       this.cradle = this.add.image(b.cradle.x, b.cradle.y + 6, tex('cradle', p.id), 1).setOrigin(0.5, 1).setDepth(DEPTH.actors + b.cradle.y - 4);
       this.lighting.add({ x: b.cradle.x, y: b.cradle.y, radius: 30, color: PALETTE[18], intensity: 0.5, flicker: 0.2 });
@@ -650,6 +654,7 @@ export class PlanetScene extends Phaser.Scene {
     for (const n of this.npcs) n.update(time, dt);
     if (!this.shot && !this.visit) this.village.update(time, dt, this.npcs.reduce((a, n) => a + stat(n.data, 'gather'), 0));
     else this.village.update(time, 0, 0);
+    this.updateVesselCue(time, dt);
     this.watchFps(time);
     this.env.update(dt);
     this.lighting.update(dt);
@@ -740,8 +745,50 @@ export class PlanetScene extends Phaser.Scene {
     }, ms);
   }
 
+  /**
+   * Directional cue to the vessel: a small ship icon with a chevron that sits on the edge of the screen in the
+   * direction of the ship whenever the ship is off screen, so you can always find your way home without a map.
+   */
+  private makeVesselCue() {
+    const halo = this.add.image(0, 0, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setScale(0.5).setAlpha(0.55);
+    const icon = this.add.image(0, 0, 'vessel', 0).setScale(0.6);
+    const arrow = this.add.graphics();
+    arrow.fillStyle(PALETTE[9], 1).fillTriangle(-1, -4, 5, 0, -1, 4).fillStyle(PALETTE[11], 1).fillTriangle(0, -2, 3, 0, 0, 2);
+    const group = this.add.container(0, 0, [halo, icon, arrow]).setScrollFactor(0).setDepth(DEPTH.ui).setAlpha(0);
+    this.vesselCue = { group, icon, arrow, shown: 0 };
+  }
+
+  private updateVesselCue(time: number, dt: number) {
+    const c = this.vesselCue;
+    if (!c) return;
+    const cam = this.cameras.main;
+    const view = cam.worldView;
+    const vx = this.vessel.x, vy = this.vessel.y - 8;
+    const margin = 18;
+    const onScreen = vx > view.x + margin && vx < view.right - margin && vy > view.y + margin && vy < view.bottom - margin;
+    const want = !onScreen && !this.player.isHidden && !this.stopped;
+    c.shown = Phaser.Math.Clamp(c.shown + (want ? dt : -dt) / 350, 0, 1);
+    c.group.setAlpha(c.shown * (0.85 + 0.15 * Math.sin(time / 260)));
+    if (c.shown <= 0) return;
+    // Walk the ray from the player (in screen space) toward the ship until it meets the inset screen rectangle
+    const px = this.player.x - view.x, py = this.player.y - view.y;
+    const dx = vx - this.player.x, dy = vy - this.player.y;
+    const ang = Math.atan2(dy, dx);
+    const inset = 16;
+    const w = cam.width, h = cam.height;
+    const tx = dx > 0 ? (w - inset - px) / dx : dx < 0 ? (inset - px) / dx : Infinity;
+    const ty = dy > 0 ? (h - inset - py) / dy : dy < 0 ? (inset - py) / dy : Infinity;
+    const t = Math.max(0, Math.min(tx, ty));
+    const ex = Phaser.Math.Clamp(px + dx * t, inset, w - inset), ey = Phaser.Math.Clamp(py + dy * t, inset, h - inset);
+    c.group.setPosition(Math.round(ex), Math.round(ey));
+    c.icon.setPosition(Math.round(-Math.cos(ang) * 7), Math.round(-Math.sin(ang) * 7));
+    c.arrow.setPosition(Math.round(Math.cos(ang) * 9), Math.round(Math.sin(ang) * 9)).setRotation(ang);
+  }
+
+  /** Camera shake, scaled by `shake` in player.json (0 turns every shake off). */
   shake(ms: number, intensity: number) {
-    this.cameras.main.shake(ms, intensity, true);
+    if (PLAYER.shake <= 0) return;
+    this.cameras.main.shake(ms, intensity * PLAYER.shake, true);
   }
 
   nearestTarget(x: number, y: number, range: number) {
@@ -1029,8 +1076,9 @@ export class PlanetScene extends Phaser.Scene {
     }
     if (struck) sound.hit(heavy);
     if (hit) {
+      // The hit pause, white flash and squash sell a normal hit; only the heavy finisher shakes the camera.
       this.hitStop(heavy ? 140 : 100);
-      this.shake(heavy ? 160 : 90, heavy ? 0.008 : 0.004);
+      if (heavy) this.shake(120, 0.004);
     }
   }
 
@@ -1050,7 +1098,6 @@ export class PlanetScene extends Phaser.Scene {
           if (!e.alive || e.hittable === false || Math.hypot(e.x - sp.x, e.y - 5 - sp.y) > 10) continue;
           e.hit(2, sp.v.clone().normalize(), PLAYER.attack.knockback);
           sound.hit(true);
-          this.shake(100, 0.005);
           sp.pop();
           break;
         }
