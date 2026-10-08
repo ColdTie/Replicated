@@ -1,0 +1,250 @@
+// The warren's layout: the copies decide what to dig (dig_room: a kind, a size, next to which room, in which
+// direction) and what to put inside (furnish); this file turns those decisions into tiles. Pure functions over
+// the saved WarrenData (planet_states.data.warren) so the browser, the canned mind and headless tests agree.
+import { WARREN } from '../core/data';
+import type { WarrenData, WarrenItem, WarrenRoom } from '../net/store';
+
+export type Dir = 'north' | 'south' | 'east' | 'west';
+export const DIRS: Dir[] = ['north', 'south', 'east', 'west'];
+export type RoomSize = keyof typeof WARREN.sizes;
+export type ItemKind = keyof typeof WARREN.items;
+
+export const CAVE = { rock: 0, floor: 1, planned: 2 } as const;
+export const GRID_W = WARREN.grid[0], GRID_H = WARREN.grid[1];
+
+const ENTRANCE_ID = 'entrance';
+
+/** The Entrance: the room at the foot of the ladder, always there, never dug by anyone. */
+export function entranceRoom(): WarrenRoom {
+  const [w, h] = WARREN.entrance;
+  return { id: ENTRANCE_ID, name: 'Entrance', kind: 'hall', size: 'small', x: Math.floor((GRID_W - w) / 2), y: 2, w, h, by: '', dug: true, at: 0 };
+}
+
+export function allRooms(d: WarrenData): WarrenRoom[] {
+  return [entranceRoom(), ...d.rooms];
+}
+
+export function findRoom(d: WarrenData, nameOrId: string | undefined | null): WarrenRoom | undefined {
+  if (!nameOrId) return undefined;
+  const k = nameOrId.trim().toLowerCase();
+  if (k === ENTRANCE_ID || k === 'the entrance') return entranceRoom();
+  return d.rooms.find((r) => r.id === k) ?? d.rooms.find((r) => r.name.toLowerCase() === k)
+    ?? d.rooms.find((r) => r.name.toLowerCase().includes(k) || k.includes(r.name.toLowerCase()));
+}
+
+/** The ladder: top center of the Entrance, in tiles. */
+export function ladderTile() {
+  const e = entranceRoom();
+  return { x: e.x + Math.floor(e.w / 2), y: e.y };
+}
+
+const overlaps = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }, pad: number) =>
+  a.x - pad < b.x + b.w && a.x + a.w + pad > b.x && a.y - pad < b.y + b.h && a.y + a.h + pad > b.y;
+
+/**
+ * The 2-tile-wide corridor from a room to the room it hangs off. Straight when the facing edges overlap enough,
+ * an L otherwise. Recomputed from the two rooms every time, nothing stored.
+ */
+export function corridorTiles(room: WarrenRoom, anchor: WarrenRoom): { x: number; y: number }[] {
+  const dir = room.dir ?? 'south';
+  const tiles: { x: number; y: number }[] = [];
+  const push = (x: number, y: number) => tiles.push({ x, y });
+  const vertical = dir === 'north' || dir === 'south';
+  if (vertical) {
+    const lo = Math.max(room.x, anchor.x), hi = Math.min(room.x + room.w, anchor.x + anchor.w);
+    const y0 = dir === 'south' ? anchor.y + anchor.h : room.y + room.h;
+    const y1 = dir === 'south' ? room.y : anchor.y;
+    if (hi - lo >= 2) {
+      const x = Math.floor((lo + hi) / 2) - 1;
+      for (let y = y0; y < y1; y++) { push(x, y); push(x + 1, y); }
+    } else {
+      // L: out of the anchor, sideways, into the room
+      const ax = anchor.x + Math.floor(anchor.w / 2) - 1, rx = room.x + Math.floor(room.w / 2) - 1;
+      const ym = Math.floor((y0 + y1) / 2);
+      for (let y = y0; y < ym; y++) { push(ax, y); push(ax + 1, y); }
+      for (let x = Math.min(ax, rx); x <= Math.max(ax, rx) + 1; x++) { push(x, ym); push(x, ym + 1); }
+      for (let y = ym + 2; y < y1; y++) { push(rx, y); push(rx + 1, y); }
+      if (ym + 2 > y1) for (let y = ym; y < ym + 2; y++) { push(rx, y); push(rx + 1, y); }
+    }
+  } else {
+    const lo = Math.max(room.y, anchor.y), hi = Math.min(room.y + room.h, anchor.y + anchor.h);
+    const x0 = dir === 'east' ? anchor.x + anchor.w : room.x + room.w;
+    const x1 = dir === 'east' ? room.x : anchor.x;
+    if (hi - lo >= 2) {
+      const y = Math.floor((lo + hi) / 2) - 1;
+      for (let x = x0; x < x1; x++) { push(x, y); push(x, y + 1); }
+    } else {
+      const ay = anchor.y + Math.floor(anchor.h / 2) - 1, ry = room.y + Math.floor(room.h / 2) - 1;
+      const xm = Math.floor((x0 + x1) / 2);
+      for (let x = x0; x < xm; x++) { push(x, ay); push(x, ay + 1); }
+      for (let y = Math.min(ay, ry); y <= Math.max(ay, ry) + 1; y++) { push(xm, y); push(xm + 1, y); }
+      for (let x = xm + 2; x < x1; x++) { push(x, ry); push(x, ry + 1); }
+      if (xm + 2 > x1) for (let x = xm; x < xm + 2; x++) { push(x, ry); push(x, ry + 1); }
+    }
+  }
+  return tiles;
+}
+
+export interface DigAsk { kind: string; name: string; size: RoomSize; beside?: string; dir?: Dir; purpose?: string; by: string }
+
+/**
+ * Where a new room goes: next to its anchor in the asked direction, centered, nudged along the wall until it fits;
+ * the other directions when that side is taken. Null when the warren has no room left for it.
+ */
+export function placeRoom(d: WarrenData, ask: DigAsk, now = Date.now()): WarrenRoom | null {
+  if (d.rooms.length >= WARREN.maxRooms) return null;
+  const size = (ask.size in WARREN.sizes ? ask.size : 'small') as RoomSize;
+  const [w, h] = WARREN.sizes[size];
+  const rooms = allRooms(d);
+  const anchor = findRoom(d, ask.beside) ?? rooms[rooms.length - 1];
+  const want = ask.dir && DIRS.includes(ask.dir) ? ask.dir : DIRS[(d.rooms.length + 1) % 4];
+  const order: Dir[] = [want, ...DIRS.filter((x) => x !== want)];
+  const shifts = [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, -6, 6];
+  const others = rooms.filter((r) => r.id !== anchor.id);
+  for (const dir of order) {
+    for (const gap of [3, 2, 4, 5]) {
+      for (const shift of shifts) {
+        let x: number, y: number;
+        if (dir === 'north') { y = anchor.y - gap - h; x = anchor.x + Math.floor((anchor.w - w) / 2) + shift; }
+        else if (dir === 'south') { y = anchor.y + anchor.h + gap; x = anchor.x + Math.floor((anchor.w - w) / 2) + shift; }
+        else if (dir === 'east') { x = anchor.x + anchor.w + gap; y = anchor.y + Math.floor((anchor.h - h) / 2) + shift; }
+        else { x = anchor.x - gap - w; y = anchor.y + Math.floor((anchor.h - h) / 2) + shift; }
+        if (x < 1 || y < 1 || x + w > GRID_W - 1 || y + h > GRID_H - 1) continue;
+        const room: WarrenRoom = {
+          id: `r${now.toString(36)}${d.rooms.length}`, name: cleanName(ask.name, ask.kind), kind: ask.kind, size, x, y, w, h,
+          by: ask.by, purpose: ask.purpose?.slice(0, 160), dug: false, link: anchor.id, dir, at: now,
+        };
+        if (rooms.some((r) => overlaps(room, r, 1))) continue;
+        const path = corridorTiles(room, anchor);
+        if (path.some((t) => t.x < 1 || t.y < 1 || t.x >= GRID_W - 1 || t.y >= GRID_H - 1)) continue;
+        if (path.some((t) => others.some((r) => overlaps({ x: t.x, y: t.y, w: 1, h: 1 }, r, 0)))) continue;
+        return room;
+      }
+    }
+  }
+  return null;
+}
+
+function cleanName(name: string | undefined, kind: string) {
+  const n = (name ?? '').replace(/[^A-Za-z' -]/g, '').trim().slice(0, 18);
+  return n.length >= 2 ? n[0].toUpperCase() + n.slice(1) : kind[0].toUpperCase() + kind.slice(1);
+}
+
+/** Tiles of a room an item of this kind may stand on, best first (pods against the back wall, lamps in corners...). */
+function spotsFor(room: WarrenRoom, kind: ItemKind): { x: number; y: number }[] {
+  const def = WARREN.items[kind];
+  const out: { x: number; y: number }[] = [];
+  const x0 = room.x, x1 = room.x + room.w - 1, y0 = room.y, y1 = room.y + room.h - 1;
+  const mid = (a: number, b: number) => Math.floor((a + b) / 2);
+  if (def.place === 'back') {
+    // spread out from the middle of the back wall
+    for (let i = 0; i < room.w; i++) { const x = mid(x0, x1) + (i % 2 ? -(i + 1) / 2 : i / 2); if (x >= x0 && x <= x1) out.push({ x: Math.floor(x), y: y0 }); }
+  } else if (def.place === 'corner') {
+    out.push({ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x0, y: y1 }, { x: x1, y: y1 });
+  } else if (def.place === 'side') {
+    for (let y = y0 + 1; y <= y1; y++) { out.push({ x: x0, y }, { x: x1, y }); }
+    for (let x = x0 + 1; x < x1; x++) out.push({ x, y: y0 });
+  } else {
+    for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++) out.push({ x, y });
+    out.sort((a, b) => Math.hypot(a.x - mid(x0, x1), a.y - mid(y0, y1)) - Math.hypot(b.x - mid(x0, x1), b.y - mid(y0, y1)));
+  }
+  return out;
+}
+
+export interface FurnishAsk { room?: string; kind: ItemKind; by: string; for?: string; note?: string }
+
+/** A free tile for the item in the room (the corridor mouths stay clear). Null when the room is full. */
+export function placeItem(d: WarrenData, ask: FurnishAsk, now = Date.now()): WarrenItem | null {
+  const room = findRoom(d, ask.room) ?? d.rooms.find((r) => r.dug) ?? entranceRoom();
+  if (!(ask.kind in WARREN.items)) return null;
+  const inRoom = d.items.filter((i) => i.room === room.id);
+  if (inRoom.length >= WARREN.maxItemsPerRoom) return null;
+  const taken = new Set(d.items.map((i) => `${i.x},${i.y}`));
+  // tiles where corridors enter the room stay open
+  const rooms = allRooms(d);
+  const mouths = new Set<string>();
+  for (const r of d.rooms) {
+    const a = rooms.find((x) => x.id === r.link);
+    if (!a || (r.id !== room.id && a.id !== room.id)) continue;
+    for (const t of corridorTiles(r, a)) for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) mouths.add(`${t.x + dx},${t.y + dy}`);
+  }
+  const ladder = ladderTile();
+  for (const s of spotsFor(room, ask.kind)) {
+    const k = `${s.x},${s.y}`;
+    if (taken.has(k) || mouths.has(k)) continue;
+    if (room.id === ENTRANCE_ID && Math.abs(s.x - ladder.x) <= 1 && s.y <= ladder.y + 1) continue;
+    return { id: `i${now.toString(36)}${d.items.length}`, kind: ask.kind, room: room.id, x: s.x, y: s.y, by: ask.by, for: ask.for, note: ask.note?.slice(0, 120), at: now };
+  }
+  return null;
+}
+
+/** Cave cells: rock, dug floor, or planned floor (rooms and corridors not dug yet). */
+export function buildCells(d: WarrenData): Uint8Array {
+  const cells = new Uint8Array(GRID_W * GRID_H);
+  const rooms = allRooms(d);
+  const set = (x: number, y: number, v: number) => { if (x >= 0 && y >= 0 && x < GRID_W && y < GRID_H && cells[y * GRID_W + x] < v) cells[y * GRID_W + x] = v; };
+  for (const r of rooms) {
+    const v = r.dug ? CAVE.floor : CAVE.planned;
+    for (let y = r.y; y < r.y + r.h; y++) for (let x = r.x; x < r.x + r.w; x++) set(x, y, v);
+    const a = rooms.find((x) => x.id === r.link);
+    if (a) for (const t of corridorTiles(r, a)) set(t.x, t.y, v);
+  }
+  // planned beats rock, dug beats planned: a dug room's corridor through a planned area reads as dug
+  return cells;
+}
+
+/** The copies' own words for the warren, for their minds (and the journal). */
+export function describeWarren(d: WarrenData, me: string | null, nameOf: (id: string) => string): string[] {
+  const lines: string[] = [];
+  const rooms = allRooms(d);
+  for (const r of rooms) {
+    const items = d.items.filter((i) => i.room === r.id);
+    const counts: Record<string, number> = {};
+    const pods: string[] = [];
+    for (const i of items) {
+      if (i.kind === 'rest') pods.push(i.for ? nameOf(i.for) + "'s" : 'spare');
+      else counts[i.kind] = (counts[i.kind] ?? 0) + 1;
+    }
+    const what = [
+      ...(pods.length ? [`${pods.length} resting station${pods.length > 1 ? 's' : ''} (${pods.join(', ')})`] : []),
+      ...Object.entries(counts).map(([k, n]) => `${n} ${k}`),
+    ];
+    const where = r.id === ENTRANCE_ID ? 'at the ladder' : `${r.dir} of ${rooms.find((x) => x.id === r.link)?.name ?? 'the Entrance'}`;
+    const by = r.by ? `, ${r.by === me ? 'your' : nameOf(r.by) + "'s"} design` : '';
+    const state = r.dug ? '' : ' - planned, not dug yet';
+    lines.push(`- ${r.name} (${r.kind}, ${r.size}, ${where}${by})${state}: ${what.length ? what.join(', ') : 'empty'}${r.purpose ? ` "${r.purpose}"` : ''}`);
+  }
+  return lines;
+}
+
+/** The resting station that belongs to this replicant, if any. */
+export function restOf(d: WarrenData, id: string) {
+  return d.items.find((i) => i.kind === 'rest' && i.for === id);
+}
+
+/** A lived-in warren for screenshots and tests: a hall with beds for the given copies, a workshop, a garden, one room still planned. */
+export function demoWarren(copies: string[], now = Date.now()): WarrenData {
+  const d: WarrenData = { rooms: [], items: [] };
+  const add = (ask: Omit<DigAsk, 'by'>, dug: boolean, t: number) => {
+    const r = placeRoom(d, { ...ask, by: copies[0] ?? '' }, now + t);
+    if (r) { r.dug = dug; d.rooms.push(r); }
+    return r;
+  };
+  const hall = add({ kind: 'hall', name: 'Hearth', size: 'medium', beside: 'Entrance', dir: 'south', purpose: 'Where we meet when the light is low.' }, true, 1);
+  add({ kind: 'workshop', name: 'Forge', size: 'small', beside: 'Hearth', dir: 'east', purpose: 'Tools and the hum of work.' }, true, 2);
+  add({ kind: 'garden', name: 'Grove', size: 'medium', beside: 'Hearth', dir: 'west', purpose: 'Something green under the stone.' }, true, 3);
+  add({ kind: 'archive', name: 'Memory', size: 'large', beside: 'Hearth', dir: 'south', purpose: 'Every note we ever kept.' }, false, 4);
+  const put = (ask: FurnishAsk, t: number) => { const i = placeItem(d, ask, now + t); if (i) d.items.push(i); };
+  copies.forEach((id, k) => put({ room: hall?.name, kind: 'rest', by: id, for: id }, 10 + k));
+  put({ room: 'Hearth', kind: 'lamp', by: copies[0] ?? '' }, 20);
+  put({ room: 'Hearth', kind: 'lamp', by: copies[0] ?? '' }, 21);
+  put({ room: 'Hearth', kind: 'mural', by: copies[1] ?? copies[0] ?? '' }, 22);
+  put({ room: 'Forge', kind: 'workbench', by: copies[0] ?? '' }, 23);
+  put({ room: 'Forge', kind: 'crate', by: copies[0] ?? '' }, 24);
+  put({ room: 'Forge', kind: 'shelf', by: copies[0] ?? '' }, 25);
+  put({ room: 'Grove', kind: 'planter', by: copies[0] ?? '' }, 26);
+  put({ room: 'Grove', kind: 'planter', by: copies[0] ?? '' }, 27);
+  put({ room: 'Grove', kind: 'bench', by: copies[0] ?? '' }, 28);
+  put({ room: 'Entrance', kind: 'lamp', by: copies[0] ?? '' }, 29);
+  return d;
+}

@@ -102,7 +102,7 @@ export class Village {
     if (save) this.markWorkDirty();
   }
 
-  private markWorkDirty() {
+  markWorkDirty() {
     this.scene.pending.village = { work: Math.round(this.work * 100) / 100 };
     this.lastSavedWork = this.work;
   }
@@ -135,7 +135,7 @@ export class Village {
   /** A free spot in the ring around the base, near other builds when there are some (so it reads as a village). */
   private findSpot(def: ProjectDef): { x: number; y: number } | null {
     const base = this.scene.baseCenter;
-    const avoid = [base, this.scene.replicatorSpot, this.scene.vesselPos];
+    const avoid = [base, this.scene.replicatorSpot, this.scene.vesselPos, ...(this.scene.warren ? [this.scene.warren.hatch] : [])];
     const taken = [...this.structures.map((s) => ({ x: s.x, y: s.y })), ...this.claimed.map((j) => ({ x: j.x, y: j.y }))];
     const w = def.solid?.[0] ?? 12;
     let best: { x: number; y: number; score: number } | null = null;

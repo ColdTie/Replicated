@@ -3,16 +3,18 @@
 import Phaser from 'phaser';
 import { sound, type Instrument, type Mood, type Tempo } from '../audio/Sound';
 import { anim, featureTex } from '../core/assets';
-import { MIND, PALETTE, PLAYER, VILLAGE } from '../core/data';
+import { MIND, PALETTE, PLAYER, VILLAGE, WARREN } from '../core/data';
 import { DRIFT, stat } from '../core/drift';
 import type { Light } from '../fx/Lighting';
 import type { ReplicantSave } from '../net/store';
 import type { PlanetScene } from '../scenes/PlanetScene';
 import { Gear } from './Gear';
 import type { BuildJob } from './Village';
+import type { BelowTask } from './Warren';
+import type { WarrenRoom } from '../net/store';
 import { squash } from './Player';
 
-type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore';
+type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below';
 /** Something a copy decided to do with its hands: walk there, swing a few times, then it happens. */
 interface Chore { x: number; y: number; swings: number; swing: () => void; done: () => void }
 type Pt = { x: number; y: number };
@@ -36,9 +38,16 @@ export class Npc {
   private mineAt: Pt | null = null;
   private job: BuildJob | null = null;
   private chore: Chore | null = null;
+  /** heading for the hatch to go down and do this */
+  private descent: { task: BelowTask; room?: WarrenRoom } | null = null;
   private nextBuild: number;
   /** hop height, added on top of the walking position */
   z = 0;
+  /** 0 rested .. 1 weary: climbs while awake, cleared by a sleep in a resting station */
+  weary = 0;
+  private nextYawn = 0;
+  /** the night level at which this copy turns in: early birds and night owls, from its id */
+  readonly nightFrom: number;
 
   constructor(private scene: PlanetScene, readonly data: ReplicantSave, x: number, y: number) {
     this.x = x; this.y = y;
@@ -54,8 +63,13 @@ export class Npc {
     this.nextTrip = scene.time.now + DRIFT.tripMs * (0.5 + Math.random()) / stat(data, 'gather');
     // copies get to work soon after you arrive, one after another
     this.nextBuild = scene.time.now + 3500 + Math.random() * 5000;
+    const [lo, hi] = WARREN.rest.nightFrom;
+    this.nightFrom = lo + ((this.voiceSeed >>> 8) % 100) / 100 * (hi - lo);
+    this.weary = Math.min(0.6, ((this.voiceSeed >>> 16) % 100) / 160);
     this.sync();
   }
+
+  get weariness(): 'rested' | 'tired' | 'weary' { return this.weary < 0.35 ? 'rested' : this.weary < 0.8 ? 'tired' : 'weary'; }
 
   /** Building-up effect when the Replicator makes this copy. Calls done() when it can walk. */
   playBirth(done: () => void) {
@@ -102,8 +116,12 @@ export class Npc {
     squash(this.scene, this.sprite, 0.8, 1.2, 120);
   }
 
+  /** Down in the warren (digging or asleep): nothing of the copy is on the surface. */
+  get below() { return this.state === 'below'; }
+
   update(time: number, dt: number) {
     if (this.state === 'born') { this.sync(); return; }
+    if (this.state === 'below') return;
     const p = this.scene.player;
     const dp = Math.hypot(p.x - this.x, p.y - this.y);
 
@@ -130,10 +148,12 @@ export class Npc {
           if (this.state === 'carry') this.deliver(time);
           else if (this.mineAt) { this.state = 'mine'; this.swings = 0; this.until = time; }
           else if (this.chore) { this.state = 'chore'; this.swings = 0; this.until = time; }
+          else if (this.descent) { const d = this.descent; this.descent = null; this.scene.warren.enter(this, d.task, d.room); return; }
           else if (this.job) { this.state = 'hammer'; this.swings = 0; this.until = time; this.scene.village.showGhost(this.job, 0); }
           else { this.state = 'idle'; this.until = time + 800 + Math.random() * 2500; }
         } else if (!this.target) {
           if (this.job) { this.scene.village.release(this.job); this.job = null; this.nextBuild = time + 5000; }
+          if (this.descent) { this.scene.warren.release(this); this.descent = null; }
           this.chore = null;
           this.state = 'idle';
         }
@@ -191,6 +211,15 @@ export class Npc {
         break;
     }
 
+    // weariness builds while awake; a weary copy is slower, dimmer, and yawns now and then
+    this.weary = Math.min(1, this.weary + dt / (WARREN.rest.wearyAfterMinutes * 60_000));
+    this.light.intensity = 0.75 * (1 - 0.45 * this.weary);
+    if (this.weary > 0.7 && time > this.nextYawn && (this.state === 'idle' || this.state === 'walk')) {
+      this.nextYawn = time + 9000 + Math.random() * 12000;
+      squash(this.scene, this.sprite, 0.9, 1.12, 260);
+      const puff = this.scene.add.image(this.x + (this.sprite.flipX ? -5 : 5), this.y - 16, 'px').setTint(PALETTE[21]).setAlpha(0.5).setDepth(6090);
+      this.scene.tweens.add({ targets: puff, y: puff.y - 8, alpha: 0, scale: 2, duration: 900, onComplete: () => puff.destroy() });
+    }
     const moving = this.state === 'walk' || this.state === 'carry';
     const working = this.state === 'mine' || this.state === 'hammer';
     if (!working || time > this.until - 300) {
@@ -207,6 +236,16 @@ export class Npc {
 
   private think(time: number) {
     const base = this.scene.baseCenter;
+    // the warren first: a room waiting to be dug, or bed when it is night and there is a bed
+    const down = this.scene.warren.pickTask(this, this.scene.env.night);
+    if (down) {
+      this.descent = down;
+      this.mineAt = null;
+      const h = this.scene.warren.hatch;
+      this.target = { x: h.x, y: h.y + 2 };
+      this.state = 'walk';
+      return;
+    }
     // something to build? (the pool has the work, the ring has room)
     if (time > this.nextBuild) {
       const job = this.scene.village.requestJob(this);
@@ -241,7 +280,7 @@ export class Npc {
   private walkTo(t: Pt, dt: number) {
     const dx = t.x - this.x, dy = t.y - this.y, d = Math.hypot(dx, dy);
     if (d < 3) return true;
-    const speed = PLAYER.speed * 0.55 * stat(this.data, 'speed');
+    const speed = PLAYER.speed * 0.55 * stat(this.data, 'speed') * (1 - 0.3 * this.weary);
     const nx = this.x + (dx / d) * speed * dt / 1000, ny = this.y + (dy / d) * speed * dt / 1000;
     if (this.scene.isWalkable(nx, ny) && this.scene.surfaceAt(nx, ny) !== 'void') {
       this.x = nx; this.y = ny;
@@ -276,7 +315,7 @@ export class Npc {
 
   /** Go and do something by hand (cut a tree, take a build down). Drops whatever it was doing. */
   startChore(c: Chore) {
-    if (this.state === 'born') return false;
+    if (this.state === 'born' || this.state === 'below') return false;
     if (this.job) { this.scene.village.release(this.job); this.job = null; }
     if (this.carried) { this.carried.destroy(); this.carried = undefined; }
     this.mineAt = null;
@@ -284,6 +323,29 @@ export class Npc {
     this.target = { x: c.x + (this.x < c.x ? -12 : 12), y: c.y + 3 };
     this.state = 'walk';
     return true;
+  }
+
+  /** Drops into the hatch: everything on the surface goes until it comes back up. */
+  hideBelow() {
+    if (this.job) { this.scene.village.release(this.job); this.job = null; }
+    if (this.carried) { this.carried.destroy(); this.carried = undefined; }
+    this.chore = null; this.mineAt = null; this.target = null; this.descent = null;
+    this.bubble?.destroy(); this.bubble = undefined;
+    this.sprite.setVisible(false); this.shadow.setVisible(false); this.gear.image.setVisible(false);
+    this.light.active = false;
+    this.state = 'below';
+  }
+
+  /** Climbs out of the hatch. */
+  surface(x: number, y: number) {
+    this.x = x; this.y = y;
+    this.sprite.setVisible(true); this.shadow.setVisible(true); this.gear.image.setVisible(true);
+    this.light.active = true;
+    this.state = 'idle';
+    this.until = this.scene.time.now + 1200;
+    this.nextBuild = this.scene.time.now + 3000;
+    this.sync();
+    this.hop();
   }
 
   // --- the copy's voice ---
@@ -304,6 +366,7 @@ export class Npc {
    * (the chorus plays its own sound).
    */
   sing(text: string, readable: boolean, opts: { silent?: boolean; harmony?: boolean; notes?: string } = {}) {
+    if (this.state === 'below') return; // underground: nobody up here hears it
     const sc = this.scene;
     const p = sc.player;
     const dp = Math.hypot(p.x - this.x, p.y - this.y);

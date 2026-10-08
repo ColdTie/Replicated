@@ -5,6 +5,7 @@ import { PlanetScene } from './scenes/PlanetScene';
 import { StarMapScene } from './scenes/StarMapScene';
 import { TravelScene } from './scenes/TravelScene';
 import { UIScene } from './scenes/UIScene';
+import { WarrenScene } from './scenes/WarrenScene';
 
 const game = new Phaser.Game({
   type: Phaser.WEBGL,
@@ -18,7 +19,7 @@ const game = new Phaser.Game({
   physics: { default: 'arcade', arcade: { debug: false } },
   input: { activePointers: 3, gamepad: true },
   render: { antialias: false, powerPreference: 'high-performance' },
-  scene: [BootScene, HomeScene, PlanetScene, UIScene, TravelScene, StarMapScene],
+  scene: [BootScene, HomeScene, PlanetScene, UIScene, TravelScene, StarMapScene, WarrenScene],
 });
 
 (window as unknown as { __game: Phaser.Game }).__game = game;

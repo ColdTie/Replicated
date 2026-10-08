@@ -1,0 +1,26 @@
+{
+  "_doc": "The warren: the underground base the copies design and dig beneath the village. grid = tiles (16 px) of the underground map; the Entrance (entrance w x h tiles, the ladder at its top) sits top center. Rooms come from the copies' dig_room tool: sizes in tiles, each costs digWork from the village work pool and digSwings hammer blows (swingMs apart) by the copy that goes down to dig it. furnish places items (furnishWork each) inside a dug room. rest: a copy with a resting station goes down when night is past nightFrom or everyMinutes after it last rested, and sleeps for minutes. maxRooms rooms, maxItemsPerRoom items each. items: sprite frame in tools/sprites/warren.json, where it stands in a room (back wall, side wall, corner, floor), the light it casts, whether it is solid.",
+  "grid": [44, 34],
+  "entrance": [5, 4],
+  "sizes": { "small": [5, 4], "medium": [7, 5], "large": [10, 7] },
+  "digWork": { "small": 3, "medium": 5, "large": 8 },
+  "digSwings": { "small": 12, "medium": 18, "large": 26 },
+  "swingMs": 420,
+  "furnishWork": 1,
+  "maxRooms": 16,
+  "maxItemsPerRoom": 8,
+  "rest": { "nightFrom": [0.4, 0.8], "minutes": 3, "everyMinutes": 12, "wearyAfterMinutes": 25 },
+  "_restDoc": "nightFrom = [earliest, latest] night level (0..1) at which a copy turns in; each copy's own bedtime comes from its id. wearyAfterMinutes: awake this long without a bed and a copy is weary (slow, dim, yawning) until it sleeps.",
+  "ambient": "17152a",
+  "kinds": ["hall", "rest", "workshop", "archive", "garden", "gallery", "pool", "other"],
+  "items": {
+    "rest": { "frame": 0, "place": "back", "light": { "radius": 32, "color": 18, "intensity": 0.55 }, "solid": true },
+    "lamp": { "frame": 2, "place": "corner", "light": { "radius": 78, "color": 10, "intensity": 0.9, "flicker": 0.12 }, "solid": true },
+    "bench": { "frame": 3, "place": "floor", "solid": true },
+    "shelf": { "frame": 4, "place": "side", "solid": true },
+    "workbench": { "frame": 5, "place": "side", "light": { "radius": 34, "color": 9, "intensity": 0.6, "flicker": 0.3 }, "solid": true },
+    "planter": { "frame": 6, "place": "floor", "light": { "radius": 40, "color": 12, "intensity": 0.5 }, "solid": true },
+    "mural": { "frame": 7, "place": "back", "solid": false },
+    "crate": { "frame": 8, "place": "side", "solid": true }
+  }
+}
