@@ -1,8 +1,10 @@
-// Procedural textures for light, glow, fog and sky. Banded on purpose so they match the pixel look.
+// Procedural textures for light, glow, fog and sky. Sky, fog and vignette are banded + dithered to match the pixel
+// look; lights and glows are smooth (Hyper Light Drifter style: soft light over crisp sprites), because a dithered
+// light scaled up reads as speckle, not as a pool of light.
 import Phaser from 'phaser';
 import { PALETTE } from '../core/data';
 
-function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, paint: (img: ImageData) => void) {
+function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, paint: (img: ImageData) => void, smooth = false) {
   if (scene.textures.exists(key)) scene.textures.remove(key);
   const ct = scene.textures.createCanvas(key, w, h)!;
   const ctx = ct.getContext();
@@ -10,40 +12,37 @@ function canvasTexture(scene: Phaser.Scene, key: string, w: number, h: number, p
   paint(img);
   ctx.putImageData(img, 0, 0);
   ct.refresh();
+  if (smooth) ct.setFilter(Phaser.Textures.FilterMode.LINEAR);
 }
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 const dither = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
 
-/** White radial light, quantized to a few bands with ordered dithering between them. */
-export function makeLightTexture(scene: Phaser.Scene, key = 'light', size = 128, bands = 6) {
+/** White radial light with a smooth falloff (linear filtered, so it stays smooth at any radius). */
+export function makeLightTexture(scene: Phaser.Scene, key = 'light', size = 128) {
   canvasTexture(scene, key, size, size, (img) => {
     const c = size / 2;
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const d = Math.min(1, Math.hypot(x + 0.5 - c, y + 0.5 - c) / c);
-      const v = Math.pow(1 - d, 1.6) * bands;
-      const q = Math.floor(v) + (v % 1 > dither(x, y) ? 1 : 0);
-      const a = Math.min(1, q / bands);
+      const a = Math.pow(1 - d, 1.6);
       const i = (y * size + x) * 4;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = Math.round(a * 255);
       img.data[i + 3] = 255;
     }
-  });
+  }, true);
 }
 
-/** Soft glow sprite (alpha falloff) for additive bloom on top of the darkness. */
+/** Soft glow sprite (smooth alpha falloff) for additive bloom on top of the darkness. */
 export function makeGlowTexture(scene: Phaser.Scene, key = 'glow', size = 64) {
   canvasTexture(scene, key, size, size, (img) => {
     const c = size / 2;
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
       const d = Math.min(1, Math.hypot(x + 0.5 - c, y + 0.5 - c) / c);
-      const v = Math.pow(1 - d, 2.2) * 5;
-      const q = Math.floor(v) + (v % 1 > dither(x, y) ? 1 : 0);
       const i = (y * size + x) * 4;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
-      img.data[i + 3] = Math.round(Math.min(1, q / 5) * 255);
+      img.data[i + 3] = Math.round(Math.pow(1 - d, 2.2) * 255);
     }
-  });
+  }, true);
 }
 
 export function makeVignette(scene: Phaser.Scene, w: number, h: number, key = 'vignette') {

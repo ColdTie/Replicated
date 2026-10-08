@@ -28,6 +28,7 @@ export class Player {
   readonly sprite: Phaser.GameObjects.Sprite;
   private shadow: Phaser.GameObjects.Image;
   private glow: Phaser.GameObjects.Image;
+  private pool: Phaser.GameObjects.Image;
   readonly light: Light;
   private key: string;
   private headY: number;
@@ -75,7 +76,9 @@ export class Player {
     this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1);
     this.sprite.play(anim(this.key, 'idle'));
     if (traits?.gear) this.gear = new Gear(scene, this.sprite, model.sprite, traits.gear, this.featureColor);
-    this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.18).setScale(0.9).setDepth(6100);
+    // Two layers of light: a tight halo hugging the body (it is the source) and a wide, faint pool on the ground.
+    this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.3).setScale(0.45).setDepth(6100);
+    this.pool = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.07).setScale(1.5, 1.0).setDepth(6100);
     this.light = scene.lighting.add({ x, y, radius: 70, color: 0xffe2b8, intensity: 1 });
   }
 
@@ -162,7 +165,9 @@ export class Player {
     const col = Phaser.Display.Color.Interpolate.ColorWithColor(WARM_RGB, HURT_RGB, 100, Math.round(hurt * 100));
     const colNum = Phaser.Display.Color.GetColor(col.r, col.g, col.b);
     this.light.color = this.hologram ? 0x9fe8ff : colNum;
-    this.glow.setTint(colNum).setAlpha(0.14 + 0.1 * hurt).setScale(0.8 + 0.2 * hurt);
+    // The halo is the health readout: it dims and tightens as hp drops (and turns red); the pool fades less.
+    this.glow.setTint(colNum).setAlpha(0.3 - 0.16 * hurt).setScale(0.45 - 0.1 * hurt);
+    this.pool.setTint(colNum).setAlpha(0.07 - 0.04 * hurt);
     if (hurt > 0 && !this.dead && time > this.nextDamageFx) {
       this.nextDamageFx = time + (frac <= 0.4 ? 180 : 700) / (0.5 + hurt);
       const sx = this.x + (Math.random() - 0.5) * 8, sy = this.y - 4 - Math.random() * 10;
@@ -279,6 +284,7 @@ export class Player {
     this.light.intensity = 0;
     this.light.active = false;
     this.glow.setVisible(false);
+    this.pool.setVisible(false);
     this.shadow.setVisible(false);
     this.gear?.image.setVisible(false);
     this.sprite.setVisible(false);
@@ -290,6 +296,7 @@ export class Player {
     this.hidden = false;
     this.light.active = true;
     this.glow.setVisible(true);
+    this.pool.setVisible(true);
     this.shadow.setVisible(true);
     this.gear?.image.setVisible(true);
     this.sprite.setVisible(true);
@@ -297,6 +304,8 @@ export class Player {
   }
 
   get dashing() { return this.scene.time.now < this.dashUntil; }
+  /** Inside the vessel or the cradle (nothing of the body is drawn). */
+  get isHidden() { return this.hidden; }
 
   private afterimage() {
     const s = this.sprite;
@@ -320,7 +329,7 @@ export class Player {
     this.sprite.setTintFill(0xffffff);
     squash(this.scene, this.sprite, 0.75, 1.25, 110);
     this.scene.hitStop(100);
-    this.scene.shake(140, 0.006);
+    this.scene.shake(120, 0.004);
     this.scene.fx.sparks(this.x, this.y - 6, PALETTE[8], 8);
     if (this.hp <= 0) this.die();
   }
@@ -358,6 +367,7 @@ export class Player {
     this.sprite.setPosition(x, y + 3).setDepth(100 + y);
     this.shadow.setPosition(x, y + 2);
     this.glow.setPosition(x, y + this.headY);
+    this.pool.setPosition(x, y + 1);
     this.light.x = x;
     this.light.y = y + this.headY;
     this.gear?.sync();

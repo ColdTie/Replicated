@@ -1,14 +1,14 @@
 # Vessel Metanoia: Replicants
 
-You are building a 2D top down sci fi game that runs in a browser on an iPad. Read this whole file before writing any code. Keep it updated as decisions change.
+You are building a 2D top down sci fi game that runs in a browser. Read this whole file before writing any code. Keep it updated as decisions change.
 
 ## Who it is for
 
-Steve, his wife, and his 5 year old daughter. Played in Safari on the daughter's iPad and in Chrome on a Windows laptop. Steve directs through chat and does not want to hand edit scenes, open visual editors, or click through GUI steps. Everything is code, scripts, and config that you create and run. If a step truly needs a human (creating an account, pasting a key), write it out plainly as a single numbered list.
+Steve. Played in Chrome on a Windows laptop. Steve directs through chat and does not want to hand edit scenes, open visual editors, or click through GUI steps. Everything is code, scripts, and config that you create and run. If a step truly needs a human (creating an account, pasting a key), write it out plainly as a single numbered list.
 
 ## Premise
 
-The player is an AI replicant piloting a self replicating vessel through a cold, empty galaxy. On each planet you fight, gather, and build a Replicator. The Replicator makes a copy of you with inherited stats plus random "drift" (a visible mutation and a small stat change). The copy stays behind to run the planet as an NPC while you fly on. A rare resource called Spark lets a player awaken a replicant and hand it to another family member, who then plays it as their own character.
+The player is an AI replicant piloting a self replicating vessel through a cold, empty galaxy. On each planet you fight, gather, and build a Replicator. The Replicator makes a copy of you with inherited stats plus random "drift" (a visible mutation and a small stat change). The copy stays behind to run the planet as an NPC while you fly on. A rare resource called Spark lets a player awaken a replicant and hand it to another profile, which then plays it as its own character.
 
 Theme: you are never alone, but every version of you is a little different. Lonely galaxy, warm settlements.
 
@@ -21,9 +21,9 @@ Anchor reference: Hyper Light Drifter. Secondary: Starbound (planet variety), De
 - Each planet gets one accent hue that tints its tiles, sky gradient, and creatures.
 - Lighting: dark vignette, soft radial light around the player and built structures, dust and spore particles, slow parallax background. Cheap shader or blend mode effects, nothing expensive.
 - Animation: smoothness beats detail. Walk cycles of at least 6 frames, squash and stretch on landing and on hit, screen shake on hits (small), hit flash white, 100ms hit pause.
-- Replicant identity: every replicant has one distinctive feature (visor color, antenna shape, trail color) that drift changes. Family must tell copies apart at a glance.
+- Replicant identity: every replicant has one distinctive feature (visor color, antenna shape, trail color) that drift changes. Copies must be told apart at a glance.
 - UI: almost none. Health is a glow around the player that dims. Collected resources float up as small icons. Interaction is walking into things. One clean pixel font, sparse title cards when you land on a planet.
-- No text needed to understand the world. A 5 year old should read a glowing door or a broken machine without words.
+- No text needed to understand the world. A glowing door or a broken machine should read without words.
 
 ## Art pipeline
 
@@ -32,15 +32,15 @@ No final art yet. Generate placeholder sprites with a Node script that writes pi
 ## Stack
 
 - TypeScript, Phaser 3, Vite. No frameworks beyond that.
-- Supabase (Postgres plus auth) for family profiles, shared galaxy state, saves, and replicant ownership. Use the supabase js client. Ownership handoff is a single row update, not realtime multiplayer.
+- Supabase (Postgres plus auth) for profiles, shared galaxy state, saves, and replicant ownership. Use the supabase js client. Ownership handoff is a single row update, not realtime multiplayer.
 - Deploy to GitHub Pages with a GitHub Actions workflow on push to main. Vite `base` must be set for Pages.
-- Touch first. Virtual joystick on the left, one big action button on the right. Keyboard and gamepad also work. No tilt controls.
-- Must run smoothly in iOS Safari: keep memory small, compress audio, start audio only after first tap.
+- Keyboard and mouse first. Gamepad and the touch controls (virtual joystick on the left, one action button on the right) exist and must keep working. No tilt controls.
+- Keep memory small and start audio only after the first tap or key.
 
-## Three profiles
+## Profiles
 
-- Steve and wife: full game.
-- Daughter ("kid mode" flag on the profile): no inventory, no stats, no death (knocked back and respawn at base). Explore, collect glowing things, pet creatures, press one button to build. Resources still count toward the shared base.
+One player, Steve, with the full game. (Pivot, 2026-10-08: the game is no longer being built or tuned for other players or
+other devices. The profile `kid_mode` flag, no counter and no death, still exists in the code but is not a priority.)
 
 ## Core loop (build in this order)
 
@@ -53,10 +53,10 @@ No final art yet. Generate placeholder sprites with a Node script that writes pi
 
 ## Phase plan
 
-- **Phase 0, vertical slice** (do this first, nothing else): one planet, one player, movement, one enemy, one resource, the lighting and particle look from the brief, touch controls, deployed to GitHub Pages and confirmed on the iPad. It should already feel polished. Take a screenshot (headless Chromium via Playwright) and save it to `screenshots/` after each milestone so Steve can review the look in chat.
+- **Phase 0, vertical slice** (do this first, nothing else): one planet, one player, movement, one enemy, one resource, the lighting and particle look from the brief, deployed to GitHub Pages. It should already feel polished. Take a screenshot (headless Chromium via Playwright) and save it to `screenshots/` after each milestone so Steve can review the look in chat.
 - **Phase 1:** full loop steps 1 to 3 plus Supabase profiles and saves. Start on Earth (hand-tuned, peaceful and overgrown) instead of a random planet. Design the Supabase schema for the shared galaxy from day one (see Long-term decisions), even though travel comes in Phase 2.
 - **Phase 2:** steps 4 and 5. Travel uses real-world time; the star map shows real nearby stars.
-- **Phase 3:** step 6, kid mode polish, sound, family playtest fixes.
+- **Phase 3:** step 6, sound, playtest fixes.
 
 ## Out of scope
 
@@ -68,7 +68,7 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 - Keep data (planet biomes, enemy stats, drift tables, items) in JSON under `src/data/` so content is easy to add.
 - Ask before adding any dependency beyond Phaser, Vite, TypeScript, supabase js, pngjs, and Playwright.
 - Update the Progress section below at the end of every session.
-- When something needs Steve (keys, account creation, testing on the iPad), stop and give a short numbered list.
+- When something needs Steve (keys, account creation, testing in the browser), stop and give a short numbered list.
 - Small fixes and feel tweaks go straight to `main` without asking (Steve, 2026-10-06: "if there is a fix like this
   you need to just push it"): verify (build, playtest), open the PR and merge it so Pages deploys. Ask first only for
   database changes, new dependencies, or anything that changes what the game is.
@@ -82,8 +82,8 @@ These shape the data model now, even where the feature comes later.
 
 - **Travel runs on real-world time.** (Switched off 2026-10-06 at Steve's request: every trip takes 5 seconds via
   `fixedSeconds` in `src/data/travel.json`; 0 restores real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
-- **One shared galaxy for the family.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that the three profiles share. Store a `galaxy_id` on everything so more families could get their own galaxy later. No strangers, no public play.
-- **Earth is the start.** Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly for a 5 year old. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
+- **One shared galaxy per login.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
+- **Earth is the start.** Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
 - **Messages travel at light speed until FTL comms exist.** A message between replicants in different systems arrives after a delay based on distance (scaled like travel). Building or finding the FTL comms device makes messages from that system instant.
 - **Stars are real.** The galaxy is real nearby stars (positions relative to the Sun). Each star's planets are generated from a seed derived from the star's id. Beacon systems sit at fixed, symmetrical points around the Sun, snapped to the nearest real star.
 
@@ -94,7 +94,7 @@ Steve's ideas for later phases. Do not build these until a phase explicitly pick
 - **Origin on Earth.** The first replicant starts at a fixed point on a specific starting planet, probably Earth.
 - **Real-sky galaxy.** Star systems and their layout follow real star formations (real nearby stars and their positions), not random scatter.
 - **Beacon systems.** Fixed, symmetrical points in space around the start hold enormous resources and a beacon. Reaching one should take about a full week of play, so they work as long-term goals.
-- **Star map.** Unique, easy to open, and usable on iPad touch. Possibly a 2D/3D map (pinch, rotate, tap a star) with toggleable overlays for other players' replicants and discovered resources. Note: "3D" here means the star map view only; the game itself stays 2D.
+- **Star map.** Unique and easy to open, usable with a mouse and with touch. Possibly a 2D/3D map (pinch, rotate, tap a star) with toggleable overlays for other players' replicants and discovered resources. Note: "3D" here means the star map view only; the game itself stays 2D.
 - **FTL communication (Bobiverse style).** Replicants, and other people, can only talk to each other through a device that allows faster-than-light communication. It is something you build or find, not available from the start. Fits the "ownership handoff is a row update" model: messages are async rows, not realtime chat.
 - **Wormholes (very late game).** Replicants eventually develop portal and wormhole technology for fast travel between explored systems.
 
@@ -149,7 +149,7 @@ supabase/migrations/     schema applied to the "Replicated" Supabase project (ke
 
 Saving: the shared Ember pool, node damage, structures (Replicator and the copies' builds) and the copies' banked
 building work live in `planet_states` and are written as atomic deltas
-(`apply_planet_delta` RPC) every 4s and when the page is hidden; the server value wins so family members share one
+(`apply_planet_delta` RPC) every 4s and when the page is hidden; the server value wins so every profile shares one
 pool. The replicant row stores position, planet and `traits.awake` (Earth's wake-up intro plays once per replicant).
 Journeys store `from_planet` / `to_planet` (migration 0006). Every table is scoped by `galaxy_id` with row level
 security; `ensure_family_galaxy()` creates the galaxy on first sign-in.
@@ -216,7 +216,7 @@ Done:
   keeps a higher floor at low health so a hurt replicant no longer fades into the darkness and looks see-through.
 
 ### Session 3 (2026-10-04): Milestones 1 and 2 ("Living Earth" visuals, "Feel" gameplay)
-Plan agreed with Steve: M1 visuals, M2 feel, M3 Replicate, M4 Leaving Earth (space travel). Target device: iPad 9th gen.
+Plan agreed with Steve: M1 visuals, M2 feel, M3 Replicate, M4 Leaving Earth (space travel).
 - Sound: all procedural (WebAudio). Footsteps per surface (grass, stone, water), swings, hits, crystal chimes in a
   pentatonic scale, rising pickup notes, hurt, dash, enemy calls, build, door, upgrade, rain bed, thunder, and a slow
   generative pad that drops lower and sparser at night. Starts on first tap; `navigator.audioSession` set to playback.
@@ -274,7 +274,6 @@ Plan agreed with Steve: M1 visuals, M2 feel, M3 Replicate, M4 Leaving Earth (spa
 Not done / next:
 - Milestone 1 leftovers: rounded autotiled rock edges, bloom, a guardian mini-boss in the largest ruin.
 - Beacon landmark (something special to find at a beacon), FTL comms, messages, Spark handoff (Phase 3).
-- Not yet confirmed on the iPad.
 
 ### Session 4 (2026-10-06): consolidation, single lead
 - A parallel session had built its own Phase 2 (copies, star map, travel) on a separate branch at the same time as
@@ -309,7 +308,6 @@ Not done / next:
 
 Not done / next:
 - Rock tops are still the old speckled tiles; painting them the same way would match the new floors.
-- Not yet confirmed on the iPad (paint time and memory on the iPad 9th gen in particular).
 - Fix: ships launched before the 5 second change (still on the old real-time schedule) now also arrive 5 seconds after
   departure (`capJourney` in `src/net/store.ts`).
 
@@ -334,7 +332,7 @@ Not done / next:
 - Verified: build and both playtests pass; all 44 star worlds checked. Screenshot `fomalhaut-fixed.png`.
 
 
-### Session 5d (2026-10-06): poles, landing (Steve's iPad feedback)
+### Session 5d (2026-10-06): poles, landing (Steve's feedback)
 - Globes from orbit had the same flat grey cap on every world, covering 35 degrees of latitude at each pole. Caps are
   now a per-world tunable `poles` (`size`, `[edge, core]` palette colors) in `planets.json` / `biomes.json`, measured
   in true latitude, with a wavy edge that follows the terrain noise and two shaded tones: Earth and Verdant get small
@@ -381,7 +379,6 @@ Not done / next:
   their gardens (regrow nearby nodes faster) would make the village matter.
 - Decided 2026-10-06: no AI for the copies after all (Steve). The village stays fully procedural; "LLM driven NPC
   dialogue" stays out of scope.
-- Still not confirmed on the iPad.
 
 ### Session 5f (2026-10-06): feel fixes from Steve's play
 - Damage no longer fades the replicant into the dark. The light stays at full strength and only shrinks a little;
@@ -446,6 +443,20 @@ Not done / next:
   Screenshots `screenshots/beacon-*.png`, `map-beacon-lit.png`.
 
 Not done / next:
-- Spark handoff (Phase 3, step 6): spend a Spark at the Replicator to awaken a copy for another family member.
+- Spark handoff (Phase 3, step 6): spend a Spark at the Replicator to awaken a copy for another profile.
 - Steve's worlds at Fomalhaut and Pollux are already settled: the plaza appears on them now (nothing of theirs moves).
-- Not yet seen on the iPad: the keeper fight on touch (swipe to dash out of a charge).
+
+### Session 6b (2026-10-08): pivot to one player, softer shake, smooth light, a way home
+- Pivot (Steve): the game is built for Steve alone on a laptop for now. Everything about other players and other
+  devices is gone from these instructions; the touch controls and the `kid_mode` flag stay in the code untouched.
+- Screen shake: normal hits no longer shake the camera (the hit pause, flash and squash carry them); only the heavy
+  finisher (120 ms, 0.004) and taking damage (120 ms, 0.004, was 0.006) do, and the spore reflect shake is gone. One
+  multiplier `shake` in `src/data/player.json` scales every shake in the game (0 turns them all off).
+- Light: the `light` and `glow` textures are smooth, linear-filtered falloffs instead of 6 dithered bands (the dither
+  scaled up read as a checkerboard speckle around the player and the vessel). Sky, fog and vignette keep their dither.
+  The player now has a tight halo at the body (the health readout: dims, tightens and turns red as hp drops) and a
+  wide faint pool on the ground; the vessel has a smaller bloom and a warm pool on the ground under it.
+  `screenshots/light-before-zoom.png` vs `light-after-zoom.png`, `light-after-base.png`.
+- Vessel cue: whenever the ship is off screen, a small ship icon with a warm chevron sits on the edge of the screen in
+  its direction (fades in and out over 0.35 s, gentle pulse; hidden while you are inside the ship). `PlanetScene.
+  updateVesselCue`. `screenshots/vessel-cue.png`.
