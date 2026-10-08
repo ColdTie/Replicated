@@ -43,6 +43,8 @@ export interface PlanetData {
   village?: { work: number };
   /** Beacon worlds: the monolith was lit (its keeper beaten) */
   beacon?: { lit: boolean; at: number; by?: string };
+  /** Trees the copies cut down (indexes into the generated props) */
+  felled?: number[];
 }
 export interface PlanetSave {
   star_id: string;
@@ -96,10 +98,14 @@ export interface MindContext {
   events: string[];
   /** replicant id -> seconds a letter takes to reach it (light speed) */
   delays: Record<string, number>;
+  /** what this copy built, by kind */
+  mine: Record<string, number>;
+  /** trees standing near the base */
+  treesNear: number;
 }
 export interface Voice { instrument: string; mood: string; tempo: string }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut';
   body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string;
   /** melody: the voice chosen and the tune (scale degrees) */
   instrument?: string; mood?: string; tempo?: string; notes?: string;
@@ -208,6 +214,8 @@ export class LocalStore implements GameStore {
       me.traits.voice = voice;
       actions.push({ type: 'melody', ...voice, notes: pick(tunes) });
     }
+    if (ctx.treesNear > 0 && Math.random() < 0.25) actions.push({ type: 'cut' });
+    else if (Object.keys(ctx.mine).length && Math.random() < 0.2) actions.push({ type: 'demolish', kind: 'any' });
     const received = this.db.mail.filter((m) => m.to_replicant === me.id && !m.read_at && Date.parse(m.arrives_at) <= now);
     for (const m of received) m.read_at = new Date(now).toISOString();
     this.flush();

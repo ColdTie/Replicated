@@ -12,7 +12,9 @@ import { Gear } from './Gear';
 import type { BuildJob } from './Village';
 import { squash } from './Player';
 
-type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer';
+type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore';
+/** Something a copy decided to do with its hands: walk there, swing a few times, then it happens. */
+interface Chore { x: number; y: number; swings: number; swing: () => void; done: () => void }
 type Pt = { x: number; y: number };
 
 export class Npc {
@@ -33,6 +35,7 @@ export class Npc {
   private swings = 0;
   private mineAt: Pt | null = null;
   private job: BuildJob | null = null;
+  private chore: Chore | null = null;
   private nextBuild: number;
   /** hop height, added on top of the walking position */
   z = 0;
@@ -126,11 +129,32 @@ export class Npc {
         if (this.target && this.walkTo(this.target, dt)) {
           if (this.state === 'carry') this.deliver(time);
           else if (this.mineAt) { this.state = 'mine'; this.swings = 0; this.until = time; }
+          else if (this.chore) { this.state = 'chore'; this.swings = 0; this.until = time; }
           else if (this.job) { this.state = 'hammer'; this.swings = 0; this.until = time; this.scene.village.showGhost(this.job, 0); }
           else { this.state = 'idle'; this.until = time + 800 + Math.random() * 2500; }
         } else if (!this.target) {
           if (this.job) { this.scene.village.release(this.job); this.job = null; this.nextBuild = time + 5000; }
+          this.chore = null;
           this.state = 'idle';
+        }
+        break;
+      case 'chore':
+        if (time > this.until) {
+          const c = this.chore;
+          if (!c) { this.state = 'idle'; break; }
+          if (this.swings >= c.swings) {
+            this.chore = null;
+            c.done();
+            this.hop();
+            this.state = 'idle';
+            this.until = time + 1500;
+            break;
+          }
+          this.swings++;
+          this.until = time + VILLAGE.hammerMs;
+          this.sprite.play(anim(this.key, 'attack'), true);
+          this.sprite.setFlipX(c.x < this.x);
+          c.swing();
         }
         break;
       case 'hammer':
@@ -248,6 +272,18 @@ export class Npc {
     }
     this.state = 'idle';
     this.until = time + 1200;
+  }
+
+  /** Go and do something by hand (cut a tree, take a build down). Drops whatever it was doing. */
+  startChore(c: Chore) {
+    if (this.state === 'born') return false;
+    if (this.job) { this.scene.village.release(this.job); this.job = null; }
+    if (this.carried) { this.carried.destroy(); this.carried = undefined; }
+    this.mineAt = null;
+    this.chore = c;
+    this.target = { x: c.x + (this.x < c.x ? -12 : 12), y: c.y + 3 };
+    this.state = 'walk';
+    return true;
   }
 
   // --- the copy's voice ---
