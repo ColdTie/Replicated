@@ -1168,6 +1168,8 @@ export class PlanetScene extends Phaser.Scene {
       void this.saveReplicant();
     }
     this.fx.floatIcon(this.player.x, this.player.y - 24, 'module');
+    const who = (rep?.name ?? session.profile?.name ?? 'YOU').toUpperCase();
+    this.game.events.emit('notice', `${who} GETS +20% ${r.kind.toUpperCase()}`);
   }
 
   surfaceAt(x: number, y: number): 'grass' | 'stone' | 'water' | 'void' {

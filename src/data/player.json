@@ -36,7 +36,7 @@
   },
   "dash": {
     "speed": 290,
-    "ms": 170,
+    "ms": 120,
     "cooldownMs": 420,
     "afterimageEveryMs": 22
   },
