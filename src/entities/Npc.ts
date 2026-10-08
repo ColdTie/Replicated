@@ -297,8 +297,11 @@ export class Npc {
     const base = this.scene.baseCenter;
     // the warren first: a room waiting to be dug, or bed when it is night and there is a bed
     const down = this.scene.warren.pickTask(this, this.scene.env.night);
-    if (down) {
-      this.descent = down;
+    if (down?.task === 'entrance') { this.scene.warren.digEntrance(this); return; }
+    if (down?.task === 'wood') { if (this.scene.cutTree(this)) return; }
+    else if (down?.task === 'scavenge') { this.scene.warren.scavenge(this, down.ruinIndex ?? 0); return; }
+    else if (down) {
+      this.descent = { task: down.task, room: down.room };
       this.mineAt = null;
       const h = this.scene.warren.hatch;
       this.target = { x: h.x, y: h.y + 2 };

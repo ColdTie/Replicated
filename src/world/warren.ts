@@ -130,13 +130,22 @@ function cleanName(name: string | undefined, kind: string) {
   return n.length >= 2 ? n[0].toUpperCase() + n.slice(1) : kind[0].toUpperCase() + kind.slice(1);
 }
 
-/** Tiles of a room an item of this kind may stand on, best first (pods against the back wall, lamps in corners...). */
-function spotsFor(room: WarrenRoom, kind: ItemKind): { x: number; y: number }[] {
+/**
+ * Tiles of a room an item of this kind may stand on, best first (pods against the back wall, lamps in corners...),
+ * or where the copy asked for it: wall, corner, center, or beside items of a kind already in the room.
+ */
+function spotsFor(room: WarrenRoom, kind: ItemKind, placement?: string, besideItems?: WarrenItem[]): { x: number; y: number }[] {
   const def = WARREN.items[kind];
   const out: { x: number; y: number }[] = [];
   const x0 = room.x, x1 = room.x + room.w - 1, y0 = room.y, y1 = room.y + room.h - 1;
   const mid = (a: number, b: number) => Math.floor((a + b) / 2);
-  if (def.place === 'back') {
+  const place = placement === 'wall' ? 'back' : placement === 'corner' ? 'corner' : placement === 'center' ? 'floor' : placement === 'beside' && besideItems?.length ? 'beside' : def.place;
+  if (place === 'beside') {
+    for (const it of besideItems!) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [2, 0], [-2, 0]]) {
+      const x = it.x + dx, y = it.y + dy;
+      if (x >= x0 && x <= x1 && y >= y0 && y <= y1) out.push({ x, y });
+    }
+  } else if (place === 'back') {
     // spread out from the middle of the back wall
     for (let i = 0; i < room.w; i++) { const x = mid(x0, x1) + (i % 2 ? -(i + 1) / 2 : i / 2); if (x >= x0 && x <= x1) out.push({ x: Math.floor(x), y: y0 }); }
   } else if (def.place === 'corner') {
@@ -151,7 +160,7 @@ function spotsFor(room: WarrenRoom, kind: ItemKind): { x: number; y: number }[] 
   return out;
 }
 
-export interface FurnishAsk { room?: string; kind: ItemKind; by: string; for?: string; note?: string }
+export interface FurnishAsk { room?: string; kind: ItemKind; by: string; for?: string; note?: string; placement?: string; beside?: string; tint?: number }
 
 /** A free tile for the item in the room (the corridor mouths stay clear). Null when the room is full. */
 export function placeItem(d: WarrenData, ask: FurnishAsk, now = Date.now()): WarrenItem | null {
@@ -170,11 +179,12 @@ export function placeItem(d: WarrenData, ask: FurnishAsk, now = Date.now()): War
   }
   const ladder = ladderTile();
   const cells = buildCells(d);
-  for (const s of spotsFor(room, ask.kind)) {
+  const besideItems = ask.beside ? inRoom.filter((i) => i.kind === ask.beside || i.kind.includes(ask.beside!.toLowerCase())) : [];
+  for (const s of spotsFor(room, ask.kind, ask.placement, besideItems)) {
     const k = `${s.x},${s.y}`;
     if (taken.has(k) || mouths.has(k) || cells[s.y * GRID_W + s.x] === CAVE.water) continue;
     if (room.id === ENTRANCE_ID && Math.abs(s.x - ladder.x) <= 1 && s.y <= ladder.y + 1) continue;
-    return { id: `i${now.toString(36)}${d.items.length}`, kind: ask.kind, room: room.id, x: s.x, y: s.y, by: ask.by, for: ask.for, note: ask.note?.slice(0, 120), at: now };
+    return { id: `i${now.toString(36)}${d.items.length}`, kind: ask.kind, room: room.id, x: s.x, y: s.y, by: ask.by, for: ask.for, note: ask.note?.slice(0, 120), at: now, tint: ask.tint, placement: ask.placement || undefined };
   }
   return null;
 }

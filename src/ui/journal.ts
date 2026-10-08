@@ -68,6 +68,10 @@ export interface JournalView {
   journal: Journal;
   /** the warren, room by room (describeWarren); empty when nothing is dug or planned */
   warren?: string[];
+  /** the planet's materials in words */
+  supplies?: string;
+  /** what waits on what */
+  shortages?: string[];
 }
 
 let open: HTMLElement | null = null;
@@ -125,6 +129,10 @@ export function openJournal(v: JournalView) {
   if (v.warren?.length) {
     parts.push(`<h3 style="color:${css(PALETTE[2])}">THE WARREN</h3>`);
     for (const line of v.warren) parts.push(`<p>${show(line.replace(/^- /, ''))}</p>`);
+  }
+  if (v.supplies) {
+    parts.push(`<h3 style="color:${css(PALETTE[2])}">SUPPLIES</h3><p>${esc(v.supplies)}</p>`);
+    for (const line of v.shortages ?? []) parts.push(`<p class="ask">${show(line)}</p>`);
   }
   const el = document.createElement('div');
   el.className = 'jn';

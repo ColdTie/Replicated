@@ -32,12 +32,20 @@ try {
   if (!planned.r || !planned.r2 || planned.rooms !== 3) fail('rooms were not planned');
   if (planned.opened) fail('hatch open before anything is dug');
 
-  // 2. a copy goes down and digs (work in the pool, copies idle)
-  await ev(() => { const s = window.__scene; s.village.work = 30; s.npcs.forEach((n) => { n.state = 'idle'; n.until = 0; }); });
+  // 2. the first copy digs the way down (a chore on the surface), then a copy goes down and digs (rooms take wood)
+  await ev(() => { const s = window.__scene; s.supplies.wood = 5; s.npcs.forEach((n) => { n.state = 'idle'; n.until = 0; }); });
+  await page.waitForFunction(() => window.__scene.warren.data.entrance.swings > 0, null, { timeout: 25000 }).catch(() => fail('nobody started digging the entrance'));
+  log('entrance', await ev(() => JSON.stringify({ swings: window.__scene.warren.data.entrance.swings, frame: window.__scene.warren.hatchSprite.frame.name, digger: window.__scene.warren.entranceDigger?.npc.data.name })));
+  await page.waitForFunction(() => window.__scene.warren.opened, null, { timeout: 30000 }).catch(() => fail('the entrance never got dug'));
+  log('hole', await ev(() => JSON.stringify({ frame: window.__scene.warren.hatchSprite.frame.name, supplies: window.__scene.supplies })));
+  if (!(await ev(() => (window.__scene.supplies.stone ?? 0) >= 4))) fail('the entrance dig yielded no stone');
   await page.waitForFunction(() => window.__scene.warren.below.size > 0, null, { timeout: 25000 }).catch(() => fail('no copy went down the hatch'));
   log('below', await ev(() => JSON.stringify([...window.__scene.warren.below.values()].map((b) => ({ who: b.npc.data.name, task: b.task, room: b.room?.name, hidden: !b.npc.sprite.visible })))));
   await page.waitForFunction(() => window.__scene.warren.data.rooms.some((r) => r.dug), null, { timeout: 30000 }).catch(() => fail('room never got dug'));
-  log('dug', await ev(() => JSON.stringify({ rooms: window.__scene.warren.data.rooms.map((r) => [r.name, r.dug]), work: Math.round(window.__scene.village.work * 10) / 10, opened: window.__scene.warren.opened, hatchFrame: window.__scene.warren.hatchSprite.frame.name })));
+  log('dug', await ev(() => JSON.stringify({ rooms: window.__scene.warren.data.rooms.map((r) => [r.name, r.dug]), supplies: window.__scene.supplies, opened: window.__scene.warren.opened, hatchFrame: window.__scene.warren.hatchSprite.frame.name })));
+  if (!(await ev(() => (window.__scene.supplies.wood ?? 0) < 5))) fail('digging the room spent no wood');
+  log('shortage check', await ev(() => window.__scene.warren.shortage({ wood: 99 })));
+  if (!(await ev(() => !!window.__scene.warren.shortage({ wood: 99 })))) fail('shortage() did not refuse an unaffordable recipe');
 
   // 3. the home drive: with a dug room and no bed, a copy makes itself a resting station
   await page.waitForFunction(() => window.__scene.warren.data.items.some((i) => i.kind === 'rest'), null, { timeout: 40000 }).catch(() => fail('nobody made a bed'));
@@ -58,7 +66,7 @@ try {
   if (!mind.acts.includes('dig') && !mind.acts.includes('furnish')) fail('the canned mind never dug or furnished');
 
   // 5. down the hatch, with a copy at work below so we can watch it walk there (the pool room gets dug by hand)
-  await ev(() => { const s = window.__scene; const pool = s.warren.data.rooms.find((r) => r.kind === 'pool'); if (pool) pool.dug = true; s.village.work = 40; });
+  await ev(() => { const s = window.__scene; const pool = s.warren.data.rooms.find((r) => r.kind === 'pool'); if (pool) pool.dug = true; s.supplies.wood = 9; s.supplies.stone = 9; });
   await page.waitForFunction(() => [...window.__scene.warren.below.values()].some((b) => b.task === 'dig' || b.task === 'furnish'), null, { timeout: 30000 }).catch(() => log('note: nobody is working below right now'));
   await ev(() => { const s = window.__scene; s.player.locked = false; s.hatchReadyAt = 0; s.player.setPosition(s.warren.hatch.x, s.warren.hatch.y); });
   await page.waitForFunction(() => !!window.__warren && window.__warren.scene.isActive(), null, { timeout: 8000 }).catch(() => fail('warren scene did not open'));

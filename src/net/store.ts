@@ -59,6 +59,8 @@ export interface PlanetData {
   felled?: number[];
   /** The underground base the copies design and dig (src/world/warren.ts) */
   warren?: WarrenData;
+  /** The planet's materials (src/data/supplies.json): stone, soil, wood, water, food, scrap; Ember is `embers` */
+  supplies?: Record<string, number>;
 }
 
 /** A room of the warren in tiles of the underground grid; link/dir = the room it hangs off and on which side. */
@@ -69,8 +71,14 @@ export interface WarrenRoom {
   by: string; purpose?: string; dug: boolean; link?: string; dir?: 'north' | 'south' | 'east' | 'west'; at: number;
 }
 /** Something placed in a room (tile coords); a resting station has `for` = the replicant it belongs to. */
-export interface WarrenItem { id: string; kind: string; room: string; x: number; y: number; by: string; for?: string; note?: string; at: number }
-export interface WarrenData { hatch?: { x: number; y: number }; rooms: WarrenRoom[]; items: WarrenItem[] }
+export interface WarrenItem { id: string; kind: string; room: string; x: number; y: number; by: string; for?: string; note?: string; at: number; /** palette index the copy chose */ tint?: number; placement?: string }
+export interface WarrenData {
+  hatch?: { x: number; y: number }; rooms: WarrenRoom[]; items: WarrenItem[];
+  /** the hole by the vessel: dug by the first copy (swings so far) */
+  entrance?: { dug: boolean; swings: number };
+  /** ruin index -> when it was last picked over for scrap (ms epoch) */
+  scavenged?: Record<string, number>;
+}
 export interface PlanetSave {
   star_id: string;
   planet_index: number;
@@ -149,6 +157,14 @@ export interface MindContext {
   kit: { head: string[]; visor: string[]; torso: string[]; arms: string[]; legs: string[]; back: string[]; headgear: string[]; colors: string[]; visors: string[]; visorLights: number[]; colorIndex: Record<string, number> };
   /** its goals so far, numbered */
   wants: string[];
+  /** the planet's materials (ember = the pool) and what things cost */
+  supplies: Record<string, number>;
+  recipes: Record<string, Record<string, number | boolean>>;
+  roomWood: Record<string, number>;
+  hasWorkbench: boolean;
+  entranceDug: boolean;
+  /** what waits on what ("Hearth waits for 2 more wood") */
+  shortages: string[];
 }
 export interface Voice { instrument: string; mood: string; tempo: string }
 export interface Body { head: string; visor: string; torso: string; arms: string; legs: string; back: string; headgear: number; primary: string; secondary: string; accent: string }
@@ -161,6 +177,8 @@ export interface MindAction {
   size?: string; beside?: string; direction?: string; purpose?: string; room?: string; item?: string; forId?: string;
   /** become: the traits the copy chose for itself (merged over its row); wants: its goals */
   traits?: ReplicantSave['traits']; wants?: Want[];
+  /** furnish: where in the room (wall, corner, center, beside) and the kit color it chose */
+  placement?: string; color?: string;
   /** melody: the voice chosen and the tune (scale degrees) */
   instrument?: string; mood?: string; tempo?: string; notes?: string;
 }
@@ -301,7 +319,7 @@ export class LocalStore implements GameStore {
       actions.push({ type: 'dig', kind, name: pick(names[kind]), size: pick(['small', 'medium', 'medium', 'large']), beside: pick(rooms), direction: pick(['north', 'south', 'east', 'west']), purpose: 'A place of our own under the ground.' });
     } else if (rooms.length > 1 && Math.random() < 0.55) {
       const item = !ctx.hasRest ? 'rest' : pick(['lamp', 'bench', 'shelf', 'workbench', 'planter', 'mural', 'crate', 'rest']);
-      actions.push({ type: 'furnish', room: pick(rooms.slice(1)), item, forId: item === 'rest' ? me.id : undefined });
+      actions.push({ type: 'furnish', room: pick(rooms.slice(1)), item, forId: item === 'rest' ? me.id : undefined, placement: pick(['', 'wall', 'corner', 'center']), color: pick(['', 'cyan', 'gold', 'moss', 'plum']) });
     }
     const received = this.db.mail.filter((m) => m.to_replicant === me.id && !m.read_at && Date.parse(m.arrives_at) <= now);
     for (const m of received) m.read_at = new Date(now).toISOString();

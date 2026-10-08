@@ -146,6 +146,7 @@ src/entities/Warren.ts   the warren at runtime: the hatch by the base, which cop
                          sleep, swing timers, the home drive, saving (planet_states.data.warren)
 src/scenes/WarrenScene   underground view over the paused planet: walk, dash, lanterns, sleepers in pods, diggers at
                          the rock face; the ladder takes you back up
+src/data/supplies.json   materials (stone, soil, wood, water, food, scrap, Ember), yields, production, storage, recipes
 src/data/parts.json      the parts kit: heads, visors, torsos, arms, legs (or treads / hover), back pieces, named colors, poses
 src/core/bodyRender.ts   composes a 16x20 x 14 frame body from the kit + a spec (pure; tools/body-preview.mjs runs it in Node)
 src/core/body.ts         bodyFor(): the texture for a replicant (composed and cached, or its hand-made model), visor anchors
@@ -678,3 +679,24 @@ dropped glyph rows (`screenshots/bubble-scaled.png`). PR #27.
 - Journal: a one-line temperament under each name and a WANTS list. `?copies=N` screenshot copies come with bodies
   and names (Ash, Wren, Pip, ...).
 - Verified: `tools/playtest-become.mjs` plus the four older playtests pass. Traits schema v1 documented above.
+
+**3a-c. The hole, digging that yields, a material economy.**
+- The hatch is a hole in the ground (`tools/sprites/hatch.json`, 32x24): a scraped mark, a pit, then a dark oval
+  with a lit rim, the ladder's top and a dirt pile with pebbles. It sits a few tiles from the vessel (new planets;
+  a planet that already had a hatch keeps it). The first copy on a planet walks over and digs it (14 swings, dirt
+  flies, the pile grows; `Warren.digEntrance`, a surface chore); only then can anyone go down. Offline, a copy
+  digs it in the first quarter hour away.
+- Supplies per planet (`planet_states.data.supplies`; Ember stays the pool): stone and soil from digging (the
+  entrance 4 + 3, rooms 0.3 + 0.2 per tile), wood from felled trees (3 each, the logs arc to the hatch), water from
+  dug pools and food from planters and surface gardens (per real hour, live and while away), scrap from
+  scavenging an opened ruin (2, once per 30 min per ruin). Storage: 12 of each plus 10 per shelf. Icons in
+  `tools/sprites/supplies.json`; `flyMaterial` carries them to the hatch.
+- Rooms cost timber to shore up (small 1, medium 2, large 4 wood) and digging time; the village work pool now pays
+  for the surface village only. Every furnishing has a recipe (`supplies.json recipes`; bench / shelf / planter /
+  mural need a workbench in the warren). The mind sees the supplies, the recipes, what each planned room waits
+  for, and `furnish` refuses with "needs 2 more wood"; the autopilot cuts a tree when wood is short for a dig or
+  a bed, and scavenges when scrap is low. Journal: SUPPLIES line and what waits on what.
+- 3e done here too: `furnish` takes a placement (wall, corner, center, beside an item kind) and one of the kit's
+  colors; the item is tinted (lamps, planters and workbenches keep their own colors).
+- Verified: `playtest-warren.mjs` (entrance dug by a copy, stone won, a room spends wood, an unaffordable recipe is
+  refused, a bed made from stone and wood) and the other five pass. `screenshots/warren-hole.png`.

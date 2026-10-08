@@ -1,0 +1,33 @@
+{
+  "_doc": "The material economy that ties the surface to the bunker. Supplies are per planet (planet_states.data.supplies), shared by every copy; Ember is the planet's Ember pool. Sources: stone and soil from digging (digYield per tile, the entrance has its own), wood from felled trees (treeWood each, carried to the hatch), water from dug pool rooms and food from planters and surface gardens (production per real hour, live and while nobody plays), scrap from scavenging opened ruins (scrapPerRuin, once per ruinCooldownMinutes). Storage: baseCap of each material, plus shelfCap per shelf in the warren. roomWood: timber to shore up a room before it is dug. recipes: what each furnishing takes (ember draws on the Ember pool); bench = needs a workbench in the warren. icons: frames in tools/sprites/supplies.json.",
+  "materials": {
+    "stone": { "icon": 0, "color": 21 },
+    "soil": { "icon": 1, "color": 4 },
+    "wood": { "icon": 2, "color": 5 },
+    "water": { "icon": 3, "color": 17 },
+    "food": { "icon": 4, "color": 12 },
+    "scrap": { "icon": 5, "color": 9 },
+    "ember": { "icon": 6, "color": 10 }
+  },
+  "baseCap": 12,
+  "shelfCap": 10,
+  "digYield": { "stonePerTile": 0.3, "soilPerTile": 0.2 },
+  "entrance": { "swings": 14, "yield": { "stone": 4, "soil": 3 } },
+  "roomWood": { "small": 1, "medium": 2, "large": 4 },
+  "treeWood": 3,
+  "scrapPerRuin": 2,
+  "ruinCooldownMinutes": 30,
+  "production": { "waterPerPoolHour": 4, "foodPerPlanterHour": 2, "foodPerGardenHour": 1 },
+  "recipes": {
+    "rest": { "stone": 2, "wood": 1 },
+    "lamp": { "scrap": 1, "ember": 2 },
+    "bench": { "wood": 2, "bench": true },
+    "shelf": { "wood": 2, "stone": 1, "bench": true },
+    "workbench": { "wood": 3, "scrap": 1 },
+    "planter": { "wood": 1, "soil": 2, "bench": true },
+    "mural": { "stone": 1, "ember": 1, "bench": true },
+    "crate": { "wood": 1 }
+  },
+  "placements": ["wall", "corner", "center", "beside"],
+  "offline": { "maxRoomsDugAway": 3 }
+}

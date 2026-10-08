@@ -43,6 +43,12 @@ interface Context {
   blank?: boolean;                // born blank: this wake is the becoming
   kit?: { head: string[]; visor: string[]; torso: string[]; arms: string[]; legs: string[]; back: string[]; headgear: string[]; colors: string[]; visors: string[]; visorLights: number[]; colorIndex: Record<string, number> };
   wants?: string[];               // its goals, numbered
+  supplies?: Record<string, number>;      // the planet's materials (ember = the pool)
+  recipes?: Record<string, Record<string, number | boolean>>;
+  roomWood?: Record<string, number>;      // timber a room of each size takes before it is dug
+  hasWorkbench?: boolean;
+  entranceDug?: boolean;
+  shortages?: string[];
 }
 
 interface Replicant {
@@ -144,14 +150,17 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "furnish",
-    description: "Put something in a room of the warren: a resting station (a bed: yours, or for another copy named in `for`), a lamp, a bench, a shelf, a workbench, a planter, a mural in your colors, a crate. Only dug rooms show it right away; a planned room gets it once dug.",
+    description: "Put something in a room of the warren, paid from the supplies (the recipes are listed): a resting station (a bed: yours, or for another copy named in `for`), a lamp, a bench, a shelf, a workbench, a planter, a mural, a crate. Say where it goes and in which of your colors. Only dug rooms show it right away; a planned room gets it once dug.",
     strict: true,
     input_schema: {
-      type: "object", additionalProperties: false, required: ["room", "item", "for"],
+      type: "object", additionalProperties: false, required: ["room", "item", "for", "placement", "beside", "color"],
       properties: {
         room: { type: "string", description: "The exact name of the room." },
         item: { type: "string", enum: ["rest", "lamp", "bench", "shelf", "workbench", "planter", "mural", "crate"] },
         for: { type: "string", description: "For a resting station: \"me\" or the exact name of the copy it is for. Otherwise \"\"." },
+        placement: { type: "string", enum: ["", "wall", "corner", "center", "beside"], description: "Where in the room; empty lets it find its own place." },
+        beside: { type: "string", description: "With placement beside: the kind of item to stand next to (e.g. lamp). Otherwise \"\"." },
+        color: { type: "string", description: "One of the kit's color names to paint it, or \"\" for its own." },
       },
     },
   },
@@ -294,6 +303,12 @@ Deno.serve(async (req) => {
     lines.push(`You are ${context.weariness ?? "rested"}.${context.hasRest ? "" : context.warren?.length ? " You have no resting station of your own: furnish a dug room with item rest, for me." : " You have nowhere to sleep yet."}`);
     if (context.warren?.length) lines.push(`The warren (${context.warrenFull ? "no room for more digging" : "there is space to dig more"}):\n${context.warren.join("\n")}\nYou may name these rooms: ${(context.warrenRooms ?? []).join(", ")}.`);
     else lines.push(`Nothing is dug beneath the base yet. The warren begins with the first dig_room (beside "Entrance").`);
+    if (context.supplies) {
+      const sup = Object.entries(context.supplies).map(([m, n]) => `${m} ${Math.floor(n)}`).join(", ");
+      lines.push(`Supplies here (shared, kept at the base and on shelves): ${sup}.${context.hasWorkbench ? " There is a workbench." : " No workbench yet (shelves, planters, murals and benches need one)."}`);
+      if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench").map(([m, n]) => `${n} ${m}`).join(" + ")}${r.bench ? " (workbench)" : ""}`).join("; ")}. A room takes wood to shore up before it is dug: ${Object.entries(context.roomWood ?? {}).map(([s, n]) => `${s} ${n}`).join(", ")}. Digging yields stone and soil; felled trees give wood; opened ruins give scrap; pools give water; planters and gardens give food.`);
+      if (context.shortages?.length) lines.push(`Waiting on: ${context.shortages.join("; ")}.`);
+    }
     if (context.events.length) lines.push(`Since you last woke: ${context.events.join("; ")}.`);
     if (context.reflect) lines.push(`It has been a while. Look over your notes and, with remember, write one line that sums up what matters to you now; let the rest go.`);
     if (context.wants?.length) lines.push(`Your wants:\n${context.wants.join("\n")}`);
@@ -398,7 +413,15 @@ Deno.serve(async (req) => {
             const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
             const room = String(input.room ?? "");
             const item = String(input.item ?? "lamp");
+            const recipe = context.recipes?.[item];
+            const short: string[] = [];
+            if (recipe) for (const [m, n] of Object.entries(recipe)) {
+              if (m === "bench") { if (n && !context.hasWorkbench) short.push("a workbench"); continue; }
+              const have = Math.floor(context.supplies?.[m] ?? 0);
+              if (have < (n as number)) short.push(`${(n as number) - have} more ${m}`);
+            }
             if (!rooms.includes(room.toLowerCase())) out = `No room called ${room}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
+            else if (short.length) out = `Not yet: a ${item} needs ${short.join(", ")}.`;
             else {
               let forId: string | undefined, forName = "";
               if (item === "rest") {
@@ -408,8 +431,10 @@ Deno.serve(async (req) => {
                 if (!forId) out = `No replicant named ${input.for}.`;
               }
               if (out === "ok") {
-                actions.push({ type: "furnish", room, item, forId, detail: forName });
-                out = item === "rest" ? `A resting station for ${forName} goes in ${room}.` : `A ${item} goes in ${room}.`;
+                const placement = String(input.placement ?? ""), beside = String(input.beside ?? ""), color = String(input.color ?? "");
+                if (recipe) for (const [m, n] of Object.entries(recipe)) if (m !== "bench" && context.supplies) context.supplies[m] = (context.supplies[m] ?? 0) - (n as number);
+                actions.push({ type: "furnish", room, item, forId, detail: forName, placement, beside, color });
+                out = item === "rest" ? `A resting station for ${forName} goes in ${room}${placement ? ", by the " + placement : ""}.` : `A ${item} goes in ${room}${placement ? ", " + placement : ""}${color ? ", in " + color : ""}.`;
               }
             }
           } else if (u.name === "choose_body") {

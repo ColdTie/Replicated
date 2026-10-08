@@ -123,7 +123,7 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
     // the ladder up, on the back wall of the Entrance; a little daylight falls down the shaft
     const lt = ladderTile();
     this.ladder = { x: lt.x * 16 + 8, y: lt.y * 16 };
-    this.add.sprite(this.ladder.x, this.ladder.y, tex('hatch', p.id), 2).setOrigin(0.5, 1).setDepth(DEPTH.walls);
+    this.add.sprite(this.ladder.x, this.ladder.y, tex('hatch', p.id), 3).setOrigin(0.5, 1).setDepth(DEPTH.walls);
     const day = 1 - this.host.env.night * 0.75;
     this.ladderLight = this.lighting.add({ x: this.ladder.x, y: this.ladder.y + 4, radius: 44, color: 0xb8c8ff, intensity: 0.5 + 0.5 * day });
     this.add.image(this.ladder.x, this.ladder.y + 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[20]).setAlpha(0.08 + 0.1 * day).setScale(0.8, 0.5).setDepth(DEPTH.glow);
@@ -178,7 +178,8 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
     if (!def) return;
     const x = it.x * 16 + 8, y = it.y * 16 + 16;
     const sprite = this.add.sprite(x, y, tex('warren', this.host.planet.id), def.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + y - 2);
-    if (it.kind === 'mural') {
+    if (it.tint !== undefined && !['lamp', 'planter', 'workbench'].includes(it.kind)) sprite.setTint(PALETTE[it.tint]);
+    else if (it.kind === 'mural') {
       const by = this.host.npcs.find((n) => n.data.id === it.by);
       sprite.setTint(by?.trailColor ?? PALETTE[18]);
     }
