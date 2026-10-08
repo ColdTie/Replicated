@@ -95,7 +95,7 @@ export class PlanetScene extends Phaser.Scene {
   private home = new Phaser.Math.Vector2();
   private stopped = false;
   private seed?: number;
-  private shot = false;
+  shot = false;
   /** Screenshot mode: enemies hold still. */
   private frozen = false;
 
@@ -120,6 +120,8 @@ export class PlanetScene extends Phaser.Scene {
   mindLog: { t: number; text: string }[] = [];
   private everyone: ReplicantSummary[] = [];
   private chorusAt = Infinity;
+  /** ms the minds have been running: advanced by this scene, and by the warren while the planet is paused */
+  mindClock = 0;
   trees: { index: number; x: number; y: number; sprite: Phaser.GameObjects.Sprite; zone: Phaser.GameObjects.Zone; alive: boolean }[] = [];
   private saving = false;
   private lastSaveAt = 0;
@@ -699,7 +701,7 @@ export class PlanetScene extends Phaser.Scene {
     this.updateVesselCue(time, dt);
     this.warren.update(dt);
     if (time > this.hatchReadyAt && this.player.alive && !this.player.locked && !this.stopped && this.warren.playerOnHatch()) this.descend();
-    this.updateMinds(time);
+    this.tickMinds(dt);
     this.watchFps(time);
     this.env.update(dt);
     this.lighting.update(dt);
@@ -1141,8 +1143,8 @@ export class PlanetScene extends Phaser.Scene {
     if (params.has('sing')) this.time.delayedCall(1500, () => this.npcs[0]?.sing(MIND.canned.songs[0], this.canHear()));
     if (this.shot || this.visit) return;
     const me = session.replicant;
-    this.mindLog.push({ t: this.time.now, text: `${me?.name ?? 'the original'} ${this.arrival ? 'landed here in the vessel' : 'is here'}` });
-    this.chorusAt = this.time.now + 30_000 + Math.random() * 40_000;
+    this.mindLog.push({ t: this.mindClock, text: `${me?.name ?? 'the original'} ${this.arrival ? 'landed here in the vessel' : 'is here'}` });
+    this.chorusAt = this.mindClock + 30_000 + Math.random() * 40_000;
     session.store?.listReplicants().then((all) => { this.everyone = all; }).catch(() => undefined);
   }
 
@@ -1193,7 +1195,7 @@ export class PlanetScene extends Phaser.Scene {
     const d = (p: { x: number; y: number }) => Math.hypot(p.x - npc.x, p.y - npc.y);
     if (npc.below) {
       const b = this.warren.below.get(npc);
-      out.push(b?.task === 'dig' ? `the rock face of ${b.room?.name ?? 'a room'} you are digging` : b?.task === 'rest' ? 'your resting station' : 'the warren around you');
+      out.push(b?.task === 'dig' ? `the rock face of ${b.room?.name ?? 'a room'} you are digging` : b?.task === 'rest' ? 'your resting station' : b?.task === 'linger' && b.item ? `the ${b.item.kind} in ${this.warren.nameOfRoom(b.item.room)} you are resting by` : 'the warren around you');
       const others = [...this.warren.below.keys()].filter((n) => n !== npc);
       if (others.length) out.push(`${others.map((n) => n.data.name).join(' and ')} ${others.length > 1 ? 'are' : 'is'} down here too`);
       return out;
@@ -1223,7 +1225,7 @@ export class PlanetScene extends Phaser.Scene {
     if (!st || this.mindBusy) return;
     this.mindBusy = true;
     this.wakeCount.set(npc, (this.wakeCount.get(npc) ?? 0) + 1);
-    const t = this.time.now;
+    const t = this.mindClock;
     try {
       const res = await st.mindTick(npc.data.id, this.mindContext(npc));
       this.lastWake.set(npc, t);
@@ -1236,7 +1238,7 @@ export class PlanetScene extends Phaser.Scene {
         npc.data.traits.voice = { instrument: melody.instrument ?? 'hum', mood: melody.mood ?? 'bright', tempo: melody.tempo ?? 'walking' };
         if (hear) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} SINGS ON THE ${String(melody.instrument).toUpperCase()}`);
       }
-      if (res.song) this.time.delayedCall(res.received?.length ? 900 : 0, () => npc.sing(res.song!, hear, { notes: melody?.notes || undefined }));
+      if (res.song) { const say = () => { if (this.npcs.includes(npc)) npc.sing(res.song!, hear, { notes: melody?.notes || undefined }); }; if (res.received?.length) setTimeout(say, 900); else say(); }
       for (const a of res.actions ?? []) {
         if (a.type === 'mail') {
           const to = this.npcs.find((n) => n.data.id === a.toId);
@@ -1267,8 +1269,11 @@ export class PlanetScene extends Phaser.Scene {
     }
   }
 
-  private updateMinds(time: number) {
+  /** Advances the minds' clock; the warren view calls this too, so the copies keep waking while you are below. */
+  tickMinds(dt: number) {
     if (this.shot || this.visit || this.stopped || !session.store || !this.npcs.length) return;
+    this.mindClock += dt;
+    const time = this.mindClock;
     this.firstWakeAt ??= time + MIND.firstWakeMs;
     this.npcs.forEach((n, i) => { if (!this.nextWake.has(n)) this.nextWake.set(n, this.firstWakeAt! + i * MIND.staggerMs); });
     if (!this.mindBusy) {
@@ -1279,7 +1284,7 @@ export class PlanetScene extends Phaser.Scene {
         break;
       }
     }
-    if (time > this.chorusAt) {
+    if (time > this.chorusAt && !this.warren.view) {
       this.chorusAt = time + (4 + Math.random() * 3) * 60_000;
       this.chorus();
     }
@@ -1310,7 +1315,7 @@ export class PlanetScene extends Phaser.Scene {
           this.tweens.add({ targets: tree.sprite, alpha: 0, duration: 1200, delay: 600, onComplete: () => tree.sprite.destroy() });
         } });
         this.pending.felled = [...new Set([...(session.planet?.data.felled ?? []), ...(this.pending.felled ?? []), tree.index])];
-        this.mindLog.push({ t: this.time.now, text: `${npc.data.name} cut down a tree near the base` });
+        this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} cut down a tree near the base` });
         if (this.canHear()) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} CUT DOWN A TREE`);
       },
     });
@@ -1329,7 +1334,7 @@ export class PlanetScene extends Phaser.Scene {
       done: () => {
         if (!this.village.remove(s)) return;
         if (Math.hypot(this.player.x - s.x, this.player.y - s.y) < 220) sound.pop();
-        this.mindLog.push({ t: this.time.now, text: `${npc.data.name} took down its ${s.type}` });
+        this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} took down its ${s.type}` });
         if (this.canHear()) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} TOOK DOWN A ${s.type.toUpperCase()}`);
       },
     });
@@ -1508,12 +1513,12 @@ export class PlanetScene extends Phaser.Scene {
     if (r.kind === 'listen') {
       // the Plaything moment: from now on their songs are words, and they greet it with a chorus
       this.game.events.emit('notice', `${who} HEARS THEM NOW`);
-      this.mindLog.push({ t: this.time.now, text: `${rep?.name ?? 'the original'} found the listening module in a ruin and can understand you from now on` });
+      this.mindLog.push({ t: this.mindClock, text: `${rep?.name ?? 'the original'} found the listening module in a ruin and can understand you from now on` });
       this.time.delayedCall(1400, () => this.chorus(true));
     } else {
       this.game.events.emit('notice', `${who} GETS +20% ${r.kind.toUpperCase()}`);
     }
-    this.mindLog.push({ t: this.time.now, text: `${rep?.name ?? 'the original'} opened a ruin door and took its ${r.kind} module` });
+    this.mindLog.push({ t: this.mindClock, text: `${rep?.name ?? 'the original'} opened a ruin door and took its ${r.kind} module` });
   }
 
   surfaceAt(x: number, y: number): 'grass' | 'stone' | 'water' | 'void' {

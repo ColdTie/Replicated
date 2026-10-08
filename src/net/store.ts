@@ -17,7 +17,7 @@ export interface ReplicantSave {
   profile_id: string | null;
   name: string;
   model: string;
-  traits: { awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number; sparks?: number; look?: string; voice?: Voice };
+  traits: { awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number; sparks?: number; look?: string; voice?: Voice; weary?: number; sleptAt?: number };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
   generation?: number;

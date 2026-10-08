@@ -58,6 +58,16 @@ export function paintWarren(d: WarrenData, accent: [number, number, number], see
         if (rng() < 0.03) col = mix(col, rock2, 0.5);
         put(px, py, col);
       }
+    } else if (c === CAVE.water) {
+      // still water: deep teal, slow ripples, a pale lip where it meets the walkway
+      const n = fbm(px * 0.08, py * 0.08, seed + 41);
+      const ripple = 0.5 + 0.5 * Math.sin(px * 0.3 + py * 0.18 + n * 7);
+      let col = mix(mix(P(15), P(16), n * 0.6), P(17), ripple * 0.12);
+      const edge = at(tx, ty - 1) !== CAVE.water && (py & 15) === 0 || at(tx - 1, ty) !== CAVE.water && (px & 15) === 0
+        || at(tx, ty + 1) !== CAVE.water && (py & 15) === 15 || at(tx + 1, ty) !== CAVE.water && (px & 15) === 15;
+      if (edge) col = mix(col, P(17), 0.5);
+      if (at(tx, ty - 1) !== CAVE.water && (py & 15) < 4) col = mix(col, rock0, 0.35 - (py & 15) * 0.08);
+      put(px, py, col);
     } else if (c === CAVE.planned) {
       // unlit rock with a chalk outline: what the copies mean to dig
       const n = fbm(px * 0.12, py * 0.12, seed + 1);

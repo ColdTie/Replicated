@@ -65,7 +65,8 @@ export class Npc {
     this.nextBuild = scene.time.now + 3500 + Math.random() * 5000;
     const [lo, hi] = WARREN.rest.nightFrom;
     this.nightFrom = lo + ((this.voiceSeed >>> 8) % 100) / 100 * (hi - lo);
-    this.weary = Math.min(0.6, ((this.voiceSeed >>> 16) % 100) / 160);
+    // how tired it is carries over; a copy that slept while you were away comes back rested (Warren checks the bed)
+    this.weary = data.traits.weary ?? Math.min(0.6, ((this.voiceSeed >>> 16) % 100) / 160);
     this.sync();
   }
 
@@ -366,7 +367,7 @@ export class Npc {
    * (the chorus plays its own sound).
    */
   sing(text: string, readable: boolean, opts: { silent?: boolean; harmony?: boolean; notes?: string } = {}) {
-    if (this.state === 'below') return; // underground: nobody up here hears it
+    if (this.state === 'below') { this.scene.warren.view?.sing(this, text, readable, opts); return; } // sung down in the warren
     const sc = this.scene;
     const p = sc.player;
     const dp = Math.hypot(p.x - this.x, p.y - this.y);
@@ -382,31 +383,7 @@ export class Npc {
       this.hop();
     }
     this.bubble?.destroy();
-    const items: Phaser.GameObjects.GameObject[] = [];
-    let w: number, h: number;
-    if (readable) {
-      const t = sc.add.bitmapText(0, -3, 'pixel', text.toUpperCase()).setMaxWidth(118).setTint(PALETTE[20]).setOrigin(0.5, 1).setCenterAlign();
-      w = t.width + 8; h = t.height + 6;
-      items.push(t);
-    } else {
-      const words = text.split(/\s+/).filter(Boolean).length;
-      const n = Math.max(2, Math.min(12, words));
-      const g = sc.add.graphics();
-      g.fillStyle(this.trailColor, 1);
-      let hh = this.voiceSeed;
-      for (let i = 0; i < n; i++) {
-        hh = (hh * 1103515245 + 12345) >>> 0;
-        const rune = RUNES[hh % RUNES.length];
-        const ox = -Math.floor((n * 6) / 2) + i * 6;
-        rune.forEach((row, ry) => row.split('').forEach((c, rx) => { if (c === '#') g.fillRect(ox + rx, -9 + ry, 1, 1); }));
-      }
-      w = n * 6 + 6; h = 12;
-      items.push(g);
-    }
-    const box = sc.add.rectangle(0, 0, w, h, PALETTE[25], 0.88).setOrigin(0.5, 1).setStrokeStyle(1, this.trailColor, 0.9);
-    const tail = sc.add.rectangle(0, 1, 2, 2, this.trailColor, 0.9).setOrigin(0.5, 0);
-    this.bubble = sc.add.container(0, 0, [box, tail, ...items]).setDepth(6200).setAlpha(0);
-    sc.tweens.add({ targets: this.bubble, alpha: 1, duration: 200 });
+    this.bubble = makeBubble(sc, text, readable, this.trailColor, this.voiceSeed);
     this.bubbleUntil = sc.time.now + MIND.bubbleMs * (readable ? 0.8 + text.length / 90 : 0.7);
     this.sync();
   }
@@ -438,6 +415,36 @@ export class Npc {
     this.bubble?.setPosition(x, y - 24 - Math.round(this.z));
     this.updateBubble(this.scene.time.now);
   }
+}
+
+/** A song bubble: readable words in the pixel font, or runes in the singer's color until the replicant can hear. */
+export function makeBubble(sc: Phaser.Scene, text: string, readable: boolean, color: number, seed: number) {
+  const items: Phaser.GameObjects.GameObject[] = [];
+  let w: number, h: number;
+  if (readable) {
+    const t = sc.add.bitmapText(0, -3, 'pixel', text.toUpperCase()).setMaxWidth(118).setTint(PALETTE[20]).setOrigin(0.5, 1).setCenterAlign();
+    w = t.width + 8; h = t.height + 6;
+    items.push(t);
+  } else {
+    const words = text.split(/\s+/).filter(Boolean).length;
+    const n = Math.max(2, Math.min(12, words));
+    const g = sc.add.graphics();
+    g.fillStyle(color, 1);
+    let hh = seed;
+    for (let i = 0; i < n; i++) {
+      hh = (hh * 1103515245 + 12345) >>> 0;
+      const rune = RUNES[hh % RUNES.length];
+      const ox = -Math.floor((n * 6) / 2) + i * 6;
+      rune.forEach((row, ry) => row.split('').forEach((c, rx) => { if (c === '#') g.fillRect(ox + rx, -9 + ry, 1, 1); }));
+    }
+    w = n * 6 + 6; h = 12;
+    items.push(g);
+  }
+  const box = sc.add.rectangle(0, 0, w, h, PALETTE[25], 0.88).setOrigin(0.5, 1).setStrokeStyle(1, color, 0.9);
+  const tail = sc.add.rectangle(0, 1, 2, 2, color, 0.9).setOrigin(0.5, 0);
+  const bubble = sc.add.container(0, 0, [box, tail, ...items]).setDepth(6200).setAlpha(0);
+  sc.tweens.add({ targets: bubble, alpha: 1, duration: 200 });
+  return bubble;
 }
 
 /** Little 5x5 runes for songs you cannot read yet. */
