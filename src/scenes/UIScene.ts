@@ -98,6 +98,8 @@ export class UIScene extends Phaser.Scene {
       }
       touch.active = true;
       this.touchUi.setVisible(true);
+      // a tap on the corner label (place and who lives here) opens the journal
+      if (p.x < 130 && p.y > 14 && p.y < 70) { this.game.events.emit('journal'); return; }
       if (p.x < width * 0.45 && this.stickPointer === null) {
         this.stickPointer = p.id;
         this.stickOrigin.set(p.x, p.y);

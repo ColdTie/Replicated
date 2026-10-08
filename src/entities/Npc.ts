@@ -3,7 +3,7 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, featureTex } from '../core/assets';
-import { PALETTE, PLAYER, VILLAGE } from '../core/data';
+import { MIND, PALETTE, PLAYER, VILLAGE } from '../core/data';
 import { DRIFT, stat } from '../core/drift';
 import type { Light } from '../fx/Lighting';
 import type { ReplicantSave } from '../net/store';
@@ -250,6 +250,80 @@ export class Npc {
     this.until = time + 1200;
   }
 
+  // --- the copy's voice ---
+
+  private bubble?: Phaser.GameObjects.Container;
+  private bubbleUntil = 0;
+
+  /** Every copy sounds like itself: a seed from its id. */
+  get voiceSeed() {
+    let h = 2166136261;
+    for (const c of this.data.id) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+    return h;
+  }
+
+  /**
+   * Say something out loud: the song plays and a bubble floats over the head. Readable only once the player can
+   * hear them; before that the words are runes in the copy's trail color. `silent` shows the bubble without the song
+   * (the chorus plays its own sound).
+   */
+  sing(text: string, readable: boolean, opts: { silent?: boolean; harmony?: boolean } = {}) {
+    const sc = this.scene;
+    const p = sc.player;
+    const dp = Math.hypot(p.x - this.x, p.y - this.y);
+    const len = opts.silent ? 2 : (dp < 260 ? sound.sing(this.voiceSeed, text, { harmony: opts.harmony, pan: Math.max(-0.7, Math.min(0.7, (this.x - p.x) / 200)) }) : 0);
+    if (this.state === 'idle' || this.state === 'walk' || this.state === 'greet') {
+      this.state = 'greet';
+      this.until = sc.time.now + Math.max(900, len * 1000);
+      this.sprite.setFlipX(p.x < this.x);
+      this.hop();
+    }
+    this.bubble?.destroy();
+    const items: Phaser.GameObjects.GameObject[] = [];
+    let w: number, h: number;
+    if (readable) {
+      const t = sc.add.bitmapText(0, -3, 'pixel', text.toUpperCase()).setMaxWidth(118).setTint(PALETTE[20]).setOrigin(0.5, 1).setCenterAlign();
+      w = t.width + 8; h = t.height + 6;
+      items.push(t);
+    } else {
+      const words = text.split(/\s+/).filter(Boolean).length;
+      const n = Math.max(2, Math.min(12, words));
+      const g = sc.add.graphics();
+      g.fillStyle(this.trailColor, 1);
+      let hh = this.voiceSeed;
+      for (let i = 0; i < n; i++) {
+        hh = (hh * 1103515245 + 12345) >>> 0;
+        const rune = RUNES[hh % RUNES.length];
+        const ox = -Math.floor((n * 6) / 2) + i * 6;
+        rune.forEach((row, ry) => row.split('').forEach((c, rx) => { if (c === '#') g.fillRect(ox + rx, -9 + ry, 1, 1); }));
+      }
+      w = n * 6 + 6; h = 12;
+      items.push(g);
+    }
+    const box = sc.add.rectangle(0, 0, w, h, PALETTE[25], 0.88).setOrigin(0.5, 1).setStrokeStyle(1, this.trailColor, 0.9);
+    const tail = sc.add.rectangle(0, 1, 2, 2, this.trailColor, 0.9).setOrigin(0.5, 0);
+    this.bubble = sc.add.container(0, 0, [box, tail, ...items]).setDepth(6200).setAlpha(0);
+    sc.tweens.add({ targets: this.bubble, alpha: 1, duration: 200 });
+    this.bubbleUntil = sc.time.now + MIND.bubbleMs * (readable ? 0.8 + text.length / 90 : 0.7);
+    this.sync();
+  }
+
+  /** A letter reached this copy: a small glint over its head. */
+  receiveLetter() {
+    const p = this.scene.player;
+    if (Math.hypot(p.x - this.x, p.y - this.y) < 260) sound.letter();
+    this.scene.fx.sparks(this.x, this.y - 18, this.trailColor, 6);
+  }
+
+  private updateBubble(time: number) {
+    if (!this.bubble) return;
+    if (time > this.bubbleUntil) {
+      const b = this.bubble;
+      this.bubble = undefined;
+      this.scene.tweens.add({ targets: b, alpha: 0, y: b.y - 4, duration: 400, onComplete: () => b.destroy() });
+    }
+  }
+
   sync() {
     const x = Math.round(this.x), y = Math.round(this.y);
     this.sprite.setPosition(x, y + 3 - Math.round(this.z));
@@ -258,5 +332,21 @@ export class Npc {
     this.carried?.setPosition(x, y - 22 + Math.sin(this.scene.time.now / 200));
     this.light.x = x; this.light.y = y - 9;
     this.gear.sync();
+    this.bubble?.setPosition(x, y - 24 - Math.round(this.z));
+    this.updateBubble(this.scene.time.now);
   }
 }
+
+/** Little 5x5 runes for songs you cannot read yet. */
+const RUNES = [
+  ['#...#', '.#.#.', '..#..', '.#.#.', '#...#'],
+  ['..#..', '.###.', '#.#.#', '..#..', '..#..'],
+  ['#####', '....#', '..##.', '.#...', '#####'],
+  ['.###.', '#...#', '#...#', '#...#', '.###.'],
+  ['#....', '##...', '#.#..', '#..#.', '#...#'],
+  ['..#..', '..#..', '#####', '..#..', '..#..'],
+  ['#...#', '#...#', '.###.', '..#..', '..#..'],
+  ['.#.#.', '#.#.#', '.#.#.', '#.#.#', '.#.#.'],
+  ['#####', '#...#', '#...#', '#...#', '#####'],
+  ['....#', '...#.', '..#..', '.#...', '#....'],
+];

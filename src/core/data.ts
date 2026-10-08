@@ -9,6 +9,7 @@ import backendJson from '../data/backend.json';
 import dayJson from '../data/daycycle.json';
 import villageJson from '../data/village.json';
 import beaconJson from '../data/beacon.json';
+import mindJson from '../data/mind.json';
 
 export interface PlanetDef {
   id: string;
@@ -58,6 +59,7 @@ export const BACKEND = backendJson;
 export const DAYCYCLE = dayJson;
 export const VILLAGE = villageJson;
 export const BEACON = beaconJson;
+export const MIND = mindJson;
 export type GuardianDef = (typeof beaconJson)['guardian'];
 
 export const hex = (s: string) => parseInt(s, 16);

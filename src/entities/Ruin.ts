@@ -8,7 +8,7 @@ import type { PlanetScene } from '../scenes/PlanetScene';
 import { DECOR } from '../world/planetGen';
 import { flashWhite, squash } from './Player';
 
-export const MODULES = ['light', 'dash', 'swing'] as const;
+export const MODULES = ['light', 'dash', 'swing', 'listen'] as const;
 export type ModuleKind = (typeof MODULES)[number];
 
 type CoreState = 'machine' | 'ground' | 'carried' | 'home';
@@ -169,7 +169,7 @@ export class Ruin {
 
   private showModule(animate: boolean) {
     const { x, y } = this.inside;
-    const color = this.kind === 'light' ? PALETTE[11] : this.kind === 'dash' ? PALETTE[18] : PALETTE[19];
+    const color = this.kind === 'light' ? PALETTE[11] : this.kind === 'dash' ? PALETTE[18] : this.kind === 'listen' ? PALETTE[9] : PALETTE[19];
     this.module = this.scene.add.image(x, y - 10, 'module', MODULES.indexOf(this.kind)).setDepth(6090);
     this.moduleGlow = this.scene.add.image(x, y - 10, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(color).setAlpha(0.35).setScale(0.7).setDepth(6100);
     this.moduleLight = this.scene.lighting.add({ x, y: y - 10, radius: 44, color, intensity: 0.9, flicker: 0.1 });
