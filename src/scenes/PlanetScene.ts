@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
-import { BACKEND, BEACON, ENEMIES, ITEMS, MIND, PALETTE, PLANETS, PLAYER, STRUCTURES, VILLAGE, WARREN, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
+import { BACKEND, BEACON, BUILDINGS, ENEMIES, ITEMS, MIND, PALETTE, PLANETS, PLAYER, STRUCTURES, SUPPLIES, VILLAGE, WARREN, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
 import { closeJournal, journalOpen, openJournal } from '../ui/journal';
 import { DRIFT, replicate, stat } from '../core/drift';
 import { session } from '../core/session';
@@ -13,7 +13,9 @@ import { Hopper } from '../entities/Hopper';
 import { Npc } from '../entities/Npc';
 import { Village } from '../entities/Village';
 import { Warren } from '../entities/Warren';
+import { Buildings } from '../entities/Buildings';
 import { allRooms, demoWarren, describeWarren, restOf } from '../world/warren';
+import { PARTS } from '../core/body';
 import { planetAt } from '../world/system';
 import { Player, squash } from '../entities/Player';
 import { CrystalNode, Shard, Spark } from '../entities/Resources';
@@ -27,7 +29,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
 import { Controls } from '../input/Controls';
-import type { DoorState, MindContext, NodeState, PlanetData, PlanetSave, ReplicantSave, ReplicantSummary, WarrenData } from '../net/store';
+import type { Building, DoorState, MindContext, NodeState, PlanetData, PlanetSave, ReplicantSave, ReplicantSummary, WarrenData } from '../net/store';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
@@ -35,6 +37,21 @@ import { TRAVEL, distanceLy, fuelFor, planetFor, starById, travelMs } from '../w
 import type { StarMapData } from './StarMapScene';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
+
+const GEAR_NAMES = ['nothing', 'antennae', 'halo', 'horns', 'sprout', 'dish', 'crown'];
+
+/** The parts kit as lists of names, for a blank copy's becoming (the mind picks from these). */
+function kitLists(): MindContext['kit'] {
+  const names = (o: Record<string, unknown>) => Object.keys(o).filter((k) => !k.startsWith('_'));
+  const colorIndex: Record<string, number> = {};
+  for (const k of names(PARTS.colors)) colorIndex[k] = PARTS.colors[k];
+  const colorName = (i: number) => names(PARTS.colors).find((k) => PARTS.colors[k] === i) ?? `color ${i}`;
+  return {
+    head: names(PARTS.head.variants), visor: names(PARTS.visor.variants), torso: names(PARTS.torso.variants), arms: names(PARTS.arms.variants),
+    legs: names(PARTS.legs.variants), back: names(PARTS.back.variants), headgear: GEAR_NAMES, colors: names(PARTS.colors),
+    visors: PLAYER.featureColors.map((f) => colorName(f[1])), visorLights: PLAYER.featureColors.map((f) => f[1]), colorIndex,
+  };
+}
 
 interface InitData {
   planetId?: string;
@@ -67,7 +84,12 @@ export class PlanetScene extends Phaser.Scene {
   npcs: Npc[] = [];
   village!: Village;
   warren!: Warren;
+  buildings!: Buildings;
   embers = 0;
+  /** the planet's materials (src/data/supplies.json); Ember is `embers` */
+  supplies: Record<string, number> = {};
+  /** real hours nobody was here before this load (0 while you play) */
+  private awayHours = 0;
   env!: Environment;
 
   private atmosphere!: Atmosphere;
@@ -100,7 +122,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[] } = { embers: 0, nodes: {}, doors: {} };
   private replicating = false;
   /** Hologram visit while the replicant's ship is flying elsewhere: no position saves, no launching */
   visit: { star: string; planetIndex: number } | null = null;
@@ -213,6 +235,8 @@ export class PlanetScene extends Phaser.Scene {
     const m = this.map;
     const pw = m.w * 16, ph = m.h * 16;
     this.embers = save?.embers ?? 0;
+    this.supplies = { ...(save?.data.supplies ?? {}) };
+    this.awayHours = 0;
 
     this.lighting = new Lighting(this, hex(p.ambient), DEPTH.dark);
     this.fx = new Fx(this, PALETTE[p.accent[1]], PALETTE[p.accent[2]]);
@@ -311,8 +335,10 @@ export class PlanetScene extends Phaser.Scene {
       }
       this.nodes.push(new CrystalNode(this, n.x * 16 + 8, n.y * 16 + 10, i, hits));
     });
-    // the way down to the warren the copies dig (hatch spot kept per planet)
+    // the way down to the warren the copies dig (hatch spot kept per planet); it moved on while nobody was here
     this.warren = new Warren(this, save?.data.warren);
+    this.buildings = new Buildings(this, save?.data.buildings);
+    if (!this.shot && !this.visit) { this.warren.applyOffline(this.awayHours); this.buildings.applyOffline(this.awayHours); }
     for (const e of m.enemies) {
       const def = ENEMIES[e.type];
       const ex = e.x * 16 + 8, ey = e.y * 16 + 8;
@@ -748,7 +774,7 @@ export class PlanetScene extends Phaser.Scene {
     // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
     if (this.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
     if (p.npcTick !== undefined) this.npcTickAt = Date.now();
-    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && p.npcTick === undefined) return;
+    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && p.npcTick === undefined) return;
     this.pending = { embers: 0, nodes: {}, doors: {} };
     this.saving = true;
     try {
@@ -760,6 +786,8 @@ export class PlanetScene extends Phaser.Scene {
       if (p.beacon) data.beacon = p.beacon;
       if (p.felled) data.felled = p.felled;
       if (p.warren) data.warren = p.warren;
+      if (p.supplies) data.supplies = p.supplies;
+      if (p.buildings) data.buildings = p.buildings;
       const row = await st.applyPlanetDelta(this.planet.star, this.planet.planetIndex, p.embers, data);
       if (row) {
         this.embers = row.embers + this.pending.embers;
@@ -777,12 +805,49 @@ export class PlanetScene extends Phaser.Scene {
       this.pending.beacon ??= p.beacon;
       this.pending.felled ??= p.felled;
       this.pending.warren ??= p.warren;
+      this.pending.supplies ??= p.supplies;
+      this.pending.buildings ??= p.buildings;
     } finally {
       this.saving = false;
     }
   }
 
   // --- services used by entities ---
+
+  /** Supplies changed: write them with the next flush. */
+  markSupplies() {
+    this.pending.supplies = { ...this.supplies };
+  }
+
+  /** Embers in or out of the shared pool (recipes, gifts). */
+  addEmbers(n: number) {
+    this.embers = Math.max(0, this.embers + n);
+    this.pending.embers += n;
+    this.game.events.emit('embers', this.embers, true);
+  }
+
+  treesNearBase() {
+    const base = this.baseCenter;
+    return this.trees.filter((t) => t.alive && Math.hypot(t.x - base.x, t.y - base.y) < 240).length;
+  }
+
+  /** Material icons arc from where they were won to the hatch (or the Replicator) and join the supplies. */
+  flyMaterial(material: string, from: { x: number; y: number }, to: { x: number; y: number }, n: number) {
+    const def = (SUPPLIES.materials as Record<string, { icon: number }>)[material];
+    const count = Math.max(1, Math.round(n));
+    for (let i = 0; i < Math.min(count, 8); i++) {
+      const s = this.add.image(from.x + (Math.random() - 0.5) * 10, from.y - 8, 'supplies', def?.icon ?? 0).setDepth(6300).setAlpha(0);
+      const arc = { t: 0 };
+      const sx = s.x, sy = s.y;
+      this.tweens.add({
+        targets: arc, t: 1, delay: 120 + i * 140, duration: 700, ease: 'Sine.easeInOut',
+        onStart: () => s.setAlpha(1),
+        onUpdate: () => { s.setPosition(sx + (to.x - sx) * arc.t, sy + (to.y - 6 - sy) * arc.t - Math.sin(arc.t * Math.PI) * 26); },
+        onComplete: () => { s.destroy(); this.fx.sparks(to.x, to.y - 6, PALETTE[(SUPPLIES.materials as Record<string, { color: number }>)[material]?.color ?? 20], 2); if (Math.hypot(this.player.x - to.x, this.player.y - to.y) < 200) sound.collect(); },
+      });
+    }
+    this.warren.add(material, n);
+  }
 
   hitStop(ms: number) {
     if (this.stopped) return;
@@ -1054,6 +1119,7 @@ export class PlanetScene extends Phaser.Scene {
       const npc = new Npc(this, { ...row, id: 'pending' }, bx, by);
       this.npcs.push(npc);
       this.announceLocation();
+      this.warren.refreshHatch();
       sound.birth();
       npc.playBirth(() => {
         pl.locked = false;
@@ -1070,8 +1136,9 @@ export class PlanetScene extends Phaser.Scene {
     return true;
   }
 
-  /** The copy's name floats above it for a moment so the family knows who is who. */
-  private floatName(npc: Npc) {
+  /** The copy's name floats above it for a moment so the family knows who is who (a blank copy has none yet). */
+  floatName(npc: Npc) {
+    if (npc.data.traits.blank) return;
     const t = this.add.bitmapText(npc.x, npc.y - 30, 'pixel', npc.data.name).setOrigin(0.5).setTint(npc.trailColor).setDepth(6300).setAlpha(0);
     this.tweens.add({ targets: t, alpha: 1, y: t.y - 4, duration: 400, ease: 'Sine.easeOut' });
     this.tweens.add({ targets: t, alpha: 0, delay: 2200, duration: 600, onComplete: () => t.destroy() });
@@ -1082,8 +1149,14 @@ export class PlanetScene extends Phaser.Scene {
     const fake = Number(new URLSearchParams(location.search).get('copies') ?? 0);
     if (this.shot && fake && session.replicant) {
       let parent = session.replicant;
+      const kit = kitLists();
+      const at = <T>(a: T[], k: number) => a[k % a.length];
       for (let i = 0; i < fake; i++) {
         const r = { ...replicate(parent, this.planet.star, this.planet.planetIndex, 0, 0), id: `fake${i}` } as ReplicantSave;
+        // already themselves: a body from the kit, a visor color, a name
+        const body = { head: at(kit.head, i * 5 + 1), visor: at(kit.visor, i * 3), torso: at(kit.torso, i * 2 + 1), arms: at(kit.arms, i), legs: at(kit.legs, i * 2), back: at(kit.back, i + 1), headgear: (i * 2 + 1) % 7, primary: at(kit.colors, i * 7 + 2), secondary: at(kit.colors, i * 11 + 5), accent: at(kit.colors, i * 13 + 8) };
+        r.traits = { ...r.traits, blank: false, body, feature: at(kit.visorLights, i + 1), trail: kit.colorIndex[body.accent], gear: body.headgear };
+        r.name = at(['Ash', 'Wren', 'Pip', 'Moth', 'Ferro', 'Lark'], i);
         rows.push(r);
         parent = r;
       }
@@ -1102,6 +1175,7 @@ export class PlanetScene extends Phaser.Scene {
     this.pending.npcTick = now;
     if (!tick) return;
     const hours = Math.min(DRIFT.offlineCapHours, Math.max(0, (now - tick) / 3_600_000));
+    this.awayHours = hours;
     const gatherSum = this.npcs.reduce((s, n) => s + stat(n.data, 'gather'), 0);
     const rate = gatherSum * DRIFT.gatherPerHour;
     // building effort banks up the same way; the copies spend it in front of you once you land
@@ -1175,6 +1249,20 @@ export class PlanetScene extends Phaser.Scene {
       weariness: npc.weariness,
       around: this.aroundNpc(npc),
       reflect: (this.wakeCount.get(npc) ?? 0) % 5 === 4,
+      blank: !!npc.data.traits.blank,
+      kit: kitLists(),
+      supplies: { ...this.supplies, ember: this.embers },
+      recipes: SUPPLIES.recipes,
+      roomWood: SUPPLIES.roomWood,
+      hasWorkbench: this.warren.hasWorkbench,
+      entranceDug: this.warren.opened,
+      shortages: [...this.warren.shortages(), ...this.buildings.shortages()],
+      needs: npc.lowNeeds(),
+      mood: npc.moodWord,
+      buildings: this.buildings.describe(nameOf),
+      buildingKit: { materials: Object.keys(BUILDINGS.materials), roofs: BUILDINGS.roofs, doors: BUILDINGS.doors, minFootprint: BUILDINGS.minFootprint, maxFootprint: BUILDINGS.maxFootprint, perTile: Object.fromEntries(Object.entries(BUILDINGS.materials).map(([k, v]) => [k, v.perTile])) },
+      inventory: npc.data.traits.inventory ?? {},
+      wants: (npc.data.traits.wants ?? []).map((w, i) => `${i + 1}. ${w.text} (${w.category}${w.done ? ', done' : ''})`),
       planet: this.placeLabel,
       biome: this.planet.subtitle ?? this.planet.id,
       timeOfDay,
@@ -1252,6 +1340,20 @@ export class PlanetScene extends Phaser.Scene {
           this.cutTree(npc);
         } else if (a.type === 'demolish') {
           this.demolish(npc, a.kind ?? 'any');
+        } else if (a.type === 'become') {
+          const was = npc.data.name;
+          npc.become(a.traits ?? {}, a.name);
+          if (st.mode === 'local') st.saveReplicant(npc.data).catch(() => undefined);
+          this.announceLocation();
+          this.time.delayedCall(900, () => this.floatName(npc));
+          this.mindLog.push({ t: this.mindClock, text: `${was} became itself: it is ${npc.data.name} now` });
+          this.game.events.emit('notice', hear ? `${was.toUpperCase()} IS ${npc.data.name.toUpperCase()} NOW` : `${was.toUpperCase()} HAS BECOME ITSELF`);
+        } else if (a.type === 'wants' && a.wants) {
+          const before = (npc.data.traits.wants ?? []).filter((w) => w.done).length;
+          npc.data.traits.wants = a.wants;
+          if (a.wants.filter((w) => w.done).length > before) { npc.onWorked(true); this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} got something it wanted` }); }
+        } else if (a.type === 'building') {
+          this.buildings.propose(npc, a);
         } else if (a.type === 'dig') {
           this.warren.dig(npc, a);
         } else if (a.type === 'furnish') {
@@ -1278,6 +1380,7 @@ export class PlanetScene extends Phaser.Scene {
     this.npcs.forEach((n, i) => { if (!this.nextWake.has(n)) this.nextWake.set(n, this.firstWakeAt! + i * MIND.staggerMs); });
     if (!this.mindBusy) {
       for (const n of this.npcs) {
+        if (n.data.id === 'pending') continue; // its row is still being written
         if (time < this.nextWake.get(n)!) continue;
         this.nextWake.set(n, time + MIND.wakeMinutes * 60_000 + Math.random() * 20_000);
         void this.wake(n);
@@ -1290,14 +1393,14 @@ export class PlanetScene extends Phaser.Scene {
     }
   }
 
-  /** A copy clears the nearest standing tree near the base: walks over, swings, the tree falls and stays down. */
-  private cutTree(npc: Npc) {
+  /** A copy clears the nearest standing tree near the base: walks over, swings, the tree falls (and its timber goes to the hatch). */
+  cutTree(npc: Npc) {
     const base = this.baseCenter;
     const tree = this.trees
       .filter((t) => t.alive && Math.hypot(t.x - base.x, t.y - base.y) < 240)
       .sort((a, b) => Math.hypot(a.x - npc.x, a.y - npc.y) - Math.hypot(b.x - npc.x, b.y - npc.y))[0];
-    if (!tree) return;
-    npc.startChore({
+    if (!tree) return false;
+    return npc.startChore({
       x: tree.x, y: tree.y, swings: 6,
       swing: () => {
         this.fx.sparks(tree.x + (Math.random() - 0.5) * 6, tree.y - 10 - Math.random() * 8, PALETTE[this.planet.accent[1]], 3);
@@ -1315,7 +1418,8 @@ export class PlanetScene extends Phaser.Scene {
           this.tweens.add({ targets: tree.sprite, alpha: 0, duration: 1200, delay: 600, onComplete: () => tree.sprite.destroy() });
         } });
         this.pending.felled = [...new Set([...(session.planet?.data.felled ?? []), ...(this.pending.felled ?? []), tree.index])];
-        this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} cut down a tree near the base` });
+        this.time.delayedCall(1500, () => this.flyMaterial('wood', { x: tree.x, y: tree.y }, this.warren.hatch, SUPPLIES.treeWood));
+        this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} cut down a tree near the base (${SUPPLIES.treeWood} wood)` });
         if (this.canHear()) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} CUT DOWN A TREE`);
       },
     });
@@ -1365,7 +1469,46 @@ export class PlanetScene extends Phaser.Scene {
     for (const r of this.everyone) names[r.id] = r.name;
     if (session.replicant) names[session.replicant.id] = session.replicant.name;
     const nameOf = (id: string) => names[id] ?? this.npcs.find((n) => n.data.id === id)?.data.name ?? 'someone';
-    openJournal({ place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j, warren: this.warren.data.rooms.length ? describeWarren(this.warren.data, null, nameOf) : [] });
+    const feelings: Record<string, string> = {};
+    for (const n of this.npcs) feelings[n.data.id] = `${n.moodWord}${n.lowNeeds().length ? ': ' + n.lowNeeds().join(', ') : ''}`;
+    const actions = {
+      approve: (id: string) => { this.buildings.approve(id); void this.toggleJournal().then(() => this.toggleJournal()); },
+      veto: (id: string) => { this.buildings.veto(id); void this.toggleJournal().then(() => this.toggleJournal()); },
+      talk: (id: string, text: string) => void this.talkTo(id, text),
+      give: (id: string) => this.giveTo(id),
+    };
+    openJournal({ place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j, feelings, actions,
+      buildings: this.buildings.describe(nameOf), pending: this.buildings.list.filter((b) => !b.vetoed && !b.approved && !b.built).map((b) => ({ id: b.id, name: b.name })), warren: this.warren.data.rooms.length ? describeWarren(this.warren.data, null, nameOf) : [], supplies: this.npcs.length ? this.warren.describeSupplies() : undefined, shortages: this.warren.shortages() });
+  }
+
+  /** The original speaks to a copy: a letter that arrives at once; the copy reads it at its next wake. */
+  private async talkTo(id: string, text: string) {
+    const me = session.replicant, st = session.store;
+    const npc = this.npcs.find((n) => n.data.id === id);
+    if (!me || !st || !npc || !text.trim()) return;
+    try { await st.sendMessage(me, id, text.trim()); } catch (e) { console.warn('talk failed', e); return; }
+    npc.receiveLetter();
+    this.mindLog.push({ t: this.mindClock, text: `${me.name} spoke to ${npc.data.name}` });
+    // let it answer soon
+    this.nextWake.set(npc, Math.min(this.nextWake.get(npc) ?? Infinity, this.mindClock + 3000));
+  }
+
+  /** A gift of Embers from the pool into the copy's own hands: company and purpose lift, and it may spend them. */
+  private giveTo(id: string) {
+    const npc = this.npcs.find((n) => n.data.id === id);
+    const n = 5;
+    if (!npc || this.embers < n) { sound.denied(); return; }
+    this.addEmbers(-n);
+    const inv = (npc.data.traits.inventory ??= {});
+    inv.ember = (inv.ember ?? 0) + n;
+    npc.needs.company = Math.min(1, npc.needs.company + 0.3);
+    npc.needs.purpose = Math.min(1, npc.needs.purpose + 0.15);
+    const st = session.store;
+    if (st && !this.shot && npc.data.id !== 'pending' && !npc.data.id.startsWith('fake')) st.saveReplicant(npc.data).catch(() => undefined);
+    for (let i = 0; i < n; i++) this.time.delayedCall(i * 90, () => { const s = this.add.image(this.player.x, this.player.y - 14, 'shard').setDepth(6300); this.tweens.add({ targets: s, x: npc.x, y: npc.y - 14, duration: 500, ease: 'Quad.easeIn', onComplete: () => { s.destroy(); this.fx.sparks(npc.x, npc.y - 14, PALETTE[10], 2); } }); });
+    sound.collect();
+    this.mindLog.push({ t: this.mindClock, text: `${session.replicant?.name ?? 'the original'} gave ${npc.data.name} ${n} Ember` });
+    this.nextWake.set(npc, Math.min(this.nextWake.get(npc) ?? Infinity, this.mindClock + 3000));
   }
 
   /** Copies bring in what they gathered while you were away: a stream of Embers into the Replicator. */

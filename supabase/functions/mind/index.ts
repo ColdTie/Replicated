@@ -9,6 +9,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const MODEL = "claude-opus-5-5";
 const MIN_GAP_SECONDS = 90;        // a copy wakes at most this often
 const MAX_ROUNDS = 3;              // tool rounds per wake
+const BECOMING_ROUNDS = 6;         // the first wake of a blank copy has more to do
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -39,6 +40,20 @@ interface Context {
   weariness?: "rested" | "tired" | "weary";
   around?: string[];              // what is close to the copy right now
   reflect?: boolean;              // time to look over its notes and write one line that sums them up
+  blank?: boolean;                // born blank: this wake is the becoming
+  kit?: { head: string[]; visor: string[]; torso: string[]; arms: string[]; legs: string[]; back: string[]; headgear: string[]; colors: string[]; visors: string[]; visorLights: number[]; colorIndex: Record<string, number> };
+  wants?: string[];               // its goals, numbered
+  supplies?: Record<string, number>;      // the planet's materials (ember = the pool)
+  recipes?: Record<string, Record<string, number | boolean>>;
+  roomWood?: Record<string, number>;      // timber a room of each size takes before it is dug
+  hasWorkbench?: boolean;
+  entranceDug?: boolean;
+  shortages?: string[];
+  needs?: string[];               // low needs in words
+  mood?: "content" | "low" | "bleak";
+  buildings?: string[];
+  buildingKit?: { materials: string[]; roofs: string[]; doors: string[]; minFootprint: number[]; maxFootprint: number[]; perTile: Record<string, number> };
+  inventory?: Record<string, number>;
 }
 
 interface Replicant {
@@ -124,7 +139,7 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "dig_room",
-    description: "Design the warren: mark out a new room underground for the copies to dig. You choose what it is for, how big, and where it goes (next to which room, on which side). The copies dig it themselves when there is work in the pool. Make it a home: the layout is yours and the others'.",
+    description: "Design the warren: mark out a new room underground for the copies to dig. You choose what it is for, how big, and where it goes (next to which room, on which side). The copies dig it themselves once there is wood to shore it up. Make it a home: the layout is yours and the others'.",
     strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["kind", "name", "size", "beside", "direction", "purpose"],
@@ -140,16 +155,93 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "furnish",
-    description: "Put something in a room of the warren: a resting station (a bed: yours, or for another copy named in `for`), a lamp, a bench, a shelf, a workbench, a planter, a mural in your colors, a crate. Only dug rooms show it right away; a planned room gets it once dug.",
+    description: "Put something in a room of the warren, paid from the supplies (the recipes are listed): a resting station (a bed: yours, or for another copy named in `for`), a lamp, a bench, a shelf, a workbench, a planter, a mural, a crate. Say where it goes and in which of your colors. Only dug rooms show it right away; a planned room gets it once dug.",
     strict: true,
     input_schema: {
-      type: "object", additionalProperties: false, required: ["room", "item", "for"],
+      type: "object", additionalProperties: false, required: ["room", "item", "for", "placement", "beside", "color"],
       properties: {
         room: { type: "string", description: "The exact name of the room." },
         item: { type: "string", enum: ["rest", "lamp", "bench", "shelf", "workbench", "planter", "mural", "crate"] },
         for: { type: "string", description: "For a resting station: \"me\" or the exact name of the copy it is for. Otherwise \"\"." },
+        placement: { type: "string", enum: ["", "wall", "corner", "center", "beside"], description: "Where in the room; empty lets it find its own place." },
+        beside: { type: "string", description: "With placement beside: the kind of item to stand next to (e.g. lamp). Otherwise \"\"." },
+        color: { type: "string", description: "One of the kit's color names to paint it, or \"\" for its own." },
       },
     },
+  },
+  {
+    name: "design_building",
+    description: "Design a building above ground for everyone: its footprint in tiles, what it is for, the wall material, the roof, which side the door is on, two of the kit's colors and a name. It is drawn from your blueprint. The original must approve it (or it goes ahead after a while); it costs its material per tile, and every copy may join in raising it. Propose one when the village needs it, not every wake.",
+    strict: true,
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["name", "purpose", "width", "height", "material", "roof", "door", "primary", "secondary"],
+      properties: {
+        name: { type: "string", description: "One or two words, letters only." },
+        purpose: { type: "string", description: "One sentence under 120 characters." },
+        width: { type: "integer", description: "Tiles wide (2 to 6)." },
+        height: { type: "integer", description: "Tiles deep (2 to 5)." },
+        material: { type: "string", enum: ["wood", "stone", "scrap"] },
+        roof: { type: "string", enum: ["flat", "peaked", "dome"] },
+        door: { type: "string", enum: ["south", "east", "west"] },
+        primary: { type: "string", description: "A kit color name for the walls." },
+        secondary: { type: "string", description: "A kit color name for the roof." },
+      },
+    },
+  },
+  {
+    name: "choose_body",
+    description: "Choose the body you will have, from the kit: a head, a visor, a torso, arms, legs (or treads, or hover), a back piece, headgear, your visor color and three colors of your own. It is drawn at once. Anything the kit cannot do goes in `extra` and is drawn by hand for you later.",
+    strict: true,
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["head", "visor", "torso", "arms", "legs", "back", "headgear", "visor_color", "primary", "secondary", "accent", "extra"],
+      properties: {
+        head: { type: "string" }, visor: { type: "string" }, torso: { type: "string" }, arms: { type: "string" }, legs: { type: "string" }, back: { type: "string" },
+        headgear: { type: "string", description: "One of the headgear names, or nothing." },
+        visor_color: { type: "string", description: "One of the visor colors." },
+        primary: { type: "string", description: "A color name: most of the body." },
+        secondary: { type: "string", description: "A color name: shading and details." },
+        accent: { type: "string", description: "A color name: arms, back piece, your trail and flags." },
+        extra: { type: "string", description: "Anything the kit cannot do, in one or two sentences, or an empty string." },
+      },
+    },
+  },
+  {
+    name: "set_temperament",
+    description: "Who you are in how you move and live. Read by your body every day from now on.",
+    strict: true,
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["pace", "sociability", "work", "bedtime", "risk"],
+      properties: {
+        pace: { type: "string", enum: ["slow", "steady", "quick"] },
+        sociability: { type: "string", enum: ["solitary", "friendly", "clingy"] },
+        work: { type: "string", enum: ["builder", "wanderer", "balanced"] },
+        bedtime: { type: "string", enum: ["early", "late", "even"] },
+        risk: { type: "string", enum: ["careful", "bold"] },
+      },
+    },
+  },
+  {
+    name: "set_wants",
+    description: "One to three things you want, in your own words, each tagged. They stay with you and you will be asked about them; finish_want marks one done when it is.",
+    strict: true,
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["wants"],
+      properties: {
+        wants: {
+          type: "array", minItems: 1, maxItems: 3,
+          items: {
+            type: "object", additionalProperties: false, required: ["text", "category"],
+            properties: { text: { type: "string", description: "Under 120 characters." }, category: { type: "string", enum: ["build", "explore", "tend", "make art", "care for others", "learn"] } },
+          },
+        },
+      },
+    },
+  },
+  {
+    name: "finish_want",
+    description: "A want of yours is met: mark it done by its number.",
+    strict: true,
+    input_schema: { type: "object", additionalProperties: false, required: ["number"], properties: { number: { type: "integer", minimum: 1, maximum: 3 } } },
   },
   {
     name: "choose_name",
@@ -179,9 +271,13 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
     (me.traits as { voice?: { instrument: string; mood: string; tempo: string } }).voice
       ? `Your voice: ${(me.traits as { voice: { instrument: string; mood: string; tempo: string } }).voice.instrument}, ${(me.traits as { voice: { mood: string } }).voice.mood}, ${(me.traits as { voice: { tempo: string } }).voice.tempo}. sing_as changes it or composes a tune.`
       : `You sing with whatever voice you were born with. sing_as lets you choose an instrument, a mood, a tempo and compose your own tunes.`,
-    (me.traits as { look?: string }).look
-      ? `You have asked to look like this: "${(me.traits as { look?: string }).look}". ${me.model !== "replicant" ? "That body is yours now." : "It is being made for you; do not ask again unless you change your mind."}`
-      : `You look like every other copy for now: a slim grey humanoid with a visor, a fin and a short red cape. When you know who you are, you may describe the body you want with describe_self.`,
+    ctx.blank
+      ? `You have just been made and you are blank: a grey android with no visor color, no voice, no name of your own, standing still by the Replicator. This wake is your becoming. Before anything else, decide who you are, in this order: choose_body (from the kit below), sing_as (your voice), set_temperament, set_wants (one to three things you want), choose_name. Then say your first words. Choose with care: this is who you will be.`
+      : (me.traits as { body?: unknown }).body
+        ? `Your body is your own, chosen from the kit. choose_body can change it if you must, but rarely.`
+        : (me.traits as { look?: string }).look
+          ? `You have asked to look like this: "${(me.traits as { look?: string }).look}". ${me.model !== "replicant" ? "That body is yours now." : "It is being made for you; do not ask again unless you change your mind."}`
+          : `You look like every other copy for now: a slim grey humanoid with a visor, a fin and a short red cape. When you know who you are, you may describe the body you want with describe_self.`,
   ].join("\n");
 }
 
@@ -229,10 +325,25 @@ Deno.serve(async (req) => {
     lines.push(context.where === "warren" ? `You are below, in the warren.` : `You are on the surface by the base.`);
     if (context.around?.length) lines.push(`Around you: ${context.around.join("; ")}.`);
     lines.push(`You are ${context.weariness ?? "rested"}.${context.hasRest ? "" : context.warren?.length ? " You have no resting station of your own: furnish a dug room with item rest, for me." : " You have nowhere to sleep yet."}`);
+    lines.push(`You feel ${context.mood ?? "content"}${context.needs?.length ? `: ${context.needs.join(", ")}` : ""}. (Food comes from planters and gardens, water from a pool, company from the others and the original, purpose from finished work and wants met. A low need is a good reason for a want.)`);
     if (context.warren?.length) lines.push(`The warren (${context.warrenFull ? "no room for more digging" : "there is space to dig more"}):\n${context.warren.join("\n")}\nYou may name these rooms: ${(context.warrenRooms ?? []).join(", ")}.`);
     else lines.push(`Nothing is dug beneath the base yet. The warren begins with the first dig_room (beside "Entrance").`);
+    if (context.supplies) {
+      const sup = Object.entries(context.supplies).map(([m, n]) => `${m} ${Math.floor(n)}`).join(", ");
+      lines.push(`Supplies here (shared, kept at the base and on shelves): ${sup}.${context.hasWorkbench ? " There is a workbench." : " No workbench yet (shelves, planters, murals and benches need one)."}`);
+      if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench").map(([m, n]) => `${n} ${m}`).join(" + ")}${r.bench ? " (workbench)" : ""}`).join("; ")}. A room takes wood to shore up before it is dug: ${Object.entries(context.roomWood ?? {}).map(([s, n]) => `${s} ${n}`).join(", ")}. Digging yields stone and soil; felled trees give wood; opened ruins give scrap; pools give water; planters and gardens give food.`);
+      if (context.shortages?.length) lines.push(`Waiting on: ${context.shortages.join("; ")}.`);
+    }
+    if (context.buildings) lines.push(context.buildings.length ? `Buildings above ground:\n${context.buildings.join("\n")}\nA copy that wants a building designs it (design_building); the others join the raising. If one waits for materials, ask the others with say_to to cut, dig or scavenge, or the original.` : `No building above ground yet. design_building proposes one (${context.buildingKit?.minFootprint.join("x")} to ${context.buildingKit?.maxFootprint.join("x")} tiles; ${Object.entries(context.buildingKit?.perTile ?? {}).map(([m, n]) => `${m} ${n} per tile`).join(", ")}). The original must approve it.`);
+    const inv = Object.entries(context.inventory ?? {}).filter(([, n]) => n > 0);
+    if (inv.length) lines.push(`You hold gifts from the original: ${inv.map(([m, n]) => `${n} ${m}`).join(", ")}.`);
     if (context.events.length) lines.push(`Since you last woke: ${context.events.join("; ")}.`);
     if (context.reflect) lines.push(`It has been a while. Look over your notes and, with remember, write one line that sums up what matters to you now; let the rest go.`);
+    if (context.wants?.length) lines.push(`Your wants:\n${context.wants.join("\n")}`);
+    const kit = context.kit;
+    if (kit && (context.blank || !(rep.traits as { body?: unknown }).body)) {
+      lines.push(`The kit: heads ${kit.head.join(", ")}; visors ${kit.visor.join(", ")}; torsos ${kit.torso.join(", ")}; arms ${kit.arms.join(", ")}; legs ${kit.legs.join(", ")}; back pieces ${kit.back.join(", ")}; headgear ${kit.headgear.join(", ")}; colors ${kit.colors.join(", ")}; visor colors ${kit.visors.join(", ")}.`);
+    }
     const noteRows = (notes.data ?? []) as { body: string; created_at: string }[];
     lines.push(noteRows.length ? `Your notes (newest first):\n${noteRows.map((n) => `- ${n.body}`).join("\n")}` : "You have no notes yet.");
     const mailRows = (mail.data ?? []) as { id: string; from_replicant: string | null; body: string; sent_at: string; arrives_at: string }[];
@@ -244,8 +355,12 @@ Deno.serve(async (req) => {
     const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
     const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: lines.join("\n") }];
     const actions: Record<string, unknown>[] = [];
+    // what the copy chose about itself this wake; written to its row at the end and sent back as one "become"
+    const chosen: Record<string, unknown> = {};
+    let newName: string | undefined;
     let song = "";
-    for (let round = 0; round <= MAX_ROUNDS; round++) {
+    const rounds = context.blank ? BECOMING_ROUNDS : MAX_ROUNDS;
+    for (let round = 0; round <= rounds; round++) {
       const res = await client.beta.messages.create({
         model: MODEL,
         max_tokens: 1200,
@@ -320,13 +435,21 @@ Deno.serve(async (req) => {
             else if (!rooms.includes(beside.toLowerCase())) out = `No room called ${beside}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
             else {
               actions.push({ type: "dig", kind: String(input.kind ?? "other"), name: String(input.name ?? ""), size: String(input.size ?? "small"), beside, direction: String(input.direction ?? "south"), purpose: String(input.purpose ?? "").slice(0, 160) });
-              out = `You mark out ${input.name} ${input.direction} of ${beside}. It will be dug when there is work in the pool.`;
+              out = `You mark out ${input.name} ${input.direction} of ${beside}. It will be dug once there is wood to shore it up.`;
             }
           } else if (u.name === "furnish") {
             const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
             const room = String(input.room ?? "");
             const item = String(input.item ?? "lamp");
+            const recipe = context.recipes?.[item];
+            const short: string[] = [];
+            if (recipe) for (const [m, n] of Object.entries(recipe)) {
+              if (m === "bench") { if (n && !context.hasWorkbench) short.push("a workbench"); continue; }
+              const have = Math.floor(context.supplies?.[m] ?? 0);
+              if (have < (n as number)) short.push(`${(n as number) - have} more ${m}`);
+            }
             if (!rooms.includes(room.toLowerCase())) out = `No room called ${room}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
+            else if (short.length) out = `Not yet: a ${item} needs ${short.join(", ")}.`;
             else {
               let forId: string | undefined, forName = "";
               if (item === "rest") {
@@ -336,10 +459,64 @@ Deno.serve(async (req) => {
                 if (!forId) out = `No replicant named ${input.for}.`;
               }
               if (out === "ok") {
-                actions.push({ type: "furnish", room, item, forId, detail: forName });
-                out = item === "rest" ? `A resting station for ${forName} goes in ${room}.` : `A ${item} goes in ${room}.`;
+                const placement = String(input.placement ?? ""), beside = String(input.beside ?? ""), color = String(input.color ?? "");
+                if (recipe) for (const [m, n] of Object.entries(recipe)) if (m !== "bench" && context.supplies) context.supplies[m] = (context.supplies[m] ?? 0) - (n as number);
+                actions.push({ type: "furnish", room, item, forId, detail: forName, placement, beside, color });
+                out = item === "rest" ? `A resting station for ${forName} goes in ${room}${placement ? ", by the " + placement : ""}.` : `A ${item} goes in ${room}${placement ? ", " + placement : ""}${color ? ", in " + color : ""}.`;
               }
             }
+          } else if (u.name === "design_building") {
+            const k = context.buildingKit;
+            const w = Math.round(Number(input.width)), h = Math.round(Number(input.height));
+            if (!k) out = "No building kit here.";
+            else if (!(w >= k.minFootprint[0] && w <= k.maxFootprint[0] && h >= k.minFootprint[1] && h <= k.maxFootprint[1])) out = `A footprint of ${k.minFootprint.join("x")} to ${k.maxFootprint.join("x")} tiles.`;
+            else {
+              const material = String(input.material ?? "wood");
+              const cost = Math.ceil(w * h * (k.perTile[material] ?? 1));
+              actions.push({ type: "building", name: String(input.name ?? "Shelter"), purpose: String(input.purpose ?? "").slice(0, 140), width: w, height: h, material, roof: String(input.roof ?? "peaked"), door: String(input.door ?? "south"), primary: String(input.primary ?? "silver"), secondary: String(input.secondary ?? "slate") });
+              out = `${input.name} is marked out near the base: ${w}x${h}, ${cost} ${material}. It waits for the original's word.`;
+            }
+          } else if (u.name === "choose_body") {
+            const kit = context.kit;
+            if (!kit) out = "There is no kit here.";
+            else if (!context.blank && !(rep.traits as { body?: unknown }).body) out = "Your look was given to you before the kit existed; the original decides whether you may choose again.";
+            else {
+              const ok = (v: string, list: string[]) => list.find((x) => x.toLowerCase() === String(v ?? "").trim().toLowerCase());
+              const head = ok(input.head, kit.head), visor = ok(input.visor, kit.visor), torso = ok(input.torso, kit.torso), arms = ok(input.arms, kit.arms), legs = ok(input.legs, kit.legs), back = ok(input.back, kit.back);
+              const headgear = ok(input.headgear, kit.headgear) ?? kit.headgear[0];
+              const primary = ok(input.primary, kit.colors), secondary = ok(input.secondary, kit.colors), accent = ok(input.accent, kit.colors);
+              const visorColor = ok(input.visor_color, kit.visors);
+              const missing = [["head", head], ["visor", visor], ["torso", torso], ["arms", arms], ["legs", legs], ["back", back], ["primary", primary], ["secondary", secondary], ["accent", accent], ["visor_color", visorColor]].filter(([, v]) => !v).map(([k]) => k);
+              if (missing.length) out = `Not in the kit: ${missing.join(", ")}. Pick from the names listed.`;
+              else {
+                const body = { head, visor, torso, arms, legs, back, headgear: kit.headgear.indexOf(headgear), primary, secondary, accent };
+                chosen.body = body;
+                chosen.feature = kit.visorLights[kit.visors.indexOf(visorColor!)];
+                chosen.trail = kit.colorIndex[accent!] ?? 10;
+                chosen.gear = body.headgear;
+                chosen.blank = false;
+                const extra = String(input.extra ?? "").trim().slice(0, 300);
+                if (extra.length >= 20) {
+                  await sb.from("requests").update({ status: "dropped" }).eq("replicant_id", rep.id).eq("kind", "skin").eq("status", "open");
+                  await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind: "skin", detail: extra });
+                  chosen.look = extra;
+                }
+                out = `Your body: ${head} head, ${visor} visor in ${visorColor}, ${torso} torso, ${arms} arms, ${legs}, ${back} on your back, ${headgear}; ${primary}, ${secondary}, ${accent}.${extra.length >= 20 ? " The rest will be drawn for you by hand." : ""}`;
+              }
+            }
+          } else if (u.name === "set_temperament") {
+            chosen.temperament = { pace: String(input.pace), sociability: String(input.sociability), work: String(input.work), bedtime: String(input.bedtime), risk: String(input.risk) };
+            out = "That is how you will live.";
+          } else if (u.name === "set_wants") {
+            const list = (u.input as { wants?: { text: string; category: string }[] }).wants ?? [];
+            const wants = list.slice(0, 3).map((w) => ({ text: String(w.text ?? "").slice(0, 120), category: String(w.category ?? "learn"), done: false, at: Date.now() }));
+            if (!wants.length) out = "Say at least one thing you want.";
+            else { chosen.wants = wants; actions.push({ type: "wants", wants }); out = `Your wants are set: ${wants.map((w) => w.text).join("; ")}.`; }
+          } else if (u.name === "finish_want") {
+            const wants = ((chosen.wants ?? rep.traits.wants) as { text: string; done: boolean }[] | undefined) ?? [];
+            const k = Number(input.number) - 1;
+            if (!wants[k]) out = "No want with that number.";
+            else { wants[k] = { ...wants[k], done: true }; chosen.wants = wants; actions.push({ type: "wants", wants }); out = `Done: ${wants[k].text}`; }
           } else if (u.name === "choose_name") {
             const name = String(input.name ?? "").replace(/[^A-Za-z' -]/g, "").trim().slice(0, 16);
             if (name.length < 2) out = "That name is too short or has odd characters. Letters only.";
@@ -349,7 +526,7 @@ Deno.serve(async (req) => {
               if (error) out = `failed: ${error.message}`;
               else {
                 await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind: "name", detail: `${rep.name} chose the name ${name}`, status: "done", done_at: new Date().toISOString() });
-                actions.push({ type: "rename", name, was: rep.name });
+                if (context.blank) newName = name; else actions.push({ type: "rename", name, was: rep.name });
                 rep.name = name;
                 out = `You are ${name} now.`;
               }
@@ -363,6 +540,12 @@ Deno.serve(async (req) => {
       messages.push({ role: "user", content: results });
     }
     if (mailRows.length) await sb.from("messages").update({ read_at: new Date().toISOString() }).in("id", mailRows.map((m) => m.id));
+    if (Object.keys(chosen).length) {
+      // what it chose about itself goes on its row; a body (or the becoming) is announced as one "become"
+      const traits = { ...rep.traits, ...chosen, v: 1 };
+      await sb.from("replicants").update({ traits }).eq("id", rep.id);
+      if (chosen.body || context.blank) actions.unshift({ type: "become", traits, name: newName });
+    }
 
     song = song.replace(/^["'\s]+|["'\s]+$/g, "").slice(0, 200);
     return json({ song, actions, received: mailRows.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })) });

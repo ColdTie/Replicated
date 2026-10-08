@@ -8,12 +8,15 @@ export class Gear {
   readonly image: Phaser.GameObjects.Image;
   private anchors: [number, number][];
 
-  constructor(scene: Phaser.Scene, private body: Phaser.GameObjects.Sprite, bodySprite: string, frame: number, tint: number) {
-    this.anchors = getManifest().sprites[bodySprite]?.anchors ?? [];
+  constructor(scene: Phaser.Scene, private body: Phaser.GameObjects.Sprite, bodySprite: string, frame: number, tint: number, anchors?: [number, number][]) {
+    this.anchors = anchors ?? getManifest().sprites[bodySprite]?.anchors ?? [];
     this.image = scene.add.image(0, 0, 'gear', frame).setTint(tint)
       .setOrigin(0, 0)
       .setVisible(frame > 0);
   }
+
+  /** A new body: its visor moves. */
+  setAnchors(a: [number, number][]) { this.anchors = a; }
 
   setFrame(frame: number, tint?: number) {
     this.image.setFrame(frame).setVisible(frame > 0);

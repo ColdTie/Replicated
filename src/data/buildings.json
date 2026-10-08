@@ -1,0 +1,18 @@
+{
+  "_doc": "Surface buildings the copies design (design_building): a footprint in tiles, a purpose, a wall material, a roof, a door side, two kit colors and a name, drawn by src/world/buildingPaint.ts from parts (no hand art). A proposal waits for the original's word (journal: approve / veto; autoApproveMinutes later it goes ahead anyway), costs perTile of its material (paid when the first copy joins), and takes swingsPerTile hammer blows that any copy may add to (a shared project; progress shows as the building rising). Blueprints share the warren's shape (name, purpose, w, h, x, y, by) so a building can get an interior later. Placed ringMin..ringMax px from the base center on clear ground.",
+  "minFootprint": [2, 2],
+  "maxFootprint": [6, 5],
+  "ringMin": 70,
+  "ringMax": 180,
+  "swingsPerTile": 3,
+  "autoApproveMinutes": 30,
+  "offlineSwingsPerCopyHour": 30,
+  "materials": {
+    "wood": { "perTile": 1, "pattern": "planks" },
+    "stone": { "perTile": 1, "pattern": "blocks" },
+    "scrap": { "perTile": 0.6, "pattern": "plates" }
+  },
+  "roofs": ["flat", "peaked", "dome"],
+  "doors": ["south", "east", "west"],
+  "light": { "radius": 54, "color": 9, "intensity": 0.7, "flicker": 0.08 }
+}

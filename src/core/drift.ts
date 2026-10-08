@@ -1,6 +1,7 @@
 // Replication drift: a copy inherits its parent's look and stats, then changes a little.
 import DRIFT from '../data/drift.json';
 import { PLAYER } from './data';
+import { PARTS } from './body';
 import type { ReplicantSave } from '../net/store';
 
 export { DRIFT };
@@ -22,17 +23,17 @@ export function copyName(base: string, generation: number) {
   return generation + 1 < roman.length ? `${root} ${roman[generation + 1]}` : `${root} ${generation + 1}`;
 }
 
-/** Make the copy's row (not yet saved). */
+/**
+ * Make the copy's row (not yet saved). Since session 9 a copy is born blank: a grey android with no visor color,
+ * headgear, trail, voice or name of its own, and only a small stat drift. It chooses all of that on its first wake
+ * (the becoming); until then it stands dim and still by the Replicator. (The old inherit-and-drift look is still
+ * what the first copies on Earth have.)
+ */
 export function replicate(parent: ReplicantSave, star: string, planetIndex: number, x: number, y: number): Omit<ReplicantSave, 'id'> {
-  const pt = parent.traits;
-  const visorLights = PLAYER.featureColors.map((f) => f[1]);
-  const feature = Math.random() < DRIFT.visorChance ? pick(visorLights, pt.feature) : pt.feature ?? PLAYER.feature[1];
-  const gear = Math.random() < DRIFT.gearChance || !pt.gear ? pick(DRIFT.gears, pt.gear) : pt.gear;
-  const trail = Math.random() < DRIFT.trailChance || pt.trail === undefined ? pick(DRIFT.trails, pt.trail) : pt.trail;
   const stats: Stats = {};
   for (const [k, d] of Object.entries(DRIFT.stats) as [StatKey, { drift: number; min: number; max: number }][]) {
     const base = stat(parent, k);
-    const v = base * (1 + (Math.random() * 2 - 1) * d.drift);
+    const v = base * (1 + (Math.random() * 2 - 1) * d.drift * DRIFT.blankDrift);
     stats[k] = Math.round(Math.min(d.max, Math.max(d.min, v)) * 100) / 100;
   }
   const generation = (parent.generation ?? 0) + 1;
@@ -42,7 +43,7 @@ export function replicate(parent: ReplicantSave, star: string, planetIndex: numb
     generation,
     name: copyName(parent.name, generation),
     model: parent.model,
-    traits: { awake: true, feature, gear, trail },
+    traits: { v: 1, awake: true, blank: true, body: { ...PARTS.blank } },
     stats,
     status: 'npc',
     star_id: star,

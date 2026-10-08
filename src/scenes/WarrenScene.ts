@@ -5,7 +5,8 @@
 // Warren controller keeps the state and its minds keep ticking; this is the view.
 import Phaser from 'phaser';
 import { sound, type Instrument, type Mood, type Tempo } from '../audio/Sound';
-import { anim, featureTex, tex } from '../core/assets';
+import { anim, tex } from '../core/assets';
+import { bodyFor } from '../core/body';
 import { MIND, PALETTE, PLAYER, WARREN, hex } from '../core/data';
 import { stat } from '../core/drift';
 import { session } from '../core/session';
@@ -37,13 +38,12 @@ class Walker {
   onArrive?: () => void;
   private stepT = 0;
   constructor(private scene: WarrenScene, public x: number, public y: number, data: ReplicantSave | undefined, color: number, lightColor: number, radius: number) {
-    const modelId = (data?.model && data.model in PLAYER.models ? data.model : PLAYER.model) as keyof typeof PLAYER.models;
-    const model = PLAYER.models[modelId];
-    this.key = featureTex(model.sprite, data?.traits.feature ?? PLAYER.feature[1]);
+    const look = bodyFor(scene, data);
+    this.key = look.key;
     this.shadow = scene.add.image(x, y, 'shadow').setAlpha(0.5).setTint(PALETTE[25]).setDepth(DEPTH.shadow);
     this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1).play(anim(this.key, 'idle'));
     this.sprite.anims.setProgress(Math.random());
-    if (data?.traits.gear) this.gear = new Gear(scene, this.sprite, model.sprite, data.traits.gear, color);
+    if (data?.traits.gear) this.gear = new Gear(scene, this.sprite, look.model, data.traits.gear, color, look.anchors);
     this.light = scene.lighting.add({ x, y: y - 9, radius, color: lightColor, intensity: 0.9 });
     this.sync();
   }
@@ -123,7 +123,7 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
     // the ladder up, on the back wall of the Entrance; a little daylight falls down the shaft
     const lt = ladderTile();
     this.ladder = { x: lt.x * 16 + 8, y: lt.y * 16 };
-    this.add.sprite(this.ladder.x, this.ladder.y, tex('hatch', p.id), 2).setOrigin(0.5, 1).setDepth(DEPTH.walls);
+    this.add.sprite(this.ladder.x, this.ladder.y, tex('hatch', p.id), 3).setOrigin(0.5, 1).setDepth(DEPTH.walls);
     const day = 1 - this.host.env.night * 0.75;
     this.ladderLight = this.lighting.add({ x: this.ladder.x, y: this.ladder.y + 4, radius: 44, color: 0xb8c8ff, intensity: 0.5 + 0.5 * day });
     this.add.image(this.ladder.x, this.ladder.y + 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[20]).setAlpha(0.08 + 0.1 * day).setScale(0.8, 0.5).setDepth(DEPTH.glow);
@@ -178,7 +178,8 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
     if (!def) return;
     const x = it.x * 16 + 8, y = it.y * 16 + 16;
     const sprite = this.add.sprite(x, y, tex('warren', this.host.planet.id), def.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + y - 2);
-    if (it.kind === 'mural') {
+    if (it.tint !== undefined && !['lamp', 'planter', 'workbench'].includes(it.kind)) sprite.setTint(PALETTE[it.tint]);
+    else if (it.kind === 'mural') {
       const by = this.host.npcs.find((n) => n.data.id === it.by);
       sprite.setTint(by?.trailColor ?? PALETTE[18]);
     }
