@@ -255,6 +255,48 @@ class SoundEngine {
   }
 
   coreHum() { if (this.ready('core', 200)) this.tone(midi(64), 0.5, { type: 'sine', vol: 0.06, rev: 0.6 }); }
+
+  // --- the beacon keeper ---
+
+  /** Waking: a deep grinding roar. */
+  roar() {
+    if (!this.ready('roar', 800)) return;
+    this.noise(1.3, { type: 'lowpass', freq: 220, to: 70, vol: 0.32, attack: 0.08, rev: 0.5 });
+    this.tone(62, 1.1, { type: 'sawtooth', to: 38, vol: 0.09, attack: 0.1, rev: 0.4 });
+    this.tone(93, 0.9, { type: 'square', to: 50, vol: 0.04, attack: 0.15, delay: 0.1 });
+  }
+  /** A heavy foot or a charge starting. */
+  stomp() {
+    if (!this.ready('stomp', 120)) return;
+    this.tone(95, 0.26, { type: 'sine', to: 38, vol: 0.26 });
+    this.noise(0.18, { type: 'lowpass', freq: 320, to: 90, vol: 0.2 });
+  }
+  /** Landing a slam or hitting a wall. */
+  slam() {
+    if (!this.ready('slam', 150)) return;
+    this.tone(70, 0.5, { type: 'sine', to: 28, vol: 0.34 });
+    this.noise(0.45, { type: 'lowpass', freq: 500, to: 80, vol: 0.3, rev: 0.3 });
+    this.noise(0.12, { freq: 2400, q: 0.7, vol: 0.08 });
+  }
+  /** The keeper crumbles. */
+  guardianDie() {
+    if (!this.ready('guardianDie', 1000)) return;
+    this.noise(2.2, { type: 'lowpass', freq: 400, to: 40, vol: 0.3, attack: 0.05, rev: 0.6 });
+    [0, -3, -7, -12].forEach((st, i) => this.tone(midi(48 + st), 0.9, { type: 'triangle', vol: 0.08, delay: i * 0.22, rev: 0.7 }));
+  }
+  /** The beacon lights: a boom, then a chord that climbs into the sky. */
+  beacon() {
+    if (!this.ready('beacon', 1500)) return;
+    this.tone(48, 2.4, { type: 'sine', to: 26, vol: 0.3, attack: 0.02, rev: 0.5 });
+    this.noise(1.6, { type: 'highpass', freq: 1500, to: 6000, vol: 0.05, attack: 0.5, rev: 0.8 });
+    [0, 7, 12, 19, 24, 31, 36].forEach((st, i) => this.tone(midi(55 + st), 2.6 - i * 0.15, { type: i % 2 ? 'sine' : 'triangle', vol: 0.07, attack: 0.08, delay: 0.25 + i * 0.16, rev: 0.9 }));
+  }
+  /** Picking up a Spark: a quick bright shimmer. */
+  spark() {
+    if (!this.ready('spark', 400)) return;
+    [0, 4, 7, 12, 16, 19, 24, 28].forEach((st, i) => this.tone(midi(79 + st), 0.5, { type: 'sine', vol: 0.06, delay: i * 0.045, rev: 0.85 }));
+    this.noise(0.6, { type: 'highpass', freq: 4000, vol: 0.03, attack: 0.1, rev: 0.6 });
+  }
   thunder() { if (this.ready('thunder', 2000)) this.noise(2.5, { type: 'lowpass', freq: 300, to: 60, vol: 0.3, attack: 0.05, rev: 0.4 }); }
 
   // --- ambience ---

@@ -1,17 +1,19 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
-import { BACKEND, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, VILLAGE, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
+import { BACKEND, BEACON, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, VILLAGE, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
 import { DRIFT, replicate, stat } from '../core/drift';
 import { session } from '../core/session';
 import { Base } from '../entities/Base';
+import { Beacon } from '../entities/Beacon';
+import { Guardian } from '../entities/Guardian';
 import type { Enemy } from '../entities/Enemy';
 import { Hopper } from '../entities/Hopper';
 import { Npc } from '../entities/Npc';
 import { Village } from '../entities/Village';
 import { planetAt } from '../world/system';
 import { Player, squash } from '../entities/Player';
-import { CrystalNode, Shard } from '../entities/Resources';
+import { CrystalNode, Shard, Spark } from '../entities/Resources';
 import { Ruin } from '../entities/Ruin';
 import { Skitter } from '../entities/Skitter';
 import { Spitter, Spore } from '../entities/Spitter';
@@ -53,7 +55,11 @@ export class PlanetScene extends Phaser.Scene {
   enemies: Enemy[] = [];
   nodes: CrystalNode[] = [];
   shards: Shard[] = [];
+  sparks: Spark[] = [];
   spores: Spore[] = [];
+  beacon?: Beacon;
+  guardian?: Guardian;
+  private litBeacons: string[] = [];
   ruins: Ruin[] = [];
   npcs: Npc[] = [];
   village!: Village;
@@ -89,7 +95,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village'] } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon'] } = { embers: 0, nodes: {}, doors: {} };
   private replicating = false;
   /** Hologram visit while the replicant's ship is flying elsewhere: no position saves, no launching */
   visit: { star: string; planetIndex: number } | null = null;
@@ -117,6 +123,7 @@ export class PlanetScene extends Phaser.Scene {
     this.enemies = []; this.nodes = []; this.shards = []; this.spores = []; this.ruins = []; this.embers = 0; this.stopped = false; this.frozen = false;
     this.grazers = []; this.flocks = []; this.butterflies = undefined; this.bendables = new Map(); this.slow = 1;
     this.npcs = []; this.replicating = false; this.launching = false;
+    this.sparks = []; this.beacon = undefined; this.guardian = undefined; this.litBeacons = [];
     // the scene object is reused between planets: drop the old player so update() waits for the new world
     this.player = undefined as unknown as Player;
     this.pending = { embers: 0, nodes: {}, doors: {} };
@@ -278,6 +285,18 @@ export class PlanetScene extends Phaser.Scene {
       else this.enemies.push(new Skitter(this, def as SkitterDef, ex, ey));
     }
 
+    // Beacon worlds: the monolith and, until it is lit, its sleeping keeper
+    if (m.beacon) {
+      const lit = !!save?.data.beacon?.lit;
+      this.beacon = new Beacon(this, m.beacon.x, m.beacon.y, lit);
+      if (!lit) {
+        this.guardian = new Guardian(this, BEACON.guardian, m.beacon.guardian.x, m.beacon.guardian.y, () => this.onKeeperDown());
+        this.enemies.push(this.guardian);
+        if (p.beacon) p.subtitle = 'A BEACON SLEEPS HERE';
+      }
+    }
+    session.store?.litBeacons().then((l) => { this.litBeacons = l; }).catch(() => undefined);
+
     // Player: a returning replicant appears where it was; a new one wakes in the cradle
     const r = session.replicant;
     const awake = !!r?.traits.awake;
@@ -297,7 +316,7 @@ export class PlanetScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, pw, ph);
     const nodeZones = this.nodes.map((n) => n.zone);
     const enemyZones = this.enemies.map((e) => e.zone);
-    this.physics.add.collider(this.player.zone, [this.walls, this.solids, ...nodeZones, ...this.enemies.filter((e) => e instanceof Spitter).map((e) => e.zone)] as Phaser.Types.Physics.Arcade.ArcadeColliderType);
+    this.physics.add.collider(this.player.zone, [this.walls, this.solids, ...nodeZones, ...this.enemies.filter((e) => e instanceof Spitter || e instanceof Guardian).map((e) => e.zone)] as Phaser.Types.Physics.Arcade.ArcadeColliderType);
     this.physics.add.collider(enemyZones, [this.walls, this.solids, ...nodeZones] as Phaser.Types.Physics.Arcade.ArcadeColliderType);
     this.physics.add.collider(enemyZones, enemyZones);
 
@@ -571,10 +590,12 @@ export class PlanetScene extends Phaser.Scene {
       }
     }
     if (view === 'ruin' && this.ruins.length) { const r = this.ruins[0]; px = r.inside.x + 12; py = r.inside.y + 24; }
+    const atBeacon = view?.startsWith('beacon') && this.map.beacon;
+    if (atBeacon) { px = this.map.beacon!.guardian.x - 6; py = this.map.beacon!.guardian.y + 46; }
     this.player.setPosition(px, py);
     this.player.facing = 1;
     this.enemies.forEach((e, i) => {
-      if (i > 1) return;
+      if (i > 1 || atBeacon) return;
       e.body.reset(px + (i ? 46 : -40), py + (i ? -14 : 8));
       e.sync();
     });
@@ -583,6 +604,11 @@ export class PlanetScene extends Phaser.Scene {
     this.embers = Math.max(this.embers, view === 'base' ? STRUCTURES.replicator.cost : 12);
     this.game.events.emit('embers', this.embers, true);
     this.frozen = true;
+    if (view === 'beacon-lit' && this.beacon && this.guardian) {
+      this.guardian.sprite.setVisible(false);
+      this.enemies = this.enemies.filter((e) => e !== this.guardian);
+      this.onKeeperDown();
+    }
     if (view === 'replicate') {
       (this.base as unknown as { placeReplicator(a: boolean): void }).placeReplicator(false);
       this.embers = DRIFT.cost;
@@ -601,9 +627,12 @@ export class PlanetScene extends Phaser.Scene {
       if (!this.frozen) for (const e of this.enemies) e.update(time, dt);
       for (const s of this.shards) s.update(time, dt);
       this.shards = this.shards.filter((s) => !s.collected);
+      for (const s of this.sparks) s.update(time, dt);
+      this.sparks = this.sparks.filter((s) => !s.collected);
       this.updateSpores(time, dt);
     }
     for (const r of this.ruins) r.update(time);
+    this.beacon?.update(time);
     for (const g of this.grazers) g.update(time, dt);
     for (const f of this.flocks) f.update(time, dt);
     this.butterflies?.update(dt, this.env.night);
@@ -667,7 +696,7 @@ export class PlanetScene extends Phaser.Scene {
     // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
     if (this.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
     if (p.npcTick !== undefined) this.npcTickAt = Date.now();
-    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && p.npcTick === undefined) return;
+    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && p.npcTick === undefined) return;
     this.pending = { embers: 0, nodes: {}, doors: {} };
     this.saving = true;
     try {
@@ -676,6 +705,7 @@ export class PlanetScene extends Phaser.Scene {
       if (p.npcTick !== undefined) data.npcTick = p.npcTick;
       if (p.structures) data.structures = p.structures;
       if (p.village) data.village = p.village;
+      if (p.beacon) data.beacon = p.beacon;
       const row = await st.applyPlanetDelta(this.planet.star, this.planet.planetIndex, p.embers, data);
       if (row) {
         this.embers = row.embers + this.pending.embers;
@@ -690,6 +720,7 @@ export class PlanetScene extends Phaser.Scene {
       this.pending.npcTick ??= p.npcTick;
       this.pending.structures ??= p.structures;
       this.pending.village ??= p.village;
+      this.pending.beacon ??= p.beacon;
     } finally {
       this.saving = false;
     }
@@ -784,6 +815,7 @@ export class PlanetScene extends Phaser.Scene {
       from: this.planet.star,
       fromPlanet: this.planet.planetIndex,
       embers: this.embers,
+      lit: this.litBeacons,
       onLaunch: (to, planet) => this.launch(to, planet),
       onClose: () => { this.player.locked = false; this.scene.resume(); },
     };
@@ -978,7 +1010,7 @@ export class PlanetScene extends Phaser.Scene {
     const damage = heavy ? atk.heavy.damage : atk.damage;
     const knock = atk.knockback * (heavy ? atk.heavy.knockbackScale : 1);
     for (const e of this.enemies) {
-      if (!e.alive || e.hittable === false || Math.hypot(e.x - hx, e.y - 3 - hy) > radius + 5) continue;
+      if (!e.alive || e.hittable === false || Math.hypot(e.x - hx, e.y - 3 - hy) > radius + 5 + (e.reach ?? 0)) continue;
       const dir = new Phaser.Math.Vector2(e.x - this.player.x, e.y - this.player.y).normalize();
       e.hit(damage, dir.lengthSq() ? dir : aim, knock);
       hit = struck = true;
@@ -1047,6 +1079,33 @@ export class PlanetScene extends Phaser.Scene {
         this.anims.globalTimeScale = 1;
       }, 450);
     }
+  }
+
+  /** The beacon keeper is down: the monolith lights for good and leaves a Spark where the keeper fell. */
+  private onKeeperDown() {
+    const b = this.beacon, g = this.guardian;
+    if (!b || b.lit) return;
+    b.ignite();
+    if (!this.litBeacons.includes(this.planet.star)) this.litBeacons.push(this.planet.star);
+    this.pending.beacon = { lit: true, at: Date.now(), by: session.replicant?.id };
+    void this.flushPlanet();
+    const sx = g?.x ?? b.x, sy = g?.y ?? b.y + 30;
+    this.time.delayedCall(700, () => this.sparks.push(new Spark(this, sx, sy)));
+  }
+
+  collectSpark(x: number, y: number) {
+    sound.spark();
+    this.hitStop(80);
+    const r = session.replicant;
+    let n = 1;
+    if (r && !this.visit) {
+      r.traits.sparks = (r.traits.sparks ?? 0) + 1;
+      n = r.traits.sparks;
+      void this.saveReplicant();
+    }
+    this.fx.sparks(x, y - 4, PALETTE[19], 6);
+    this.fx.floatIcon(this.player.x, this.player.y - 24, 'spark');
+    this.game.events.emit('sparks', n);
   }
 
   onDoorChanged(r: Ruin) {

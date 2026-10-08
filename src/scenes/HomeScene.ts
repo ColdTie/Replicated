@@ -198,6 +198,14 @@ export class HomeScene extends Phaser.Scene {
       return;
     }
     const params = new URLSearchParams(location.search);
+    // Screenshots and headless tests: ?shot=1&at=<star>&pi=<planet> starts the replicant on another world
+    if (params.has('shot') && params.get('at')) {
+      const r = session.replicant;
+      r.star_id = params.get('at')!;
+      r.planet_index = Number(params.get('pi') ?? 1);
+      r.pos_x = null; r.pos_y = null;
+      r.traits.awake = true;
+    }
     // Flying between stars: go to the ship (it lands by itself if it arrived while you were away)
     if (session.replicant.status === 'in_transit') {
       const j = await store.activeJourney(session.replicant).catch(() => null);

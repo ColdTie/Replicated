@@ -8,6 +8,7 @@ import structuresJson from '../data/structures.json';
 import backendJson from '../data/backend.json';
 import dayJson from '../data/daycycle.json';
 import villageJson from '../data/village.json';
+import beaconJson from '../data/beacon.json';
 
 export interface PlanetDef {
   id: string;
@@ -38,6 +39,8 @@ export interface PlanetDef {
   weather?: boolean;
   /** Polar caps seen from orbit: size 0..1 of the way from equator to pole, colors = [edge, core] palette indexes. Missing = none. */
   poles?: { size: number; colors: [number, number] };
+  /** A beacon world: the plaza, the monolith and its keeper are placed on it (set by planetFor) */
+  beacon?: boolean;
 }
 
 export type SkitterDef = (typeof enemiesJson)['skitter'];
@@ -54,6 +57,8 @@ export const STRUCTURES = structuresJson;
 export const BACKEND = backendJson;
 export const DAYCYCLE = dayJson;
 export const VILLAGE = villageJson;
+export const BEACON = beaconJson;
+export type GuardianDef = (typeof beaconJson)['guardian'];
 
 export const hex = (s: string) => parseInt(s, 16);
 export const accentColor = (p: PlanetDef, i: 0 | 1 | 2) => PALETTE[p.accent[i]];

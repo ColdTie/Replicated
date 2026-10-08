@@ -9,6 +9,8 @@ export interface Enemy {
   readonly alive: boolean;
   /** False while the creature can't be hit (e.g. mid-air). */
   readonly hittable?: boolean;
+  /** Extra radius the player's swing gets against a big body. */
+  readonly reach?: number;
   update(time: number, dt: number): void;
   hit(damage: number, dir: Phaser.Math.Vector2, knockback: number): void;
   sync(): void;

@@ -78,7 +78,11 @@ export function planetFor(starId: string, planetIndex: number): PlanetDef | unde
     weather: false,
   } as unknown as PlanetDef;
   // Beacon systems hold enormous resources
-  if (star.beacon) def.resourceNodes *= 3;
+  if (star.beacon) {
+    def.resourceNodes *= 3;
+    // the beacon itself stands on the world you land on first
+    if (sp.index === defaultPlanetIndex(star.id)) def.beacon = true;
+  }
   return def;
 }
 

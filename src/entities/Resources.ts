@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { anim, tex } from '../core/assets';
-import { ITEMS, PALETTE } from '../core/data';
+import { BEACON, ITEMS, PALETTE } from '../core/data';
 import type { Light } from '../fx/Lighting';
 import type { PlanetScene } from '../scenes/PlanetScene';
 import { flashWhite } from './Player';
@@ -207,5 +207,77 @@ export class Shard {
     this.glow.destroy();
     for (const g of this.ghosts) g.destroy();
     this.scene.lighting.remove(this.light);
+  }
+}
+
+const SPARK = BEACON.spark;
+
+/** A Spark: the rare white light a lit beacon leaves behind. Pops out, settles, hovers and twinkles; walk up
+ *  to it and it flies to you. */
+export class Spark {
+  readonly sprite: Phaser.GameObjects.Sprite;
+  private glow: Phaser.GameObjects.Image;
+  private light: Light;
+  private readyAt: number;
+  private vx: number;
+  private vy: number;
+  private vz = 90;
+  private z = 0;
+  private homing = false;
+  collected = false;
+  x: number;
+  y: number;
+
+  constructor(private scene: PlanetScene, x: number, y: number) {
+    this.x = x; this.y = y;
+    const a = Math.random() * Math.PI * 2;
+    this.vx = Math.cos(a) * 30; this.vy = Math.sin(a) * 30;
+    this.sprite = scene.add.sprite(x, y, SPARK.sprite).setDepth(6090);
+    this.sprite.play(anim(SPARK.sprite, 'twinkle'));
+    this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(0x9fe8ff).setAlpha(0.4).setScale(0.8).setDepth(6100);
+    scene.tweens.add({ targets: this.glow, alpha: 0.25, scale: 0.6, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.light = scene.lighting.add({ x, y, radius: 54, color: 0xbff8ff, intensity: 1, flicker: 0.15 });
+    this.readyAt = scene.time.now + SPARK.pickupDelayMs;
+  }
+
+  update(time: number, dt: number) {
+    const s = dt / 1000;
+    const p = this.scene.player;
+    const dx = p.x - this.x, dy = p.y - 6 - this.y, d = Math.hypot(dx, dy);
+    if (!this.homing && time > this.readyAt && p.alive && !p.locked && d < SPARK.magnetRange) this.homing = true;
+    if (this.homing) {
+      this.z += (8 - this.z) * Math.min(1, s * 8);
+      const pull = SPARK.magnetPull * s;
+      this.vx = (this.vx + (dx / d) * pull) * 0.88;
+      this.vy = (this.vy + (dy / d) * pull) * 0.88;
+      this.x += this.vx * s; this.y += this.vy * s;
+      if (d < 8) { this.collect(); return; }
+    } else {
+      if (this.z > 0 || this.vz > 0) {
+        this.vz -= 300 * s;
+        this.z = Math.max(0, this.z + this.vz * s);
+        if (this.z === 0) this.vz = Math.abs(this.vz) > 30 ? -this.vz * 0.35 : 0;
+      }
+      this.vx *= Math.pow(0.02, s); this.vy *= Math.pow(0.02, s);
+      const nx = this.x + this.vx * s, ny = this.y + this.vy * s;
+      if (this.scene.isWalkable(nx, this.y)) this.x = nx; else this.vx *= -0.5;
+      if (this.scene.isWalkable(this.x, ny)) this.y = ny; else this.vy *= -0.5;
+    }
+    const hover = !this.homing && this.z === 0 ? 6 + Math.sin(time / 320) * 2.5 : 0;
+    const rx = Math.round(this.x), ry = Math.round(this.y - this.z - hover);
+    this.sprite.setPosition(rx, ry);
+    this.glow.setPosition(rx, ry);
+    this.light.x = rx; this.light.y = ry;
+  }
+
+  private collect() {
+    this.collected = true;
+    this.scene.fx.sparks(this.x, this.y - 6, PALETTE[19], 18);
+    this.scene.fx.sparks(this.x, this.y - 6, PALETTE[18], 10);
+    this.scene.collectSpark(this.x, this.y);
+    this.sprite.destroy();
+    this.scene.tweens.killTweensOf(this.glow);
+    this.scene.tweens.add({ targets: this.glow, alpha: 0, scale: 2.5, duration: 350, onComplete: () => this.glow.destroy() });
+    this.scene.tweens.add({ targets: this.light, intensity: 0, radius: 120, duration: 400, onComplete: () => this.scene.lighting.remove(this.light) });
   }
 }
