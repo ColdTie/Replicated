@@ -17,7 +17,7 @@ export interface ReplicantSave {
   profile_id: string | null;
   name: string;
   model: string;
-  traits: { awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number; sparks?: number };
+  traits: { awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number; sparks?: number; look?: string };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
   generation?: number;
@@ -97,7 +97,7 @@ export interface MindContext {
   /** replicant id -> seconds a letter takes to reach it (light speed) */
   delays: Record<string, number>;
 }
-export interface MindAction { type: 'note' | 'mail' | 'request' | 'rename'; body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string }
+export interface MindAction { type: 'note' | 'mail' | 'request' | 'rename' | 'look'; body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string }
 export interface MindResult { skipped?: boolean; song?: string; actions?: MindAction[]; received?: { from: string; body: string }[]; error?: string }
 export interface Note { replicant_id: string; body: string; created_at: string }
 export interface Letter { id: string; from_replicant: string | null; to_replicant: string | null; body: string; sent_at: string; arrives_at: string; read_at?: string | null }

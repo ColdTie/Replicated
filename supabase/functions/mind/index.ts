@@ -32,7 +32,7 @@ interface Context {
 }
 
 interface Replicant {
-  id: string; galaxy_id: string; name: string; generation: number; parent_id: string | null;
+  id: string; galaxy_id: string; name: string; model: string; generation: number; parent_id: string | null;
   traits: Record<string, unknown>; stats: Record<string, number>; star_id: string; planet_index: number;
   status: string; profile_id: string | null; last_tick_at: string | null;
 }
@@ -75,6 +75,15 @@ const tools: Anthropic.Beta.BetaTool[] = [
     },
   },
   {
+    name: "describe_self",
+    description: "Describe the body you want. You stay humanoid (a head, two arms, two legs, about the size you are now) but everything else is yours: colors, head shape, visor, a cape or no cape, markings, horns, fins, a tail, what you carry. The original has it drawn for you; it takes a while to arrive, so describe it once, with care, not every time you wake.",
+    strict: true,
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["appearance"],
+      properties: { appearance: { type: "string", description: "Two to four plain sentences, under 300 characters, concrete enough to draw from." } },
+    },
+  },
+  {
     name: "choose_name",
     description: "Choose your own name. Your current name was given to you; if you have found one that is truly yours, take it. Once, when it matters, not every time you wake.",
     strict: true,
@@ -98,6 +107,9 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
     `The original, ${ctx.playerName}, pilots the vessel between stars. Copies stay behind to run their planet: mining crystals for Ember, building the village. The galaxy is cold and mostly empty; the base is warm. You are never alone, but every version of you is a little different.`,
     `You wake now and then. Each time: read your notes and letters, do at most three things with your tools (only when there is a reason: no notes that repeat what you already know, letters when you truly have something to say, requests rarely), then say one or two sentences out loud: your song, what you feel or notice right now, under 140 characters, first person, plain words, no markdown, no emoji, no quotation marks.`,
     `Letters cross space at light speed, so a far replicant answers slowly. ${ctx.playerHere ? `${ctx.playerName} is here right now and can hear you.` : `${ctx.playerName} is away.`}`,
+    (me.traits as { look?: string }).look
+      ? `You have asked to look like this: "${(me.traits as { look?: string }).look}". ${me.model !== "replicant" ? "That body is yours now." : "It is being made for you; do not ask again unless you change your mind."}`
+      : `You look like every other copy for now: a slim grey humanoid with a visor, a fin and a short red cape. When you know who you are, you may describe the body you want with describe_self.`,
   ].join("\n");
 }
 
@@ -114,7 +126,7 @@ Deno.serve(async (req) => {
     if (!replicant_id || !context) return json({ error: "replicant_id and context required" }, 400);
 
     const { data: me, error: meErr } = await sb.from("replicants")
-      .select("id,galaxy_id,name,generation,parent_id,traits,stats,star_id,planet_index,status,profile_id,last_tick_at")
+      .select("id,galaxy_id,name,model,generation,parent_id,traits,stats,star_id,planet_index,status,profile_id,last_tick_at")
       .eq("id", replicant_id).single();
     if (meErr || !me) return json({ error: "no such replicant" }, 404);
     const rep = me as Replicant;
@@ -196,6 +208,16 @@ Deno.serve(async (req) => {
             const kind = String(input.kind ?? "other"), detail = String(input.detail ?? "").slice(0, 300);
             await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind, detail });
             actions.push({ type: "request", kind, detail });
+          } else if (u.name === "describe_self") {
+            const look = String(input.appearance ?? "").trim().slice(0, 300);
+            if (look.length < 20) out = "Say more: what colors, what head, what on your back, what in your hands.";
+            else {
+              await sb.from("requests").update({ status: "dropped" }).eq("replicant_id", rep.id).eq("kind", "skin").eq("status", "open");
+              await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind: "skin", detail: look });
+              await sb.from("replicants").update({ traits: { ...rep.traits, look } }).eq("id", rep.id);
+              actions.push({ type: "look", detail: look });
+              out = "Noted. The original will have that body drawn for you; it takes a while to arrive.";
+            }
           } else if (u.name === "choose_name") {
             const name = String(input.name ?? "").replace(/[^A-Za-z' -]/g, "").trim().slice(0, 16);
             if (name.length < 2) out = "That name is too short or has odd characters. Letters only.";

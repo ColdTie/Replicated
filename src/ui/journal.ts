@@ -106,7 +106,10 @@ export function openJournal(v: JournalView) {
     }
     if (asks.length) {
       parts.push(`<div class="k">ASKS FOR</div>`);
-      for (const r of asks) parts.push(`<p class="${r.status === 'open' ? 'ask' : 'done'}">${v.canHear ? esc(r.kind.toUpperCase()) : runes(r.kind)}: ${show(r.detail)}<small>${ago(r.created_at)}</small></p>`);
+      for (const r of asks) {
+        const label = r.kind === 'skin' ? 'A NEW BODY' : r.kind === 'name' ? 'A NAME' : r.kind.toUpperCase();
+        parts.push(`<p class="${r.status === 'open' ? 'ask' : 'done'}">${v.canHear ? esc(label) : runes(label)}: ${show(r.detail)}<small>${ago(r.created_at)}</small></p>`);
+      }
     }
   }
   const el = document.createElement('div');

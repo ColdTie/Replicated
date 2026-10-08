@@ -1121,6 +1121,8 @@ export class PlanetScene extends Phaser.Scene {
           npc.data.name = a.name;
           this.announceLocation();
           this.game.events.emit('notice', hear ? `${was} IS NOW ${a.name.toUpperCase()}` : `${was} HAS A NEW NAME`);
+        } else if (a.type === 'look' && hear) {
+          this.game.events.emit('notice', `${npc.data.name.toUpperCase()} DESCRIBES A NEW BODY`);
         } else if (a.type === 'request' && hear) {
           this.game.events.emit('notice', `${npc.data.name.toUpperCase()} ASKS FOR ${String(a.kind ?? '').toUpperCase()}`);
         }
