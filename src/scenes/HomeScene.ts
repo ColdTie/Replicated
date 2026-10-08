@@ -34,9 +34,16 @@ export class HomeScene extends Phaser.Scene {
 
   private async start() {
     const params = new URLSearchParams(location.search);
-    if (params.has('shot') || params.has('local')) {
+    if (params.has('shot') || params.has('local') || params.has('sim')) {
       // Screenshots and offline play: device storage, auto-create a profile if needed
       const store = new LocalStore(!params.has('shot'));
+      // ?sim (tools/sim-live.mjs): play straight in from storage the script seeded; the copies act on their own
+      // plans with their minds asleep (no canned decisions put words in their mouths)
+      if (params.has('sim')) {
+        store.mindTick = async () => null;
+        const p = (await store.listProfiles())[0];
+        if (p) return this.play(store, p);
+      }
       if (params.has('shot')) {
         const p = (await store.listProfiles())[0] ?? await store.createProfile({ name: 'STEVE', kid_mode: params.has('kid'), feature_color: 10, sort: 0 });
         return this.play(store, p);

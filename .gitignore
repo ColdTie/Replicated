@@ -3,3 +3,4 @@ dist
 public/assets/gen
 *.log
 .DS_Store
+dist-sim
