@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
-import { anim, featureTex } from '../core/assets';
+import { anim } from '../core/assets';
+import { bodyFor } from '../core/body';
+import type { ReplicantSave } from '../net/store';
 import { PALETTE, PLAYER } from '../core/data';
 import { isKid, session } from '../core/session';
 import { sound } from '../audio/Sound';
@@ -13,14 +15,6 @@ const WARM = PALETTE[10];
 const WARM_RGB = Phaser.Display.Color.IntegerToColor(0xffe2b8);
 const HURT_RGB = Phaser.Display.Color.IntegerToColor(PALETTE[8]);
 
-type ModelId = keyof typeof PLAYER.models;
-
-/** Body model from ?model= in the URL, else the default in player.json. */
-function pickModel() {
-  const q = new URLSearchParams(location.search).get('model');
-  const id = (q && q in PLAYER.models ? q : PLAYER.model) as ModelId;
-  return PLAYER.models[id];
-}
 
 export class Player {
   readonly zone: Phaser.GameObjects.Zone;
@@ -67,15 +61,19 @@ export class Player {
     this.body = this.zone.body as Phaser.Physics.Arcade.Body;
     this.body.setDrag(0, 0);
     this.shadow = scene.add.image(x, y, 'shadow').setAlpha(0.45).setTint(PALETTE[25]).setDepth(50);
-    const model = pickModel();
-    const feature = session.replicant?.traits.feature ?? session.profile?.feature_color ?? PLAYER.feature[1];
-    const traits = session.replicant?.traits;
+    const rep = session.replicant;
+    const feature = rep?.traits.feature ?? session.profile?.feature_color ?? PLAYER.feature[1];
+    const traits = rep?.traits;
     this.featureColor = PALETTE[traits?.trail ?? feature];
-    this.key = featureTex(model.sprite, feature);
-    this.headY = model.headY;
+    // ?model=drone tries a hand-made body; otherwise the replicant's own (composed from the kit when it has one)
+    const q = new URLSearchParams(location.search).get('model');
+    const data = q && q in PLAYER.models ? ({ ...(rep ?? { id: '', profile_id: null, name: '', star_id: 'sol', planet_index: 3, pos_x: null, pos_y: null }), model: q, traits: { ...(traits ?? {}), body: undefined, blank: false } } as ReplicantSave) : rep;
+    const look = bodyFor(scene, data ?? undefined, feature);
+    this.key = look.key;
+    this.headY = look.headY;
     this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1);
     this.sprite.play(anim(this.key, 'idle'));
-    if (traits?.gear) this.gear = new Gear(scene, this.sprite, model.sprite, traits.gear, this.featureColor);
+    if (traits?.gear) this.gear = new Gear(scene, this.sprite, look.model, traits.gear, this.featureColor, look.anchors);
     // Two layers of light: a tight halo hugging the body (it is the source) and a wide, faint pool on the ground.
     this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.3).setScale(0.45).setDepth(6100);
     this.pool = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.07).setScale(1.5, 1.0).setDepth(6100);

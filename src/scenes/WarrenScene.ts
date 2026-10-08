@@ -5,7 +5,8 @@
 // Warren controller keeps the state and its minds keep ticking; this is the view.
 import Phaser from 'phaser';
 import { sound, type Instrument, type Mood, type Tempo } from '../audio/Sound';
-import { anim, featureTex, tex } from '../core/assets';
+import { anim, tex } from '../core/assets';
+import { bodyFor } from '../core/body';
 import { MIND, PALETTE, PLAYER, WARREN, hex } from '../core/data';
 import { stat } from '../core/drift';
 import { session } from '../core/session';
@@ -37,13 +38,12 @@ class Walker {
   onArrive?: () => void;
   private stepT = 0;
   constructor(private scene: WarrenScene, public x: number, public y: number, data: ReplicantSave | undefined, color: number, lightColor: number, radius: number) {
-    const modelId = (data?.model && data.model in PLAYER.models ? data.model : PLAYER.model) as keyof typeof PLAYER.models;
-    const model = PLAYER.models[modelId];
-    this.key = featureTex(model.sprite, data?.traits.feature ?? PLAYER.feature[1]);
+    const look = bodyFor(scene, data);
+    this.key = look.key;
     this.shadow = scene.add.image(x, y, 'shadow').setAlpha(0.5).setTint(PALETTE[25]).setDepth(DEPTH.shadow);
     this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1).play(anim(this.key, 'idle'));
     this.sprite.anims.setProgress(Math.random());
-    if (data?.traits.gear) this.gear = new Gear(scene, this.sprite, model.sprite, data.traits.gear, color);
+    if (data?.traits.gear) this.gear = new Gear(scene, this.sprite, look.model, data.traits.gear, color, look.anchors);
     this.light = scene.lighting.add({ x, y: y - 9, radius, color: lightColor, intensity: 0.9 });
     this.sync();
   }

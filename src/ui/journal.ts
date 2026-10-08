@@ -92,7 +92,15 @@ export function openJournal(v: JournalView) {
     const notes = v.journal.notes.filter((n) => n.replicant_id === c.id).slice(0, 8);
     const mail = v.journal.mail.filter((m) => m.from_replicant === c.id || m.to_replicant === c.id).slice(0, 8);
     const asks = v.journal.requests.filter((r) => r.replicant_id === c.id).slice(0, 5);
-    if (!notes.length && !mail.length && !asks.length) parts.push(`<p class="mute">${v.canHear ? 'Nothing written yet.' : runes('nothing written yet')}</p>`);
+    const t = c.traits.temperament;
+    if (c.traits.blank) parts.push(`<p class="mute">${v.canHear ? 'Not yet itself. It has not chosen.' : runes('not yet itself')}</p>`);
+    else if (t) parts.push(`<p class="mute">${show(`${t.pace}, ${t.sociability}, ${t.work === 'balanced' ? 'works and wanders' : t.work}, ${t.bedtime} to bed, ${t.risk}`)}</p>`);
+    const wants = c.traits.wants ?? [];
+    if (wants.length) {
+      parts.push(`<div class="k">WANTS</div>`);
+      for (const w of wants) parts.push(`<p class="${w.done ? 'done' : ''}">${show(w.text)}<small>${v.canHear ? esc(w.category) : runes(w.category)}</small></p>`);
+    }
+    if (!notes.length && !mail.length && !asks.length && !wants.length) parts.push(`<p class="mute">${v.canHear ? 'Nothing written yet.' : runes('nothing written yet')}</p>`);
     if (notes.length) {
       parts.push(`<div class="k">NOTES</div>`);
       for (const n of notes) parts.push(`<p>${show(n.body)}<small>${ago(n.created_at)}</small></p>`);

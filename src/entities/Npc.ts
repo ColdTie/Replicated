@@ -2,7 +2,8 @@
 // Replicator, and greets you when you come close. Its drift (visor, headgear, trail) tells it apart at a glance.
 import Phaser from 'phaser';
 import { sound, type Instrument, type Mood, type Tempo } from '../audio/Sound';
-import { anim, featureTex } from '../core/assets';
+import { anim } from '../core/assets';
+import { bodyFor, ensureBodyTexture, kitColor } from '../core/body';
 import { MIND, PALETTE, PLAYER, VILLAGE, WARREN } from '../core/data';
 import { DRIFT, stat } from '../core/drift';
 import type { Light } from '../fx/Lighting';
@@ -14,7 +15,7 @@ import type { BelowTask } from './Warren';
 import type { WarrenRoom } from '../net/store';
 import { squash } from './Player';
 
-type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below';
+type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below' | 'blank';
 /** Something a copy decided to do with its hands: walk there, swing a few times, then it happens. */
 interface Chore { x: number; y: number; swings: number; swing: () => void; done: () => void }
 type Pt = { x: number; y: number };
@@ -26,7 +27,7 @@ export class Npc {
   private light: Light;
   private carried?: Phaser.GameObjects.Image;
   private key: string;
-  readonly trailColor: number;
+  trailColor: number;
   x: number; y: number;
   state: State = 'idle';
   private target: Pt | null = null;
@@ -46,28 +47,82 @@ export class Npc {
   /** 0 rested .. 1 weary: climbs while awake, cleared by a sleep in a resting station */
   weary = 0;
   private nextYawn = 0;
-  /** the night level at which this copy turns in: early birds and night owls, from its id */
-  readonly nightFrom: number;
+  /** the night level at which this copy turns in: its chosen bedtime, else early birds and night owls from its id */
+  private seedNight: number;
+  get temper() { return this.data.traits.temperament; }
+  get nightFrom() {
+    const b = this.temper?.bedtime;
+    return b === 'early' ? 0.4 : b === 'late' ? 0.8 : b === 'even' ? 0.6 : this.seedNight;
+  }
+  /** walking pace from its temperament */
+  get pace() { const p = this.temper?.pace; return p === 'slow' ? 0.85 : p === 'quick' ? 1.15 : 1; }
 
   constructor(private scene: PlanetScene, readonly data: ReplicantSave, x: number, y: number) {
     this.x = x; this.y = y;
-    const model = PLAYER.models[(data.model in PLAYER.models ? data.model : PLAYER.model) as keyof typeof PLAYER.models];
-    this.key = featureTex(model.sprite, data.traits.feature ?? PLAYER.feature[1]);
-    this.trailColor = PALETTE[data.traits.trail ?? 10];
+    const look = bodyFor(scene, data);
+    this.key = look.key;
+    this.trailColor = data.traits.blank ? PALETTE[21] : PALETTE[data.traits.trail ?? kitColor(data.traits.body?.accent, 10)];
     this.shadow = scene.add.image(x, y, 'shadow').setAlpha(0.45).setTint(PALETTE[25]).setDepth(50);
     this.sprite = scene.add.sprite(x, y, this.key).setOrigin(0.5, 1).play(anim(this.key, 'idle'));
     this.sprite.anims.setProgress(Math.random());
-    this.gear = new Gear(scene, this.sprite, model.sprite, data.traits.gear ?? 0, this.trailColor);
+    this.gear = new Gear(scene, this.sprite, look.model, data.traits.blank ? 0 : data.traits.gear ?? 0, this.trailColor, look.anchors);
     // a small warm light: copies are "ours", like the base
     this.light = scene.lighting.add({ x, y, radius: 34 * stat(data, 'light'), color: 0xffe2b8, intensity: 0.75 });
     this.nextTrip = scene.time.now + DRIFT.tripMs * (0.5 + Math.random()) / stat(data, 'gather');
     // copies get to work soon after you arrive, one after another
     this.nextBuild = scene.time.now + 3500 + Math.random() * 5000;
     const [lo, hi] = WARREN.rest.nightFrom;
-    this.nightFrom = lo + ((this.voiceSeed >>> 8) % 100) / 100 * (hi - lo);
+    this.seedNight = lo + ((this.voiceSeed >>> 8) % 100) / 100 * (hi - lo);
     // how tired it is carries over; a copy that slept while you were away comes back rested (Warren checks the bed)
     this.weary = data.traits.weary ?? Math.min(0.6, ((this.voiceSeed >>> 16) % 100) / 160);
     this.sync();
+    if (data.traits.blank) this.setBlank();
+  }
+
+  /** Born blank: grey, dim and still by the Replicator until its first wake makes it itself. */
+  get blank() { return this.state === 'blank'; }
+  private setBlank() {
+    this.state = 'blank';
+    this.sprite.setTint(0x7a7f96);
+    this.light.intensity = 0.25;
+    this.light.active = true;
+  }
+
+  /**
+   * The becoming: the copy chose its body, voice, temperament, wants and name. The parts snap on in a white flash,
+   * the visor flickers through the colors and lights in its own, and it moves for the first time.
+   */
+  become(traits: ReplicantSave['traits'], name?: string) {
+    Object.assign(this.data.traits, traits, { blank: false, v: 1 });
+    if (name) this.data.name = name;
+    const sc = this.scene, s = this.sprite;
+    const look = bodyFor(sc, this.data);
+    this.trailColor = PALETTE[this.data.traits.trail ?? kitColor(this.data.traits.body?.accent, 10)];
+    this.state = 'born';
+    s.clearTint();
+    s.setTintFill(0xffffff);
+    sound.birth();
+    sc.fx.sparks(this.x, this.y - 10, this.trailColor, 16);
+    sc.time.delayedCall(140, () => {
+      this.key = look.key;
+      s.setTexture(look.key, 0);
+      s.clearTint();
+      squash(sc, s, 1.3, 0.75, 140);
+      this.gear.setAnchors(look.anchors);
+      this.gear.setFrame(this.data.traits.gear ?? 0, this.trailColor);
+      this.light.intensity = 0.75;
+      // the visor flickers through every color and settles on its own
+      const keys = this.data.traits.body ? PLAYER.featureColors.map((f) => ensureBodyTexture(sc, this.data.traits.body, f[1])) : [look.key];
+      let i = 0;
+      const flick = sc.time.addEvent({
+        delay: 70, repeat: 8,
+        callback: () => {
+          i++;
+          s.setTexture(i > 8 ? look.key : keys[i % keys.length], 0);
+          if (i > 8) { s.play(anim(look.key, 'idle')); flick.remove(); this.state = 'greet'; this.until = sc.time.now + 1200; this.hop(); sc.fx.sparks(this.x, this.y - 12, PALETTE[this.data.traits.feature ?? 10], 10); }
+        },
+      });
+    });
   }
 
   get weariness(): 'rested' | 'tired' | 'weary' { return this.weary < 0.35 ? 'rested' : this.weary < 0.8 ? 'tired' : 'weary'; }
@@ -96,8 +151,9 @@ export class Npc {
         squash(this.scene, s, 1.3, 0.75, 140);
         this.scene.fx.sparks(s.x, s.y - 10, this.trailColor, 18);
         this.gear.image.setAlpha(1);
-        // the visor flickers through colors and settles on its own drift color
-        const keys = PLAYER.featureColors.map((f) => featureTex(PLAYER.models.replicant.sprite, f[1]));
+        if (this.data.traits.blank) { s.play(anim(this.key, 'idle')); this.setBlank(); done(); return; }
+        // the visor flickers through colors and settles on its own drift color (copies born before session 9)
+        const keys = PLAYER.featureColors.map((f) => bodyFor(this.scene, { ...this.data, traits: { ...this.data.traits, feature: f[1] } }).key);
         let i = 0;
         const flick = this.scene.time.addEvent({
           delay: 70, repeat: 8,
@@ -121,14 +177,16 @@ export class Npc {
   get below() { return this.state === 'below'; }
 
   update(time: number, dt: number) {
-    if (this.state === 'born') { this.sync(); return; }
+    if (this.state === 'born' || this.state === 'blank') { this.sync(); return; }
     if (this.state === 'below') return;
     const p = this.scene.player;
     const dp = Math.hypot(p.x - this.x, p.y - this.y);
 
-    // say hello when you come close: turn, hop, chirp
-    if (dp < 30 && time > this.nextGreet && p.alive && this.state !== 'mine') {
-      this.nextGreet = time + 20_000;
+    // say hello when you come close: turn, hop, chirp (a solitary copy waits for you to come closer)
+    const soc = this.temper?.sociability;
+    const greetAt = soc === 'solitary' ? 18 : soc === 'clingy' ? 44 : 30;
+    if (dp < greetAt && time > this.nextGreet && p.alive && this.state !== 'mine') {
+      this.nextGreet = time + (soc === 'solitary' ? 34_000 : soc === 'clingy' ? 11_000 : 20_000);
       this.state = 'greet';
       this.until = time + 900;
       this.sprite.setFlipX(p.x < this.x);
@@ -247,8 +305,9 @@ export class Npc {
       this.state = 'walk';
       return;
     }
-    // something to build? (the pool has the work, the ring has room)
-    if (time > this.nextBuild) {
+    // something to build? (the pool has the work, the ring has room); builders look first, wanderers often skip
+    const work = this.temper?.work;
+    if (time > this.nextBuild && !(work === 'wanderer' && Math.random() < 0.5)) {
       const job = this.scene.village.requestJob(this);
       if (job) {
         this.job = job;
@@ -257,12 +316,14 @@ export class Npc {
         this.state = 'walk';
         return;
       }
-      this.nextBuild = time + 9000 + Math.random() * 6000;
+      this.nextBuild = time + (work === 'builder' ? 4000 : 9000) + Math.random() * 6000;
     }
-    // time for a trip: go mine the nearest healthy crystal near the base
+    // time for a trip: go mine the nearest healthy crystal near the base (bold copies range further)
+    const risk = this.temper?.risk;
+    const range = risk === 'bold' ? 330 : risk === 'careful' ? 150 : 220;
     if (time > this.nextTrip) {
       this.nextTrip = time + DRIFT.tripMs / stat(this.data, 'gather');
-      const node = this.scene.nodes.filter((n) => n.alive && Math.hypot(n.x - base.x, n.y - base.y) < 220)
+      const node = this.scene.nodes.filter((n) => n.alive && Math.hypot(n.x - base.x, n.y - base.y) < range)
         .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))[0];
       if (node) {
         this.mineAt = { x: node.x, y: node.y };
@@ -272,7 +333,7 @@ export class Npc {
       }
     }
     this.mineAt = null;
-    const a = Math.random() * Math.PI * 2, r = 20 + Math.random() * 70;
+    const a = Math.random() * Math.PI * 2, r = (20 + Math.random() * 70) * (work === 'wanderer' ? 1.9 : 1);
     this.target = { x: base.x + Math.cos(a) * r, y: base.y + 20 + Math.sin(a) * r * 0.6 };
     this.state = 'walk';
   }
@@ -281,7 +342,7 @@ export class Npc {
   private walkTo(t: Pt, dt: number) {
     const dx = t.x - this.x, dy = t.y - this.y, d = Math.hypot(dx, dy);
     if (d < 3) return true;
-    const speed = PLAYER.speed * 0.55 * stat(this.data, 'speed') * (1 - 0.3 * this.weary);
+    const speed = PLAYER.speed * 0.55 * stat(this.data, 'speed') * this.pace * (1 - 0.3 * this.weary);
     const nx = this.x + (dx / d) * speed * dt / 1000, ny = this.y + (dy / d) * speed * dt / 1000;
     if (this.scene.isWalkable(nx, ny) && this.scene.surfaceAt(nx, ny) !== 'void') {
       this.x = nx; this.y = ny;
@@ -316,7 +377,7 @@ export class Npc {
 
   /** Go and do something by hand (cut a tree, take a build down). Drops whatever it was doing. */
   startChore(c: Chore) {
-    if (this.state === 'born' || this.state === 'below') return false;
+    if (this.state === 'born' || this.state === 'below' || this.state === 'blank') return false;
     if (this.job) { this.scene.village.release(this.job); this.job = null; }
     if (this.carried) { this.carried.destroy(); this.carried = undefined; }
     this.mineAt = null;

@@ -14,6 +14,7 @@ import { Npc } from '../entities/Npc';
 import { Village } from '../entities/Village';
 import { Warren } from '../entities/Warren';
 import { allRooms, demoWarren, describeWarren, restOf } from '../world/warren';
+import { PARTS } from '../core/body';
 import { planetAt } from '../world/system';
 import { Player, squash } from '../entities/Player';
 import { CrystalNode, Shard, Spark } from '../entities/Resources';
@@ -35,6 +36,21 @@ import { TRAVEL, distanceLy, fuelFor, planetFor, starById, travelMs } from '../w
 import type { StarMapData } from './StarMapScene';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
+
+const GEAR_NAMES = ['nothing', 'antennae', 'halo', 'horns', 'sprout', 'dish', 'crown'];
+
+/** The parts kit as lists of names, for a blank copy's becoming (the mind picks from these). */
+function kitLists(): MindContext['kit'] {
+  const names = (o: Record<string, unknown>) => Object.keys(o).filter((k) => !k.startsWith('_'));
+  const colorIndex: Record<string, number> = {};
+  for (const k of names(PARTS.colors)) colorIndex[k] = PARTS.colors[k];
+  const colorName = (i: number) => names(PARTS.colors).find((k) => PARTS.colors[k] === i) ?? `color ${i}`;
+  return {
+    head: names(PARTS.head.variants), visor: names(PARTS.visor.variants), torso: names(PARTS.torso.variants), arms: names(PARTS.arms.variants),
+    legs: names(PARTS.legs.variants), back: names(PARTS.back.variants), headgear: GEAR_NAMES, colors: names(PARTS.colors),
+    visors: PLAYER.featureColors.map((f) => colorName(f[1])), visorLights: PLAYER.featureColors.map((f) => f[1]), colorIndex,
+  };
+}
 
 interface InitData {
   planetId?: string;
@@ -1070,8 +1086,9 @@ export class PlanetScene extends Phaser.Scene {
     return true;
   }
 
-  /** The copy's name floats above it for a moment so the family knows who is who. */
-  private floatName(npc: Npc) {
+  /** The copy's name floats above it for a moment so the family knows who is who (a blank copy has none yet). */
+  floatName(npc: Npc) {
+    if (npc.data.traits.blank) return;
     const t = this.add.bitmapText(npc.x, npc.y - 30, 'pixel', npc.data.name).setOrigin(0.5).setTint(npc.trailColor).setDepth(6300).setAlpha(0);
     this.tweens.add({ targets: t, alpha: 1, y: t.y - 4, duration: 400, ease: 'Sine.easeOut' });
     this.tweens.add({ targets: t, alpha: 0, delay: 2200, duration: 600, onComplete: () => t.destroy() });
@@ -1082,8 +1099,14 @@ export class PlanetScene extends Phaser.Scene {
     const fake = Number(new URLSearchParams(location.search).get('copies') ?? 0);
     if (this.shot && fake && session.replicant) {
       let parent = session.replicant;
+      const kit = kitLists();
+      const at = <T>(a: T[], k: number) => a[k % a.length];
       for (let i = 0; i < fake; i++) {
         const r = { ...replicate(parent, this.planet.star, this.planet.planetIndex, 0, 0), id: `fake${i}` } as ReplicantSave;
+        // already themselves: a body from the kit, a visor color, a name
+        const body = { head: at(kit.head, i * 5 + 1), visor: at(kit.visor, i * 3), torso: at(kit.torso, i * 2 + 1), arms: at(kit.arms, i), legs: at(kit.legs, i * 2), back: at(kit.back, i + 1), headgear: (i * 2 + 1) % 7, primary: at(kit.colors, i * 7 + 2), secondary: at(kit.colors, i * 11 + 5), accent: at(kit.colors, i * 13 + 8) };
+        r.traits = { ...r.traits, blank: false, body, feature: at(kit.visorLights, i + 1), trail: kit.colorIndex[body.accent], gear: body.headgear };
+        r.name = at(['Ash', 'Wren', 'Pip', 'Moth', 'Ferro', 'Lark'], i);
         rows.push(r);
         parent = r;
       }
@@ -1175,6 +1198,9 @@ export class PlanetScene extends Phaser.Scene {
       weariness: npc.weariness,
       around: this.aroundNpc(npc),
       reflect: (this.wakeCount.get(npc) ?? 0) % 5 === 4,
+      blank: !!npc.data.traits.blank,
+      kit: kitLists(),
+      wants: (npc.data.traits.wants ?? []).map((w, i) => `${i + 1}. ${w.text} (${w.category}${w.done ? ', done' : ''})`),
       planet: this.placeLabel,
       biome: this.planet.subtitle ?? this.planet.id,
       timeOfDay,
@@ -1252,6 +1278,16 @@ export class PlanetScene extends Phaser.Scene {
           this.cutTree(npc);
         } else if (a.type === 'demolish') {
           this.demolish(npc, a.kind ?? 'any');
+        } else if (a.type === 'become') {
+          const was = npc.data.name;
+          npc.become(a.traits ?? {}, a.name);
+          if (st.mode === 'local') st.saveReplicant(npc.data).catch(() => undefined);
+          this.announceLocation();
+          this.time.delayedCall(900, () => this.floatName(npc));
+          this.mindLog.push({ t: this.mindClock, text: `${was} became itself: it is ${npc.data.name} now` });
+          this.game.events.emit('notice', hear ? `${was.toUpperCase()} IS ${npc.data.name.toUpperCase()} NOW` : `${was.toUpperCase()} HAS BECOME ITSELF`);
+        } else if (a.type === 'wants' && a.wants) {
+          npc.data.traits.wants = a.wants;
         } else if (a.type === 'dig') {
           this.warren.dig(npc, a);
         } else if (a.type === 'furnish') {
@@ -1278,6 +1314,7 @@ export class PlanetScene extends Phaser.Scene {
     this.npcs.forEach((n, i) => { if (!this.nextWake.has(n)) this.nextWake.set(n, this.firstWakeAt! + i * MIND.staggerMs); });
     if (!this.mindBusy) {
       for (const n of this.npcs) {
+        if (n.data.id === 'pending') continue; // its row is still being written
         if (time < this.nextWake.get(n)!) continue;
         this.nextWake.set(n, time + MIND.wakeMinutes * 60_000 + Math.random() * 20_000);
         void this.wake(n);

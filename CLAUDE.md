@@ -146,6 +146,9 @@ src/entities/Warren.ts   the warren at runtime: the hatch by the base, which cop
                          sleep, swing timers, the home drive, saving (planet_states.data.warren)
 src/scenes/WarrenScene   underground view over the paused planet: walk, dash, lanterns, sleepers in pods, diggers at
                          the rock face; the ladder takes you back up
+src/data/parts.json      the parts kit: heads, visors, torsos, arms, legs (or treads / hover), back pieces, named colors, poses
+src/core/bodyRender.ts   composes a 16x20 x 14 frame body from the kit + a spec (pure; tools/body-preview.mjs runs it in Node)
+src/core/body.ts         bodyFor(): the texture for a replicant (composed and cached, or its hand-made model), visor anchors
 src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star, tap again for its system: planets as live globes
                          on temperature-tinted orbits, tap one to pick it), launch or look-only
 src/scenes/TravelScene   departure orbit (globe, giant behind a moon), warp, real-time cruise + ETA, visits, arrival
@@ -166,10 +169,30 @@ security; `ensure_family_galaxy()` creates the galaxy on first sign-in.
 Sprite legend roles: `a0/a1/a2` = planet accent (dark, mid, light), `g0/g1/g2` = planet ground, `f0/f1` = replicant
 feature color (visor, antenna tip, chest core).
 
+### Traits schema v1 (`replicants.traits`, since session 9; `v: 1`)
+
+One JSON object per replicant, read by the game and the mind alike. Every key is optional; missing means "not yet".
+
+| group | key | what |
+| --- | --- | --- |
+| look | `body` | `{ head, visor, torso, arms, legs, back, headgear, primary, secondary, accent }`: names from `src/data/parts.json`; composed at load time (`src/core/bodyRender.ts`). Absent = a hand-made model (`replicants.model`). |
+| look | `feature` | visor light color (palette index; the dark one is its pair in `player.json featureColors`) |
+| look | `gear`, `trail` | headgear frame (`gear.json`), trail / flag / mural color (palette index) |
+| look | `look` | free text the kit cannot draw (open `requests` row of kind `skin`, hand art) |
+| voice | `voice` | `{ instrument, mood, tempo }` (`sing_as`) |
+| mind | `temperament` | `{ pace, sociability, work, bedtime, risk }` (`set_temperament`): walking pace, greeting range, build vs wander, when it turns in, how far it ranges |
+| mind | `wants` | `[{ text, category, done, at }]` 1 to 3 goals in its own words (`set_wants` / `finish_want`) |
+| state | `blank` | born and not yet itself (grey, still; the first wake is the becoming) |
+| state | `awake`, `mods`, `sparks` | intro played; ruin modules; Sparks held |
+| state | `weary`, `sleptAt` | tiredness carried over; last sleep |
+| later | `needs`, `inventory` | reserved (session 9 steps 3d, 3c): `{ rest, food, water, company, purpose }`, `{ material: count }` |
+
 Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`,
 `node tools/playtest.mjs` (scripted headless playtest of the ruin puzzle, dash, combo, spore reflect, petting),
 `node tools/playtest-beacon.mjs` (beacon world: keeper wakes, charges, slams, falls; beacon lights; Spark saved),
 `node tools/playtest-warren.mjs` (rooms planned, a copy digs, a copy makes its bed, down the hatch, walk, back up),
+`node tools/playtest-become.mjs` (a blank birth, the becoming with the canned mind, the journal's wants),
+`node --experimental-strip-types tools/body-preview.mjs [--random 6]` (composed bodies side by side -> `screenshots/bodies.png`),
 `node tools/fps.mjs "<query>"` (headless frame rate; software GL, only for comparing builds).
 
 Controls: move WASD/arrows/left stick/left-side touch drag. Attack Space/J/Enter/Z, left click, gamepad A/X/R1, tap right
@@ -619,3 +642,39 @@ Next (Steve, 2026-10-08, "give these guys everything"), in this order unless he 
 Not done / next:
 - Offline digging (rooms dug while nobody plays) is not simulated; digs happen in front of you from banked work.
 - The live model has not yet driven `dig_room` / `furnish` with Steve's copies; watch the journal's THE WARREN.
+
+### Session 9 (2026-10-08): blank births, the bunker as home base, smaller bubbles (Steve's brief; he approved new migrations and changes to what the game is)
+Order given: 1 bubbles, 2 parts kit then the becoming, 3a-c entrance and materials, 3d-e furnishings that do something
+and needs, 4 community and buildings; screenshots and a playtest after each step. Earth's first copies (Sprout, Dusk,
+Lookout, Glint) keep their look until Steve says whether they choose again (the mind refuses `choose_body` for them).
+
+**1. Bubbles** 10% smaller: `bubbleScale` in `mind.json` shrinks padding and max width (118 -> 106); scaling the font
+dropped glyph rows (`screenshots/bubble-scaled.png`). PR #27.
+
+**2. Copies are born blank; bodies are procedural.**
+- Parts kit (`src/data/parts.json`): 6 heads, 6 visors, 5 torsos, 4 arms, 5 legs (thin, sturdy, long, treads,
+  hover), 5 back pieces (cape, pack, wings, fin, none), the 7 headgear frames, 28 named colors in three slots
+  (primary, secondary, accent) plus the visor color. Arms and legs are lines from shoulder / hip to per-pose hand /
+  foot offsets, so every variant animates through the same 14 frames (idle 4, walk 6, attack 3, hurt) without
+  per-frame art; a 1px outline is added around the figure. `renderBody()` is pure (Node preview: `bodies.png`);
+  `bodyFor()` composes once per spec + visor color, registers the animations under the usual names and reports the
+  visor pixel per frame so headgear follows. Player, copies and the warren walkers all draw through it; a replicant
+  without `traits.body` keeps its hand-made model.
+- Births: `replicate()` makes a blank row (`traits.blank`, the kit's `blank` spec, grey visor, no gear / trail /
+  voice / name of its own, stats drift at `blankDrift` = 40% of before). The Replicator's build-up ends with the copy
+  dim and still by the machine (`Npc.setBlank`; no greeting, no work, nothing floats). A new profile's first
+  replicant is composed from the kit's defaults in the profile's visor color (the player has no mind to choose with).
+- The becoming: the first wake of a blank copy (its row id must exist; `pending` rows wait). The mind gets the kit
+  as lists and, over up to 6 tool rounds, `choose_body` (validated against the kit; `extra` free text becomes a
+  `skin` request for hand art), `sing_as`, `set_temperament`, `set_wants` (1 to 3, tagged build / explore / tend /
+  make art / care for others / learn; `finish_want` marks one done), `choose_name`, then its first words. The
+  function writes the traits to the row and sends one `become` action; the game snaps the parts on in a white
+  flash, flickers the visor through every color and lights it in its own (`Npc.become`), floats the name, notice
+  "STEVE II IS ASH NOW" (or "... HAS BECOME ITSELF" before you can hear). The canned mind does all of it at random
+  (`screenshots/become-blank.png`, `become-itself.png`).
+- Temperament is read by the body: pace scales walking, sociability sets how close you must come and how often it
+  greets, builders look for work first and wanderers skip half of it and roam twice as far, bedtime sets the night
+  level it turns in at (early 0.4 / even 0.6 / late 0.8), bold copies mine 330 px out, careful ones 150.
+- Journal: a one-line temperament under each name and a WANTS list. `?copies=N` screenshot copies come with bodies
+  and names (Ash, Wren, Pip, ...).
+- Verified: `tools/playtest-become.mjs` plus the four older playtests pass. Traits schema v1 documented above.

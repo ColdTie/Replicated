@@ -1,0 +1,798 @@
+{
+  "_doc": "The parts kit: every replicant body is composed from these at load time (src/core/bodyRender.ts), 16x20, 14 frames with the same animations as tools/sprites/replicant.json. A copy chooses one variant per part and three colors (traits.body); the visor takes the replicant's feature color (f0 dark, f1 light). Part grids use: b primary, B secondary, c accent, k dark, V/v visor dark/light, W white, '.' empty; a 1px dark outline is added around the whole figure afterwards, so grids hold only the interior. poses: per frame, bob (rows the upper body drops), dx (whole figure shift), and which arm / leg / back pose to draw. Arms and legs are drawn as lines from shoulder / hip to the hand / foot offsets of the pose, so every variant animates without per-frame art.",
+  "size": [
+    16,
+    20
+  ],
+  "animations": {
+    "idle": {
+      "fps": 5,
+      "frames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "repeat": -1
+    },
+    "walk": {
+      "fps": 12,
+      "frames": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "repeat": -1
+    },
+    "attack": {
+      "fps": 20,
+      "frames": [
+        10,
+        11,
+        12
+      ],
+      "repeat": 0
+    },
+    "hurt": {
+      "fps": 1,
+      "frames": [
+        13
+      ],
+      "repeat": 0
+    }
+  },
+  "poses": [
+    {
+      "bob": 0,
+      "dx": 0,
+      "arms": "hang",
+      "legs": "stand",
+      "back": "still"
+    },
+    {
+      "bob": 0,
+      "dx": 0,
+      "arms": "hang2",
+      "legs": "stand",
+      "back": "still"
+    },
+    {
+      "bob": 1,
+      "dx": 0,
+      "arms": "hang2",
+      "legs": "stand",
+      "back": "still"
+    },
+    {
+      "bob": 1,
+      "dx": 0,
+      "arms": "hang",
+      "legs": "stand",
+      "back": "still"
+    },
+    {
+      "bob": 1,
+      "dx": 0,
+      "arms": "swingA",
+      "legs": "w1",
+      "back": "sway"
+    },
+    {
+      "bob": 0,
+      "dx": 0,
+      "arms": "swingB",
+      "legs": "w2",
+      "back": "sway"
+    },
+    {
+      "bob": 0,
+      "dx": 0,
+      "arms": "hang",
+      "legs": "w3",
+      "back": "still"
+    },
+    {
+      "bob": 1,
+      "dx": 0,
+      "arms": "swingB",
+      "legs": "w4",
+      "back": "sway"
+    },
+    {
+      "bob": 0,
+      "dx": 0,
+      "arms": "swingA",
+      "legs": "w5",
+      "back": "sway"
+    },
+    {
+      "bob": 0,
+      "dx": 0,
+      "arms": "hang",
+      "legs": "w6",
+      "back": "still"
+    },
+    {
+      "bob": 0,
+      "dx": -1,
+      "arms": "windup",
+      "legs": "brace",
+      "back": "flare"
+    },
+    {
+      "bob": 0,
+      "dx": 1,
+      "arms": "strike",
+      "legs": "lunge",
+      "back": "flare"
+    },
+    {
+      "bob": 0,
+      "dx": 0,
+      "arms": "hang",
+      "legs": "brace",
+      "back": "still"
+    },
+    {
+      "bob": 0,
+      "dx": -1,
+      "arms": "flinch",
+      "legs": "brace",
+      "back": "flare",
+      "hurt": true
+    }
+  ],
+  "colors": {
+    "_doc": "Named palette picks a copy may use for its three slots (Endesga 32 indexes).",
+    "bone": 2,
+    "sand": 3,
+    "clay": 4,
+    "umber": 5,
+    "rust": 1,
+    "red": 8,
+    "orange": 9,
+    "gold": 10,
+    "pale": 11,
+    "lime": 12,
+    "leaf": 13,
+    "moss": 14,
+    "pine": 15,
+    "deep blue": 16,
+    "sky": 17,
+    "cyan": 18,
+    "white": 19,
+    "silver": 20,
+    "steel": 21,
+    "slate": 22,
+    "navy": 23,
+    "ink": 24,
+    "magenta": 26,
+    "plum": 27,
+    "mauve": 28,
+    "pink": 29,
+    "peach": 30,
+    "tan": 31
+  },
+  "defaults": {
+    "head": "round",
+    "visor": "band",
+    "torso": "slim",
+    "arms": "thin",
+    "legs": "thin",
+    "back": "cape",
+    "headgear": 0,
+    "primary": "silver",
+    "secondary": "steel",
+    "accent": "red"
+  },
+  "blank": {
+    "head": "round",
+    "visor": "band",
+    "torso": "slim",
+    "arms": "thin",
+    "legs": "thin",
+    "back": "none",
+    "headgear": 0,
+    "primary": "steel",
+    "secondary": "slate",
+    "accent": "slate"
+  },
+  "head": {
+    "anchor": [
+      4,
+      0
+    ],
+    "variants": {
+      "round": [
+        "........",
+        "...v....",
+        "...B....",
+        "..bbb...",
+        ".bbbbb..",
+        ".bbbbb..",
+        ".bbbbb..",
+        "..BBB..."
+      ],
+      "tall": [
+        "..bbb...",
+        ".bbbbb..",
+        ".bbbbb..",
+        ".bbbbb..",
+        ".bbbbb..",
+        ".bbbbb..",
+        ".bBBBb..",
+        "..BBB..."
+      ],
+      "boxy": [
+        "........",
+        "........",
+        ".bbbbbb.",
+        ".bbbbbb.",
+        ".bbbbbb.",
+        ".bbbbbb.",
+        ".bbbbbb.",
+        ".BBBBBB."
+      ],
+      "dome": [
+        "........",
+        "...cc...",
+        "..bbbb..",
+        ".bbbbbb.",
+        ".bbbbbb.",
+        ".bbbbbb.",
+        "..bbbb..",
+        "..BBBB.."
+      ],
+      "narrow": [
+        "........",
+        "...v....",
+        "...bb...",
+        "...bb...",
+        "..bbbb..",
+        "..bbbb..",
+        "..bbbb..",
+        "...BB..."
+      ],
+      "crest": [
+        "....c...",
+        "...cc...",
+        "..cbb...",
+        ".bbbbb..",
+        ".bbbbb..",
+        ".bbbbb..",
+        ".bbbbb..",
+        "..BBB..."
+      ]
+    }
+  },
+  "visor": {
+    "_doc": "Overlay on the head grid; drawn after the head so it replaces head pixels.",
+    "variants": {
+      "band": [
+        "........",
+        "........",
+        "........",
+        "........",
+        "........",
+        "...Vvv..",
+        ".....W..",
+        "........"
+      ],
+      "dot": [
+        "........",
+        "........",
+        "........",
+        "........",
+        "....Vv..",
+        "....vW..",
+        "........",
+        "........"
+      ],
+      "slit": [
+        "........",
+        "........",
+        "........",
+        "........",
+        "..Vvvvv.",
+        "........",
+        "........",
+        "........"
+      ],
+      "goggles": [
+        "........",
+        "........",
+        "........",
+        "..Vv.Vv.",
+        "..vW.vW.",
+        "........",
+        "........",
+        "........"
+      ],
+      "twin": [
+        "........",
+        "........",
+        "........",
+        "........",
+        "...V.V..",
+        "...v.v..",
+        "........",
+        "........"
+      ],
+      "wide": [
+        "........",
+        "........",
+        "........",
+        "........",
+        ".Vvvvvv.",
+        ".vvvvvW.",
+        "........",
+        "........"
+      ]
+    }
+  },
+  "torso": {
+    "anchor": [
+      5,
+      8
+    ],
+    "variants": {
+      "slim": [
+        "...B......",
+        ".bbbbb....",
+        ".bbbvb....",
+        ".bbbBb....",
+        ".bkBBb....",
+        ".bkccb...."
+      ],
+      "broad": [
+        "...B......",
+        "bbbbbbb...",
+        "bbbbvbb...",
+        "bbbbBbb...",
+        "bkBBBBb...",
+        "bkccccb..."
+      ],
+      "armored": [
+        "...B......",
+        ".BbbbB....",
+        ".BbvbB....",
+        ".BBBBB....",
+        ".kcccck...",
+        ".kBBBBk..."
+      ],
+      "round": [
+        "...B......",
+        "..bbbb....",
+        ".bbbvbb...",
+        ".bbbbbb...",
+        ".bBBBBb...",
+        "..kccb...."
+      ],
+      "hollow": [
+        "...B......",
+        ".bbbbb....",
+        ".bkvkb....",
+        ".bkkkb....",
+        ".bBBBb....",
+        ".bcccb...."
+      ]
+    }
+  },
+  "arms": {
+    "_doc": "shoulders: [left, right] (x, y) in the frame; poses give the hand offset from each shoulder. width = line thickness in px.",
+    "shoulders": [
+      [
+        5,
+        10
+      ],
+      [
+        12,
+        10
+      ]
+    ],
+    "poses": {
+      "hang": [
+        [
+          -1,
+          4
+        ],
+        [
+          1,
+          4
+        ]
+      ],
+      "hang2": [
+        [
+          -1,
+          3
+        ],
+        [
+          1,
+          4
+        ]
+      ],
+      "swingA": [
+        [
+          -2,
+          3
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "swingB": [
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          4
+        ]
+      ],
+      "windup": [
+        [
+          -3,
+          2
+        ],
+        [
+          -1,
+          3
+        ]
+      ],
+      "strike": [
+        [
+          -1,
+          3
+        ],
+        [
+          4,
+          0
+        ]
+      ],
+      "flinch": [
+        [
+          -3,
+          0
+        ],
+        [
+          3,
+          -1
+        ]
+      ]
+    },
+    "variants": {
+      "thin": {
+        "width": 1,
+        "hand": 1,
+        "color": "c"
+      },
+      "bulky": {
+        "width": 2,
+        "hand": 2,
+        "color": "b"
+      },
+      "claws": {
+        "width": 1,
+        "hand": 2,
+        "color": "B"
+      },
+      "none": {
+        "width": 0,
+        "hand": 0,
+        "color": "b"
+      }
+    }
+  },
+  "legs": {
+    "_doc": "hips: [left, right] (x, y); poses give the foot offset from each hip. treads and hover ignore poses.",
+    "hips": [
+      [
+        7,
+        14
+      ],
+      [
+        9,
+        14
+      ]
+    ],
+    "poses": {
+      "stand": [
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          4
+        ]
+      ],
+      "w1": [
+        [
+          -2,
+          4
+        ],
+        [
+          2,
+          4
+        ]
+      ],
+      "w2": [
+        [
+          -1,
+          3
+        ],
+        [
+          1,
+          4
+        ]
+      ],
+      "w3": [
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "w4": [
+        [
+          2,
+          4
+        ],
+        [
+          -2,
+          4
+        ]
+      ],
+      "w5": [
+        [
+          1,
+          3
+        ],
+        [
+          -1,
+          4
+        ]
+      ],
+      "w6": [
+        [
+          0,
+          4
+        ],
+        [
+          0,
+          3
+        ]
+      ],
+      "brace": [
+        [
+          -1,
+          4
+        ],
+        [
+          1,
+          4
+        ]
+      ],
+      "lunge": [
+        [
+          -2,
+          4
+        ],
+        [
+          3,
+          4
+        ]
+      ]
+    },
+    "variants": {
+      "thin": {
+        "kind": "legs",
+        "width": 1,
+        "color": "B"
+      },
+      "sturdy": {
+        "kind": "legs",
+        "width": 2,
+        "color": "b"
+      },
+      "long": {
+        "kind": "legs",
+        "width": 1,
+        "color": "c",
+        "stretch": 1
+      },
+      "treads": {
+        "kind": "block",
+        "anchor": [
+          4,
+          15
+        ],
+        "rows": [
+          "..kBBBBBBk..",
+          ".kckckckckk.",
+          "kBkBkBkBkBkB",
+          ".kkkkkkkkkk."
+        ],
+        "roll": true
+      },
+      "hover": {
+        "kind": "block",
+        "anchor": [
+          5,
+          15
+        ],
+        "rows": [
+          ".bBBBBBBb.",
+          "..kkkkkk..",
+          "...vvvv...",
+          "....vv...."
+        ],
+        "float": true
+      }
+    }
+  },
+  "back": {
+    "_doc": "Drawn first (behind the body). Each pose is a grid at the anchor.",
+    "variants": {
+      "cape": {
+        "anchor": [
+          3,
+          9
+        ],
+        "poses": {
+          "still": [
+            "..cc..",
+            ".ccc..",
+            ".ccc..",
+            ".ccc..",
+            ".ccc..",
+            ".kcc..",
+            ".kc...",
+            "......",
+            "......"
+          ],
+          "sway": [
+            "..cc..",
+            ".ccc..",
+            "cccc..",
+            "ccc...",
+            "ccc...",
+            "kcc...",
+            "kc....",
+            "k.....",
+            "......"
+          ],
+          "flare": [
+            ".ccc..",
+            "cccc..",
+            "ccc...",
+            "cc....",
+            "cc....",
+            "kc....",
+            "k.....",
+            "......",
+            "......"
+          ]
+        }
+      },
+      "pack": {
+        "anchor": [
+          2,
+          9
+        ],
+        "poses": {
+          "still": [
+            ".BBB.",
+            "BkkkB",
+            "BkckB",
+            "BkkkB",
+            ".BBB.",
+            "..k.."
+          ],
+          "sway": [
+            ".BBB.",
+            "BkkkB",
+            "BkckB",
+            "BkkkB",
+            ".BBB.",
+            "..k.."
+          ],
+          "flare": [
+            ".BBB.",
+            "BkkkB",
+            "BkckB",
+            "BkkkB",
+            ".BBB.",
+            "..k.."
+          ]
+        }
+      },
+      "wings": {
+        "anchor": [
+          1,
+          8
+        ],
+        "poses": {
+          "still": [
+            "..............",
+            "cc..........cc",
+            ".cc........cc.",
+            "..cc......cc..",
+            "...c......c...",
+            "..............",
+            ".............."
+          ],
+          "sway": [
+            "c............c",
+            "cc..........cc",
+            ".cc........cc.",
+            "..c........c..",
+            "..............",
+            "..............",
+            ".............."
+          ],
+          "flare": [
+            ".cc........cc.",
+            "..cc......cc..",
+            "...cc....cc...",
+            "....c....c....",
+            "..............",
+            "..............",
+            ".............."
+          ]
+        }
+      },
+      "fin": {
+        "anchor": [
+          4,
+          8
+        ],
+        "poses": {
+          "still": [
+            "....c...",
+            "....cc..",
+            "....cc..",
+            "....c...",
+            "........",
+            "........"
+          ],
+          "sway": [
+            "....c...",
+            "....cc..",
+            "....cc..",
+            "....c...",
+            "........",
+            "........"
+          ],
+          "flare": [
+            "....cc..",
+            "....ccc.",
+            "....cc..",
+            "....c...",
+            "........",
+            "........"
+          ]
+        }
+      },
+      "none": {
+        "anchor": [
+          0,
+          0
+        ],
+        "poses": {
+          "still": [],
+          "sway": [],
+          "flare": []
+        }
+      }
+    }
+  }
+}
