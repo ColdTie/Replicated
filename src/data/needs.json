@@ -1,13 +1,9 @@
 {
-  "_doc": "The copies' needs (traits.needs, 0 empty .. 1 full): rest is 1 - weariness (a bed restores it); food and water empty over decayHours and are refilled from the supplies when they drop under eatBelow (one unit, restoreOnEat); company fills near the original or another copy (companyNearPx, companyGainPerHour) and empties alone (solitary copies slower, clingy faster); purpose fills with finished work (purposeOnWork per dig, build, furnishing or chore, more for a want done) and empties idle. mood = the mean, plus muralMood per mural in the warren (up to muralMoodMax); it scales the copy's light between moodLight[0] and [1]. Lamps in the warren slow weariness by lampWakeBonus each, up to lampWakeMax. Needs advance from banked offline time like the Ember pool.",
+  "_doc": "The copies' needs (traits.needs, 0 empty .. 1 full): rest is 1 - weariness (a bed restores it); company fills near the original or another copy (companyNearPx, companyGainPerHour) and empties alone over decayHours.company (solitary copies slower, clingy faster); purpose fills with finished work (purposeOnWork per dig, build, furnishing or chore, more for a want done) and empties idle over decayHours.purpose. They do not eat or drink (Steve, 2026-10-08). mood = the mean of rest, company and purpose, plus muralMood per mural in the warren (up to muralMoodMax); it scales the copy's light between moodLight[0] and [1]. Lamps in the warren slow weariness by lampWakeBonus each, up to lampWakeMax. Needs advance from banked offline time like the Ember pool.",
   "decayHours": {
-    "food": 6,
-    "water": 4,
     "company": 3,
     "purpose": 5
   },
-  "eatBelow": 0.5,
-  "restoreOnEat": 0.6,
   "companyNearPx": 60,
   "companyGainPerHour": 2.0,
   "purposeOnWork": 0.3,

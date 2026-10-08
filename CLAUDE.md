@@ -146,11 +146,11 @@ src/entities/Warren.ts   the warren at runtime: the hatch by the base, which cop
                          sleep, swing timers, the home drive, saving (planet_states.data.warren)
 src/scenes/WarrenScene   underground view over the paused planet: walk, dash, lanterns, sleepers in pods, diggers at
                          the rock face; the ladder takes you back up
-src/data/needs.json      the copies' needs: decay hours, eating, company range, purpose per work, lamp and mural effects
+src/data/needs.json      the copies' needs (rest, company, purpose): decay hours, company range, purpose per work, lamp and mural effects
 src/data/buildings.json  surface buildings: footprint limits, cost per tile and material, roofs, doors, approval delay
 src/world/buildingPaint.ts draws a building from its blueprint (planks / blocks / plates, flat / peaked / dome roof, door, window)
 src/entities/Buildings.ts proposals, the original's approve / veto, paying, shared raising, offline progress
-src/data/supplies.json   materials (stone, soil, wood, water, food, scrap, Ember), yields, production, storage, recipes
+src/data/supplies.json   materials (stone, soil, wood, scrap, Ember), yields, storage, recipes
 src/data/parts.json      the parts kit: heads, visors, torsos, arms, legs (or treads / hover), back pieces, named colors, poses
 src/core/bodyRender.ts   composes a 16x20 x 14 frame body from the kit + a spec (pure; tools/body-preview.mjs runs it in Node)
 src/core/body.ts         bodyFor(): the texture for a replicant (composed and cached, or its hand-made model), visor anchors
@@ -190,7 +190,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | state | `blank` | born and not yet itself (grey, still; the first wake is the becoming) |
 | state | `awake`, `mods`, `sparks` | intro played; ruin modules; Sparks held |
 | state | `weary`, `sleptAt` | tiredness carried over; last sleep |
-| state | `needs` | `{ food, water, company, purpose }` 0 empty .. 1 full (`src/data/needs.json`); rest is `1 - weary` |
+| state | `needs` | `{ company, purpose }` 0 empty .. 1 full (`src/data/needs.json`); rest is `1 - weary`. No food or water (Steve, 2026-10-08). |
 | state | `inventory` | `{ material: count }` gifts from the original the copy still holds |
 
 Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`,
@@ -740,3 +740,10 @@ dig costs, furnish placement and color, the becoming, needs, buildings and gifts
 
 Open question for Steve: Sprout, Dusk, Lookout and Glint on Earth still wear the old inherit-and-drift look; say
 whether they keep it or get to choose again (then the mind's `choose_body` is opened to them).
+
+### Session 9b (2026-10-08): no food or water (Steve: "No food or water actually for these guys. Take that out.")
+- The copies do not eat or drink. Needs are rest (1 - weary), company and purpose; mood is their mean plus murals.
+  Food and water are gone from `needs.json`, from the materials in `supplies.json` (and with them pool and planter
+  production), from the mind's context ("You do not eat or drink"), the journal and the playtest. Pools and
+  planters stay as rooms and furnishings: still water and something green to sit by, nothing more. Old saved
+  `traits.needs.food / water` values are ignored on load.

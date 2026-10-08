@@ -1,5 +1,5 @@
 // The warren at runtime: the hole by the vessel the first copy digs, which copy goes down to dig or to rest, how
-// far each dig has come, the planet's supplies (stone, soil, wood, water, food, scrap; Ember is the pool) and the
+// far each dig has come, the planet's supplies (stone, soil, wood, scrap; Ember is the pool) and the
 // save. The copies decide the layout themselves (their minds call dig_room / furnish; the canned mind does too);
 // this turns those decisions into rooms (src/world/warren.ts), pays for them in wood, stone and the rest
 // (src/data/supplies.json) and keeps planet_states.data.warren / data.supplies up to date. WarrenScene is the
@@ -57,7 +57,6 @@ export class Warren {
   private lastRest = new Map<string, number>();
   private entranceDigger: { npc: Npc; at: number } | null = null;
   private nextWood = new Map<Npc, number>();
-  private prodAcc: Record<string, number> = {};
 
   constructor(private scene: PlanetScene, data: WarrenData | undefined) {
     this.data = data ? structuredClone(data) : { rooms: [], items: [] };
@@ -176,26 +175,15 @@ export class Warren {
     return out;
   }
 
-  /** Water from pools, food from planters and the surface gardens: per real hour, live or while nobody plays. */
-  private production(): Record<string, number> {
-    const dug = new Set(['entrance', ...this.data.rooms.filter((r) => r.dug).map((r) => r.id)]);
-    const pools = this.data.rooms.filter((r) => r.dug && r.kind === 'pool' && r.w >= 4 && r.h >= 4).length;
-    const planters = this.data.items.filter((i) => i.kind === 'planter' && dug.has(i.room)).length;
-    const gardens = this.scene.village.structures.filter((s) => s.type === 'garden').length;
-    const p = SUPPLIES.production;
-    return { water: pools * p.waterPerPoolHour, food: planters * p.foodPerPlanterHour + gardens * p.foodPerGardenHour };
-  }
-
   /**
-   * Time passed while nobody was here: pools and planters produced, and the copies dug on (up to a few rooms,
+   * Time passed while nobody was here: the copies dug on (up to a few rooms,
    * wood permitting) so the warren moves while you are away, the way the Ember pool does.
    */
   applyOffline(hours: number) {
     if (hours <= 0.05) return;
-    for (const [m, perHour] of Object.entries(this.production())) this.add(m, perHour * hours);
     if (!this.scene.npcs.length) return;
-    // the copies got hungry, thirsty and lonely meanwhile, and ate what there was
-    for (const n of this.scene.npcs) n.advanceNeeds(hours, 0);
+    // the copies grew lonely and aimless meanwhile
+    for (const n of this.scene.npcs) n.advanceNeeds(hours);
     let dug = 0;
     if (!this.data.entrance!.dug && hours >= 0.25) { this.data.entrance!.dug = true; this.add('stone', SUPPLIES.entrance.yield.stone); this.add('soil', SUPPLIES.entrance.yield.soil); dug++; }
     for (const r of [...this.planned].sort((a, b) => a.at - b.at)) {
@@ -411,11 +399,6 @@ export class Warren {
 
   update(dt: number) {
     this.clock += dt;
-    // pools and planters, slowly
-    for (const [m, perHour] of Object.entries(this.production())) {
-      this.prodAcc[m] = (this.prodAcc[m] ?? 0) + (perHour * dt) / 3_600_000;
-      if (this.prodAcc[m] >= 1) { this.add(m, 1); this.prodAcc[m] -= 1; }
-    }
     for (const b of [...this.below.values()]) {
       if (b.task === 'dig') {
         const room = b.room!;

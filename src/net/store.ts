@@ -29,8 +29,8 @@ export interface ReplicantSave {
     body?: Body;
     temperament?: Temperament;
     wants?: Want[];
-    /** 0 empty .. 1 full (src/data/needs.json); rest is 1 - weary */
-    needs?: { food: number; water: number; company: number; purpose: number };
+    /** 0 empty .. 1 full (src/data/needs.json); rest is 1 - weary. They do not eat or drink. */
+    needs?: { company: number; purpose: number };
     /** what the original handed it (gifts), by material */
     inventory?: Record<string, number>;
   };
@@ -63,7 +63,7 @@ export interface PlanetData {
   felled?: number[];
   /** The underground base the copies design and dig (src/world/warren.ts) */
   warren?: WarrenData;
-  /** The planet's materials (src/data/supplies.json): stone, soil, wood, water, food, scrap; Ember is `embers` */
+  /** The planet's materials (src/data/supplies.json): stone, soil, wood, scrap; Ember is `embers` */
   supplies?: Record<string, number>;
   /** Surface buildings the copies designed (src/entities/Buildings.ts) */
   buildings?: Building[];

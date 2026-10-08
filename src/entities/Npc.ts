@@ -47,10 +47,9 @@ export class Npc {
   z = 0;
   /** 0 rested .. 1 weary: climbs while awake, cleared by a sleep in a resting station */
   weary = 0;
-  /** food, water, company, purpose: 0 empty .. 1 full (src/data/needs.json) */
-  needs: { food: number; water: number; company: number; purpose: number };
+  /** company and purpose: 0 empty .. 1 full (src/data/needs.json); rest is 1 - weary. They do not eat or drink. */
+  needs: { company: number; purpose: number };
   private nextNeedsSave = 0;
-  private nextEat = 0;
   private nextYawn = 0;
   /** the night level at which this copy turns in: its chosen bedtime, else early birds and night owls from its id */
   private seedNight: number;
@@ -80,25 +79,24 @@ export class Npc {
     this.seedNight = lo + ((this.voiceSeed >>> 8) % 100) / 100 * (hi - lo);
     // how tired it is carries over; a copy that slept while you were away comes back rested (Warren checks the bed)
     this.weary = data.traits.weary ?? Math.min(0.6, ((this.voiceSeed >>> 16) % 100) / 160);
-    this.needs = { food: 0.8, water: 0.8, company: 0.7, purpose: 0.7, ...(data.traits.needs ?? {}) };
+    const saved = data.traits.needs as { company?: number; purpose?: number } | undefined;
+    this.needs = { company: saved?.company ?? 0.7, purpose: saved?.purpose ?? 0.7 };
     this.sync();
     if (data.traits.blank) this.setBlank();
   }
 
-  /** rest, food, water, company and purpose averaged, lifted a little by the warren's murals. */
+  /** rest, company and purpose averaged, lifted a little by the warren's murals. */
   get mood() {
     const n = this.needs;
-    const base = (1 - this.weary + n.food + n.water + n.company + n.purpose) / 5;
+    const base = (1 - this.weary + n.company + n.purpose) / 3;
     return Math.min(1, base + Math.min(NEEDS.muralMoodMax, this.scene.warren.muralCount * NEEDS.muralMood));
   }
   get moodWord(): 'content' | 'low' | 'bleak' { const m = this.mood; return m > 0.6 ? 'content' : m > 0.35 ? 'low' : 'bleak'; }
-  /** Which needs are low, in words ("hungry (food 20%)"). */
+  /** Which needs are low, in words ("lonely (company 20%)"). */
   lowNeeds(): string[] {
     const out: string[] = [];
     const n = this.needs, pct = (v: number) => `${Math.round(v * 100)}%`;
     if (this.weary > 0.8) out.push(`weary (rest ${pct(1 - this.weary)})`);
-    if (n.food < NEEDS.lowBelow) out.push(`hungry (food ${pct(n.food)})`);
-    if (n.water < NEEDS.lowBelow) out.push(`thirsty (water ${pct(n.water)})`);
     if (n.company < NEEDS.lowBelow) out.push(`lonely (company ${pct(n.company)})`);
     if (n.purpose < NEEDS.lowBelow) out.push(`aimless (purpose ${pct(n.purpose)})`);
     return out;
@@ -109,11 +107,9 @@ export class Npc {
     this.needs.purpose = Math.min(1, this.needs.purpose + (want ? NEEDS.purposeOnWant : NEEDS.purposeOnWork));
   }
 
-  /** Needs change with time, here or while nobody was here (hours); eats and drinks from the supplies. */
-  advanceNeeds(hours: number, time: number) {
+  /** Needs change with time, here or while nobody was here (hours). */
+  advanceNeeds(hours: number) {
     const n = this.needs, d = NEEDS.decayHours;
-    n.food = Math.max(0, n.food - hours / d.food);
-    n.water = Math.max(0, n.water - hours / d.water);
     n.purpose = Math.max(0, n.purpose - hours / d.purpose);
     const soc = this.temper?.sociability;
     const p = this.scene.player;
@@ -121,18 +117,6 @@ export class Npc {
       || this.scene.npcs.some((o) => o !== this && !o.below && Math.hypot(o.x - this.x, o.y - this.y) < NEEDS.companyNearPx * 0.7);
     const rate = soc === 'solitary' ? 0.5 : soc === 'clingy' ? 1.5 : 1;
     n.company = near && hours < 0.01 ? Math.min(1, n.company + (hours * NEEDS.companyGainPerHour) / rate) : Math.max(0, n.company - (hours * rate) / d.company);
-    // eat and drink from the shared supplies when low (one unit each, a short while apart)
-    if (time > this.nextEat) {
-      const w = this.scene.warren;
-      for (const [need, mat] of [['food', 'food'], ['water', 'water']] as const) {
-        if (n[need] < NEEDS.eatBelow && (w.supplies[mat] ?? 0) >= 1) {
-          w.supplies[mat] -= 1; this.scene.markSupplies();
-          n[need] = Math.min(1, n[need] + NEEDS.restoreOnEat);
-          this.nextEat = time + 4000;
-          if (hours < 0.01) this.scene.fx.floatIcon(this.x, this.y - 22, 'supplies', (mat === 'food' ? 4 : 3));
-        }
-      }
-    }
   }
 
   /** Writes needs and weariness to its row now and then (not for screenshot copies). */
@@ -342,7 +326,7 @@ export class Npc {
     // weariness builds while awake (lamps in the warren slow it); needs tick; the light shows the mood
     const lampBonus = Math.min(NEEDS.lampWakeMax, this.scene.warren.lampCount * NEEDS.lampWakeBonus);
     this.weary = Math.min(1, this.weary + ((1 - lampBonus) * dt) / (WARREN.rest.wearyAfterMinutes * 60_000));
-    this.advanceNeeds(dt / 3_600_000, time);
+    this.advanceNeeds(dt / 3_600_000);
     this.saveNeeds(time);
     const [lo, hi] = NEEDS.moodLight;
     this.light.intensity = 0.75 * (lo + (hi - lo) * this.mood) * (1 - 0.3 * this.weary);
