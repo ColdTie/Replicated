@@ -1,7 +1,7 @@
 // Save layer. CloudStore talks to Supabase (family galaxy, RLS); LocalStore keeps the same shapes in
 // localStorage for offline play, screenshots and development (?local).
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { BACKEND, PLAYER } from '../core/data';
+import { BACKEND, MIND, PLAYER } from '../core/data';
 import TRAVEL from '../data/travel.json';
 
 export interface Profile {
@@ -82,8 +82,34 @@ export interface ReplicantSummary {
   traits: ReplicantSave['traits'];
 }
 
+/** What the game tells a copy's mind when it wakes (the mind Edge Function). */
+export interface MindContext {
+  planet: string;
+  biome: string;
+  timeOfDay: string;
+  weather: string;
+  playerName: string;
+  playerHere: boolean;
+  embers: number;
+  structures: Record<string, number>;
+  here: string[];
+  events: string[];
+  /** replicant id -> seconds a letter takes to reach it (light speed) */
+  delays: Record<string, number>;
+}
+export interface MindAction { type: 'note' | 'mail' | 'request' | 'rename'; body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string }
+export interface MindResult { skipped?: boolean; song?: string; actions?: MindAction[]; received?: { from: string; body: string }[]; error?: string }
+export interface Note { replicant_id: string; body: string; created_at: string }
+export interface Letter { id: string; from_replicant: string | null; to_replicant: string | null; body: string; sent_at: string; arrives_at: string; read_at?: string | null }
+export interface Request { replicant_id: string; kind: string; detail: string; status: string; created_at: string }
+export interface Journal { notes: Note[]; mail: Letter[]; requests: Request[] }
+
 export interface GameStore {
   readonly mode: 'cloud' | 'local';
+  /** Wake a copy's mind (null when minds are not available). */
+  mindTick(replicantId: string, ctx: MindContext): Promise<MindResult | null>;
+  /** The notes, letters and requests of these replicants, newest first. */
+  journal(ids: string[]): Promise<Journal>;
   listProfiles(): Promise<Profile[]>;
   createProfile(p: Omit<Profile, 'id'>): Promise<Profile>;
   /** The profile's active replicant, created on first play. */
@@ -133,6 +159,9 @@ interface LocalDb {
   planets: Record<string, PlanetSave>;
   journeys: Journey[];
   discovered: string[];
+  notes: Note[];
+  mail: Letter[];
+  requests: Request[];
 }
 
 export class LocalStore implements GameStore {
@@ -143,7 +172,44 @@ export class LocalStore implements GameStore {
   constructor(private persist = true) {
     let db: LocalDb | null = null;
     try { db = persist ? JSON.parse(localStorage.getItem(this.key) ?? 'null') : null; } catch { db = null; }
-    this.db = { profiles: [], replicants: [], planets: {}, journeys: [], discovered: ['sol'], ...(db ?? {}) };
+    this.db = { profiles: [], replicants: [], planets: {}, journeys: [], discovered: ['sol'], notes: [], mail: [], requests: [], ...(db ?? {}) };
+  }
+
+  /** No model on this device: a canned mind that still keeps notes and writes letters, so the game can be played
+   * and tested offline. */
+  async mindTick(replicantId: string, ctx: MindContext) {
+    const me = this.db.replicants.find((r) => r.id === replicantId);
+    if (!me) return null;
+    const pick = <T>(a: T[]) => a[Math.floor(Math.random() * a.length)];
+    const actions: MindAction[] = [];
+    const now = Date.now();
+    if (Math.random() < 0.5) {
+      const body = pick(MIND.canned.notes);
+      this.db.notes.unshift({ replicant_id: me.id, body, created_at: new Date(now).toISOString() });
+      actions.push({ type: 'note', body });
+    }
+    const others = this.db.replicants.filter((r) => r.id !== me.id);
+    if (others.length && Math.random() < 0.5) {
+      const to = pick(others);
+      const delay = ctx.delays[to.id] ?? 0;
+      const body = pick(MIND.canned.letters);
+      this.db.mail.unshift({ id: uuid(), from_replicant: me.id, to_replicant: to.id, body, sent_at: new Date(now).toISOString(), arrives_at: new Date(now + delay * 1000).toISOString(), read_at: null });
+      actions.push({ type: 'mail', to: to.name, toId: to.id, body, delay });
+    }
+    const received = this.db.mail.filter((m) => m.to_replicant === me.id && !m.read_at && Date.parse(m.arrives_at) <= now);
+    for (const m of received) m.read_at = new Date(now).toISOString();
+    this.flush();
+    const nameOf = (id: string | null) => this.db.replicants.find((r) => r.id === id)?.name ?? 'someone';
+    return { song: pick(MIND.canned.songs), actions, received: received.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })) };
+  }
+
+  async journal(ids: string[]) {
+    const has = (id: string | null) => !!id && ids.includes(id);
+    return {
+      notes: this.db.notes.filter((n) => has(n.replicant_id)),
+      mail: this.db.mail.filter((m) => has(m.from_replicant) || has(m.to_replicant)),
+      requests: this.db.requests.filter((r) => has(r.replicant_id)),
+    };
   }
 
   private flush() {
@@ -416,6 +482,23 @@ export class CloudStore implements GameStore {
     });
     if (error) throw error;
     return (row as PlanetSave[] | null)?.[0] ?? null;
+  }
+
+  async mindTick(replicantId: string, ctx: MindContext) {
+    const { data, error } = await this.sb.functions.invoke('mind', { body: { replicant_id: replicantId, context: ctx } });
+    if (error) { console.warn('mind', error); return null; }
+    return data as MindResult;
+  }
+
+  async journal(ids: string[]) {
+    if (!ids.length) return { notes: [], mail: [], requests: [] };
+    const list = `(${ids.join(',')})`;
+    const [n, m, r] = await Promise.all([
+      this.sb.from('notes').select('replicant_id,body,created_at').in('replicant_id', ids).order('created_at', { ascending: false }).limit(60),
+      this.sb.from('messages').select('id,from_replicant,to_replicant,body,sent_at,arrives_at,read_at').or(`from_replicant.in.${list},to_replicant.in.${list}`).order('sent_at', { ascending: false }).limit(60),
+      this.sb.from('requests').select('replicant_id,kind,detail,status,created_at').in('replicant_id', ids).order('created_at', { ascending: false }).limit(30),
+    ]);
+    return { notes: (n.data ?? []) as Note[], mail: (m.data ?? []) as Letter[], requests: (r.data ?? []) as Request[] };
   }
 
   async signOut() {

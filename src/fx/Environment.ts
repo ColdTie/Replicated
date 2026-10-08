@@ -48,6 +48,9 @@ export class Environment {
   private ripples?: Phaser.GameObjects.Particles.ParticleEmitter;
   private flash?: Phaser.GameObjects.Rectangle;
   private raining = false;
+  /** Hour of day (0..24) and whether it rains, for the copies' minds. */
+  get hourOfDay() { return this.hour; }
+  get isRaining() { return this.raining; }
   private rainLevel = 0;
   private t = 0;
   private nextThunder = 0;

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
-import { BACKEND, BEACON, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, VILLAGE, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
+import { BACKEND, BEACON, ENEMIES, ITEMS, MIND, PALETTE, PLANETS, PLAYER, STRUCTURES, VILLAGE, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
+import { closeJournal, journalOpen, openJournal } from '../ui/journal';
 import { DRIFT, replicate, stat } from '../core/drift';
 import { session } from '../core/session';
 import { Base } from '../entities/Base';
@@ -24,7 +25,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
 import { Controls } from '../input/Controls';
-import type { DoorState, NodeState, PlanetData, PlanetSave, ReplicantSave } from '../net/store';
+import type { DoorState, MindContext, NodeState, PlanetData, PlanetSave, ReplicantSave, ReplicantSummary } from '../net/store';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
@@ -105,6 +106,14 @@ export class PlanetScene extends Phaser.Scene {
   private boardSpot = { x: 0, y: 0 };
   private boardRing?: Phaser.GameObjects.Ellipse;
   private npcTickAt = 0;
+  // the copies' minds: when each wakes next, what happened since, who exists in the galaxy (for letters)
+  private nextWake = new Map<Npc, number>();
+  private lastWake = new Map<Npc, number>();
+  private firstWakeAt?: number;
+  private mindBusy = false;
+  private mindLog: { t: number; text: string }[] = [];
+  private everyone: ReplicantSummary[] = [];
+  private chorusAt = Infinity;
   private saving = false;
   private lastSaveAt = 0;
   private lastPosSaveAt = 0;
@@ -655,6 +664,7 @@ export class PlanetScene extends Phaser.Scene {
     if (!this.shot && !this.visit) this.village.update(time, dt, this.npcs.reduce((a, n) => a + stat(n.data, 'gather'), 0));
     else this.village.update(time, 0, 0);
     this.updateVesselCue(time, dt);
+    this.updateMinds(time);
     this.watchFps(time);
     this.env.update(dt);
     this.lighting.update(dt);
@@ -1009,6 +1019,7 @@ export class PlanetScene extends Phaser.Scene {
       if (!x || !this.isWalkable(x, y)) { x = c.x - 30 + (i % 3) * 30; y = c.y + 50 + Math.floor(i / 3) * 18; }
       this.npcs.push(new Npc(this, r, x, y));
     });
+    this.setupMinds();
     // Embers the copies gathered while nobody was here
     if (!this.npcs.length || this.shot) return;
     const tick = save?.data.npcTick;
@@ -1025,6 +1036,145 @@ export class PlanetScene extends Phaser.Scene {
     this.embers += gained;
     this.pending.embers += gained;
     this.time.delayedCall(2600, () => this.showAwayGain(gained));
+  }
+
+  // ------------------------------------------------------------------ the copies' minds
+
+  /** The replicant can understand the copies: it holds the listening module (or ?hear=1 for screenshots). */
+  canHear() {
+    return !!session.replicant?.traits.mods?.includes('listen') || new URLSearchParams(location.search).has('hear');
+  }
+
+  /** "EARTH - SOL" or "TITAN - SATURN" */
+  get placeLabel() {
+    const star = starById(this.planet.star);
+    const sp = planetAt(this.planet.star, this.planet.planetIndex);
+    return sp?.moon ? `${this.planet.name} - ${sp.name}` : `${this.planet.name} - ${star?.name ?? '?'}`;
+  }
+
+  private setupMinds() {
+    const params = new URLSearchParams(location.search);
+    const kb = this.input.keyboard;
+    if (kb) {
+      kb.addCapture('TAB');
+      const toggle = () => void this.toggleJournal();
+      kb.on('keydown-TAB', toggle);
+      kb.on('keydown-I', toggle);
+    }
+    const onJournal = () => void this.toggleJournal();
+    this.game.events.on('journal', onJournal);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.game.events.off('journal', onJournal); closeJournal(); });
+    if (params.has('chorus')) this.time.delayedCall(2500, () => this.chorus(true));
+    if (params.has('sing')) this.time.delayedCall(1500, () => this.npcs[0]?.sing(MIND.canned.songs[0], this.canHear()));
+    if (this.shot || this.visit) return;
+    const me = session.replicant;
+    this.mindLog.push({ t: this.time.now, text: `${me?.name ?? 'the original'} ${this.arrival ? 'landed here in the vessel' : 'is here'}` });
+    this.chorusAt = this.time.now + 30_000 + Math.random() * 40_000;
+    session.store?.listReplicants().then((all) => { this.everyone = all; }).catch(() => undefined);
+  }
+
+  /** What a copy knows when it wakes. */
+  private mindContext(npc: Npc): MindContext {
+    const h = this.env.hourOfDay;
+    const timeOfDay = h < 5 ? 'deep night' : h < 7 ? 'dawn' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 20 ? 'dusk' : 'night';
+    const structures: Record<string, number> = {};
+    for (const s of this.village.structures) structures[s.type] = (structures[s.type] ?? 0) + 1;
+    const delays: Record<string, number> = {};
+    for (const r of this.everyone) delays[r.id] = r.star_id === this.planet.star ? 0 : Math.round(distanceLy(this.planet.star, r.star_id) * MIND.mailSecondsPerLy);
+    const since = this.lastWake.get(npc) ?? -1;
+    const me = session.replicant;
+    return {
+      planet: this.placeLabel,
+      biome: this.planet.subtitle ?? this.planet.id,
+      timeOfDay,
+      weather: this.env.isRaining ? 'raining' : 'dry',
+      playerName: me?.name ?? 'the original',
+      playerHere: !this.visit && !!me,
+      embers: this.embers,
+      structures,
+      here: [...(me && !this.visit ? [me.name] : []), ...this.npcs.map((n) => n.data.name)],
+      events: this.mindLog.filter((e) => e.t > since).map((e) => e.text),
+      delays,
+    };
+  }
+
+  /** Wake one copy: it reads, acts (notes, letters, requests, a new name) and sings. */
+  private async wake(npc: Npc) {
+    const st = session.store;
+    if (!st || this.mindBusy) return;
+    this.mindBusy = true;
+    const t = this.time.now;
+    try {
+      const res = await st.mindTick(npc.data.id, this.mindContext(npc));
+      this.lastWake.set(npc, t);
+      if (!res || res.skipped || !this.npcs.includes(npc)) return;
+      if (res.error) { console.warn('mind:', res.error); return; }
+      const hear = this.canHear();
+      if (res.received?.length) npc.receiveLetter();
+      if (res.song) this.time.delayedCall(res.received?.length ? 900 : 0, () => npc.sing(res.song!, hear));
+      for (const a of res.actions ?? []) {
+        if (a.type === 'mail') {
+          const to = this.npcs.find((n) => n.data.id === a.toId);
+          if (to && !a.delay) this.time.delayedCall(2500, () => to.receiveLetter());
+        } else if (a.type === 'rename' && a.name) {
+          const was = npc.data.name.toUpperCase();
+          npc.data.name = a.name;
+          this.announceLocation();
+          this.game.events.emit('notice', hear ? `${was} IS NOW ${a.name.toUpperCase()}` : `${was} HAS A NEW NAME`);
+        } else if (a.type === 'request' && hear) {
+          this.game.events.emit('notice', `${npc.data.name.toUpperCase()} ASKS FOR ${String(a.kind ?? '').toUpperCase()}`);
+        }
+      }
+    } catch (e) {
+      console.warn('mind:', e);
+    } finally {
+      this.mindBusy = false;
+    }
+  }
+
+  private updateMinds(time: number) {
+    if (this.shot || this.visit || this.stopped || !session.store || !this.npcs.length) return;
+    this.firstWakeAt ??= time + MIND.firstWakeMs;
+    this.npcs.forEach((n, i) => { if (!this.nextWake.has(n)) this.nextWake.set(n, this.firstWakeAt! + i * MIND.staggerMs); });
+    if (!this.mindBusy) {
+      for (const n of this.npcs) {
+        if (time < this.nextWake.get(n)!) continue;
+        this.nextWake.set(n, time + MIND.wakeMinutes * 60_000 + Math.random() * 20_000);
+        void this.wake(n);
+        break;
+      }
+    }
+    if (time > this.chorusAt) {
+      this.chorusAt = time + (4 + Math.random() * 3) * 60_000;
+      this.chorus();
+    }
+  }
+
+  /** The copies gather their voices and sing one line together as a round. */
+  chorus(force = false) {
+    const singers = force ? this.npcs : this.npcs.filter((n) => n.state === 'idle' || n.state === 'walk' || n.state === 'greet');
+    if (singers.length < (force ? 1 : 2)) return;
+    const lines = MIND.chorusLines;
+    const line = lines[Math.floor(Math.random() * lines.length)];
+    const hear = this.canHear();
+    sound.chorus(singers.map((n) => n.voiceSeed), line);
+    singers.forEach((n, i) => this.time.delayedCall(i * 500, () => {
+      if (!this.npcs.includes(n)) return;
+      n.sing(line, hear, { silent: true });
+      this.fx.sparks(n.x, n.y - 12, n.trailColor, 5);
+    }));
+  }
+
+  /** Tab / I, or a tap on the corner label: what the copies here remember, write and ask for. */
+  private async toggleJournal() {
+    if (journalOpen()) { closeJournal(); return; }
+    const st = session.store;
+    if (!st) return;
+    const j = await st.journal(this.npcs.map((n) => n.data.id));
+    const names: Record<string, string> = {};
+    for (const r of this.everyone) names[r.id] = r.name;
+    if (session.replicant) names[session.replicant.id] = session.replicant.name;
+    openJournal({ place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j });
   }
 
   /** Copies bring in what they gathered while you were away: a stream of Embers into the Replicator. */
@@ -1169,7 +1319,15 @@ export class PlanetScene extends Phaser.Scene {
     }
     this.fx.floatIcon(this.player.x, this.player.y - 24, 'module');
     const who = (rep?.name ?? session.profile?.name ?? 'YOU').toUpperCase();
-    this.game.events.emit('notice', `${who} GETS +20% ${r.kind.toUpperCase()}`);
+    if (r.kind === 'listen') {
+      // the Plaything moment: from now on their songs are words, and they greet it with a chorus
+      this.game.events.emit('notice', `${who} HEARS THEM NOW`);
+      this.mindLog.push({ t: this.time.now, text: `${rep?.name ?? 'the original'} found the listening module in a ruin and can understand you from now on` });
+      this.time.delayedCall(1400, () => this.chorus(true));
+    } else {
+      this.game.events.emit('notice', `${who} GETS +20% ${r.kind.toUpperCase()}`);
+    }
+    this.mindLog.push({ t: this.time.now, text: `${rep?.name ?? 'the original'} opened a ruin door and took its ${r.kind} module` });
   }
 
   surfaceAt(x: number, y: number): 'grass' | 'stone' | 'water' | 'void' {

@@ -213,6 +213,79 @@ class SoundEngine {
     [0, 4, 7].forEach((s, i) => this.tone(midi(84 + s), 0.3, { type: 'sine', vol: 0.08, delay: i * 0.08, rev: 0.5 }));
   }
 
+  // --- the copies' voices ---
+
+  private lastSong = { at: 0, root: 0 };
+
+  /** Who a copy sounds like, all from its seed: register, timbre, a pentatonic mode, and whether an octave shimmer rides on top. */
+  private voice(seed: number) {
+    let s = (seed >>> 0) || 1;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const modes = [[0, 2, 4, 7, 9], [0, 3, 5, 7, 10], [0, 2, 5, 7, 9], [0, 4, 7, 11, 14], [0, 2, 3, 7, 8]];
+    const root = 64 + Math.floor(rnd() * 14);
+    const wave = (['sine', 'triangle', 'sine', 'square'] as Wave[])[Math.floor(rnd() * 4)];
+    const mode = modes[Math.floor(rnd() * modes.length)].concat([12, 14]);
+    return { root, wave, mode, shimmer: rnd() < 0.5 };
+  }
+
+  /**
+   * A copy's song. The voice comes from its seed; the words pick the notes (each word hashes to a degree of the
+   * voice's mode, longer words hold longer), so the same sentence always sings the same tune. A sentence ends on
+   * a chord. A copy that answers within a few seconds sings a harmony, a third or a fifth above the last voice.
+   * Returns the length of the phrase in seconds.
+   */
+  sing(seed: number, text = '', opts: { pan?: number; harmony?: boolean; delay?: number; vol?: number; melodySeed?: number; rootOffset?: number } = {}) {
+    if (!this.ctx || this.ctx.state !== 'running' || this.muted) return 0;
+    const v = this.voice(seed);
+    const words = (text || 'la la la.').split(/\s+/).filter(Boolean).slice(0, 14);
+    const now = performance.now();
+    const answering = opts.harmony ?? (now - this.lastSong.at < 6000);
+    let root = v.root + (opts.rootOffset ?? 0);
+    if (answering) root = this.lastSong.root + (seed % 2 ? 7 : 4);
+    if (!answering) this.lastSong = { at: now, root };
+    else this.lastSong.at = now;
+    let t = opts.delay ?? 0;
+    const vol = (opts.vol ?? 0.07) * (v.wave === 'square' ? 0.45 : 1);
+    let h = (opts.melodySeed ?? seed) >>> 0;
+    words.forEach((w) => {
+      for (const c of w) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+      const deg = v.mode[h % v.mode.length];
+      const dur = 0.16 + Math.min(7, w.length) * 0.045;
+      this.tone(midi(root + deg), dur + 0.2, { type: v.wave, vol, delay: t, attack: 0.02, rev: 0.55, pan: opts.pan });
+      if (v.shimmer) this.tone(midi(root + deg + 12), dur, { type: 'sine', vol: vol * 0.22, delay: t + 0.02, rev: 0.7, pan: opts.pan });
+      t += dur;
+      if (/[.!?]$/.test(w)) {
+        const low = deg > 7 ? deg - 12 : deg;
+        [0, 4, 7].forEach((s, k) => this.tone(midi(root + low + s), 1.1, { type: k ? 'sine' : v.wave, vol: vol * 0.6, delay: t + k * 0.04, attack: 0.06, rev: 0.85, pan: opts.pan }));
+        t += 0.55;
+      } else if (/,$/.test(w)) t += 0.18;
+    });
+    return t;
+  }
+
+  /**
+   * Several copies sing one phrase together as a round: the same tune in every voice, each entering a beat
+   * later on its own note of the chord, spread across the stereo field, and a long chord to end on.
+   */
+  chorus(seeds: number[], text: string) {
+    if (!this.ctx || this.ctx.state !== 'running' || this.muted) return 0;
+    const lead = seeds[0] ?? 1;
+    const base = this.voice(lead).root;
+    const chord = [0, 7, 4, 12, -5, 9];
+    let longest = 0;
+    seeds.slice(0, 6).forEach((seed, i) => {
+      const pan = seeds.length > 1 ? -0.6 + (1.2 * i) / (seeds.length - 1) : 0;
+      const len = this.sing(seed, text, { pan, delay: i * 0.5, harmony: false, vol: 0.05, melodySeed: lead, rootOffset: base - this.voice(seed).root + chord[i] });
+      longest = Math.max(longest, len + i * 0.5);
+    });
+    [0, 4, 7, 12, 16, 19].forEach((s, k) => this.tone(midi(base + s), 2.8, { type: k % 2 ? 'sine' : 'triangle', vol: 0.055, delay: longest + 0.1 + k * 0.06, attack: 0.35, rev: 0.9 }));
+    this.lastSong = { at: performance.now(), root: base };
+    return longest + 3;
+  }
+
+  /** A letter arrived: two small bright notes. */
+  letter() { if (this.ready('letter', 400)) [0, 5].forEach((st, i) => this.tone(midi(88 + st), 0.25, { type: 'triangle', vol: 0.06, delay: i * 0.1, rev: 0.5 })); }
+
   regen() { if (this.ready('regen', 400)) this.tone(midi(91), 0.3, { type: 'sine', vol: 0.04, rev: 0.6 }); }
 
   build() {

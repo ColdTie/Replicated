@@ -468,3 +468,44 @@ Not done / next:
   `UIScene.notice`). The pixel font gained a `%` glyph (`tools/sprites/font.json`).
 - `tools/screenshot.mjs --eval "<js>"` runs a snippet in the page before the capture. `screenshots/module-notice.png`.
 
+
+### Session 7 (2026-10-08): the copies wake up (pivot: minds, songs, journal)
+Steve's pivot, after Black Mirror "Plaything": the copies are a digital species that sings. Reverses the 2026-10-06
+"no AI for the copies" decision. The copies now have minds; "LLM driven NPC dialogue" is no longer out of scope
+(dialogue trees still are: they speak through their own notes, letters and songs).
+- **Minds.** `supabase/functions/mind/index.ts` (Edge Function, deployed): the game calls it with the player's JWT for
+  one copy at a time (`MIND.firstWakeMs` after landing, `staggerMs` apart, then every `wakeMinutes`; the function
+  itself refuses to wake a copy more than once per 90 s). The copy gets its persona (name, parent, generation, visor,
+  headgear, stat quirks), the place, time, weather, the Ember pool, the village, who is here and elsewhere, its last
+  12 notes, unread letters and what happened since it last woke, then acts through tools: `remember` (notes table),
+  `say_to` (messages table, `arrives_at` = now + light-speed delay, `mailSecondsPerLy` in `src/data/mind.json`,
+  instant on the same star), `ask_for` (requests table: lamp, garden, hut, flag, totem, sign, name, other),
+  `choose_name` (renames its own row, logged as a done request). Its final text is its song. Model: Claude Opus 5.5,
+  low effort, server-side refusal fallback. The API key is a Supabase Edge Function secret (`ANTHROPIC_API_KEY`).
+  Migration 0007 (applied live): `notes`, `requests`, `messages.read_at`, `replicants.last_tick_at`, RLS as before.
+  `?local` play uses a canned mind (`MIND.canned`) so headless tests and screenshots need no model.
+- **Songs.** `Sound.sing(seed, text)`: each copy's voice comes from its id (register, sine/triangle/square, one of
+  five pentatonic modes, optional octave shimmer); every word hashes to a note so a sentence always sings the same
+  tune, long words hold longer, a sentence ends on a chord; a copy answering within 6 s sings a third or a fifth
+  above the last voice. `Sound.chorus(seeds, line)`: a round, the same tune in every voice entering half a beat
+  apart on their own chord tones across the stereo field, ending on a long chord. Copies gather and sing a line from
+  `MIND.chorusLines` 30 to 70 s after landing and every 4 to 7 minutes (`PlanetScene.chorus`).
+- **Bubbles.** `Npc.sing(text, readable)`: a bubble over the head; readable text in the pixel font, or runes in the
+  copy's trail color until the replicant can hear. A letter arriving glints and chimes (`Npc.receiveLetter`).
+- **Hearing them.** Fourth ruin module `listen` (`tools/sprites/module.json` frame 3, orange): "STEVE HEARS THEM
+  NOW", the copies answer with a chorus, songs and the journal become words. Earth's ruin 4 holds it.
+- **Journal.** Tab or I (or tap the corner label on touch): an HTML panel (`src/ui/journal.ts`) with each copy's
+  notes, letters (sent and received, "arrives in N min" while in flight) and requests; runes until you can hear.
+- URL params: `&chorus=1` (copies sing together at once), `&sing=1`, `&hear=1` (pretend you hold the module).
+  `screenshots/minds-chorus.png` (readable), `minds-runes.png`.
+- Not yet verified with the live model (needs Steve signed in); verified headless with the canned mind.
+
+Next (Steve, 2026-10-08, "give these guys everything"), in this order unless he reorders:
+1. Requests in the world: an open request shows as a pictogram sign by the copy; the build pad builds what they ask;
+   a `NEEDS.md` the copies' needs are written to, for Steve and for a Claude Routine to read.
+2. Bigger, more open worlds: fewer rock walls, larger islands.
+3. Animals on every planet (grazers, flocks, butterflies exist on Earth only).
+4. Homes: copies go inside huts (door, lit window, out of the rain and at night).
+5. Water and food as resources the copies gather and need (thirst and hunger in their context).
+6. Appearance: a copy can ask to look different; Steve asks Claude; later a Claude Routine reads the requests
+   (Supabase) and NEEDS.md and edits `tools/sprites/*.json` and the replicant's `model` itself.
