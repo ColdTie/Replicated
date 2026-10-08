@@ -14,7 +14,7 @@ import { Gear } from './Gear';
 import type { BuildJob } from './Village';
 import type { BelowTask } from './Warren';
 import type { WarrenRoom } from '../net/store';
-import { squash } from './Player';
+import { squash, type Player } from './Player';
 
 type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below' | 'blank';
 /** Something a copy decided to do with its hands: walk there, swing a few times, then it happens. */
@@ -112,8 +112,9 @@ export class Npc {
     const n = this.needs, d = NEEDS.decayHours;
     n.purpose = Math.max(0, n.purpose - hours / d.purpose);
     const soc = this.temper?.sociability;
-    const p = this.scene.player;
-    const near = (!this.scene.visit && p.alive && Math.hypot(p.x - this.x, p.y - this.y) < NEEDS.companyNearPx)
+    // on load the copies' away-time is counted before the original exists: no player yet means nobody near
+    const p = this.scene.player as Player | undefined;
+    const near = (!this.scene.visit && !!p?.alive && Math.hypot(p.x - this.x, p.y - this.y) < NEEDS.companyNearPx)
       || this.scene.npcs.some((o) => o !== this && !o.below && Math.hypot(o.x - this.x, o.y - this.y) < NEEDS.companyNearPx * 0.7);
     const rate = soc === 'solitary' ? 0.5 : soc === 'clingy' ? 1.5 : 1;
     n.company = near && hours < 0.01 ? Math.min(1, n.company + (hours * NEEDS.companyGainPerHour) / rate) : Math.max(0, n.company - (hours * rate) / d.company);

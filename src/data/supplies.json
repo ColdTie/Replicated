@@ -7,7 +7,7 @@
     "scrap": { "icon": 5, "color": 9 },
     "ember": { "icon": 6, "color": 10 }
   },
-  "baseCap": 12,
+  "baseCap": 40,
   "shelfCap": 10,
   "digYield": { "stonePerTile": 0.3, "soilPerTile": 0.2 },
   "entrance": { "swings": 14, "yield": { "stone": 4, "soil": 3 } },
