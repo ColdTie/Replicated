@@ -453,7 +453,7 @@ export class Warren {
     npc.data.traits.weary = 0;
     npc.data.traits.sleptAt = Date.now();
     const st = session.store;
-    if (st && !this.scene.shot && !npc.data.id.startsWith('fake') && npc.data.id !== 'pending') st.saveReplicant(npc.data).catch(() => undefined);
+    if (st && !this.scene.shot && !npc.data.id.startsWith('fake') && npc.data.id !== 'pending') st.patchTraits(npc.data.id, { weary: 0, sleptAt: npc.data.traits.sleptAt }).catch(() => undefined);
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} slept in its resting station and woke rested` });
     if (Math.random() < 0.5) this.afterWork(b);
     else this.leave(npc);

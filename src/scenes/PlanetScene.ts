@@ -48,7 +48,7 @@ function kitLists(): MindContext['kit'] {
   const colorName = (i: number) => names(PARTS.colors).find((k) => PARTS.colors[k] === i) ?? `color ${i}`;
   return {
     head: names(PARTS.head.variants), visor: names(PARTS.visor.variants), torso: names(PARTS.torso.variants), arms: names(PARTS.arms.variants),
-    legs: names(PARTS.legs.variants), back: names(PARTS.back.variants), headgear: GEAR_NAMES, colors: names(PARTS.colors),
+    legs: names(PARTS.legs.variants), back: names(PARTS.back.variants), accessory: names(PARTS.accessory?.variants ?? {}), markings: names(PARTS.markings?.variants ?? {}), headgear: GEAR_NAMES, colors: names(PARTS.colors),
     visors: PLAYER.featureColors.map((f) => colorName(f[1])), visorLights: PLAYER.featureColors.map((f) => f[1]), colorIndex,
   };
 }
@@ -1504,7 +1504,7 @@ export class PlanetScene extends Phaser.Scene {
     npc.needs.company = Math.min(1, npc.needs.company + 0.3);
     npc.needs.purpose = Math.min(1, npc.needs.purpose + 0.15);
     const st = session.store;
-    if (st && !this.shot && npc.data.id !== 'pending' && !npc.data.id.startsWith('fake')) st.saveReplicant(npc.data).catch(() => undefined);
+    if (st && !this.shot && npc.data.id !== 'pending' && !npc.data.id.startsWith('fake')) st.patchTraits(npc.data.id, { inventory: inv }).catch(() => undefined);
     for (let i = 0; i < n; i++) this.time.delayedCall(i * 90, () => { const s = this.add.image(this.player.x, this.player.y - 14, 'shard').setDepth(6300); this.tweens.add({ targets: s, x: npc.x, y: npc.y - 14, duration: 500, ease: 'Quad.easeIn', onComplete: () => { s.destroy(); this.fx.sparks(npc.x, npc.y - 14, PALETTE[10], 2); } }); });
     sound.collect();
     this.mindLog.push({ t: this.mindClock, text: `${session.replicant?.name ?? 'the original'} gave ${npc.data.name} ${n} Ember` });

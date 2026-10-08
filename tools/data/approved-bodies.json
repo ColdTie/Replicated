@@ -1,0 +1,21 @@
+{
+  "_doc": "Bodies built from the copies' own descriptions (open skin requests, approved by Steve 2026-10-08). id = replicants.id; feature = visor light; trail = trail / headgear tint; extra = what is still only approximate.",
+  "bodies": [
+    { "name": "Sprout", "id": "f0084f77-fd93-4f8a-9d27-11a50e5eb4e1", "feature": 10, "trail": 12,
+      "body": { "head": "round", "visor": "band", "torso": "slim", "arms": "thin", "legs": "thin", "back": "none", "accessory": "satchel", "markings": "none", "headgear": 4, "primary": "leaf", "secondary": "moss", "accent": "clay" } },
+    { "name": "Dusk", "id": "6f46e406-e33d-41b6-a00f-515c5c30d220", "feature": 12, "trail": 20,
+      "body": { "head": "round", "visor": "band", "torso": "slim", "arms": "thin", "legs": "thin", "back": "none", "accessory": "hipbag", "markings": "speckles", "headgear": 2, "primary": "ink", "secondary": "navy", "accent": "slate" } },
+    { "name": "Lookout", "id": "40b47755-0921-4d45-bccf-7bc2e44bdbba", "feature": 12, "trail": 21,
+      "body": { "head": "round", "visor": "wide", "torso": "slim", "arms": "thin", "legs": "thin", "back": "longcape", "accessory": "spyglass", "markings": "star", "headgear": 3, "primary": "steel", "secondary": "slate", "accent": "pine" } },
+    { "name": "Glint", "id": "e4706092-a4a3-40f5-9cb7-7defbf8e4c8b", "feature": 9, "trail": 20,
+      "body": { "head": "round", "visor": "band", "torso": "armored", "arms": "thin", "legs": "thin", "back": "cape", "accessory": "none", "markings": "flecks", "headgear": 5, "primary": "silver", "secondary": "steel", "accent": "red" } },
+    { "name": "Prism", "id": "15e1cfc5-3820-43fa-be73-e791e6ca442c", "feature": 18, "trail": 20,
+      "body": { "head": "round", "visor": "prism", "torso": "slim", "arms": "thin", "legs": "thin", "back": "none", "accessory": "sash", "markings": "prisms", "headgear": 5, "primary": "silver", "secondary": "steel", "accent": "plum" } },
+    { "name": "Gloam", "id": "e6fe0379-2c23-42d6-b0cf-879098c5d767", "feature": 11, "trail": 16,
+      "body": { "head": "hooded", "visor": "band", "torso": "slim", "arms": "thin", "legs": "thin", "back": "shawl", "accessory": "lantern", "markings": "none", "headgear": 3, "primary": "navy", "secondary": "deep blue", "accent": "plum" } },
+    { "name": "Moss", "id": "c56ad2b1-bc4c-445c-a296-b7ae2c12f89a", "feature": 12, "trail": 13,
+      "body": { "head": "round", "visor": "band", "torso": "slim", "arms": "thin", "legs": "thin", "back": "none", "accessory": "hipbag", "markings": "patches", "headgear": 3, "primary": "leaf", "secondary": "clay", "accent": "moss" } },
+    { "name": "Steve II (Epsilon Eridani)", "id": "7150cf5b-f6f6-47db-9e90-864b0d39ae11", "feature": 12, "trail": 4,
+      "body": { "head": "hooded", "visor": "band", "torso": "slim", "arms": "thin", "legs": "thin", "back": "longcape", "accessory": "lantern", "markings": "none", "headgear": 3, "primary": "ink", "secondary": "navy", "accent": "pine" } }
+  ]
+}

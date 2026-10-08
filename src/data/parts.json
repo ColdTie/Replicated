@@ -1,5 +1,5 @@
 {
-  "_doc": "The parts kit: every replicant body is composed from these at load time (src/core/bodyRender.ts), 16x20, 14 frames with the same animations as tools/sprites/replicant.json. A copy chooses one variant per part and three colors (traits.body); the visor takes the replicant's feature color (f0 dark, f1 light). Part grids use: b primary, B secondary, c accent, k dark, V/v visor dark/light, W white, '.' empty; a 1px dark outline is added around the whole figure afterwards, so grids hold only the interior. poses: per frame, bob (rows the upper body drops), dx (whole figure shift), and which arm / leg / back pose to draw. Arms and legs are drawn as lines from shoulder / hip to the hand / foot offsets of the pose, so every variant animates without per-frame art.",
+  "_doc": "The parts kit: every replicant body is composed from these at load time (src/core/bodyRender.ts), 16x20, 14 frames with the same animations as tools/sprites/replicant.json. A copy chooses one variant per part and three colors (traits.body); the visor takes the replicant's feature color (f0 dark, f1 light). Part grids use: b primary, B secondary, c accent, k dark, V/v visor dark/light, W white, '.' empty; a 1px dark outline is added around the whole figure afterwards, so grids hold only the interior. poses: per frame, bob (rows the upper body drops), dx (whole figure shift), and which arm / leg / back pose to draw. Arms and legs are drawn as lines from shoulder / hip to the hand / foot offsets of the pose, so every variant animates without per-frame art. fixed: grid chars with a fixed palette color (r red, o orange, y gold, g lime, u cyan, p mauve, s silver, n clay, m umber, t sand). accessory: drawn in front after the arms (grid at an anchor, or hand: true at the right hand of each pose). markings: points drawn only where the body already is.",
   "size": [
     16,
     20
@@ -186,7 +186,9 @@
     "headgear": 0,
     "primary": "silver",
     "secondary": "steel",
-    "accent": "red"
+    "accent": "red",
+    "accessory": "none",
+    "markings": "none"
   },
   "blank": {
     "head": "round",
@@ -198,7 +200,9 @@
     "headgear": 0,
     "primary": "steel",
     "secondary": "slate",
-    "accent": "slate"
+    "accent": "slate",
+    "accessory": "none",
+    "markings": "none"
   },
   "head": {
     "anchor": [
@@ -265,6 +269,16 @@
         ".bbbbb..",
         ".bbbbb..",
         "..BBB..."
+      ],
+      "hooded": [
+        "...cc...",
+        "..cccc..",
+        ".ccbbbc.",
+        ".cbbbbbc",
+        ".cbbbbbc",
+        ".cbbbbbc",
+        ".ccbbbcc",
+        "..cBBBc."
       ]
     }
   },
@@ -328,6 +342,16 @@
         "........",
         ".Vvvvvv.",
         ".vvvvvW.",
+        "........",
+        "........"
+      ],
+      "prism": [
+        "........",
+        "........",
+        "........",
+        "........",
+        ".Voygup.",
+        ".roygW..",
         "........",
         "........"
       ]
@@ -792,7 +816,365 @@
           "sway": [],
           "flare": []
         }
+      },
+      "longcape": {
+        "anchor": [
+          3,
+          9
+        ],
+        "poses": {
+          "still": [
+            "..cc..",
+            ".ccc..",
+            ".ccc..",
+            "cccc..",
+            "cccc..",
+            "cccc..",
+            "cccc..",
+            "kccc..",
+            "kcc...",
+            ".kk..."
+          ],
+          "sway": [
+            "..cc..",
+            ".ccc..",
+            "cccc..",
+            "ccc...",
+            "cccc..",
+            "ccc...",
+            "kcc...",
+            "kcc...",
+            "kc....",
+            "k....."
+          ],
+          "flare": [
+            ".ccc..",
+            "cccc..",
+            "ccc...",
+            "ccc...",
+            "cc....",
+            "kc....",
+            "kc....",
+            "k.....",
+            "......",
+            "......"
+          ]
+        }
+      },
+      "shawl": {
+        "anchor": [
+          2,
+          8
+        ],
+        "poses": {
+          "still": [
+            "....cccc....",
+            "..cccccccc..",
+            ".cccccccccc.",
+            ".cccccccccc.",
+            ".ccc....ccc.",
+            "..cc....cc..",
+            "..c......c.."
+          ],
+          "sway": [
+            "....cccc....",
+            "..cccccccc..",
+            ".cccccccccc.",
+            ".cccccccccc.",
+            ".ccc....ccc.",
+            "..cc....cc..",
+            "..c......c.."
+          ],
+          "flare": [
+            "....cccc....",
+            "..cccccccc..",
+            ".cccccccccc.",
+            ".cccccccccc.",
+            ".ccc....ccc.",
+            "..cc....cc..",
+            "..c......c.."
+          ]
+        }
       }
+    }
+  },
+  "fixed": {
+    "r": 8,
+    "o": 9,
+    "y": 10,
+    "g": 12,
+    "u": 18,
+    "p": 28,
+    "s": 20,
+    "n": 4,
+    "m": 5,
+    "t": 3
+  },
+  "accessory": {
+    "_doc": "Front pieces. anchor + rows like the back pieces; hand: true draws the rows at the right hand of each pose (offset).",
+    "variants": {
+      "none": {
+        "anchor": [
+          0,
+          0
+        ],
+        "rows": []
+      },
+      "satchel": {
+        "anchor": [
+          5,
+          9
+        ],
+        "rows": [
+          ".....n",
+          "....n.",
+          "...n..",
+          "nnm...",
+          "nun...",
+          "mmm..."
+        ]
+      },
+      "hipbag": {
+        "anchor": [
+          10,
+          12
+        ],
+        "rows": [
+          "kBk",
+          "BBB",
+          "kBk"
+        ]
+      },
+      "sash": {
+        "anchor": [
+          6,
+          9
+        ],
+        "rows": [
+          "c....",
+          "cc...",
+          ".cc..",
+          "..cc.",
+          "...cc"
+        ]
+      },
+      "lantern": {
+        "hand": true,
+        "offset": [
+          0,
+          1
+        ],
+        "rows": [
+          "kk",
+          "yo",
+          "kk"
+        ]
+      },
+      "spyglass": {
+        "anchor": [
+          10,
+          13
+        ],
+        "rows": [
+          "tty"
+        ]
+      }
+    }
+  },
+  "markings": {
+    "_doc": "Points [x, y, char] in the frame (the upper body's bob and the pose's dx are added); drawn only on body pixels.",
+    "variants": {
+      "none": [],
+      "speckles": [
+        [
+          6,
+          9,
+          "s"
+        ],
+        [
+          9,
+          10,
+          "s"
+        ],
+        [
+          7,
+          12,
+          "s"
+        ],
+        [
+          10,
+          11,
+          "s"
+        ],
+        [
+          8,
+          13,
+          "s"
+        ],
+        [
+          6,
+          3,
+          "s"
+        ],
+        [
+          8,
+          2,
+          "s"
+        ],
+        [
+          9,
+          4,
+          "s"
+        ]
+      ],
+      "flecks": [
+        [
+          4,
+          11,
+          "y"
+        ],
+        [
+          4,
+          13,
+          "y"
+        ],
+        [
+          5,
+          12,
+          "y"
+        ],
+        [
+          13,
+          11,
+          "y"
+        ],
+        [
+          13,
+          13,
+          "y"
+        ],
+        [
+          12,
+          12,
+          "y"
+        ],
+        [
+          3,
+          13,
+          "y"
+        ],
+        [
+          14,
+          13,
+          "y"
+        ],
+        [
+          7,
+          10,
+          "y"
+        ]
+      ],
+      "patches": [
+        [
+          6,
+          10,
+          "m"
+        ],
+        [
+          7,
+          10,
+          "m"
+        ],
+        [
+          6,
+          11,
+          "m"
+        ],
+        [
+          9,
+          12,
+          "m"
+        ],
+        [
+          10,
+          12,
+          "m"
+        ],
+        [
+          9,
+          13,
+          "m"
+        ],
+        [
+          6,
+          3,
+          "m"
+        ],
+        [
+          7,
+          3,
+          "m"
+        ]
+      ],
+      "star": [
+        [
+          6,
+          9,
+          "s"
+        ],
+        [
+          5,
+          10,
+          "s"
+        ],
+        [
+          6,
+          10,
+          "s"
+        ],
+        [
+          7,
+          10,
+          "s"
+        ],
+        [
+          6,
+          11,
+          "s"
+        ]
+      ],
+      "prisms": [
+        [
+          4,
+          12,
+          "p"
+        ],
+        [
+          4,
+          13,
+          "u"
+        ],
+        [
+          13,
+          12,
+          "p"
+        ],
+        [
+          13,
+          13,
+          "u"
+        ],
+        [
+          3,
+          13,
+          "p"
+        ],
+        [
+          14,
+          13,
+          "u"
+        ]
+      ]
     }
   }
 }

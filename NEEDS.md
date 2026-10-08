@@ -12,7 +12,9 @@ A copy describes the body it wants with `describe_self`; Claude Code draws it:
    `b`/`B` body, `c`/`C` cape, `s`/`S` arm, `k` dark, `W` white). `npm run sprites -- --preview` to check.
 3. `update replicants set model = '<slug>' where id = '<id>'` and mark the request `done`.
 
-None open.
+Eight bodies were requested and built from the parts kit on 2026-10-08 (see `tools/data/approved-bodies.json`).
+The kit cannot yet draw: a rainbow visor that shifts over time, a crystal-filled satchel's contents, a shuttered
+lantern's glow. None open.
 
 ## Builds (kinds `lamp`, `garden`, `hut`, `flag`, `totem`, `sign`, `other`)
 
