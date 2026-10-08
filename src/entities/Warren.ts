@@ -141,7 +141,7 @@ export class Warren {
   }
 
   /** Pays a recipe (after shortage() said it can be paid). */
-  private pay(recipe: Recipe) {
+  pay(recipe: Recipe) {
     for (const [m, n] of Object.entries(recipe)) {
       if (m === 'bench' || typeof n !== 'number') continue;
       if (m === 'ember') this.scene.addEmbers(-n);

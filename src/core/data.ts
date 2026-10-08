@@ -13,6 +13,7 @@ import mindJson from '../data/mind.json';
 import warrenJson from '../data/warren.json';
 import suppliesJson from '../data/supplies.json';
 import needsJson from '../data/needs.json';
+import buildingsJson from '../data/buildings.json';
 
 export interface PlanetDef {
   id: string;
@@ -64,6 +65,7 @@ export const VILLAGE = villageJson;
 export const WARREN = warrenJson;
 export const SUPPLIES = suppliesJson;
 export const NEEDS = needsJson;
+export const BUILDINGS = buildingsJson;
 export const BEACON = beaconJson;
 export const MIND = mindJson;
 export type GuardianDef = (typeof beaconJson)['guardian'];

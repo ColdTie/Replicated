@@ -28,6 +28,10 @@ function ensureStyle() {
   .jn small { color: ${css(PALETTE[22])}; font-size: 11px; margin-left: 6px; }
   .jn .mute { color: ${css(PALETTE[21])}; font-style: italic; }
   .jn .rune { color: ${css(PALETTE[18])}; letter-spacing: 1px; }
+  .jn .act { display: flex; gap: 6px; margin: 6px 0 2px 10px; align-items: center; }
+  .jn .act input { flex: 1; font: inherit; background: ${css(PALETTE[25])}; color: ${css(PALETTE[20])}; border: 1px solid ${css(PALETTE[22])}; padding: 3px 6px; }
+  .jn .act button, .jn p button { font: inherit; font-size: 11px; letter-spacing: 1px; background: ${css(PALETTE[23])}; color: ${css(PALETTE[2])}; border: 1px solid ${css(PALETTE[22])}; padding: 3px 8px; cursor: pointer; }
+  .jn .act button:hover, .jn p button:hover { background: ${css(PALETTE[22])}; }
   `;
   document.head.appendChild(s);
 }
@@ -74,6 +78,11 @@ export interface JournalView {
   shortages?: string[];
   /** mood and low needs per copy id */
   feelings?: Record<string, string>;
+  /** surface buildings in words, and the proposals waiting for the original's word */
+  buildings?: string[];
+  pending?: { id: string; name: string }[];
+  /** the original's one action on a copy or a blueprint */
+  actions?: { approve(id: string): void; veto(id: string): void; talk(id: string, text: string): void; give(id: string): void };
 }
 
 let open: HTMLElement | null = null;
@@ -102,6 +111,7 @@ export function openJournal(v: JournalView) {
     if (c.traits.blank) parts.push(`<p class="mute">${v.canHear ? 'Not yet itself. It has not chosen.' : runes('not yet itself')}</p>`);
     else if (t) parts.push(`<p class="mute">${show(`${t.pace}, ${t.sociability}, ${t.work === 'balanced' ? 'works and wanders' : t.work}, ${t.bedtime} to bed, ${t.risk}`)}</p>`);
     if (v.feelings?.[c.id]) parts.push(`<p class="mute">${show(v.feelings[c.id])}</p>`);
+    if (v.actions && !c.traits.blank) parts.push(`<div class="act"><input type="text" maxlength="200" placeholder="say something to ${esc(c.name)}" data-talk="${esc(c.id)}"><button type="button" data-send="${esc(c.id)}">TALK</button><button type="button" data-give="${esc(c.id)}">GIVE 5 EMBER</button></div>`);
     const wants = c.traits.wants ?? [];
     if (wants.length) {
       parts.push(`<div class="k">WANTS</div>`);
@@ -133,6 +143,11 @@ export function openJournal(v: JournalView) {
     parts.push(`<h3 style="color:${css(PALETTE[2])}">THE WARREN</h3>`);
     for (const line of v.warren) parts.push(`<p>${show(line.replace(/^- /, ''))}</p>`);
   }
+  if (v.buildings?.length) {
+    parts.push(`<h3 style="color:${css(PALETTE[2])}">BUILDINGS</h3>`);
+    for (const line of v.buildings) parts.push(`<p>${show(line.replace(/^- /, ''))}</p>`);
+    for (const b of v.pending ?? []) parts.push(`<p class="ask">${esc(b.name)}: <button type="button" data-approve="${esc(b.id)}">APPROVE</button> <button type="button" data-veto="${esc(b.id)}">VETO</button></p>`);
+  }
   if (v.supplies) {
     parts.push(`<h3 style="color:${css(PALETTE[2])}">SUPPLIES</h3><p>${esc(v.supplies)}</p>`);
     for (const line of v.shortages ?? []) parts.push(`<p class="ask">${show(line)}</p>`);
@@ -142,6 +157,20 @@ export function openJournal(v: JournalView) {
   el.innerHTML = `<div class="book"><header><h2>JOURNAL</h2><span>${esc(v.place)}</span><button type="button" aria-label="close">x</button></header><div class="pages">${parts.join('')}</div></div>`;
   el.addEventListener('pointerdown', (e) => { if (e.target === el) closeJournal(); });
   el.querySelector('button')!.addEventListener('click', closeJournal);
+  el.addEventListener('keydown', (e) => e.stopPropagation());
+  el.addEventListener('keyup', (e) => e.stopPropagation());
+  el.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    const a = v.actions;
+    if (!a || !t.dataset) return;
+    if (t.dataset.approve) a.approve(t.dataset.approve);
+    else if (t.dataset.veto) a.veto(t.dataset.veto);
+    else if (t.dataset.give) a.give(t.dataset.give);
+    else if (t.dataset.send) {
+      const input = el.querySelector<HTMLInputElement>(`input[data-talk="${t.dataset.send}"]`);
+      if (input?.value.trim()) { a.talk(t.dataset.send, input.value); input.value = ''; input.placeholder = 'sent; it will answer when it wakes'; }
+    }
+  });
   document.body.appendChild(el);
   open = el;
 }

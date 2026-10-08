@@ -146,6 +146,10 @@ src/entities/Warren.ts   the warren at runtime: the hatch by the base, which cop
                          sleep, swing timers, the home drive, saving (planet_states.data.warren)
 src/scenes/WarrenScene   underground view over the paused planet: walk, dash, lanterns, sleepers in pods, diggers at
                          the rock face; the ladder takes you back up
+src/data/needs.json      the copies' needs: decay hours, eating, company range, purpose per work, lamp and mural effects
+src/data/buildings.json  surface buildings: footprint limits, cost per tile and material, roofs, doors, approval delay
+src/world/buildingPaint.ts draws a building from its blueprint (planks / blocks / plates, flat / peaked / dome roof, door, window)
+src/entities/Buildings.ts proposals, the original's approve / veto, paying, shared raising, offline progress
 src/data/supplies.json   materials (stone, soil, wood, water, food, scrap, Ember), yields, production, storage, recipes
 src/data/parts.json      the parts kit: heads, visors, torsos, arms, legs (or treads / hover), back pieces, named colors, poses
 src/core/bodyRender.ts   composes a 16x20 x 14 frame body from the kit + a spec (pure; tools/body-preview.mjs runs it in Node)
@@ -186,13 +190,15 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | state | `blank` | born and not yet itself (grey, still; the first wake is the becoming) |
 | state | `awake`, `mods`, `sparks` | intro played; ruin modules; Sparks held |
 | state | `weary`, `sleptAt` | tiredness carried over; last sleep |
-| later | `needs`, `inventory` | reserved (session 9 steps 3d, 3c): `{ rest, food, water, company, purpose }`, `{ material: count }` |
+| state | `needs` | `{ food, water, company, purpose }` 0 empty .. 1 full (`src/data/needs.json`); rest is `1 - weary` |
+| state | `inventory` | `{ material: count }` gifts from the original the copy still holds |
 
 Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`,
 `node tools/playtest.mjs` (scripted headless playtest of the ruin puzzle, dash, combo, spore reflect, petting),
 `node tools/playtest-beacon.mjs` (beacon world: keeper wakes, charges, slams, falls; beacon lights; Spark saved),
 `node tools/playtest-warren.mjs` (rooms planned, a copy digs, a copy makes its bed, down the hatch, walk, back up),
-`node tools/playtest-become.mjs` (a blank birth, the becoming with the canned mind, the journal's wants),
+`node tools/playtest-become.mjs` (a blank birth, the becoming with the canned mind, eating, the journal's wants),
+`node tools/playtest-buildings.mjs` (a proposal, approval in the journal, paid and raised by three copies, talk, give),
 `node --experimental-strip-types tools/body-preview.mjs [--random 6]` (composed bodies side by side -> `screenshots/bodies.png`),
 `node tools/fps.mjs "<query>"` (headless frame rate; software GL, only for comparing builds).
 
@@ -700,3 +706,37 @@ dropped glyph rows (`screenshots/bubble-scaled.png`). PR #27.
   colors; the item is tinted (lamps, planters and workbenches keep their own colors).
 - Verified: `playtest-warren.mjs` (entrance dug by a copy, stone won, a room spends wood, an unaffordable recipe is
   refused, a bed made from stone and wood) and the other five pass. `screenshots/warren-hole.png`.
+
+**3d. Needs, and furnishings that do something.** Each copy has food, water, company and purpose (0 to 1; rest is
+1 - weary) in `traits.needs` (`src/data/needs.json`): food and water empty over 6 / 4 hours and are refilled from the
+supplies when under 50% (one unit each, an icon floats up); company fills within 60 px of the original or another
+copy and empties alone (solitary copies slower, clingy faster); purpose fills with finished work (digs, builds,
+furnishings, chores; more for a want met) and empties idle. Mood is the mean plus 0.05 per mural (up to 0.2) and
+scales the copy's light. Lamps in the warren slow weariness 10% each (up to 50%); shelves add storage; pools give
+water; planters and gardens give food; the workbench unlocks benches, shelves, planters and murals. The mind is told
+"You feel low: hungry (food 20%), lonely" and that a low need is a good reason for a want; the journal shows it.
+Needs advance from banked offline time (the copies eat what there was).
+
+**4. Community and buildings.** `design_building` (name, purpose, footprint 2x2 to 6x5 tiles, wood / stone / scrap,
+flat / peaked / dome roof, door side, two kit colors) places a blueprint on clear ground 70 to 180 px from the base
+(`src/entities/Buildings.ts`), drawn from parts by `src/world/buildingPaint.ts` (plank seams and grain, mortar and
+blocks, riveted plates; a lit window; the door; a 1px outline). It waits for the original's word as a faint
+outline (journal: APPROVE / VETO; after 30 minutes it goes ahead anyway), costs its material per tile (paid by the
+first copy to join), and up to three copies at a time hammer at it (builders first) while it rises row by row;
+built, it is solid and lights its door. Progress shows in the world and in words ("being raised, 40% (Ash, Wren)");
+offline, copies add 30 swings per copy-hour. The mind sees every building and is told to ask the others with
+`say_to` when one waits for materials. Blueprints share one shape (`Blueprint` in `store.ts`: id, name, w, h, x, y,
+by, purpose, at) between warren rooms and buildings, so a building can get an interior later.
+
+**5. For later, now.** Traits schema v1 above (needs and inventory are live). Materials, recipes, parts, buildings
+and needs are all data files. Offline: digging (the entrance, then up to 3 rooms wood permitting), production,
+needs and building progress all advance from the same banked hours as the Ember pool. The original's one action on
+a copy, in the journal: TALK (a letter that arrives at once; the copy wakes within seconds to answer), GIVE 5 EMBER
+(from the pool into the copy's `inventory`; company and purpose lift), and APPROVE / VETO on a blueprint.
+
+Verified: `tools/playtest-buildings.mjs` (proposal, approval through the journal, paid, raised by three, talk,
+give) and the six other playtests pass; `screenshots/building-built.png`. The mind Edge Function is redeployed with
+dig costs, furnish placement and color, the becoming, needs, buildings and gifts.
+
+Open question for Steve: Sprout, Dusk, Lookout and Glint on Earth still wear the old inherit-and-drift look; say
+whether they keep it or get to choose again (then the mind's `choose_body` is opened to them).

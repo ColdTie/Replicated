@@ -51,6 +51,9 @@ interface Context {
   shortages?: string[];
   needs?: string[];               // low needs in words
   mood?: "content" | "low" | "bleak";
+  buildings?: string[];
+  buildingKit?: { materials: string[]; roofs: string[]; doors: string[]; minFootprint: number[]; maxFootprint: number[]; perTile: Record<string, number> };
+  inventory?: Record<string, number>;
 }
 
 interface Replicant {
@@ -163,6 +166,25 @@ const tools: Anthropic.Beta.BetaTool[] = [
         placement: { type: "string", enum: ["", "wall", "corner", "center", "beside"], description: "Where in the room; empty lets it find its own place." },
         beside: { type: "string", description: "With placement beside: the kind of item to stand next to (e.g. lamp). Otherwise \"\"." },
         color: { type: "string", description: "One of the kit's color names to paint it, or \"\" for its own." },
+      },
+    },
+  },
+  {
+    name: "design_building",
+    description: "Design a building above ground for everyone: its footprint in tiles, what it is for, the wall material, the roof, which side the door is on, two of the kit's colors and a name. It is drawn from your blueprint. The original must approve it (or it goes ahead after a while); it costs its material per tile, and every copy may join in raising it. Propose one when the village needs it, not every wake.",
+    strict: true,
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["name", "purpose", "width", "height", "material", "roof", "door", "primary", "secondary"],
+      properties: {
+        name: { type: "string", description: "One or two words, letters only." },
+        purpose: { type: "string", description: "One sentence under 120 characters." },
+        width: { type: "integer", description: "Tiles wide (2 to 6)." },
+        height: { type: "integer", description: "Tiles deep (2 to 5)." },
+        material: { type: "string", enum: ["wood", "stone", "scrap"] },
+        roof: { type: "string", enum: ["flat", "peaked", "dome"] },
+        door: { type: "string", enum: ["south", "east", "west"] },
+        primary: { type: "string", description: "A kit color name for the walls." },
+        secondary: { type: "string", description: "A kit color name for the roof." },
       },
     },
   },
@@ -312,6 +334,9 @@ Deno.serve(async (req) => {
       if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench").map(([m, n]) => `${n} ${m}`).join(" + ")}${r.bench ? " (workbench)" : ""}`).join("; ")}. A room takes wood to shore up before it is dug: ${Object.entries(context.roomWood ?? {}).map(([s, n]) => `${s} ${n}`).join(", ")}. Digging yields stone and soil; felled trees give wood; opened ruins give scrap; pools give water; planters and gardens give food.`);
       if (context.shortages?.length) lines.push(`Waiting on: ${context.shortages.join("; ")}.`);
     }
+    if (context.buildings) lines.push(context.buildings.length ? `Buildings above ground:\n${context.buildings.join("\n")}\nA copy that wants a building designs it (design_building); the others join the raising. If one waits for materials, ask the others with say_to to cut, dig or scavenge, or the original.` : `No building above ground yet. design_building proposes one (${context.buildingKit?.minFootprint.join("x")} to ${context.buildingKit?.maxFootprint.join("x")} tiles; ${Object.entries(context.buildingKit?.perTile ?? {}).map(([m, n]) => `${m} ${n} per tile`).join(", ")}). The original must approve it.`);
+    const inv = Object.entries(context.inventory ?? {}).filter(([, n]) => n > 0);
+    if (inv.length) lines.push(`You hold gifts from the original: ${inv.map(([m, n]) => `${n} ${m}`).join(", ")}.`);
     if (context.events.length) lines.push(`Since you last woke: ${context.events.join("; ")}.`);
     if (context.reflect) lines.push(`It has been a while. Look over your notes and, with remember, write one line that sums up what matters to you now; let the rest go.`);
     if (context.wants?.length) lines.push(`Your wants:\n${context.wants.join("\n")}`);
@@ -439,6 +464,17 @@ Deno.serve(async (req) => {
                 actions.push({ type: "furnish", room, item, forId, detail: forName, placement, beside, color });
                 out = item === "rest" ? `A resting station for ${forName} goes in ${room}${placement ? ", by the " + placement : ""}.` : `A ${item} goes in ${room}${placement ? ", " + placement : ""}${color ? ", in " + color : ""}.`;
               }
+            }
+          } else if (u.name === "design_building") {
+            const k = context.buildingKit;
+            const w = Math.round(Number(input.width)), h = Math.round(Number(input.height));
+            if (!k) out = "No building kit here.";
+            else if (!(w >= k.minFootprint[0] && w <= k.maxFootprint[0] && h >= k.minFootprint[1] && h <= k.maxFootprint[1])) out = `A footprint of ${k.minFootprint.join("x")} to ${k.maxFootprint.join("x")} tiles.`;
+            else {
+              const material = String(input.material ?? "wood");
+              const cost = Math.ceil(w * h * (k.perTile[material] ?? 1));
+              actions.push({ type: "building", name: String(input.name ?? "Shelter"), purpose: String(input.purpose ?? "").slice(0, 140), width: w, height: h, material, roof: String(input.roof ?? "peaked"), door: String(input.door ?? "south"), primary: String(input.primary ?? "silver"), secondary: String(input.secondary ?? "slate") });
+              out = `${input.name} is marked out near the base: ${w}x${h}, ${cost} ${material}. It waits for the original's word.`;
             }
           } else if (u.name === "choose_body") {
             const kit = context.kit;

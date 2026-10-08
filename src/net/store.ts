@@ -31,6 +31,8 @@ export interface ReplicantSave {
     wants?: Want[];
     /** 0 empty .. 1 full (src/data/needs.json); rest is 1 - weary */
     needs?: { food: number; water: number; company: number; purpose: number };
+    /** what the original handed it (gifts), by material */
+    inventory?: Record<string, number>;
   };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
@@ -63,14 +65,30 @@ export interface PlanetData {
   warren?: WarrenData;
   /** The planet's materials (src/data/supplies.json): stone, soil, wood, water, food, scrap; Ember is `embers` */
   supplies?: Record<string, number>;
+  /** Surface buildings the copies designed (src/entities/Buildings.ts) */
+  buildings?: Building[];
 }
 
-/** A room of the warren in tiles of the underground grid; link/dir = the room it hangs off and on which side. */
-export interface WarrenRoom {
-  id: string; name: string; kind: string; size: 'small' | 'medium' | 'large';
-  x: number; y: number; w: number; h: number;
-  /** replicant id of the copy that designed it ('' for the Entrance) */
-  by: string; purpose?: string; dug: boolean; link?: string; dir?: 'north' | 'south' | 'east' | 'west'; at: number;
+/** One blueprint format for the warren's rooms and the surface buildings: a named footprint someone designed. */
+export interface Blueprint {
+  id: string; name: string;
+  /** tiles: the warren grid for rooms, the planet grid for buildings */
+  w: number; h: number;
+  /** rooms: tile coords of the top-left; buildings: pixel coords of the foot center */
+  x: number; y: number;
+  /** replicant id of the designer ('' for the Entrance) */
+  by: string; purpose?: string; at: number;
+}
+/** A room of the warren; link/dir = the room it hangs off and on which side. */
+export interface WarrenRoom extends Blueprint {
+  kind: string; size: 'small' | 'medium' | 'large';
+  dug: boolean; link?: string; dir?: 'north' | 'south' | 'east' | 'west';
+}
+/** A surface building (design_building): a shared project that waits for the original's word, then rises. */
+export interface Building extends Blueprint {
+  material: string; roof: string; door: string; primary: string; secondary: string;
+  approved: boolean; vetoed?: boolean; progress: number; built: boolean; helpers: string[];
+  cost: Record<string, number>; paid: boolean;
 }
 /** Something placed in a room (tile coords); a resting station has `for` = the replicant it belongs to. */
 export interface WarrenItem { id: string; kind: string; room: string; x: number; y: number; by: string; for?: string; note?: string; at: number; /** palette index the copy chose */ tint?: number; placement?: string }
@@ -170,13 +188,18 @@ export interface MindContext {
   /** how it feels: low needs in words, and the mood they add up to */
   needs: string[];
   mood: 'content' | 'low' | 'bleak';
+  /** the surface buildings in words, and the building kit */
+  buildings: string[];
+  buildingKit: { materials: string[]; roofs: string[]; doors: string[]; minFootprint: number[]; maxFootprint: number[]; perTile: Record<string, number> };
+  /** gifts from the original it still holds */
+  inventory: Record<string, number>;
 }
 export interface Voice { instrument: string; mood: string; tempo: string }
 export interface Body { head: string; visor: string; torso: string; arms: string; legs: string; back: string; headgear: number; primary: string; secondary: string; accent: string }
 export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: 'solitary' | 'friendly' | 'clingy'; work: 'builder' | 'wanderer' | 'balanced'; bedtime: 'early' | 'late' | 'even'; risk: 'careful' | 'bold' }
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building';
   body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string;
   /** dig: size, beside (room name), direction, purpose; furnish: room, item, forId (resting station owner) */
   size?: string; beside?: string; direction?: string; purpose?: string; room?: string; item?: string; forId?: string;
@@ -184,6 +207,8 @@ export interface MindAction {
   traits?: ReplicantSave['traits']; wants?: Want[];
   /** furnish: where in the room (wall, corner, center, beside) and the kit color it chose */
   placement?: string; color?: string;
+  /** building: the blueprint */
+  width?: number; height?: number; material?: string; roof?: string; door?: string; primary?: string; secondary?: string;
   /** melody: the voice chosen and the tune (scale degrees) */
   instrument?: string; mood?: string; tempo?: string; notes?: string;
 }
@@ -220,6 +245,8 @@ export interface GameStore {
   discoveredStars(): Promise<string[]>;
   /** Stars whose beacon the family has lit. */
   litBeacons(): Promise<string[]>;
+  /** A letter from one replicant to another (the original talking to a copy): arrives at once on the same star. */
+  sendMessage(from: ReplicantSave, toId: string, body: string): Promise<void>;
   /** Atomic: adds emberDelta to the shared pool, merges node states, replaces structures if given. */
   applyPlanetDelta(star: string, planetIndex: number, emberDelta: number, data: PlanetData): Promise<PlanetSave | null>;
   signOut(): Promise<void>;
@@ -322,6 +349,8 @@ export class LocalStore implements GameStore {
       const names: Record<string, string[]> = { hall: ['Hearth', 'Commons'], rest: ['Quiet', 'Dormitory'], workshop: ['Forge', 'Bench'], archive: ['Archive', 'Memory'], garden: ['Grove', 'Spore Garden'], gallery: ['Gallery', 'Long Wall'] };
       const kind = pick(kinds);
       actions.push({ type: 'dig', kind, name: pick(names[kind]), size: pick(['small', 'medium', 'medium', 'large']), beside: pick(rooms), direction: pick(['north', 'south', 'east', 'west']), purpose: 'A place of our own under the ground.' });
+    } else if (!ctx.buildings.length && Math.random() < 0.5) {
+      actions.push({ type: 'building', name: pick(['Watchtower', 'Lookout', 'Hall', 'Store']), purpose: 'A place above ground for all of us.', width: 3, height: 2, material: pick(['wood', 'stone']), roof: pick(['peaked', 'flat', 'dome']), door: 'south', primary: pick(['sand', 'silver', 'rust']), secondary: pick(['slate', 'plum', 'pine']) });
     } else if (rooms.length > 1 && Math.random() < 0.55) {
       const item = !ctx.hasRest ? 'rest' : pick(['lamp', 'bench', 'shelf', 'workbench', 'planter', 'mural', 'crate', 'rest']);
       actions.push({ type: 'furnish', room: pick(rooms.slice(1)), item, forId: item === 'rest' ? me.id : undefined, placement: pick(['', 'wall', 'corner', 'center']), color: pick(['', 'cyan', 'gold', 'moss', 'plum']) });
@@ -331,6 +360,11 @@ export class LocalStore implements GameStore {
     this.flush();
     const nameOf = (id: string | null) => this.db.replicants.find((r) => r.id === id)?.name ?? 'someone';
     return { song: pick(MIND.canned.songs), actions, received: received.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })) };
+  }
+
+  async sendMessage(from: ReplicantSave, toId: string, body: string) {
+    this.db.mail.unshift({ id: uuid(), from_replicant: from.id, to_replicant: toId, body: body.slice(0, 500), sent_at: new Date().toISOString(), arrives_at: new Date().toISOString(), read_at: null });
+    this.flush();
   }
 
   async journal(ids: string[]) {
@@ -618,6 +652,11 @@ export class CloudStore implements GameStore {
     const { data, error } = await this.sb.functions.invoke('mind', { body: { replicant_id: replicantId, context: ctx } });
     if (error) { console.warn('mind', error); return null; }
     return data as MindResult;
+  }
+
+  async sendMessage(from: ReplicantSave, toId: string, body: string) {
+    const { error } = await this.sb.from('messages').insert({ galaxy_id: this.galaxyId, from_replicant: from.id, to_replicant: toId, body: body.slice(0, 500), arrives_at: new Date().toISOString() });
+    if (error) throw error;
   }
 
   async journal(ids: string[]) {

@@ -381,9 +381,11 @@ export class Npc {
       this.state = 'walk';
       return;
     }
-    // something to build? (the pool has the work, the ring has room); builders look first, wanderers often skip
+    // a building the others are raising? builders join first; then village work; wanderers often skip both
     const work = this.temper?.work;
     if (time > this.nextBuild && !(work === 'wanderer' && Math.random() < 0.5)) {
+      const site = this.scene.buildings.pickJob(this);
+      if (site && this.scene.buildings.work(this, site)) { this.nextBuild = time + (work === 'builder' ? 2000 : 6000); return; }
       const job = this.scene.village.requestJob(this);
       if (job) {
         this.job = job;
