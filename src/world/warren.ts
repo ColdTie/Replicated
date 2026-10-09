@@ -1,7 +1,7 @@
 // The warren's layout: the copies decide what to dig (dig_room: a kind, a size, next to which room, in which
 // direction) and what to put inside (furnish); this file turns those decisions into tiles. Pure functions over
 // the saved WarrenData (planet_states.data.warren) so the browser, the canned mind and headless tests agree.
-import { WARREN } from '../core/data';
+import { SUPPLIES, WARREN } from '../core/data';
 import type { WarrenData, WarrenItem, WarrenRoom } from '../net/store';
 
 export type Dir = 'north' | 'south' | 'east' | 'west';
@@ -227,7 +227,7 @@ export function describeWarren(d: WarrenData, me: string | null, nameOf: (id: st
     ];
     const where = r.id === ENTRANCE_ID ? 'at the ladder' : `${r.dir} of ${rooms.find((x) => x.id === r.link)?.name ?? 'the Entrance'}`;
     const by = r.by ? `, ${r.by === me ? 'your' : nameOf(r.by) + "'s"} design` : '';
-    const state = r.dug ? '' : ' - planned, not dug yet';
+    const state = r.dug ? (r.level ? `, ${SUPPLIES.upgrade.words.slice(1, r.level + 1).join(', ')}` : '') : ' - planned, not dug yet';
     lines.push(`- ${r.name} (${r.kind}, ${r.size}, ${where}${by})${state}: ${what.length ? what.join(', ') : 'empty'}${r.purpose ? ` "${r.purpose}"` : ''}`);
   }
   return lines;

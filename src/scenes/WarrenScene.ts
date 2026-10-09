@@ -301,6 +301,14 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
     if (v) { v.w.play('idle'); this.hop(v.w); }
   }
 
+  onRoomImproved(room: WarrenRoom) {
+    this.paint();
+    const cx = (room.x + room.w / 2) * 16, cy = (room.y + room.h / 2) * 16;
+    for (let i = 0; i < 4; i++) this.fx.dust(cx + (Math.random() - 0.5) * room.w * 12, cy + (Math.random() - 0.5) * room.h * 12, 3);
+    this.fx.sparks(cx, cy, PALETTE[this.host.planet.accent[2]], 12);
+    sound.build();
+  }
+
   onItem(it: WarrenItem) { this.addItem(it, true); }
 
   onArrive(b: Below) {

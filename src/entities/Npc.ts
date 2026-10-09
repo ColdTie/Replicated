@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 import { sound, type Instrument, type Mood, type Tempo } from '../audio/Sound';
 import { anim } from '../core/assets';
 import { bodyFor, ensureBodyTexture, kitColor } from '../core/body';
-import { MIND, NEEDS, PALETTE, PLAYER, VILLAGE, WARREN } from '../core/data';
+import { BUILDINGS, MIND, NEEDS, PALETTE, PLAYER, SUPPLIES, VILLAGE, WARREN } from '../core/data';
 import { DRIFT, stat } from '../core/drift';
 import { session } from '../core/session';
 import type { Light } from '../fx/Lighting';
@@ -16,7 +16,7 @@ import type { BelowTask } from './Warren';
 import type { WarrenRoom } from '../net/store';
 import { squash, type Player } from './Player';
 
-type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below' | 'blank';
+type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below' | 'blank' | 'visit';
 /** Something a copy decided to do with its hands: walk there, swing a few times, then it happens. */
 interface Chore { x: number; y: number; swings: number; swing: () => void; done: () => void }
 type Pt = { x: number; y: number };
@@ -43,6 +43,10 @@ export class Npc {
   /** heading for the hatch to go down and do this */
   private descent: { task: BelowTask; room?: WarrenRoom } | null = null;
   private nextBuild: number;
+  /** lonely: walking over to someone (or the Meeting Hall) to stand together a while */
+  private seek: { who?: Npc; player?: boolean } | null = null;
+  private nextSeek = 0;
+  private visitWith?: Npc;
   /** hop height, added on top of the walking position */
   z = 0;
   /** 0 rested .. 1 weary: climbs while awake, cleared by a sleep in a resting station */
@@ -89,7 +93,9 @@ export class Npc {
   get mood() {
     const n = this.needs;
     const base = (1 - this.weary + n.company + n.purpose) / 3;
-    return Math.min(1, base + Math.min(NEEDS.muralMoodMax, this.scene.warren.muralCount * NEEDS.muralMood));
+    const w = this.scene.warren;
+    const finer = Math.min(SUPPLIES.upgrade.moodMax, w.upgradeLevels * SUPPLIES.upgrade.moodPerLevel);
+    return Math.min(1, base + Math.min(NEEDS.muralMoodMax, w.muralCount * NEEDS.muralMood) + finer);
   }
   get moodWord(): 'content' | 'low' | 'bleak' { const m = this.mood; return m > 0.6 ? 'content' : m > 0.35 ? 'low' : 'bleak'; }
   /** Which needs are low, in words ("lonely (company 20%)"). */
@@ -104,7 +110,8 @@ export class Npc {
 
   /** Finished something: purpose fills (more for a want met). */
   onWorked(want = false) {
-    this.needs.purpose = Math.min(1, this.needs.purpose + (want ? NEEDS.purposeOnWant : NEEDS.purposeOnWork));
+    const shop = this.scene.buildings?.has('workshop') ? BUILDINGS.communal.workshopPurpose : 1;
+    this.needs.purpose = Math.min(1, this.needs.purpose + (want ? NEEDS.purposeOnWant : NEEDS.purposeOnWork) * shop);
   }
 
   /** Needs change with time, here or while nobody was here (hours). */
@@ -117,7 +124,15 @@ export class Npc {
     const near = (!this.scene.visit && !!p?.alive && Math.hypot(p.x - this.x, p.y - this.y) < NEEDS.companyNearPx)
       || this.scene.npcs.some((o) => o !== this && !o.below && Math.hypot(o.x - this.x, o.y - this.y) < NEEDS.companyNearPx * 0.7);
     const rate = soc === 'solitary' ? 0.5 : soc === 'clingy' ? 1.5 : 1;
-    n.company = near && hours < 0.01 ? Math.min(1, n.company + (hours * NEEDS.companyGainPerHour) / rate) : Math.max(0, n.company - (hours * rate) / d.company);
+    if (hours >= 0.01) {
+      // time away: copies that share a planet keep each other company; one alone grows lonely
+      const others = this.scene.npcs.some((o) => o !== this);
+      if (others) n.company += (Math.max(n.company, NEEDS.togetherCompany) - n.company) * Math.min(1, hours / 2);
+      else n.company = Math.max(0, n.company - (hours * rate) / d.company);
+      return;
+    }
+    const gain = this.state === 'visit' ? NEEDS.seek.gainPerHour : NEEDS.companyGainPerHour;
+    n.company = near ? Math.min(1, n.company + (hours * gain) / rate) : Math.max(0, n.company - (hours * rate) / d.company);
   }
 
   /** Writes needs and weariness to its row now and then (not for screenshot copies). */
@@ -253,6 +268,9 @@ export class Npc {
       case 'idle':
         if (time > this.until) this.think(time);
         break;
+      case 'visit':
+        this.updateVisit(time);
+        break;
       case 'walk':
       case 'carry':
         if (this.target && this.walkTo(this.target, dt)) {
@@ -261,11 +279,13 @@ export class Npc {
           else if (this.chore) { this.state = 'chore'; this.swings = 0; this.until = time; }
           else if (this.descent) { const d = this.descent; this.descent = null; this.scene.warren.enter(this, d.task, d.room); return; }
           else if (this.job) { this.state = 'hammer'; this.swings = 0; this.until = time; this.scene.village.showGhost(this.job, 0); }
+          else if (this.seek) this.arriveVisit(time);
           else { this.state = 'idle'; this.until = time + 800 + Math.random() * 2500; }
         } else if (!this.target) {
           if (this.job) { this.scene.village.release(this.job); this.job = null; this.nextBuild = time + 5000; }
           if (this.descent) { this.scene.warren.release(this); this.descent = null; }
           this.chore = null;
+          this.seek = null;
           this.state = 'idle';
         }
         break;
@@ -366,6 +386,9 @@ export class Npc {
       this.state = 'walk';
       return;
     }
+    // lonely: go and stand with someone for a while (solitary copies only when very lonely)
+    const seekBelow = this.temper?.sociability === 'solitary' ? NEEDS.seek.below * 0.4 : this.temper?.sociability === 'clingy' ? NEEDS.seek.below * 1.4 : NEEDS.seek.below;
+    if (this.needs.company < seekBelow && time > this.nextSeek && this.startSeek(time)) return;
     // a building the others are raising? builders join first; then village work; wanderers often skip both
     const work = this.temper?.work;
     if (time > this.nextBuild && !(work === 'wanderer' && Math.random() < 0.5)) {
@@ -438,23 +461,120 @@ export class Npc {
     this.until = time + 1200;
   }
 
+  /** Who to go and be with: the Meeting Hall when there is one, else the nearest copy up here, else the original. */
+  private startSeek(time: number) {
+    this.nextSeek = time + NEEDS.seek.cooldownMs * (0.7 + Math.random() * 0.6);
+    const hall = this.scene.buildings.gatheringSpot();
+    const others = this.scene.npcs.filter((o) => o !== this && (o.state === 'idle' || o.state === 'walk' || o.state === 'greet' || o.state === 'visit'));
+    const d = (p: Pt) => Math.hypot(p.x - this.x, p.y - this.y);
+    const p = this.scene.player;
+    let spot: Pt | null = null;
+    if (hall) { spot = { x: hall.x + (Math.random() - 0.5) * 36, y: hall.y + 8 + Math.random() * 10 }; this.seek = {}; }
+    else if (others.length) {
+      const who = others.sort((a, b) => d(a) - d(b))[0];
+      spot = { x: who.x + (this.x < who.x ? -14 : 14), y: who.y + 2 };
+      this.seek = { who };
+    } else if (p?.alive && !this.scene.visit && d(p) < 300) { spot = { x: p.x + (this.x < p.x ? -16 : 16), y: p.y + 2 }; this.seek = { player: true }; }
+    if (!spot || !this.scene.isWalkable(spot.x, spot.y)) { this.seek = null; return false; }
+    this.mineAt = null;
+    this.chore = null;
+    this.target = spot;
+    this.state = 'walk';
+    return true;
+  }
+
+  /** Arrived beside someone: they stand together a while; the other turns to meet it if it is free. */
+  private arriveVisit(time: number) {
+    const s = this.seek!;
+    const [lo, hi] = NEEDS.seek.visitMs;
+    this.state = 'visit';
+    this.until = time + lo + Math.random() * (hi - lo);
+    const who = s.who && this.scene.npcs.includes(s.who) ? s.who : undefined;
+    if (who) { this.sprite.setFlipX(who.x < this.x); who.joinVisit(this, this.until); }
+    else if (s.player) this.sprite.setFlipX(this.scene.player.x < this.x);
+    else {
+      // at the hall: turn toward whoever else is there
+      const mate = this.scene.npcs.find((o) => o !== this && o.state === 'visit' && Math.hypot(o.x - this.x, o.y - this.y) < 60);
+      if (mate) this.sprite.setFlipX(mate.x < this.x);
+    }
+    this.visitWith = who;
+    this.hop();
+    this.scene.fx.sparks(this.x, this.y - 16, this.trailColor, 4);
+    if (Math.random() < NEEDS.seek.humChance) {
+      const hums = MIND.hums;
+      this.scene.time.delayedCall(1200 + Math.random() * 2500, () => { if (this.state === 'visit') this.sing(hums[Math.floor(Math.random() * hums.length)], this.scene.canHear(), { harmony: true }); });
+    }
+    this.scene.mindLog.push({ t: this.scene.mindClock, text: `${this.data.name} felt lonely and went to ${who ? `be with ${who.data.name}` : s.player ? `stand by ${session.replicant?.name ?? 'the original'}` : 'the Meeting Hall'}` });
+    this.seek = null;
+  }
+
+  /** Someone lonely came over: stop and stand with it (only when not busy). */
+  joinVisit(other: Npc, until: number) {
+    if (this.state !== 'idle' && this.state !== 'walk' && this.state !== 'greet') return;
+    this.target = null; this.mineAt = null;
+    if (this.job) { this.scene.village.release(this.job); this.job = null; }
+    this.state = 'visit';
+    this.until = until;
+    this.visitWith = other;
+    this.sprite.setFlipX(other.x < this.x);
+    this.scene.time.delayedCall(300, () => { if (this.state === 'visit') this.hop(); });
+  }
+
+  private updateVisit(time: number) {
+    const w = this.visitWith;
+    if (w && (!this.scene.npcs.includes(w) || w.below)) this.visitWith = undefined;
+    if (time > this.until) { this.endVisit(); this.state = 'idle'; this.until = time + 600; return; }
+    // a small sway and the odd glint while they stand together
+    if (Math.random() < 0.004) { this.hop(); this.scene.fx.sparks(this.x, this.y - 18, this.trailColor, 2); }
+  }
+
+  private endVisit() { this.visitWith = undefined; }
+
   /** Go and do something by hand (cut a tree, take a build down). Drops whatever it was doing. */
   startChore(c: Chore) {
     if (this.state === 'born' || this.state === 'below' || this.state === 'blank') return false;
     if (this.job) { this.scene.village.release(this.job); this.job = null; }
     if (this.carried) { this.carried.destroy(); this.carried = undefined; }
     this.mineAt = null;
+    this.seek = null;
+    this.endVisit();
     this.chore = c;
     this.target = { x: c.x + (this.x < c.x ? -12 : 12), y: c.y + 3 };
     this.state = 'walk';
     return true;
   }
 
+  /**
+   * Awakened by a Spark: it rises in a column of white light and is gone from the planet as a copy (it plays as
+   * itself now, from the home screen). Everything of it here is cleaned up.
+   */
+  ascend(done?: () => void) {
+    const sc = this.scene, s = this.sprite;
+    if (this.job) { sc.village.release(this.job); this.job = null; }
+    this.carried?.destroy(); this.carried = undefined;
+    this.bubble?.destroy(); this.bubble = undefined;
+    this.state = 'born';
+    const beam = sc.add.rectangle(this.x, this.y + 2, 10, 260, 0xffffff, 0).setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setDepth(6150);
+    sc.tweens.add({ targets: beam, fillAlpha: 0.55, duration: 500, yoyo: true, hold: 900, onComplete: () => beam.destroy() });
+    s.setTintFill(0xffffff);
+    sc.fx.sparks(this.x, this.y - 10, 0xffffff, 18);
+    sc.tweens.add({
+      targets: [s, this.gear.image], y: '-=40', alpha: 0, delay: 600, duration: 1100, ease: 'Quad.easeIn',
+      onComplete: () => {
+        s.destroy(); this.shadow.destroy(); this.gear.image.destroy();
+        sc.lighting.remove(this.light);
+        done?.();
+      },
+    });
+    sc.tweens.add({ targets: this.shadow, alpha: 0, duration: 900, delay: 600 });
+  }
+
   /** Drops into the hatch: everything on the surface goes until it comes back up. */
   hideBelow() {
     if (this.job) { this.scene.village.release(this.job); this.job = null; }
     if (this.carried) { this.carried.destroy(); this.carried = undefined; }
-    this.chore = null; this.mineAt = null; this.target = null; this.descent = null;
+    this.chore = null; this.mineAt = null; this.target = null; this.descent = null; this.seek = null;
+    this.endVisit();
     this.bubble?.destroy(); this.bubble = undefined;
     this.sprite.setVisible(false); this.shadow.setVisible(false); this.gear.image.setVisible(false);
     this.light.active = false;

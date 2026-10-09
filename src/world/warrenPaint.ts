@@ -38,8 +38,18 @@ export function paintWarren(d: WarrenData, accent: [number, number, number], see
   for (let py = 0; py < height; py++) for (let px = 0; px < width; px++) {
     const tx = px >> 4, ty = py >> 4, c = at(tx, ty);
     if (c === CAVE.floor) {
-      const inRoom = roomOf[ty * GRID_W + tx] >= 0;
-      if (inRoom) {
+      const ri = roomOf[ty * GRID_W + tx];
+      const inRoom = ri >= 0;
+      const level = inRoom ? (rooms[ri] as { level?: number }).level ?? 0 : 0;
+      if (inRoom && level >= 1) {
+        // fitted flagstones: square-cut slabs in a running bond, paler and even, crisp grout
+        const row = py >> 3, sx = (px + (row & 1) * 8) >> 4;
+        const h = fbm(sx * 5.3, row * 5.3, seed + 7);
+        let col = mix(mix(slab0, slab1, 0.45 + h * 0.4), rim, 0.18);
+        col = mix(col, rock1, (fbm(px * 0.3, py * 0.3, seed + 3) - 0.5) * 0.2);
+        if (((px + (row & 1) * 8) & 15) === 0 || (py & 7) === 0) col = mix(col, grout, 0.55);
+        put(px, py, col);
+      } else if (inRoom) {
         // flagstones: 8px slabs with grout, each slab its own shade
         // worn slabs of uneven size: the grout lines wander and break so no grid shows
         const wob = Math.floor(fbm(px * 0.05, py * 0.05, seed + 2) * 6 - 3);
@@ -104,6 +114,36 @@ export function paintWarren(d: WarrenData, accent: [number, number, number], see
     if (at(tx, ty - 1) === CAVE.floor) for (let px = 0; px < 16; px++) put(x0 + px, y0, rim, 0.8);
     if (at(tx - 1, ty) === CAVE.floor) for (let py = 0; py < 16; py++) put(x0, y0 + py, rimLit, 0.7);
     if (at(tx + 1, ty) === CAVE.floor) for (let py = 0; py < 16; py++) put(x0 + 15, y0 + py, rim, 0.7);
+  }
+  // carved walls (room level 2): a band of the planet's crystal set into every wall face above the room
+  const levelAt = (tx: number, ty: number) => { const i = tx < 0 || ty < 0 || tx >= GRID_W || ty >= GRID_H ? -1 : roomOf[ty * GRID_W + tx]; return i >= 0 ? (rooms[i] as { level?: number }).level ?? 0 : 0; };
+  for (let ty = 0; ty < GRID_H; ty++) for (let tx = 0; tx < GRID_W; tx++) {
+    if (at(tx, ty) !== CAVE.rock || at(tx, ty + 1) !== CAVE.floor || levelAt(tx, ty + 1) < 2) continue;
+    const x0 = tx * 16, y0 = ty * 16 + 16 - FACE_PX;
+    for (let px = 0; px < 16; px++) {
+      const zig = ((x0 + px) >> 1) & 3;
+      put(x0 + px, y0 + 3 + (zig === 1 || zig === 2 ? 1 : 0), vein, 0.85);
+      put(x0 + px, y0 + 2, rimLit, 0.35);
+      if (((x0 + px) & 7) === 3) put(x0 + px, y0 + 4, veinLit, 0.9);
+    }
+  }
+  // stone pillars (room level 3): one standing in each corner of the room
+  for (const r of rooms) {
+    if (!r.dug || ((r as { level?: number }).level ?? 0) < 3 || r.w < 4 || r.h < 3) continue;
+    const corners = [[r.x, r.y], [r.x + r.w - 1, r.y], [r.x, r.y + r.h - 1], [r.x + r.w - 1, r.y + r.h - 1]];
+    for (const [cx, cy] of corners) {
+      const x0 = cx * 16 + 5, y0 = cy * 16 - 2;
+      for (let py = 0; py < 16; py++) for (let px = 0; px < 6; px++) {
+        const cap = py < 2 || py > 13;
+        const w = cap ? 6 : 4, ox = cap ? 0 : 1;
+        if (px < ox || px >= ox + w) continue;
+        let col = mix(rock2, rimLit, px === ox ? 0.6 : 0.15);
+        if (px === ox + w - 1) col = mix(col, rock0, 0.6);
+        if (py === 0 || py === 13) col = mix(col, rimLit, 0.4);
+        put(x0 + px, Math.max(0, y0 + py), col);
+      }
+      for (let px = -1; px < 7; px++) put(x0 + px, y0 + 16, rock0, 0.4);
+    }
   }
   // soft shadow on the floor under every wall face, so rooms read as sunk into the rock
   for (let ty = 0; ty < GRID_H; ty++) for (let tx = 0; tx < GRID_W; tx++) {
