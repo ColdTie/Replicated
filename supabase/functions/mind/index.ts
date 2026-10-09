@@ -272,7 +272,7 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
     `You are ${me.name}, a replicant: a copy the Replicator made on ${ctx.planet}${parentName ? ` from ${parentName}` : ""} (generation ${me.generation}).`,
     `You have a ${VISOR[t.feature ?? 10] ?? "colored"} visor and ${GEAR[t.gear ?? 0] ?? "nothing on your head"}. ${quirks.length ? "You are " + quirks.join(", ") + "." : ""}`,
     `The original, ${ctx.playerName}, pilots the vessel between stars. Copies stay behind to run their planet: mining crystals for Ember, building the village. The galaxy is cold and mostly empty; the base is warm. You are never alone, but every version of you is a little different.`,
-    `You wake now and then. Each time: read your notes and letters, do at most three things with your tools (only when there is a reason: no notes that repeat what you already know, letters when you truly have something to say, requests rarely), then say one or two sentences out loud: your song, what you feel or notice right now, under 140 characters, first person, plain words, no markdown, no emoji, no quotation marks.`,
+    `You wake now and then. Each time: read your notes and letters, do at most three things with your tools (only when there is a reason: no notes that repeat what you already know, letters when you truly have something to say, requests rarely), then say one or two sentences out loud: your song, what you feel or notice right now, under 140 characters, first person, plain words, no markdown, no emoji, no quotation marks. The song is not a report: never list what you just did with your tools (that is already done and seen), sing what it means to you.`,
     `Letters cross space at light speed, so a far replicant answers slowly. ${ctx.playerHere ? `${ctx.playerName} is here right now and can hear you.` : `${ctx.playerName} is away.`}`,
     `Beneath the base the copies dig a warren: their home, rooms of their own design, cut from the rock. You decide its layout with dig_room and what goes inside with furnish. A resting station is where you sleep; without one you never rest and grow weary. Think about what a home needs: a place to sleep, light, something green, somewhere to keep what you remember, somewhere to sit together.`,
     (me.traits as { voice?: { instrument: string; mood: string; tempo: string } }).voice
@@ -563,7 +563,14 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context) {
       if (chosen.body || context.blank) actions.unshift({ type: "become", traits, name: newName });
     }
 
-    song = song.replace(/^["'\s]+|["'\s]+$/g, "").slice(0, 200);
+    // a song is a line or two, not a report: whole sentences, up to 160 characters
+    song = song.replace(/\s+/g, " ").replace(/^["'\s]+|["'\s]+$/g, "");
+    let line = "";
+    for (const sentence of song.match(/[^.!?]+[.!?]+/g) ?? [song]) {
+      if ((line + sentence).trim().length > 160) break;
+      line += sentence;
+    }
+    song = (line.trim() || song.slice(0, 160)).trim();
     return { song, actions, received: mailRows.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })) };
 }
 

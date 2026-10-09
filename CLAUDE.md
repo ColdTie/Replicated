@@ -815,5 +815,13 @@ whether they keep it or get to choose again (then the mind's `choose_body` is op
   The copy rises in a column of white light and leaves the planet as a copy; `GameStore.awaken` creates a profile in
   its name and visor color and makes the copy that profile's replicant (`status` active, `traits.handedBy`); the
   giver spends the Spark. On the home screen the new profile plays as the copy, on its own planet, in its own body.
+- **Fix: every mind wake had been failing since session 9.** The API rejects `maxItems` / `minimum` in strict tool
+  schemas, and `set_wants` / `finish_want` had them, so each wake (live and away) ended in a 400 and the copies said
+  nothing, chose nothing and wrote nothing from the session 9 deploy on (the game only logs `mind:` warnings). The
+  limits are now in the descriptions and enforced in code. A failed away wake gives its turn back.
+- Songs are a line or two again: the persona says the song is not a report of what was done, and the function keeps
+  whole sentences up to 160 characters.
+- Live: the first away run woke four copies on other worlds, who became themselves (Gleaner, Shade, Hearth, Vigil:
+  bodies, voices, wants, rooms planned, letters); their queued deeds wait on their planets for Steve's next landing.
 - Verified: build; `tools/playtest-together.mjs` and all six older playtests pass with no errors; the deployed
-  function (v10) matches the repo byte for byte. Screenshots `together-hall.png`, `warren-improved.png`.
+  function (v12) matches the repo byte for byte. Screenshots `together-hall.png`, `warren-improved.png`.
