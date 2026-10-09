@@ -16,7 +16,7 @@ import type { PlanetScene } from '../scenes/PlanetScene';
 import { allRooms, digSpot, placeItem, placeRoom, restOf, type Dir, type ItemKind, type RoomSize } from '../world/warren';
 import type { Npc } from './Npc';
 
-export type BelowTask = 'dig' | 'rest' | 'furnish' | 'linger' | 'idle';
+export type BelowTask = 'dig' | 'rest' | 'furnish' | 'improve' | 'linger' | 'idle';
 /** What a copy does about the warren next: below (dig, furnish, rest) or on the surface (entrance, wood, scrap). */
 export type WarrenTask = { task: BelowTask | 'entrance' | 'wood' | 'scavenge'; room?: WarrenRoom; ruinIndex?: number };
 export interface Below {
@@ -29,6 +29,8 @@ export interface Below {
 export interface WarrenView {
   onSwing(b: Below): void;
   onRoomDug(room: WarrenRoom): void;
+  /** a dug room was improved (flagstones, carvings, pillars): repaint */
+  onRoomImproved?(room: WarrenRoom): void;
   onItem(item: WarrenItem): void;
   onArrive(b: Below): void;
   /** the copy's task changed (work done, now lingering by a bench) */
@@ -159,6 +161,33 @@ export class Warren {
     return this.data.items.filter((i) => i.kind === 'mural' && dug.has(i.room)).length;
   }
 
+  /** Room improvements in all, for the copies' mood. */
+  get upgradeLevels() { return this.data.rooms.reduce((s, r) => s + (r.dug ? r.level ?? 0 : 0), 0); }
+
+  /** A dug room to improve while the store is full of stone (lowest level first), or null. */
+  private roomToImprove(): WarrenRoom | null {
+    const u = SUPPLIES.upgrade;
+    if ((this.supplies.stone ?? 0) < this.cap * u.whenFull || this.shortage(u.cost)) return null;
+    return this.data.rooms.filter((r) => r.dug && (r.level ?? 0) < u.max && !this.digging.has(r.id))
+      .sort((a, b) => (a.level ?? 0) - (b.level ?? 0) || a.at - b.at)[0] ?? null;
+  }
+
+  /** One level better: paid, saved, repainted. */
+  private improveRoom(room: WarrenRoom, npc?: Npc) {
+    const u = SUPPLIES.upgrade;
+    if (this.shortage(u.cost) || (room.level ?? 0) >= u.max) return false;
+    this.pay(u.cost);
+    room.level = (room.level ?? 0) + 1;
+    this.digging.delete(room.id);
+    this.save();
+    this.view?.onRoomImproved?.(room);
+    if (npc) {
+      this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} improved ${room.name}: now ${u.words.slice(1, room.level + 1).join(', ')}` });
+      if (this.scene.canHear()) this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} IMPROVES ${room.name.toUpperCase()}`);
+    }
+    return true;
+  }
+
   get hasWorkbench() {
     const dug = new Set(['entrance', ...this.data.rooms.filter((r) => r.dug).map((r) => r.id)]);
     return this.data.items.some((i) => i.kind === 'workbench' && dug.has(i.room));
@@ -193,7 +222,14 @@ export class Warren {
       this.finishRoom(r);
       dug++;
     }
-    if (dug) { this.save(); this.refreshHatch(); }
+    // a store full of stone: the copies improved their rooms meanwhile
+    let improved = 0;
+    for (let i = 0; i < Math.floor(hours * SUPPLIES.upgrade.offlinePerHour); i++) {
+      const r = this.roomToImprove();
+      if (!r || !this.improveRoom(r)) break;
+      improved++;
+    }
+    if (dug || improved) { this.save(); this.refreshHatch(); }
   }
 
   // ------------------------------------------------------------ what the minds decide
@@ -282,6 +318,9 @@ export class Warren {
         if (short.includes('wood') && canCut) return cut();
       }
     }
+    // a full store of stone: make a room finer
+    const better = Math.random() < 0.5 ? this.roomToImprove() : null;
+    if (better) { this.digging.set(better.id, npc); return { task: 'improve', room: better }; }
     // scrap for lamps and workbenches: scavenge an opened ruin now and then
     if ((this.supplies.scrap ?? 0) < 2 && Math.random() < 0.3) {
       const ruin = this.scene.ruins.find((r) => r.open && Date.now() - (this.data.scavenged?.[r.index] ?? 0) > SUPPLIES.ruinCooldownMinutes * 60_000);
@@ -357,7 +396,7 @@ export class Warren {
   /** The copy reached the hatch and drops in. */
   enter(npc: Npc, task: BelowTask, room?: WarrenRoom) {
     if (task === 'dig' && (!room || room.dug)) task = 'idle';
-    if (task === 'furnish' && (!room || !room.dug)) task = 'idle';
+    if ((task === 'furnish' || task === 'improve') && (!room || !room.dug)) task = 'idle';
     const b: Below = { npc, task, room, arrived: !this.view, swings: 0, nextSwingAt: this.clock + 900, until: this.clock + (task === 'rest' ? WARREN.rest.minutes * 60_000 : 2000) };
     this.below.set(npc, b);
     npc.hideBelow();
@@ -386,7 +425,7 @@ export class Warren {
   spotFor(b: Below): { x: number; y: number } {
     const px = (t: { x: number; y: number }) => ({ x: t.x * 16 + 8, y: t.y * 16 + 11 });
     if (b.task === 'dig' && b.room) return px(digSpot(this.data, b.room));
-    if (b.task === 'furnish' && b.room) return { x: (b.room.x + b.room.w / 2) * 16, y: (b.room.y + 1) * 16 + 11 };
+    if ((b.task === 'furnish' || b.task === 'improve') && b.room) return { x: (b.room.x + b.room.w / 2) * 16, y: (b.room.y + 1) * 16 + 11 };
     if (b.task === 'rest') {
       const pod = restOf(this.data, b.npc.data.id);
       if (pod) return { x: pod.x * 16 + 8, y: pod.y * 16 + 13 };
@@ -419,6 +458,16 @@ export class Warren {
         this.view?.onSwing(b);
         if (b.swings >= 5) {
           if (this.furnish(b.npc, { type: 'furnish', item: 'rest', room: b.room!.name, forId: b.npc.data.id })) b.npc.onWorked();
+          this.afterWork(b);
+        }
+      } else if (b.task === 'improve') {
+        if (!b.arrived || this.clock < b.nextSwingAt) continue;
+        b.swings++;
+        b.nextSwingAt = this.clock + WARREN.swingMs;
+        this.view?.onSwing(b);
+        if (b.swings >= SUPPLIES.upgrade.swings) {
+          if (this.improveRoom(b.room!, b.npc)) b.npc.onWorked();
+          else this.digging.delete(b.room!.id);
           this.afterWork(b);
         }
       } else if (this.clock >= b.until) {

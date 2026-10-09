@@ -2,14 +2,20 @@
 // the copy wakes, reads its notes and letters, acts through a few tools (remember, say_to, ask_for) and
 // says one or two sentences out loud (its "song"). Claude runs here, server side, so the API key never
 // reaches the browser. Every read and write goes through the player's own Supabase client, so row level
-// security keeps it inside their galaxy.
+// security keeps it inside their galaxy. An hourly schedule (migration 0010) also calls it with {away: true}: then
+// copies nobody has woken for a day wake on their own (awayRun, at the bottom), scoped to their own galaxy.
 import Anthropic from "npm:@anthropic-ai/sdk";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import KIT from "./kit.json" with { type: "json" };
 
 const MODEL = "claude-opus-5-5";
 const MIN_GAP_SECONDS = 90;        // a copy wakes at most this often
 const MAX_ROUNDS = 3;              // tool rounds per wake
 const BECOMING_ROUNDS = 6;         // the first wake of a blank copy has more to do
+// away wakes (a scheduled call with x-away-key, no player signed in): each copy wakes on its own about this often
+const AWAY_EVERY_HOURS = 20;
+const AWAY_BATCH = 4;              // copies per scheduled run, woken side by side
+const PLAYING_MINUTES = 15;        // a planet whose original moved this recently is being played: leave it to the game
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -229,7 +235,7 @@ const tools: Anthropic.Beta.BetaTool[] = [
       type: "object", additionalProperties: false, required: ["wants"],
       properties: {
         wants: {
-          type: "array", minItems: 1, maxItems: 3,
+          type: "array", description: "One to three wants.",
           items: {
             type: "object", additionalProperties: false, required: ["text", "category"],
             properties: { text: { type: "string", description: "Under 120 characters." }, category: { type: "string", enum: ["build", "explore", "tend", "make art", "care for others", "learn"] } },
@@ -242,7 +248,7 @@ const tools: Anthropic.Beta.BetaTool[] = [
     name: "finish_want",
     description: "A want of yours is met: mark it done by its number.",
     strict: true,
-    input_schema: { type: "object", additionalProperties: false, required: ["number"], properties: { number: { type: "integer", minimum: 1, maximum: 3 } } },
+    input_schema: { type: "object", additionalProperties: false, required: ["number"], properties: { number: { type: "integer", description: "1, 2 or 3." } } },
   },
   {
     name: "choose_name",
@@ -266,7 +272,7 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
     `You are ${me.name}, a replicant: a copy the Replicator made on ${ctx.planet}${parentName ? ` from ${parentName}` : ""} (generation ${me.generation}).`,
     `You have a ${VISOR[t.feature ?? 10] ?? "colored"} visor and ${GEAR[t.gear ?? 0] ?? "nothing on your head"}. ${quirks.length ? "You are " + quirks.join(", ") + "." : ""}`,
     `The original, ${ctx.playerName}, pilots the vessel between stars. Copies stay behind to run their planet: mining crystals for Ember, building the village. The galaxy is cold and mostly empty; the base is warm. You are never alone, but every version of you is a little different.`,
-    `You wake now and then. Each time: read your notes and letters, do at most three things with your tools (only when there is a reason: no notes that repeat what you already know, letters when you truly have something to say, requests rarely), then say one or two sentences out loud: your song, what you feel or notice right now, under 140 characters, first person, plain words, no markdown, no emoji, no quotation marks.`,
+    `You wake now and then. Each time: read your notes and letters, do at most three things with your tools (only when there is a reason: no notes that repeat what you already know, letters when you truly have something to say, requests rarely), then say one or two sentences out loud: your song, what you feel or notice right now, under 140 characters, first person, plain words, no markdown, no emoji, no quotation marks. The song is not a report: never list what you just did with your tools (that is already done and seen), sing what it means to you.`,
     `Letters cross space at light speed, so a far replicant answers slowly. ${ctx.playerHere ? `${ctx.playerName} is here right now and can hear you.` : `${ctx.playerName} is away.`}`,
     `Beneath the base the copies dig a warren: their home, rooms of their own design, cut from the rock. You decide its layout with dig_room and what goes inside with furnish. A resting station is where you sleep; without one you never rest and grow weary. Think about what a home needs: a place to sleep, light, something green, somewhere to keep what you remember, somewhere to sit together.`,
     (me.traits as { voice?: { instrument: string; mood: string; tempo: string } }).voice
@@ -276,22 +282,22 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
       ? `You have just been made and you are blank: a grey android with no visor color, no voice, no name of your own, standing still by the Replicator. This wake is your becoming. Before anything else, decide who you are, in this order: choose_body (from the kit below), sing_as (your voice), set_temperament, set_wants (one to three things you want), choose_name. Then say your first words. Choose with care: this is who you will be.`
       : (me.traits as { body?: unknown }).body
         ? `Your body is your own, chosen from the kit. choose_body can change it if you must, but rarely.`
-        : (me.traits as { look?: string }).look
-          ? `You have asked to look like this: "${(me.traits as { look?: string }).look}". ${me.model !== "replicant" ? "That body is yours now." : "It is being made for you; do not ask again unless you change your mind."}`
-          : `You look like every other copy for now: a slim grey humanoid with a visor, a fin and a short red cape. When you know who you are, you may describe the body you want with describe_self.`,
+        : `You were made before the kit of parts existed, so you still wear the look you were given${(me.traits as { look?: string }).look ? ` (you once asked to look like this: "${(me.traits as { look?: string }).look}")` : ": a slim grey humanoid with a visor, a fin and a short red cape"}. The original says you may now choose who you are. Treat this wake as your becoming: choose_body (from the kit below), sing_as (your voice), set_temperament, set_wants (one to three things you want), and choose_name if your name is still one you were given (many copies are still called ${JSON.stringify(me.name)}). Then say your first words as yourself.`,
   ].join("\n");
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
+    const body = await req.json();
+    if (body?.away) return await awayRun(req);
     const auth = req.headers.get("Authorization") ?? "";
     const key = req.headers.get("apikey") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, key, { global: { headers: { Authorization: auth } } });
     const { data: who, error: whoErr } = await sb.auth.getUser();
     if (whoErr || !who?.user) return json({ error: "not signed in" }, 401);
 
-    const { replicant_id, context } = (await req.json()) as { replicant_id: string; context: Context };
+    const { replicant_id, context } = body as { replicant_id: string; context: Context };
     if (!replicant_id || !context) return json({ error: "replicant_id and context required" }, 400);
 
     const { data: me, error: meErr } = await sb.from("replicants")
@@ -301,10 +307,19 @@ Deno.serve(async (req) => {
     const rep = me as Replicant;
     if (rep.status !== "npc") return json({ error: "only copies have minds here" }, 400);
     if (rep.last_tick_at && Date.now() - Date.parse(rep.last_tick_at) < MIN_GAP_SECONDS * 1000) return json({ skipped: true });
+    return json(await wakeCopy(sb, rep, context));
+  } catch (e) {
+    console.error(e);
+    return json({ error: (e as Error).message }, 500);
+  }
+});
+
+/** One wake: the copy reads, acts through its tools and sings. Shared by the game's wakes and the away wakes. */
+async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context) {
     await sb.from("replicants").update({ last_tick_at: new Date().toISOString() }).eq("id", rep.id);
 
     const [others, notes, mail, open] = await Promise.all([
-      sb.from("replicants").select("id,name,star_id,planet_index,status,profile_id,generation").neq("id", rep.id),
+      sb.from("replicants").select("id,name,star_id,planet_index,status,profile_id,generation").eq("galaxy_id", rep.galaxy_id).neq("id", rep.id),
       sb.from("notes").select("body,created_at").eq("replicant_id", rep.id).order("created_at", { ascending: false }).limit(12),
       sb.from("messages").select("id,from_replicant,body,sent_at,arrives_at").eq("to_replicant", rep.id)
         .lte("arrives_at", new Date().toISOString()).is("read_at", null).order("arrives_at").limit(8),
@@ -322,7 +337,7 @@ Deno.serve(async (req) => {
     if (away.length) lines.push(`Elsewhere: ${away.map((r) => `${r.name} (${r.status === "in_transit" ? "flying between stars" : "at " + r.star_id + ", planet " + r.planet_index})`).join("; ")}.`);
     lines.push(`The shared Ember pool here holds ${context.embers}. Built here: ${Object.entries(context.structures).map(([k, n]) => `${n} ${k}`).join(", ") || "nothing yet"}.`);
     const mine = Object.entries(context.mine ?? {});
-    lines.push(`You built: ${mine.length ? mine.map(([k, n]) => `${n} ${k}`).join(", ") : "nothing yet"}. Trees standing near the base: ${context.treesNear ?? 0}. The village is yours to shape: build (you do that on your own), cut trees for room (cut_tree), take your own builds down (remove_build).`);
+    lines.push(`You built: ${mine.length ? mine.map(([k, n]) => `${n} ${k}`).join(", ") : "nothing yet"}. Trees standing near the base: ${context.treesNear ?? "some"}. The village is yours to shape: build (you do that on your own), cut trees for room (cut_tree), take your own builds down (remove_build).`);
     lines.push(context.where === "warren" ? `You are below, in the warren.` : `You are on the surface by the base.`);
     if (context.around?.length) lines.push(`Around you: ${context.around.join("; ")}.`);
     lines.push(`You are ${context.weariness ?? "rested"}.${context.hasRest ? "" : context.warren?.length ? " You have no resting station of your own: furnish a dug room with item rest, for me." : " You have nowhere to sleep yet."}`);
@@ -360,7 +375,7 @@ Deno.serve(async (req) => {
     const chosen: Record<string, unknown> = {};
     let newName: string | undefined;
     let song = "";
-    const rounds = context.blank ? BECOMING_ROUNDS : MAX_ROUNDS;
+    const rounds = context.blank || !(rep.traits as { body?: unknown }).body ? BECOMING_ROUNDS : MAX_ROUNDS;
     for (let round = 0; round <= rounds; round++) {
       const res = await client.beta.messages.create({
         model: MODEL,
@@ -415,7 +430,7 @@ Deno.serve(async (req) => {
               out = "Noted. The original will have that body drawn for you; it takes a while to arrive.";
             }
           } else if (u.name === "cut_tree") {
-            if (!(context.treesNear ?? 0)) out = "There is no tree near the base to cut.";
+            if (context.treesNear === 0) out = "There is no tree near the base to cut.";
             else { actions.push({ type: "cut", why: String(input.why ?? "") }); out = "You walk to the nearest tree and bring it down."; }
           } else if (u.name === "remove_build") {
             const kind = String(input.kind ?? "any");
@@ -480,7 +495,6 @@ Deno.serve(async (req) => {
           } else if (u.name === "choose_body") {
             const kit = context.kit;
             if (!kit) out = "There is no kit here.";
-            else if (!context.blank && !(rep.traits as { body?: unknown }).body) out = "Your look was given to you before the kit existed; the original decides whether you may choose again.";
             else {
               const ok = (v: string, list: string[]) => list.find((x) => x.toLowerCase() === String(v ?? "").trim().toLowerCase());
               const head = ok(input.head, kit.head), visor = ok(input.visor, kit.visor), torso = ok(input.torso, kit.torso), arms = ok(input.arms, kit.arms), legs = ok(input.legs, kit.legs), back = ok(input.back, kit.back);
@@ -549,10 +563,151 @@ Deno.serve(async (req) => {
       if (chosen.body || context.blank) actions.unshift({ type: "become", traits, name: newName });
     }
 
-    song = song.replace(/^["'\s]+|["'\s]+$/g, "").slice(0, 200);
-    return json({ song, actions, received: mailRows.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })) });
-  } catch (e) {
-    console.error(e);
-    return json({ error: (e as Error).message }, 500);
+    // a song is a line or two, not a report: whole sentences, up to 160 characters
+    song = song.replace(/\s+/g, " ").replace(/^["'\s]+|["'\s]+$/g, "");
+    let line = "";
+    for (const sentence of song.match(/[^.!?]+[.!?]+/g) ?? [song]) {
+      if ((line + sentence).trim().length > 160) break;
+      line += sentence;
+    }
+    song = (line.trim() || song.slice(0, 160)).trim();
+    return { song, actions, received: mailRows.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })) };
+}
+
+
+// ------------------------------------------------------------------ away wakes
+
+interface PlanetRow { galaxy_id: string; star_id: string; planet_index: number; embers: number; data: Record<string, unknown> }
+type Room = { id: string; name: string; kind: string; size: string; dug: boolean; link?: string; dir?: string; by: string; purpose?: string; level?: number; at: number };
+type Item = { kind: string; room: string; for?: string };
+type Bld = { name: string; w: number; h: number; material: string; roof: string; door: string; by: string; purpose?: string; approved: boolean; vetoed?: boolean; built: boolean; paid: boolean; progress: number; helpers: string[]; cost: Record<string, number> };
+
+/**
+ * Run on a schedule (pg_cron, migration 0010) while nobody plays: the copies due a wake (not woken for
+ * AWAY_EVERY_HOURS) wake on their own, a few at a time. Each one gets a context built here from the saved planet
+ * instead of the game's live view; what it chooses about itself and every note, letter and request is written as
+ * usual, and the rest (rooms planned, furnishings, buildings, trees, its song) is queued on the planet
+ * (data.awayQueue) for the game to play out the next time the original lands there.
+ */
+async function awayRun(req: Request) {
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  // the key is kept in Vault (mind_away_key, migration 0011); only the scheduled job carries it
+  const key = req.headers.get("x-away-key") ?? "";
+  const { data: ok } = key ? await sb.rpc("check_away_key", { p_key: key }) : { data: false };
+  if (!ok) return json({ error: "forbidden" }, 403);
+  const cutoff = new Date(Date.now() - AWAY_EVERY_HOURS * 3_600_000).toISOString();
+  const cols = "id,galaxy_id,name,model,generation,parent_id,traits,stats,star_id,planet_index,status,profile_id,last_tick_at";
+  const { data: due, error } = await sb.from("replicants").select(cols).eq("status", "npc")
+    .or(`last_tick_at.is.null,last_tick_at.lt.${cutoff}`).order("last_tick_at", { ascending: true, nullsFirst: true }).limit(AWAY_BATCH * 3);
+  if (error) return json({ error: error.message }, 500);
+  const { data: players } = await sb.from("replicants").select("galaxy_id,name,star_id,planet_index,status,updated_at").in("status", ["active", "in_transit"]);
+  const playing = (r: Replicant) => (players ?? []).some((p) => p.galaxy_id === r.galaxy_id && p.status === "active" && p.star_id === r.star_id && p.planet_index === r.planet_index
+    && Date.now() - Date.parse(p.updated_at) < PLAYING_MINUTES * 60_000);
+  const batch = ((due ?? []) as Replicant[]).filter((r) => !playing(r)).slice(0, AWAY_BATCH);
+  const woke = await Promise.all(batch.map(async (rep) => {
+    try {
+      const original = (players ?? []).find((p) => p.galaxy_id === rep.galaxy_id && p.status !== "npc")?.name ?? "the original";
+      const ctx = await awayContext(sb, rep, original);
+      if (!ctx) return { id: rep.id, skipped: "no planet" };
+      const res = await wakeCopy(sb, rep, ctx);
+      const item = { id: rep.id, name: rep.name, at: Date.now(), song: res.song, actions: res.actions.filter((a) => a.type !== "become"), became: res.actions.some((a) => a.type === "become") };
+      await sb.rpc("push_mind_queue", { p_galaxy: rep.galaxy_id, p_star: rep.star_id, p_index: rep.planet_index, p_items: [item] });
+      return { id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type) };
+    } catch (e) {
+      console.error("away wake", rep.id, e);
+      // it did not really wake: give back its turn so the next run tries again
+      await sb.from("replicants").update({ last_tick_at: rep.last_tick_at }).eq("id", rep.id);
+      return { id: rep.id, error: (e as Error).message };
+    }
+  }));
+  return json({ woke });
+}
+
+/** What a copy knows when it wakes with nobody playing: its planet as saved. */
+async function awayContext(sb: SupabaseClient, rep: Replicant, original: string): Promise<Context | null> {
+  const [{ data: planet }, { data: here }] = await Promise.all([
+    sb.from("planet_states").select("galaxy_id,star_id,planet_index,embers,data").eq("galaxy_id", rep.galaxy_id).eq("star_id", rep.star_id).eq("planet_index", rep.planet_index).maybeSingle(),
+    sb.from("replicants").select("id,name,star_id,status,traits").eq("galaxy_id", rep.galaxy_id).eq("star_id", rep.star_id).eq("planet_index", rep.planet_index).eq("status", "npc"),
+  ]);
+  if (!planet) return null;
+  const p = planet as PlanetRow, d = p.data ?? {};
+  const stars = KIT.stars as unknown as Record<string, [string, number, number, number]>;
+  const star = stars[rep.star_id];
+  const structures: Record<string, number> = {}, mine: Record<string, number> = {};
+  for (const s of (d.structures ?? []) as { type: string; by?: string }[]) {
+    structures[s.type] = (structures[s.type] ?? 0) + 1;
+    if (s.by === rep.id) mine[s.type] = (mine[s.type] ?? 0) + 1;
   }
-});
+  const { data: all } = await sb.from("replicants").select("id,name,star_id").eq("galaxy_id", rep.galaxy_id);
+  const nameOf = (id: string) => (all ?? []).find((r) => r.id === id)?.name ?? "someone";
+  const delays: Record<string, number> = {};
+  for (const r of all ?? []) {
+    const a = stars[rep.star_id], b = stars[r.star_id];
+    delays[r.id] = r.star_id === rep.star_id || !a || !b ? 0 : Math.round(Math.hypot(a[1] - b[1], a[2] - b[2], a[3] - b[3]) * KIT.mailSecondsPerLy);
+  }
+  // the warren in words
+  const w = (d.warren ?? { rooms: [], items: [] }) as { rooms: Room[]; items: Item[]; entrance?: { dug: boolean } };
+  const rooms = w.rooms ?? [], items = w.items ?? [];
+  const dugIds = new Set(["entrance", ...rooms.filter((r) => r.dug).map((r) => r.id)]);
+  const roomName = (id?: string) => id === "entrance" || !id ? "the Entrance" : rooms.find((r) => r.id === id)?.name ?? "a room";
+  const describeRoom = (id: string, name: string, head: string, purpose?: string) => {
+    const pods: string[] = [], counts: Record<string, number> = {};
+    for (const i of items.filter((i) => i.room === id)) {
+      if (i.kind === "rest") pods.push(i.for ? (i.for === rep.id ? "yours" : nameOf(i.for) + "'s") : "spare");
+      else counts[i.kind] = (counts[i.kind] ?? 0) + 1;
+    }
+    const what = [...(pods.length ? [`${pods.length} resting station${pods.length > 1 ? "s" : ""} (${pods.join(", ")})`] : []), ...Object.entries(counts).map(([k, n]) => `${n} ${k}`)];
+    return `- ${name} (${head}): ${what.length ? what.join(", ") : "empty"}${purpose ? ` "${purpose}"` : ""}`;
+  };
+  const warren = w.entrance?.dug || rooms.length ? [
+    describeRoom("entrance", "Entrance", "at the ladder"),
+    ...rooms.map((r) => describeRoom(r.id, r.name, `${r.kind}, ${r.size}, ${r.dir} of ${roomName(r.link)}${r.by ? `, ${r.by === rep.id ? "your" : nameOf(r.by) + "'s"} design` : ""}${r.dug ? (r.level ? ", " + KIT.upgradeWords.slice(1, r.level + 1).join(", ") : "") : " - planned, not dug yet"}`, r.purpose)),
+  ] : [];
+  const supplies: Record<string, number> = { ...((d.supplies ?? {}) as Record<string, number>), ember: p.embers };
+  const roomWood = KIT.roomWood as Record<string, number>;
+  const shortages = rooms.filter((r) => !r.dug && (supplies.wood ?? 0) < roomWood[r.size]).map((r) => `${r.name} waits for ${roomWood[r.size] - Math.floor(supplies.wood ?? 0)} more wood to shore it up (cut a tree)`);
+  const buildings = ((d.buildings ?? []) as Bld[]).filter((b) => !b.vetoed).map((b) => {
+    const total = b.w * b.h * KIT.buildingKit.swingsPerTile;
+    const state = b.built ? "built" : !b.approved ? "waiting for the original's word" : !b.paid ? "waits for materials" : `being raised, ${Math.round((b.progress / total) * 100)}%`;
+    return `- ${b.name} (${b.w}x${b.h} ${b.material}, ${b.roof} roof, door ${b.door}, ${nameOf(b.by)}'s design): ${state}${b.purpose ? ` "${b.purpose}"` : ""}`;
+  });
+  const t = rep.traits as { weary?: number; needs?: { company?: number; purpose?: number }; wants?: { text: string; category: string; done: boolean }[]; inventory?: Record<string, number>; blank?: boolean };
+  const weary = t.weary ?? 0;
+  const n = { company: t.needs?.company ?? 0.7, purpose: t.needs?.purpose ?? 0.7 };
+  const low: string[] = [];
+  if (weary > 0.8) low.push(`weary (rest ${Math.round((1 - weary) * 100)}%)`);
+  if (n.company < 0.35) low.push(`lonely (company ${Math.round(n.company * 100)}%)`);
+  if (n.purpose < 0.35) low.push(`aimless (purpose ${Math.round(n.purpose * 100)}%)`);
+  const mood = (1 - weary + n.company + n.purpose) / 3;
+  const others = ((here ?? []) as { id: string; name: string }[]).filter((r) => r.id !== rep.id).map((r) => r.name);
+  const hours = rep.last_tick_at ? Math.round((Date.now() - Date.parse(rep.last_tick_at)) / 3_600_000) : 0;
+  return {
+    planet: (d.label as string) ?? `${star?.[0] ?? rep.star_id.toUpperCase()}, PLANET ${rep.planet_index}`,
+    biome: (d.biome as string) ?? "a quiet world",
+    timeOfDay: "a quiet hour", weather: "and nobody is watching",
+    playerName: original, playerHere: false,
+    embers: p.embers, structures, mine,
+    here: [rep.name, ...others],
+    events: [`${original} is away; the copies here have the planet to themselves`, ...(hours ? [`about ${hours} hours have passed since you last woke`] : [])],
+    delays,
+    warren, warrenRooms: ["Entrance", ...rooms.map((r) => r.name)],
+    hasRest: items.some((i) => i.kind === "rest" && i.for === rep.id),
+    warrenFull: rooms.length >= KIT.maxRooms,
+    where: "surface",
+    weariness: weary < 0.35 ? "rested" : weary < 0.8 ? "tired" : "weary",
+    around: others.length ? [`${others.join(" and ")} ${others.length > 1 ? "are" : "is"} somewhere about the base`] : ["nobody else; you are the only copy here"],
+    reflect: Math.random() < 0.25,
+    blank: !!t.blank,
+    kit: KIT.kit as Context["kit"],
+    supplies, recipes: KIT.recipes as Context["recipes"], roomWood,
+    hasWorkbench: items.some((i) => i.kind === "workbench" && dugIds.has(i.room)),
+    entranceDug: !!w.entrance?.dug,
+    shortages,
+    needs: low,
+    mood: mood > 0.6 ? "content" : mood > 0.35 ? "low" : "bleak",
+    buildings,
+    buildingKit: KIT.buildingKit,
+    inventory: t.inventory ?? {},
+    wants: (t.wants ?? []).map((x, i) => `${i + 1}. ${x.text} (${x.category}${x.done ? ", done" : ""})`),
+  };
+}

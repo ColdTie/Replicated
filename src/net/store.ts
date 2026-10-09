@@ -22,6 +22,8 @@ export interface ReplicantSave {
   traits: {
     v?: number;
     awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number; sparks?: number; look?: string; voice?: Voice;
+    /** handed over: the replicant whose Spark awakened this one as a player of its own */
+    handedBy?: string;
     weary?: number; sleptAt?: number;
     /** born blank: grey, still, no name of its own until its first wake (the becoming) */
     blank?: boolean;
@@ -48,7 +50,14 @@ export interface NodeState { hits: number; at: number }
 /** A built thing on a planet: the Replicator, or something a copy raised (by = its replicant id, tint = palette index, variant = sprite frame). */
 export interface StructureSave { type: string; x: number; y: number; at: number; by?: string; tint?: number; variant?: number }
 export interface DoorState { open: boolean; taken?: boolean }
+/** One copy's wake while nobody played (the mind function's away run): queued on its planet for the game. */
+export interface AwayItem { id: string; name: string; at: number; song?: string; actions?: MindAction[]; became?: boolean }
+
 export interface PlanetData {
+  /** "EARTH - SOL" and the biome's words, kept for the minds' away wakes */
+  label?: string; biome?: string;
+  /** what the copies did in their away wakes, until the game takes it (take_mind_queue) */
+  awayQueue?: AwayItem[];
   nodes?: Record<string, NodeState>;
   /** Ruin doors by index: opened with a core, reward taken */
   doors?: Record<string, DoorState>;
@@ -83,12 +92,16 @@ export interface Blueprint {
 export interface WarrenRoom extends Blueprint {
   kind: string; size: 'small' | 'medium' | 'large';
   dug: boolean; link?: string; dir?: 'north' | 'south' | 'east' | 'west';
+  /** improvements the copies made (supplies.json upgrade): 1 flagstones, 2 carved walls, 3 pillars */
+  level?: number;
 }
 /** A surface building (design_building): a shared project that waits for the original's word, then rises. */
 export interface Building extends Blueprint {
   material: string; roof: string; door: string; primary: string; secondary: string;
   approved: boolean; vetoed?: boolean; progress: number; built: boolean; helpers: string[];
   cost: Record<string, number>; paid: boolean;
+  /** a shared building the village started on its own (buildings.json communal): hall, workshop, lookout */
+  kind?: string;
 }
 /** Something placed in a room (tile coords); a resting station has `for` = the replicant it belongs to. */
 export interface WarrenItem { id: string; kind: string; room: string; x: number; y: number; by: string; for?: string; note?: string; at: number; /** palette index the copy chose */ tint?: number; placement?: string }
@@ -200,7 +213,7 @@ export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: '
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
   type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building';
-  body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string;
+  body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string; was?: string;
   /** dig: size, beside (room name), direction, purpose; furnish: room, item, forId (resting station owner) */
   size?: string; beside?: string; direction?: string; purpose?: string; room?: string; item?: string; forId?: string;
   /** become: the traits the copy chose for itself (merged over its row); wants: its goals */
@@ -250,6 +263,13 @@ export interface GameStore {
   litBeacons(): Promise<string[]>;
   /** A letter from one replicant to another (the original talking to a copy): arrives at once on the same star. */
   sendMessage(from: ReplicantSave, toId: string, body: string): Promise<void>;
+  /** Takes (returns and clears) what the copies here did in their away wakes (migration 0010). */
+  takeMindQueue(star: string, planetIndex: number): Promise<AwayItem[]>;
+  /**
+   * The handoff: a Spark awakens a copy as a player of its own. A new profile is made in its name and visor
+   * color and the copy becomes that profile's replicant (one row update); the giver spends the Spark.
+   */
+  awaken(copy: ReplicantSave, giver: ReplicantSave): Promise<Profile>;
   /** Atomic: adds emberDelta to the shared pool, merges node states, replaces structures if given. */
   applyPlanetDelta(star: string, planetIndex: number, emberDelta: number, data: PlanetData): Promise<PlanetSave | null>;
   signOut(): Promise<void>;
@@ -488,6 +508,23 @@ export class LocalStore implements GameStore {
     return structuredClone(cur);
   }
 
+  async takeMindQueue(star: string, planetIndex: number) {
+    const cur = this.db.planets[`${star}:${planetIndex}`];
+    const q = cur?.data.awayQueue ?? [];
+    if (cur?.data.awayQueue) { delete cur.data.awayQueue; this.flush(); }
+    return structuredClone(q);
+  }
+
+  async awaken(copy: ReplicantSave, giver: ReplicantSave) {
+    const profile = await this.createProfile({ name: copy.name, kid_mode: false, feature_color: copy.traits.feature ?? 10, sort: this.db.profiles.length });
+    const r = this.db.replicants.find((x) => x.id === copy.id);
+    if (r) { r.status = 'active'; r.profile_id = profile.id; r.traits = { ...r.traits, awake: true, handedBy: giver.id }; }
+    const g = this.db.replicants.find((x) => x.id === giver.id);
+    if (g) g.traits = { ...g.traits, sparks: Math.max(0, (g.traits.sparks ?? 0) - 1) };
+    this.flush();
+    return profile;
+  }
+
   async signOut() { /* nothing to sign out of */ }
 }
 
@@ -662,6 +699,22 @@ export class CloudStore implements GameStore {
     });
     if (error) throw error;
     return (row as PlanetSave[] | null)?.[0] ?? null;
+  }
+
+  async takeMindQueue(star: string, planetIndex: number) {
+    const { data, error } = await this.sb.rpc('take_mind_queue', { p_galaxy: this.galaxyId, p_star: star, p_index: planetIndex });
+    if (error) throw error;
+    return (data ?? []) as AwayItem[];
+  }
+
+  async awaken(copy: ReplicantSave, giver: ReplicantSave) {
+    const { count } = await this.sb.from('profiles').select('id', { count: 'exact', head: true });
+    const profile = await this.createProfile({ name: copy.name, kid_mode: false, feature_color: copy.traits.feature ?? 10, sort: count ?? 9 });
+    const { error } = await this.sb.from('replicants').update({ status: 'active', profile_id: profile.id, updated_at: new Date().toISOString() }).eq('id', copy.id);
+    if (error) throw error;
+    await this.patchTraits(copy.id, { awake: true, handedBy: giver.id });
+    await this.patchTraits(giver.id, { sparks: Math.max(0, (giver.traits.sparks ?? 0) - 1) });
+    return profile;
   }
 
   async mindTick(replicantId: string, ctx: MindContext) {

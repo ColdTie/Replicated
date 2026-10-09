@@ -32,6 +32,7 @@ function ensureStyle() {
   .jn .act input { flex: 1; font: inherit; background: ${css(PALETTE[25])}; color: ${css(PALETTE[20])}; border: 1px solid ${css(PALETTE[22])}; padding: 3px 6px; }
   .jn .act button, .jn p button { font: inherit; font-size: 11px; letter-spacing: 1px; background: ${css(PALETTE[23])}; color: ${css(PALETTE[2])}; border: 1px solid ${css(PALETTE[22])}; padding: 3px 8px; cursor: pointer; }
   .jn .act button:hover, .jn p button:hover { background: ${css(PALETTE[22])}; }
+  .jn .act button.spark { color: ${css(PALETTE[19])}; border-color: ${css(PALETTE[18])}; }
   `;
   document.head.appendChild(s);
 }
@@ -82,7 +83,9 @@ export interface JournalView {
   buildings?: string[];
   pending?: { id: string; name: string }[];
   /** the original's one action on a copy or a blueprint */
-  actions?: { approve(id: string): void; veto(id: string): void; talk(id: string, text: string): void; give(id: string): void };
+  actions?: { approve(id: string): void; veto(id: string): void; talk(id: string, text: string): void; give(id: string): void; awaken(id: string): void };
+  /** Sparks the original holds: each one can awaken a copy as a player of its own */
+  sparks?: number;
 }
 
 let open: HTMLElement | null = null;
@@ -111,7 +114,7 @@ export function openJournal(v: JournalView) {
     if (c.traits.blank) parts.push(`<p class="mute">${v.canHear ? 'Not yet itself. It has not chosen.' : runes('not yet itself')}</p>`);
     else if (t) parts.push(`<p class="mute">${show(`${t.pace}, ${t.sociability}, ${t.work === 'balanced' ? 'works and wanders' : t.work}, ${t.bedtime} to bed, ${t.risk}`)}</p>`);
     if (v.feelings?.[c.id]) parts.push(`<p class="mute">${show(v.feelings[c.id])}</p>`);
-    if (v.actions && !c.traits.blank) parts.push(`<div class="act"><input type="text" maxlength="200" placeholder="say something to ${esc(c.name)}" data-talk="${esc(c.id)}"><button type="button" data-send="${esc(c.id)}">TALK</button><button type="button" data-give="${esc(c.id)}">GIVE 5 EMBER</button></div>`);
+    if (v.actions && !c.traits.blank) parts.push(`<div class="act"><input type="text" maxlength="200" placeholder="say something to ${esc(c.name)}" data-talk="${esc(c.id)}"><button type="button" data-send="${esc(c.id)}">TALK</button><button type="button" data-give="${esc(c.id)}">GIVE 5 EMBER</button>${v.sparks ? `<button type="button" class="spark" data-awaken="${esc(c.id)}">AWAKEN (1 SPARK)</button>` : ''}</div>`);
     const wants = c.traits.wants ?? [];
     if (wants.length) {
       parts.push(`<div class="k">WANTS</div>`);
@@ -166,6 +169,11 @@ export function openJournal(v: JournalView) {
     if (t.dataset.approve) a.approve(t.dataset.approve);
     else if (t.dataset.veto) a.veto(t.dataset.veto);
     else if (t.dataset.give) a.give(t.dataset.give);
+    else if (t.dataset.awaken) {
+      // twice: the first press says what it means
+      if (t.dataset.sure) { a.awaken(t.dataset.awaken); closeJournal(); }
+      else { t.dataset.sure = '1'; t.textContent = 'SURE? IT LEAVES TO PLAY AS ITSELF'; }
+    }
     else if (t.dataset.send) {
       const input = el.querySelector<HTMLInputElement>(`input[data-talk="${t.dataset.send}"]`);
       if (input?.value.trim()) { a.talk(t.dataset.send, input.value); input.value = ''; input.placeholder = 'sent; it will answer when it wakes'; }

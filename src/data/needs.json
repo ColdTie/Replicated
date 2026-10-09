@@ -1,5 +1,5 @@
 {
-  "_doc": "The copies' needs (traits.needs, 0 empty .. 1 full): rest is 1 - weariness (a bed restores it); company fills near the original or another copy (companyNearPx, companyGainPerHour) and empties alone over decayHours.company (solitary copies slower, clingy faster); purpose fills with finished work (purposeOnWork per dig, build, furnishing or chore, more for a want done) and empties idle over decayHours.purpose. They do not eat or drink (Steve, 2026-10-08). mood = the mean of rest, company and purpose, plus muralMood per mural in the warren (up to muralMoodMax); it scales the copy's light between moodLight[0] and [1]. Lamps in the warren slow weariness by lampWakeBonus each, up to lampWakeMax. Needs advance from banked offline time like the Ember pool.",
+  "_doc": "The copies' needs (traits.needs, 0 empty .. 1 full): rest is 1 - weariness (a bed restores it); company fills near the original or another copy (companyNearPx, companyGainPerHour) and empties alone over decayHours.company (solitary copies slower, clingy faster); purpose fills with finished work (purposeOnWork per dig, build, furnishing or chore, more for a want done) and empties idle over decayHours.purpose. They do not eat or drink (Steve, 2026-10-08). mood = the mean of rest, company and purpose, plus muralMood per mural in the warren (up to muralMoodMax); it scales the copy's light between moodLight[0] and [1]. Lamps in the warren slow weariness by lampWakeBonus each, up to lampWakeMax. Needs advance from banked offline time like the Ember pool; while nobody is here, copies that share a planet keep each other company (company drifts toward togetherCompany) and a copy alone empties. seek: a copy whose company falls under seek.below walks over to the others (the Meeting Hall when there is one, else the nearest copy, else the original), and they stand together for visitMs, company filling at gainPerHour; now and then one of them hums (humChance).",
   "decayHours": {
     "company": 3,
     "purpose": 5
@@ -16,5 +16,7 @@
     0.6,
     1.0
   ],
-  "lowBelow": 0.35
+  "lowBelow": 0.35,
+  "togetherCompany": 0.7,
+  "seek": { "below": 0.45, "cooldownMs": 40000, "visitMs": [18000, 34000], "gainPerHour": 40, "humChance": 0.4 }
 }

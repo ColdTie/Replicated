@@ -19,6 +19,7 @@ export class Buildings {
   list: Building[];
   private placed = new Map<string, Placed>();
   private workers = new Map<string, Set<Npc>>();
+  private nextCommunal = 0;
 
   constructor(private scene: PlanetScene, data: Building[] | undefined) {
     this.list = data ? structuredClone(data) : [];
@@ -62,7 +63,7 @@ export class Buildings {
       sprite.setAlpha(1).clearTint().setCrop();
       if (!p.solid) p.solid = this.scene.addSolid(b.x, b.y - b.h * 4, b.w * 16, b.h * 8);
       if (!p.light) {
-        const l = BUILDINGS.light;
+        const l = b.kind === 'lookout' ? { ...BUILDINGS.light, ...BUILDINGS.communal.lookoutLight } : BUILDINGS.light;
         const dx = b.door === 'west' ? -b.w * 8 + 4 : b.door === 'east' ? b.w * 8 - 4 : 0;
         p.light = this.scene.lighting.add({ x: b.x + dx, y: b.y - 6, radius: l.radius, color: PALETTE[l.color], intensity: animate ? 0 : l.intensity, flicker: l.flicker });
         p.glow = this.scene.add.image(b.x + dx, b.y - 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[l.color]).setAlpha(animate ? 0 : 0.14).setScale(0.6).setDepth(6100);
@@ -93,7 +94,7 @@ export class Buildings {
   }
 
   /** design_building: the copy's blueprint, placed; null when nothing fits. */
-  propose(npc: Npc, a: MindAction): Building | null {
+  propose(npc: Npc, a: MindAction, kind?: string): Building | null {
     const [minW, minH] = BUILDINGS.minFootprint, [maxW, maxH] = BUILDINGS.maxFootprint;
     const w = Math.max(minW, Math.min(maxW, Math.round(Number(a.width) || 3))), h = Math.max(minH, Math.min(maxH, Math.round(Number(a.height) || 2)));
     const material = a.material && a.material in BUILDINGS.materials ? a.material : 'wood';
@@ -105,11 +106,16 @@ export class Buildings {
       purpose: (a.purpose ?? '').slice(0, 140), w, h, x: spot.x, y: spot.y, by: npc.data.id,
       material, roof: BUILDINGS.roofs.includes(a.roof ?? '') ? a.roof! : 'peaked', door: BUILDINGS.doors.includes(a.door ?? '') ? a.door! : 'south',
       primary: a.primary ?? 'silver', secondary: a.secondary ?? 'slate',
-      approved: false, progress: 0, built: false, helpers: [], cost, paid: false, at: Date.now(),
+      approved: !!kind, progress: 0, built: false, helpers: [], cost, paid: false, at: Date.now(), ...(kind ? { kind } : {}),
     };
     this.list.push(b);
     this.place(b, false);
     this.save();
+    if (kind) {
+      this.scene.mindLog.push({ t: this.scene.mindClock, text: `the store was full, so the copies began raising a ${b.name} for everyone (${Object.entries(cost).map(([m, n]) => `${n} ${m}`).join(', ')}): ${b.purpose}` });
+      if (this.scene.canHear()) this.scene.game.events.emit('notice', `THE COPIES BEGIN A ${b.name.toUpperCase()}`);
+      return b;
+    }
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} proposed a building: ${b.name} (${w}x${h} ${material}, ${b.roof} roof), waiting for the original's word` });
     if (this.scene.canHear()) this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} PROPOSES ${b.name.toUpperCase()}`);
     return b;
@@ -136,8 +142,41 @@ export class Buildings {
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${session.replicant?.name ?? 'the original'} vetoed ${b.name}` });
   }
 
+  /** A built shared building of this kind (hall, workshop, lookout). */
+  has(kind: string) { return this.list.some((b) => b.kind === kind && b.built && !b.vetoed); }
+
+  /** Where lonely copies gather: in front of the Meeting Hall's door. */
+  gatheringSpot(): { x: number; y: number } | null {
+    const b = this.list.find((x) => x.kind === 'hall' && x.built && !x.vetoed);
+    if (!b) return null;
+    const dx = b.door === 'west' ? -b.w * 8 - 8 : b.door === 'east' ? b.w * 8 + 8 : 0;
+    return { x: b.x + dx, y: b.y + 4 };
+  }
+
+  /**
+   * A full store wants spending: when a material is near capacity and no shared building is underway, the copies
+   * start the next one of the communal list on their own (approved: the original said yes to all they want).
+   */
+  maybeCommunal(npc: Npc | undefined, force = false) {
+    const now = this.scene.warren.clock;
+    if (!npc || (!force && now < this.nextCommunal)) return null;
+    this.nextCommunal = now + BUILDINGS.communal.checkMs;
+    if (this.list.some((b) => b.kind && !b.built && !b.vetoed)) return null;
+    const cap = this.scene.warren.cap;
+    for (const t of BUILDINGS.communal.kinds) {
+      if (this.list.some((b) => b.kind === t.kind && !b.vetoed)) continue;
+      const have = Math.floor(this.scene.supplies[t.material] ?? 0);
+      const cost = Math.ceil(t.w * t.h * (BUILDINGS.materials as Record<string, { perTile: number }>)[t.material].perTile);
+      if (have < cost || have < cap * BUILDINGS.communal.whenFull) continue;
+      const b = this.propose(npc, { type: 'building', name: t.name, purpose: t.purpose, width: t.w, height: t.h, material: t.material, roof: t.roof, door: t.door, primary: t.primary, secondary: t.secondary }, t.kind);
+      if (b) return b;
+    }
+    return null;
+  }
+
   /** Something to raise: an approved building that is not built, its material paid (or payable now). */
   pickJob(npc: Npc): Building | null {
+    this.maybeCommunal(npc);
     const now = Date.now();
     for (const b of this.list) {
       if (b.vetoed || b.built) continue;
@@ -197,6 +236,8 @@ export class Buildings {
 
   /** Progress won while nobody was here: the copies kept hammering. */
   applyOffline(hours: number) {
+    // a full store while nobody was here: they started the next shared building (and pay it at the first swing)
+    if (hours > 0.1) { this.maybeCommunal(this.scene.npcs.find((n) => !n.blank), true); this.pickPayable(); }
     const swings = hours * BUILDINGS.offlineSwingsPerCopyHour * this.scene.npcs.length;
     if (swings < 1) return;
     let left = swings;
@@ -210,6 +251,15 @@ export class Buildings {
       if (p) this.refresh(p, false);
     }
     this.save();
+  }
+
+  /** Pays every approved, unpaid building the supplies cover (offline: nobody walks over to start it). */
+  private pickPayable() {
+    for (const b of this.list) {
+      if (b.vetoed || b.built || !b.approved || b.paid || this.scene.warren.shortage(b.cost)) continue;
+      this.scene.warren.pay(b.cost);
+      b.paid = true;
+    }
   }
 
   /** The buildings in words, for the minds and the journal. */
