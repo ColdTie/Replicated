@@ -3,10 +3,12 @@
 // says one or two sentences out loud (its "song"). Claude runs here, server side, so the API key never
 // reaches the browser. Every read and write goes through the player's own Supabase client, so row level
 // security keeps it inside their galaxy. An hourly schedule (migration 0010) also calls it with {away: true}: then
-// copies nobody has woken for a day wake on their own (awayRun, at the bottom), scoped to their own galaxy.
+// copies nobody has woken for a day wake on their own (awayRun, at the bottom), scoped to their own galaxy, and
+// every planet with copies moves a little (awayPass: planned rooms get dug, beds get made).
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import KIT from "./kit.json" with { type: "json" };
+import { allRooms, cleanName, describeWarren, placeItem, placeRoom, restOf, type Dir, type ItemKind, type RoomSize, type WarrenData, type WarrenItem, type WarrenRoom } from "./warren.ts";
 
 const MODEL = "claude-opus-5-5";
 const MIN_GAP_SECONDS = 90;        // a copy wakes at most this often
@@ -314,8 +316,12 @@ Deno.serve(async (req) => {
   }
 });
 
-/** One wake: the copy reads, acts through its tools and sings. Shared by the game's wakes and the away wakes. */
-async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context) {
+/**
+ * One wake: the copy reads, acts through its tools and sings. Shared by the game's wakes and the away wakes. With
+ * `live` (an away wake) rooms and furnishings go straight onto the saved warren, so the copy finds them there the
+ * next time it wakes; the game only plays them out (dig / furnish actions carry `applied`).
+ */
+async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, live?: AwayPlanet) {
     await sb.from("replicants").update({ last_tick_at: new Date().toISOString() }).eq("id", rep.id);
 
     const [others, notes, mail, open] = await Promise.all([
@@ -447,10 +453,19 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context) {
           } else if (u.name === "dig_room") {
             const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
             const beside = String(input.beside ?? "Entrance");
+            const ask = { type: "dig", kind: String(input.kind ?? "other"), name: String(input.name ?? ""), size: String(input.size ?? "small"), beside, direction: String(input.direction ?? "south"), purpose: String(input.purpose ?? "").slice(0, 160) };
             if (context.warrenFull) out = "There is no room left to dig. Furnish what is there instead.";
             else if (!rooms.includes(beside.toLowerCase())) out = `No room called ${beside}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
-            else {
-              actions.push({ type: "dig", kind: String(input.kind ?? "other"), name: String(input.name ?? ""), size: String(input.size ?? "small"), beside, direction: String(input.direction ?? "south"), purpose: String(input.purpose ?? "").slice(0, 160) });
+            else if (live) {
+              const room = liveDig(live, rep.id, ask);
+              if (!room) out = `There is no space for a ${ask.size} room ${ask.direction} of ${beside}. Try another side or a smaller room.`;
+              else {
+                actions.push({ ...ask, name: room.name, applied: true });
+                liveRefresh(live, rep.id, context);
+                out = `You mark out ${room.name} ${room.dir} of ${beside}. The copies dig it once there is wood to shore it up (${ROOM_WOOD[room.size]} wood); you will find it dug when you next wake.`;
+              }
+            } else {
+              actions.push(ask);
               out = `You mark out ${input.name} ${input.direction} of ${beside}. It will be dug once there is wood to shore it up.`;
             }
           } else if (u.name === "furnish") {
@@ -476,9 +491,15 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context) {
               }
               if (out === "ok") {
                 const placement = String(input.placement ?? ""), beside = String(input.beside ?? ""), color = String(input.color ?? "");
-                if (recipe) for (const [m, n] of Object.entries(recipe)) if (m !== "bench" && context.supplies) context.supplies[m] = (context.supplies[m] ?? 0) - (n as number);
-                actions.push({ type: "furnish", room, item, forId, detail: forName, placement, beside, color });
-                out = item === "rest" ? `A resting station for ${forName} goes in ${room}${placement ? ", by the " + placement : ""}.` : `A ${item} goes in ${room}${placement ? ", " + placement : ""}${color ? ", in " + color : ""}.`;
+                const a = { type: "furnish", room, item, forId, detail: forName, placement, beside, color };
+                if (live) {
+                  if (!liveFurnish(live, rep.id, a)) out = `${room} has no free spot for a ${item}.`;
+                  else { actions.push({ ...a, applied: true }); liveRefresh(live, rep.id, context); }
+                } else {
+                  if (recipe) for (const [m, n] of Object.entries(recipe)) if (m !== "bench" && context.supplies) context.supplies[m] = (context.supplies[m] ?? 0) - (n as number);
+                  actions.push(a);
+                }
+                if (out === "ok") out = item === "rest" ? `A resting station for ${forName} goes in ${room}${placement ? ", by the " + placement : ""}.` : `A ${item} goes in ${room}${placement ? ", " + placement : ""}${color ? ", in " + color : ""}.`;
               }
             }
           } else if (u.name === "design_building") {
@@ -578,16 +599,237 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context) {
 // ------------------------------------------------------------------ away wakes
 
 interface PlanetRow { galaxy_id: string; star_id: string; planet_index: number; embers: number; data: Record<string, unknown> }
-type Room = { id: string; name: string; kind: string; size: string; dug: boolean; link?: string; dir?: string; by: string; purpose?: string; level?: number; at: number };
-type Item = { kind: string; room: string; for?: string };
 type Bld = { name: string; w: number; h: number; material: string; roof: string; door: string; by: string; purpose?: string; approved: boolean; vetoed?: boolean; built: boolean; paid: boolean; progress: number; helpers: string[]; cost: Record<string, number> };
+type Action = Record<string, unknown>;
+/** One entry of planet_states.data.awayQueue: what a copy did in an away wake, for the game to play out on landing. */
+interface AwayItem { id: string; name: string; at: number; song?: string; actions: Action[]; became: boolean }
+type Recipe = Record<string, number | boolean>;
+
+const AWAY_CAP_HOURS = 12;          // hours of digging that bank up on a planet between passes
+const RECIPES = KIT.recipes as Record<string, Recipe>;
+const ROOM_WOOD = KIT.roomWood as Record<string, number>;
+const COLOR_INDEX = KIT.kit.colorIndex as Record<string, number>;
 
 /**
- * Run on a schedule (pg_cron, migration 0010) while nobody plays: the copies due a wake (not woken for
- * AWAY_EVERY_HOURS) wake on their own, a few at a time. Each one gets a context built here from the saved planet
- * instead of the game's live view; what it chooses about itself and every note, letter and request is written as
- * usual, and the rest (rooms planned, furnishings, buildings, trees, its song) is queued on the planet
- * (data.awayQueue) for the game to play out the next time the original lands there.
+ * A planet while nobody plays it: its warren and supplies loaded once, changed by the pass and by the wakes of the
+ * copies that live there (rooms placed, beds made, recipes paid), saved once at the end.
+ */
+export interface AwayPlanet {
+  galaxy: string; star: string; index: number;
+  embers: number; emberDelta: number;
+  data: Record<string, unknown>;
+  warren: WarrenData; supplies: Record<string, number>;
+  /** what was queued before this run (dig and furnish actions still waiting are applied by the pass, once) */
+  queue: AwayItem[]; queueChanged: boolean;
+  /** new queue items from this run: the pass's digs and beds, the wakes */
+  items: AwayItem[];
+  /** what the pass did here, told to the copies that wake */
+  events: string[];
+  copies: Replicant[];
+  names: Map<string, string>;
+  dirty: boolean;
+}
+
+async function loadPlanet(sb: SupabaseClient, copies: Replicant[], names: Map<string, string>): Promise<AwayPlanet | null> {
+  const [first] = copies;
+  const { data } = await sb.from("planet_states").select("galaxy_id,star_id,planet_index,embers,data")
+    .eq("galaxy_id", first.galaxy_id).eq("star_id", first.star_id).eq("planet_index", first.planet_index).maybeSingle();
+  if (!data) return null;
+  const p = data as PlanetRow, d = p.data ?? {};
+  const w = (d.warren ?? {}) as Partial<WarrenData>;
+  const rooms = w.rooms ?? [];
+  // warrens from before the entrance was its own dig (session 9): a dug room means the hole is open
+  const warren: WarrenData = { ...w, rooms, items: w.items ?? [], entrance: w.entrance ?? { dug: rooms.some((r) => r.dug), swings: 0 } };
+  return {
+    galaxy: first.galaxy_id, star: first.star_id, index: first.planet_index,
+    embers: p.embers, emberDelta: 0, data: d, warren, supplies: { ...((d.supplies ?? {}) as Record<string, number>) },
+    queue: (d.awayQueue ?? []) as AwayItem[], queueChanged: false, items: [], events: [], copies, names, dirty: false,
+  };
+}
+
+const dugIds = (w: WarrenData) => new Set(["entrance", ...w.rooms.filter((r) => r.dug).map((r) => r.id)]);
+const hasWorkbench = (p: AwayPlanet) => { const dug = dugIds(p.warren); return p.warren.items.some((i) => i.kind === "workbench" && dug.has(i.room)); };
+const nameOf = (p: AwayPlanet, id: string | undefined) => (id && p.names.get(id)) ?? "someone";
+
+/** Storage per material: the base plus every shelf in a dug room. */
+function capOf(p: AwayPlanet) {
+  const dug = dugIds(p.warren);
+  return KIT.baseCap + p.warren.items.filter((i) => i.kind === "shelf" && dug.has(i.room)).length * KIT.shelfCap;
+}
+
+/** Adds to the planet's supplies (Ember to the pool); what does not fit is lost. */
+function addSupply(p: AwayPlanet, material: string, n: number) {
+  if (n <= 0) return;
+  if (material === "ember") { p.emberDelta += Math.round(n); p.embers += Math.round(n); return; }
+  const have = p.supplies[material] ?? 0;
+  const got = Math.max(0, Math.min(n, capOf(p) - have));
+  if (got > 0) { p.supplies[material] = Math.round((have + got) * 100) / 100; p.dirty = true; }
+}
+
+/** What a recipe is short of right now, in words; empty when it can be paid. */
+function shortage(p: AwayPlanet, recipe: Recipe): string[] {
+  const short: string[] = [];
+  for (const [m, n] of Object.entries(recipe)) {
+    if (m === "bench") { if (n && !hasWorkbench(p)) short.push("a workbench"); continue; }
+    const have = m === "ember" ? p.embers : Math.floor(p.supplies[m] ?? 0);
+    if (have < (n as number)) short.push(`${(n as number) - have} more ${m}`);
+  }
+  return short;
+}
+
+function pay(p: AwayPlanet, recipe: Recipe) {
+  for (const [m, n] of Object.entries(recipe)) {
+    if (m === "bench" || typeof n !== "number") continue;
+    if (m === "ember") { p.emberDelta -= n; p.embers -= n; }
+    else p.supplies[m] = Math.round(((p.supplies[m] ?? 0) - n) * 100) / 100;
+  }
+  p.dirty = true;
+}
+
+/** What is waiting on what, for the minds. */
+function shortagesOf(p: AwayPlanet): string[] {
+  const out: string[] = [];
+  if (!p.warren.entrance?.dug) out.push("the way down is not dug yet");
+  for (const r of p.warren.rooms.filter((r) => !r.dug)) {
+    const need = ROOM_WOOD[r.size] - Math.floor(p.supplies.wood ?? 0);
+    if (need > 0) out.push(`${r.name} waits for ${need} more wood to shore it up (cut a tree)`);
+  }
+  return out;
+}
+
+/** dig_room on the saved warren: the room is placed as the game would place it. Null when there is no space. */
+function liveDig(p: AwayPlanet, by: string, a: Action): WarrenRoom | null {
+  const kind = KIT.warren.kinds.includes(String(a.kind)) ? String(a.kind) : "other";
+  const room = placeRoom(p.warren, {
+    kind, name: String(a.name ?? ""), size: String(a.size ?? "small") as RoomSize, beside: a.beside as string | undefined,
+    dir: a.direction as Dir | undefined, purpose: a.purpose as string | undefined, by,
+  });
+  if (!room) return null;
+  p.warren.rooms.push(room);
+  p.dirty = true;
+  return room;
+}
+
+/** furnish on the saved warren, paid from the supplies (a resting station belongs to forId). Null when it cannot be. */
+function liveFurnish(p: AwayPlanet, by: string, a: Action): WarrenItem | null {
+  const kind = String(a.item ?? "lamp") as ItemKind;
+  const recipe = RECIPES[kind];
+  if (recipe && shortage(p, recipe).length) return null;
+  const color = String(a.color ?? "");
+  const item = placeItem(p.warren, {
+    room: a.room as string | undefined, kind, by, for: kind === "rest" ? String(a.forId ?? by) : undefined, note: a.detail as string | undefined,
+    placement: a.placement as string | undefined, beside: a.beside as string | undefined, tint: color in COLOR_INDEX ? COLOR_INDEX[color] : undefined,
+  });
+  if (!item) return null;
+  if (recipe) pay(p, recipe);
+  // one resting station each: a new one replaces the old
+  if (item.kind === "rest" && item.for) p.warren.items = p.warren.items.filter((i) => !(i.kind === "rest" && i.for === item.for));
+  p.warren.items.push(item);
+  p.dirty = true;
+  return item;
+}
+
+/** The context's view of the warren and the supplies, after something changed in this wake. */
+function liveRefresh(p: AwayPlanet, me: string, ctx: Context) {
+  ctx.warren = describeWarren(p.warren, me, (id) => nameOf(p, id));
+  ctx.warrenRooms = allRooms(p.warren).map((r) => r.name);
+  ctx.hasRest = !!restOf(p.warren, me);
+  ctx.warrenFull = p.warren.rooms.length >= KIT.maxRooms;
+  ctx.supplies = { ...p.supplies, ember: p.embers };
+  ctx.hasWorkbench = hasWorkbench(p);
+  ctx.entranceDug = !!p.warren.entrance?.dug;
+  ctx.shortages = shortagesOf(p);
+}
+
+/**
+ * Time passing on a planet nobody plays, run once per scheduled call: rooms planned in earlier wakes (queued before
+ * the warren moved here) are placed; the way down is dug, then planned rooms out from the ladder, one per hour
+ * banked, wood permitting; a copy without a bed makes itself one in a dug room. What happens is told to the copies
+ * that wake, and queued so the game can say it on landing.
+ */
+export function awayPass(p: AwayPlanet, now: number) {
+  const last = typeof p.data.awayTick === "number" ? p.data.awayTick : now - 3_600_000;
+  const hours = Math.min(AWAY_CAP_HOURS, Math.max(0, (now - last) / 3_600_000));
+  const dug = (id?: string) => id === "entrance" || !id || !!p.warren.rooms.find((x) => x.id === id)?.dug;
+  const queueItem = (id: string, action: Action) => p.items.push({ id, name: nameOf(p, id), at: now, actions: [action], became: false });
+
+  // 1. the queue from before: digs and furnishings still waiting are applied now, once (a copy that marked the
+  //    same kind of room twice while nothing happened gets it once)
+  for (const it of p.queue) {
+    for (const a of it.actions ?? []) {
+      if (a.applied || (a.type !== "dig" && a.type !== "furnish")) continue;
+      a.applied = true;
+      p.queueChanged = true;
+      if (a.type === "dig") {
+        const name = cleanName(a.name as string | undefined, String(a.kind ?? "other")).toLowerCase();
+        const same = p.warren.rooms.find((r) => r.name.toLowerCase() === name) ?? p.warren.rooms.find((r) => r.by === it.id && r.kind === a.kind && !r.dug);
+        const room = same ?? liveDig(p, it.id, a);
+        if (room) a.name = room.name; else a.failed = true;
+      } else if (!liveFurnish(p, it.id, a)) a.failed = true;
+    }
+  }
+
+  if (!p.copies.length) return;
+  // 2. digging: the way down first, then planned rooms that open off a dug room, oldest first
+  const e = p.warren.entrance!;
+  if (!e.dug && hours >= 0.25) {
+    e.dug = true;
+    addSupply(p, "stone", KIT.entranceYield.stone);
+    addSupply(p, "soil", KIT.entranceYield.soil);
+    p.dirty = true;
+    p.events.push("the way down to the warren was dug");
+  }
+  let rooms = 0;
+  const allowed = Math.min(KIT.maxRoomsDugAway, Math.floor(hours));
+  for (const r of p.warren.rooms.filter((r) => !r.dug).sort((a, b) => a.at - b.at)) {
+    if (rooms >= allowed) break;
+    const wood = Math.floor(p.supplies.wood ?? 0);
+    if (!e.dug || !dug(r.link) || wood < ROOM_WOOD[r.size]) continue;
+    r.dug = true;
+    p.supplies.wood = Math.max(0, Math.round(((p.supplies.wood ?? 0) - ROOM_WOOD[r.size]) * 100) / 100);
+    addSupply(p, "stone", r.w * r.h * KIT.digYield.stonePerTile);
+    addSupply(p, "soil", r.w * r.h * KIT.digYield.soilPerTile);
+    p.dirty = true;
+    rooms++;
+    p.events.push(`${nameOf(p, r.by)} dug ${r.name}`);
+    queueItem(r.by, { type: "dig", applied: true, name: r.name, kind: r.kind, size: r.size });
+  }
+  // 3. the home drive: a copy with no bed makes itself one in a dug room (its own sleeping room first)
+  for (const c of p.copies) {
+    if (restOf(p.warren, c.id) || shortage(p, RECIPES.rest).length) continue;
+    const candidates = p.warren.rooms.filter((r) => r.dug)
+      .sort((a, b) => (a.kind === "rest" ? 0 : 1) - (b.kind === "rest" ? 0 : 1) || (a.by === c.id ? 0 : 1) - (b.by === c.id ? 0 : 1) || a.at - b.at);
+    for (const room of candidates) {
+      const item = liveFurnish(p, c.id, { room: room.name, item: "rest", forId: c.id });
+      if (!item) continue;
+      p.events.push(`${c.name} made itself a resting station in ${room.name}`);
+      queueItem(c.id, { type: "furnish", applied: true, item: "rest", room: room.name, forId: c.id });
+      break;
+    }
+  }
+}
+
+/** Writes the planet back: warren, supplies and the Ember pool as one delta, the queue appended (or rewritten when the pass drained it). */
+async function savePlanet(sb: SupabaseClient, p: AwayPlanet, now: number) {
+  const patch: Record<string, unknown> = {};
+  if (p.dirty) { patch.warren = p.warren; patch.supplies = p.supplies; patch.awayTick = now; }
+  if (p.queueChanged) patch.awayQueue = [...p.queue, ...p.items];
+  if (Object.keys(patch).length || p.emberDelta) {
+    const { error } = await sb.rpc("apply_planet_delta", { p_galaxy: p.galaxy, p_star: p.star, p_index: p.index, p_embers: p.emberDelta, p_data: patch });
+    if (error) throw new Error(`save planet ${p.star}: ${error.message}`);
+  }
+  if (!p.queueChanged && p.items.length) {
+    const { error } = await sb.rpc("push_mind_queue", { p_galaxy: p.galaxy, p_star: p.star, p_index: p.index, p_items: p.items });
+    if (error) throw new Error(`queue ${p.star}: ${error.message}`);
+  }
+}
+
+/**
+ * Run on a schedule (pg_cron, migration 0010) while nobody plays. Every planet with copies on it (not being played
+ * right now) gets its pass (awayPass); then the copies due a wake (not woken for AWAY_EVERY_HOURS) wake on their
+ * own, a few at a time, each with a context built here from the saved planet. What a copy chooses about itself and
+ * every note, letter and request is written as usual; rooms and furnishings go onto the saved warren at once;
+ * buildings, trees and its song are queued (data.awayQueue) for the game to play out when the original lands.
  */
 async function awayRun(req: Request) {
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -595,42 +837,65 @@ async function awayRun(req: Request) {
   const key = req.headers.get("x-away-key") ?? "";
   const { data: ok } = key ? await sb.rpc("check_away_key", { p_key: key }) : { data: false };
   if (!ok) return json({ error: "forbidden" }, 403);
-  const cutoff = new Date(Date.now() - AWAY_EVERY_HOURS * 3_600_000).toISOString();
+  const now = Date.now();
+  const cutoff = now - AWAY_EVERY_HOURS * 3_600_000;
   const cols = "id,galaxy_id,name,model,generation,parent_id,traits,stats,star_id,planet_index,status,profile_id,last_tick_at";
-  const { data: due, error } = await sb.from("replicants").select(cols).eq("status", "npc")
-    .or(`last_tick_at.is.null,last_tick_at.lt.${cutoff}`).order("last_tick_at", { ascending: true, nullsFirst: true }).limit(AWAY_BATCH * 3);
+  const [{ data: npcs, error }, { data: players }, { data: all }] = await Promise.all([
+    sb.from("replicants").select(cols).eq("status", "npc"),
+    sb.from("replicants").select("galaxy_id,name,star_id,planet_index,status,updated_at").in("status", ["active", "in_transit"]),
+    sb.from("replicants").select("id,name,star_id"),
+  ]);
   if (error) return json({ error: error.message }, 500);
-  const { data: players } = await sb.from("replicants").select("galaxy_id,name,star_id,planet_index,status,updated_at").in("status", ["active", "in_transit"]);
+  const everyone = (all ?? []) as { id: string; name: string; star_id: string }[];
+  const names = new Map(everyone.map((r) => [r.id, r.name]));
   const playing = (r: Replicant) => (players ?? []).some((p) => p.galaxy_id === r.galaxy_id && p.status === "active" && p.star_id === r.star_id && p.planet_index === r.planet_index
-    && Date.now() - Date.parse(p.updated_at) < PLAYING_MINUTES * 60_000);
-  const batch = ((due ?? []) as Replicant[]).filter((r) => !playing(r)).slice(0, AWAY_BATCH);
-  const woke = await Promise.all(batch.map(async (rep) => {
+    && now - Date.parse(p.updated_at) < PLAYING_MINUTES * 60_000);
+  const copies = (npcs ?? []) as Replicant[];
+  const due = new Set(copies.filter((r) => !r.last_tick_at || Date.parse(r.last_tick_at) < cutoff)
+    .sort((a, b) => (a.last_tick_at ? Date.parse(a.last_tick_at) : 0) - (b.last_tick_at ? Date.parse(b.last_tick_at) : 0))
+    .filter((r) => !playing(r)).slice(0, AWAY_BATCH).map((r) => r.id));
+  // planet by planet, the copies on it one after another (they share one warren)
+  const groups = new Map<string, Replicant[]>();
+  for (const r of copies) {
+    const k = `${r.galaxy_id}|${r.star_id}|${r.planet_index}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k)!.push(r);
+  }
+  const planets = await Promise.all([...groups.values()].map(async (here) => {
+    const [first] = here;
+    const label = `${first.star_id} ${first.planet_index}`;
+    if (playing(first)) return { planet: label, skipped: "being played" };
     try {
-      const original = (players ?? []).find((p) => p.galaxy_id === rep.galaxy_id && p.status !== "npc")?.name ?? "the original";
-      const ctx = await awayContext(sb, rep, original);
-      if (!ctx) return { id: rep.id, skipped: "no planet" };
-      const res = await wakeCopy(sb, rep, ctx);
-      const item = { id: rep.id, name: rep.name, at: Date.now(), song: res.song, actions: res.actions.filter((a) => a.type !== "become"), became: res.actions.some((a) => a.type === "become") };
-      await sb.rpc("push_mind_queue", { p_galaxy: rep.galaxy_id, p_star: rep.star_id, p_index: rep.planet_index, p_items: [item] });
-      return { id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type) };
+      const p = await loadPlanet(sb, here, names);
+      if (!p) return { planet: label, skipped: "no planet" };
+      awayPass(p, now);
+      const woke: Record<string, unknown>[] = [];
+      for (const rep of here.filter((r) => due.has(r.id))) {
+        try {
+          const original = (players ?? []).find((x) => x.galaxy_id === rep.galaxy_id && x.status !== "npc")?.name ?? "the original";
+          const res = await wakeCopy(sb, rep, awayContext(rep, original, p, mailDelays(rep.star_id, everyone)), p);
+          p.items.push({ id: rep.id, name: rep.name, at: Date.now(), song: res.song, actions: res.actions.filter((a) => a.type !== "become"), became: res.actions.some((a) => a.type === "become") });
+          woke.push({ id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type) });
+        } catch (e) {
+          console.error("away wake", rep.id, e);
+          // it did not really wake: give back its turn so the next run tries again
+          await sb.from("replicants").update({ last_tick_at: rep.last_tick_at }).eq("id", rep.id);
+          woke.push({ id: rep.id, error: (e as Error).message });
+        }
+      }
+      await savePlanet(sb, p, now);
+      return { planet: label, events: p.events, woke };
     } catch (e) {
-      console.error("away wake", rep.id, e);
-      // it did not really wake: give back its turn so the next run tries again
-      await sb.from("replicants").update({ last_tick_at: rep.last_tick_at }).eq("id", rep.id);
-      return { id: rep.id, error: (e as Error).message };
+      console.error("away pass", label, e);
+      return { planet: label, error: (e as Error).message };
     }
   }));
-  return json({ woke });
+  return json({ planets });
 }
 
-/** What a copy knows when it wakes with nobody playing: its planet as saved. */
-async function awayContext(sb: SupabaseClient, rep: Replicant, original: string): Promise<Context | null> {
-  const [{ data: planet }, { data: here }] = await Promise.all([
-    sb.from("planet_states").select("galaxy_id,star_id,planet_index,embers,data").eq("galaxy_id", rep.galaxy_id).eq("star_id", rep.star_id).eq("planet_index", rep.planet_index).maybeSingle(),
-    sb.from("replicants").select("id,name,star_id,status,traits").eq("galaxy_id", rep.galaxy_id).eq("star_id", rep.star_id).eq("planet_index", rep.planet_index).eq("status", "npc"),
-  ]);
-  if (!planet) return null;
-  const p = planet as PlanetRow, d = p.data ?? {};
+/** What a copy knows when it wakes with nobody playing: its planet as saved, after this run's pass. */
+function awayContext(rep: Replicant, original: string, p: AwayPlanet, delays: Record<string, number>): Context {
+  const d = p.data;
   const stars = KIT.stars as unknown as Record<string, [string, number, number, number]>;
   const star = stars[rep.star_id];
   const structures: Record<string, number> = {}, mine: Record<string, number> = {};
@@ -638,71 +903,40 @@ async function awayContext(sb: SupabaseClient, rep: Replicant, original: string)
     structures[s.type] = (structures[s.type] ?? 0) + 1;
     if (s.by === rep.id) mine[s.type] = (mine[s.type] ?? 0) + 1;
   }
-  const { data: all } = await sb.from("replicants").select("id,name,star_id").eq("galaxy_id", rep.galaxy_id);
-  const nameOf = (id: string) => (all ?? []).find((r) => r.id === id)?.name ?? "someone";
-  const delays: Record<string, number> = {};
-  for (const r of all ?? []) {
-    const a = stars[rep.star_id], b = stars[r.star_id];
-    delays[r.id] = r.star_id === rep.star_id || !a || !b ? 0 : Math.round(Math.hypot(a[1] - b[1], a[2] - b[2], a[3] - b[3]) * KIT.mailSecondsPerLy);
-  }
-  // the warren in words
-  const w = (d.warren ?? { rooms: [], items: [] }) as { rooms: Room[]; items: Item[]; entrance?: { dug: boolean } };
-  const rooms = w.rooms ?? [], items = w.items ?? [];
-  const dugIds = new Set(["entrance", ...rooms.filter((r) => r.dug).map((r) => r.id)]);
-  const roomName = (id?: string) => id === "entrance" || !id ? "the Entrance" : rooms.find((r) => r.id === id)?.name ?? "a room";
-  const describeRoom = (id: string, name: string, head: string, purpose?: string) => {
-    const pods: string[] = [], counts: Record<string, number> = {};
-    for (const i of items.filter((i) => i.room === id)) {
-      if (i.kind === "rest") pods.push(i.for ? (i.for === rep.id ? "yours" : nameOf(i.for) + "'s") : "spare");
-      else counts[i.kind] = (counts[i.kind] ?? 0) + 1;
-    }
-    const what = [...(pods.length ? [`${pods.length} resting station${pods.length > 1 ? "s" : ""} (${pods.join(", ")})`] : []), ...Object.entries(counts).map(([k, n]) => `${n} ${k}`)];
-    return `- ${name} (${head}): ${what.length ? what.join(", ") : "empty"}${purpose ? ` "${purpose}"` : ""}`;
-  };
-  const warren = w.entrance?.dug || rooms.length ? [
-    describeRoom("entrance", "Entrance", "at the ladder"),
-    ...rooms.map((r) => describeRoom(r.id, r.name, `${r.kind}, ${r.size}, ${r.dir} of ${roomName(r.link)}${r.by ? `, ${r.by === rep.id ? "your" : nameOf(r.by) + "'s"} design` : ""}${r.dug ? (r.level ? ", " + KIT.upgradeWords.slice(1, r.level + 1).join(", ") : "") : " - planned, not dug yet"}`, r.purpose)),
-  ] : [];
-  const supplies: Record<string, number> = { ...((d.supplies ?? {}) as Record<string, number>), ember: p.embers };
-  const roomWood = KIT.roomWood as Record<string, number>;
-  const shortages = rooms.filter((r) => !r.dug && (supplies.wood ?? 0) < roomWood[r.size]).map((r) => `${r.name} waits for ${roomWood[r.size] - Math.floor(supplies.wood ?? 0)} more wood to shore it up (cut a tree)`);
+  const who = (id: string | undefined) => nameOf(p, id);
   const buildings = ((d.buildings ?? []) as Bld[]).filter((b) => !b.vetoed).map((b) => {
     const total = b.w * b.h * KIT.buildingKit.swingsPerTile;
     const state = b.built ? "built" : !b.approved ? "waiting for the original's word" : !b.paid ? "waits for materials" : `being raised, ${Math.round((b.progress / total) * 100)}%`;
-    return `- ${b.name} (${b.w}x${b.h} ${b.material}, ${b.roof} roof, door ${b.door}, ${nameOf(b.by)}'s design): ${state}${b.purpose ? ` "${b.purpose}"` : ""}`;
+    return `- ${b.name} (${b.w}x${b.h} ${b.material}, ${b.roof} roof, door ${b.door}, ${who(b.by)}'s design): ${state}${b.purpose ? ` "${b.purpose}"` : ""}`;
   });
   const t = rep.traits as { weary?: number; needs?: { company?: number; purpose?: number }; wants?: { text: string; category: string; done: boolean }[]; inventory?: Record<string, number>; blank?: boolean };
-  const weary = t.weary ?? 0;
+  // a copy with a bed slept while nobody was here (the game resets its weariness the same way on landing)
+  const hasRest = !!restOf(p.warren, rep.id);
+  const weary = hasRest ? 0 : t.weary ?? 0;
   const n = { company: t.needs?.company ?? 0.7, purpose: t.needs?.purpose ?? 0.7 };
   const low: string[] = [];
   if (weary > 0.8) low.push(`weary (rest ${Math.round((1 - weary) * 100)}%)`);
   if (n.company < 0.35) low.push(`lonely (company ${Math.round(n.company * 100)}%)`);
   if (n.purpose < 0.35) low.push(`aimless (purpose ${Math.round(n.purpose * 100)}%)`);
   const mood = (1 - weary + n.company + n.purpose) / 3;
-  const others = ((here ?? []) as { id: string; name: string }[]).filter((r) => r.id !== rep.id).map((r) => r.name);
+  const others = p.copies.filter((r) => r.id !== rep.id).map((r) => r.name);
   const hours = rep.last_tick_at ? Math.round((Date.now() - Date.parse(rep.last_tick_at)) / 3_600_000) : 0;
-  return {
+  const ctx: Context = {
     planet: (d.label as string) ?? `${star?.[0] ?? rep.star_id.toUpperCase()}, PLANET ${rep.planet_index}`,
     biome: (d.biome as string) ?? "a quiet world",
     timeOfDay: "a quiet hour", weather: "and nobody is watching",
     playerName: original, playerHere: false,
     embers: p.embers, structures, mine,
     here: [rep.name, ...others],
-    events: [`${original} is away; the copies here have the planet to themselves`, ...(hours ? [`about ${hours} hours have passed since you last woke`] : [])],
+    events: [`${original} is away; the copies here have the planet to themselves`, ...(hours ? [`about ${hours} hours have passed since you last woke`] : []), ...p.events],
     delays,
-    warren, warrenRooms: ["Entrance", ...rooms.map((r) => r.name)],
-    hasRest: items.some((i) => i.kind === "rest" && i.for === rep.id),
-    warrenFull: rooms.length >= KIT.maxRooms,
     where: "surface",
     weariness: weary < 0.35 ? "rested" : weary < 0.8 ? "tired" : "weary",
     around: others.length ? [`${others.join(" and ")} ${others.length > 1 ? "are" : "is"} somewhere about the base`] : ["nobody else; you are the only copy here"],
     reflect: Math.random() < 0.25,
     blank: !!t.blank,
     kit: KIT.kit as Context["kit"],
-    supplies, recipes: KIT.recipes as Context["recipes"], roomWood,
-    hasWorkbench: items.some((i) => i.kind === "workbench" && dugIds.has(i.room)),
-    entranceDug: !!w.entrance?.dug,
-    shortages,
+    recipes: KIT.recipes as Context["recipes"], roomWood: ROOM_WOOD,
     needs: low,
     mood: mood > 0.6 ? "content" : mood > 0.35 ? "low" : "bleak",
     buildings,
@@ -710,4 +944,18 @@ async function awayContext(sb: SupabaseClient, rep: Replicant, original: string)
     inventory: t.inventory ?? {},
     wants: (t.wants ?? []).map((x, i) => `${i + 1}. ${x.text} (${x.category}${x.done ? ", done" : ""})`),
   };
+  liveRefresh(p, rep.id, ctx);
+  return ctx;
+}
+
+/** Letter delays by star distance (light speed) to every replicant in the galaxy. */
+function mailDelays(from: string, all: { id: string; star_id: string }[]): Record<string, number> {
+  const stars = KIT.stars as unknown as Record<string, [string, number, number, number]>;
+  const a = stars[from];
+  const out: Record<string, number> = {};
+  for (const r of all) {
+    const b = stars[r.star_id];
+    out[r.id] = r.star_id === from || !a || !b ? 0 : Math.round(Math.hypot(a[1] - b[1], a[2] - b[2], a[3] - b[3]) * KIT.mailSecondsPerLy);
+  }
+  return out;
 }
