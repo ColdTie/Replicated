@@ -82,16 +82,22 @@ try {
     const s = window.__scene, st = window.__session.store, n = s.npcs[1];
     const key = `${s.planet.star}:${s.planet.planetIndex}`;
     st.db.planets[key] ??= { star_id: s.planet.star, planet_index: s.planet.planetIndex, seed: 1, embers: 0, data: {} };
-    st.db.planets[key].data.awayQueue = [{ id: n.data.id, name: n.data.name, at: Date.now(), song: 'I dug alone in the quiet.', actions: [{ type: 'dig', kind: 'archive', name: 'Quiet', size: 'small', beside: 'Entrance', direction: 'east', purpose: 'For letters.' }, { type: 'note', body: 'x' }] }];
+    st.db.planets[key].data.awayQueue = [
+      { id: n.data.id, name: n.data.name, at: Date.now(), song: 'I dug alone in the quiet.', actions: [{ type: 'dig', kind: 'archive', name: 'Quiet', size: 'small', beside: 'Entrance', direction: 'east', purpose: 'For letters.' }, { type: 'note', body: 'x' }] },
+      // placed on the saved warren by the mind function already (applied): told, never placed twice
+      { id: n.data.id, name: n.data.name, at: Date.now() + 1, actions: [{ type: 'dig', applied: true, kind: 'rest', name: 'Hollow', size: 'small' }, { type: 'furnish', applied: true, item: 'rest', room: 'Hollow', forId: n.data.id }, { type: 'dig', applied: true, failed: true, name: 'Nowhere' }] },
+    ];
     const q = await st.takeMindQueue(s.planet.star, s.planet.planetIndex);
     const again = await st.takeMindQueue(s.planet.star, s.planet.planetIndex);
     const rooms0 = s.warren.data.rooms.length;
     s.replayAway(q);
-    return { taken: q.length, again: again.length, rooms: s.warren.data.rooms.length - rooms0, log: s.mindLog.slice(-2).map((e) => e.text) };
+    return { taken: q.length, again: again.length, rooms: s.warren.data.rooms.length - rooms0, log: s.mindLog.slice(-4).map((e) => e.text) };
   });
   log('away', JSON.stringify(away));
-  if (away.taken !== 1 || away.again !== 0) fail('the away queue was not taken exactly once');
-  if (away.rooms !== 1) fail('the away dig was not played out');
+  if (away.taken !== 2 || away.again !== 0) fail('the away queue was not taken exactly once');
+  if (away.rooms !== 1) fail('the away dig was not played out (or an applied one was placed again)');
+  if (!away.log.some((t) => t.includes('marked out Hollow')) || !away.log.some((t) => t.includes('resting station'))) fail('applied away deeds were not told');
+  if (away.log.some((t) => t.includes('Nowhere'))) fail('a failed away deed was told');
   await page.waitForFunction(() => !!window.__scene.npcs[1].bubble, null, { timeout: 20000 }).catch(() => fail('the away song was never sung'));
 
   // 5. a Spark awakens a copy: a profile in its name, its row active, the copy gone from the planet

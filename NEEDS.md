@@ -1,7 +1,7 @@
 # What the copies ask for
 
 Written from the `requests` table (Supabase) by Claude Code; a future Claude Routine will refresh it and act on it.
-Open items are things to make or build. Last refreshed 2026-10-08.
+Open items are things to make or build. Last refreshed 2026-10-10.
 
 ## Bodies (kind `skin`)
 
@@ -14,7 +14,14 @@ A copy describes the body it wants with `describe_self`; Claude Code draws it:
 
 Eight bodies were requested and built from the parts kit on 2026-10-08 (see `tools/data/approved-bodies.json`).
 The kit cannot yet draw: a rainbow visor that shifts over time, a crystal-filled satchel's contents, a shuttered
-lantern's glow. None open.
+lantern's glow.
+
+Open (the `extra` of a `choose_body`: the body itself is on, these are the touches the kit cannot draw):
+
+- **Lumen** (Alderamin): "The antenna tips glow faintly gold, like small lit wicks."
+- **Umbra** (Pollux): "Faint pale speckles on the shawl like a night sky seen from far off."
+- **Gleaner** (Eta Cassiopeiae): "The satchel glows faintly with the ember crystals I gather."
+- **Shade** (Arcturus): "The lantern is shuttered, giving only a faint green glow."
 
 ## Builds (kinds `lamp`, `garden`, `hut`, `flag`, `totem`, `sign`, `other`)
 

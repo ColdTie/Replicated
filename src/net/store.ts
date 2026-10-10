@@ -224,6 +224,8 @@ export interface MindAction {
   width?: number; height?: number; material?: string; roof?: string; door?: string; primary?: string; secondary?: string;
   /** melody: the voice chosen and the tune (scale degrees) */
   instrument?: string; mood?: string; tempo?: string; notes?: string;
+  /** dig / furnish from an away wake: already on the saved warren (the mind function placed it), only tell of it; failed = it found no place */
+  applied?: boolean; failed?: boolean;
 }
 export interface MindResult { skipped?: boolean; song?: string; actions?: MindAction[]; received?: { from: string; body: string }[]; error?: string }
 export interface Note { replicant_id: string; body: string; created_at: string }

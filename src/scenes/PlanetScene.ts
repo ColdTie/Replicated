@@ -1245,7 +1245,13 @@ export class PlanetScene extends Phaser.Scene {
       if (it.became) log(`${it.name} became itself: it is ${name} now`);
       for (const a of it.actions ?? []) {
         const later = (ms: number, f: () => void) => this.time.delayedCall(ms, () => { if (this.npcs.includes(npc) && !npc.below) f(); });
-        if (a.type === 'dig') this.warren.dig(npc, a);
+        if (a.applied) {
+          // the away wake put it on the saved warren itself (it loaded with the planet): only say so
+          if (a.failed) continue;
+          if (a.type === 'dig') log(`${name} marked out ${a.name ?? 'a room'} in the warren`);
+          else if (a.type === 'furnish') log(a.item === 'rest' ? `${name} made a resting station${a.forId && a.forId !== npc.data.id ? ` for ${this.npcs.find((n) => n.data.id === a.forId)?.data.name ?? 'someone'}` : ''} in ${a.room ?? 'the warren'}` : `${name} put a ${a.item ?? 'thing'} in ${a.room ?? 'the warren'}`);
+        }
+        else if (a.type === 'dig') this.warren.dig(npc, a);
         else if (a.type === 'furnish') this.warren.furnish(npc, a);
         else if (a.type === 'building') this.buildings.propose(npc, a);
         else if (a.type === 'cut') later(5000 + k * 4000, () => this.cutTree(npc));
@@ -1258,7 +1264,8 @@ export class PlanetScene extends Phaser.Scene {
         else if (a.type === 'melody') log(`${name} found its voice on the ${a.instrument}`);
       }
       if (it.song) this.time.delayedCall(8000 + k * 7000, () => { if (this.npcs.includes(npc) && !npc.below) npc.sing(it.song!, hear); });
-      k++;
+      // the pass's own entries (a room dug, a bed made) have no song and are not a wake
+      if (it.song || it.became) k++;
     }
     if (k) this.game.events.emit('notice', `WHILE YOU WERE AWAY ${k} ${k === 1 ? 'COPY' : 'COPIES'} WOKE`);
   }
