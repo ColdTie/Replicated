@@ -853,5 +853,10 @@ whether they keep it or get to choose again (then the mind's `choose_body` is op
   `playtest-warren.mjs`, `playtest-become.mjs` pass with no errors. `deno check` needs a copy of the function
   folder with a `deno.json` of `{"nodeModulesDir":"none"}` beside it (the repo's package.json otherwise makes Deno
   look for node_modules); Deno is not a project dependency.
+- Live (function v13, the pass fired by hand right after the deploy): every far world moved at once. Vigil got its
+  Watchroom and a bed, Shade its Dimroom, Vesper and Umbra their Stillrooms, Hearth its Ember Nook, Gleaner and
+  Hollow share Hearth; Regulus's seven queued digs became Stillroom (dug, three beds), Nest, Dimhollow and
+  Gathering, and Nightglean woke into it and marked its sleeping-room want done. Earth was skipped (being played).
+  The deployed `warren.ts` differs from the repo copy only by the final newline.
 - Open body requests (kit cannot draw): Lumen's glowing antenna tips, Umbra's speckled shawl, Gleaner's glowing
   satchel, Shade's shuttered lantern (`NEEDS.md`).
