@@ -33,6 +33,7 @@ import type { AwayItem, Building, DoorState, MindContext, NodeState, PlanetData,
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
+import { TOWN_LAYOUT, TOWN_TUNING, assignHomes, birthOrder, migrateToTown, nextFreeLot, occupiedLots, type Lot, type TownState } from '../world/town';
 import { TRAVEL, distanceLy, fuelFor, planetFor, starById, travelMs } from '../world/galaxy';
 import type { StarMapData } from './StarMapScene';
 
@@ -122,7 +123,11 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState } = { embers: 0, nodes: {}, doors: {} };
+  /** who lives on which lot of the town (planet_states.data.town) */
+  townState: TownState = { lots: {}, civic: {} };
+  /** this load moved an old save into the town: saved positions of the player and the copies are ignored once */
+  private migrated = false;
   private replicating = false;
   /** Hologram visit while the replicant's ship is flying elsewhere: no position saves, no launching */
   visit: { star: string; planetIndex: number } | null = null;
@@ -168,6 +173,8 @@ export class PlanetScene extends Phaser.Scene {
     // the scene object is reused between planets: drop the old player so update() waits for the new world
     this.player = undefined as unknown as Player;
     this.pending = { embers: 0, nodes: {}, doors: {} };
+    this.townState = { lots: {}, civic: {} };
+    this.migrated = false;
   }
 
   async preloadSave(): Promise<PlanetSave | null> {
@@ -228,12 +235,15 @@ export class PlanetScene extends Phaser.Scene {
   }
 
   private build(save: PlanetSave | null, npcRows: ReplicantSave[] = []) {
+    npcRows = birthOrder(npcRows);
     session.planet = save;
     const p = this.planet;
     const { width, height } = this.scale;
     this.map = generatePlanet(p, this.seed ?? p.seed);
     const m = this.map;
     const pw = m.w * 16, ph = m.h * 16;
+    npcRows = this.withScreenshotCopies(npcRows);
+    this.settleTown(save, npcRows);
     this.embers = save?.embers ?? 0;
     this.supplies = { ...(save?.data.supplies ?? {}) };
     this.awayHours = 0;
@@ -246,8 +256,11 @@ export class PlanetScene extends Phaser.Scene {
 
     // Floor: one painted image for the whole planet (src/world/groundPaint.ts); the tilemap keeps water and walls
     // (the walls layer also holds invisible collision over the void)
-    this.addPaintedGround(p.id, this.seed ?? p.seed);
+    const tPaint0 = performance.now(); // TEMP-TIMING
+    this.addPaintedGround(p.id, this.seed ?? p.seed, save?.data.buildings);
+    const tPaint1 = performance.now(); // TEMP-TIMING
     this.addPaintedRock(p.id, this.seed ?? p.seed);
+    (window as unknown as { __paintMs: number[] }).__paintMs = [tPaint1 - tPaint0, performance.now() - tPaint1]; // TEMP-TIMING
     const tm = this.make.tilemap({ tileWidth: 16, tileHeight: 16, width: m.w, height: m.h });
     const ts = tm.addTilesetImage('tiles', tex('tiles', p.id), 16, 16, 0, 0)!;
     const waterOnly = m.ground.map((row, y) => row.map((t, x) => (m.cells[y * m.w + x] === Cell.Water ? t : -1)));
@@ -363,8 +376,9 @@ export class PlanetScene extends Phaser.Scene {
     const r = session.replicant;
     const awake = !!r?.traits.awake;
     const saved = r && r.star_id === p.star && r.planet_index === p.planetIndex && r.pos_x != null && r.pos_y != null
-      && this.isWalkable(r.pos_x, r.pos_y) ? { x: r.pos_x, y: r.pos_y! } : null;
-    const start = saved ?? this.home;
+      && this.isWalkable(r.pos_x, r.pos_y) && !this.migrated ? { x: r.pos_x, y: r.pos_y! } : null;
+    // just moved into the town: the replicant stands by the vessel (its old spot belongs to the old layout)
+    const start = saved ?? (this.migrated ? { x: b.vessel.x + 20, y: b.vessel.y + 18 } : this.home);
     this.player = new Player(this, start.x, start.y);
     this.reflection = this.add.image(0, 0, this.player.sprite.texture.key).setOrigin(0.5, 0).setFlipY(true)
       .setAlpha(0.3).setTint(0x9ab8ff).setDepth(DEPTH.ground + 3).setVisible(false);
@@ -421,8 +435,9 @@ export class PlanetScene extends Phaser.Scene {
     return z;
   }
 
-  private addPaintedGround(styleId: string, seed: number) {
-    const g = paintGround(this.map, styleId, seed);
+  private addPaintedGround(styleId: string, seed: number, buildings?: Building[]) {
+    // the streets are worn as far out as someone lives; a footpath leads to every home and building
+    const g = paintGround(this.map, styleId, seed, occupiedLots(this.map.town, this.townState, buildings));
     const key = 'floor';
     if (this.textures.exists(key)) this.textures.remove(key);
     const ct = this.textures.createCanvas(key, g.width, g.height)!;
@@ -774,7 +789,7 @@ export class PlanetScene extends Phaser.Scene {
     // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
     if (this.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
     if (p.npcTick !== undefined) this.npcTickAt = Date.now();
-    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && p.npcTick === undefined) return;
+    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && !p.town && !p.layout && p.npcTick === undefined) return;
     this.pending = { embers: 0, nodes: {}, doors: {} };
     this.saving = true;
     try {
@@ -789,6 +804,8 @@ export class PlanetScene extends Phaser.Scene {
       if (p.supplies) data.supplies = p.supplies;
       if (p.buildings) data.buildings = p.buildings;
       if (p.label) { data.label = p.label; data.biome = p.biome; }
+      if (p.town) data.town = p.town;
+      if (p.layout) data.layout = p.layout;
       const row = await st.applyPlanetDelta(this.planet.star, this.planet.planetIndex, p.embers, data);
       if (row) {
         this.embers = row.embers + this.pending.embers;
@@ -809,6 +826,7 @@ export class PlanetScene extends Phaser.Scene {
       this.pending.supplies ??= p.supplies;
       this.pending.buildings ??= p.buildings;
       this.pending.label ??= p.label; this.pending.biome ??= p.biome;
+      this.pending.town ??= p.town; this.pending.layout ??= p.layout;
     } finally {
       this.saving = false;
     }
@@ -828,9 +846,15 @@ export class PlanetScene extends Phaser.Scene {
     this.game.events.emit('embers', this.embers, true);
   }
 
-  treesNearBase() {
-    const base = this.baseCenter;
-    return this.trees.filter((t) => t.alive && Math.hypot(t.x - base.x, t.y - base.y) < 240).length;
+  /** Trees a copy may cut for wood: near the base or near its own home (the town itself is kept clear of trees). */
+  private woodTrees(npc?: Npc) {
+    const base = this.baseCenter, home = npc?.home;
+    return this.trees.filter((t) => t.alive && (Math.hypot(t.x - base.x, t.y - base.y) < TOWN_TUNING.woodRadiusPx
+      || (!!home && Math.hypot(t.x - home.x, t.y - home.y) < TOWN_TUNING.woodHomeRadiusPx)));
+  }
+
+  treesNearBase(npc?: Npc) {
+    return this.woodTrees(npc).length;
   }
 
   /** Material icons arc from where they were won to the hatch (or the Replicator) and join the supplies. */
@@ -1119,6 +1143,11 @@ export class PlanetScene extends Phaser.Scene {
     const row = replicate(parent, this.planet.star, this.planet.planetIndex, bx, by);
     this.time.delayedCall(1700, () => {
       const npc = new Npc(this, { ...row, id: 'pending' }, bx, by);
+      // its home: the next free lot, recorded under its id once the row is saved
+      const lotIndex = nextFreeLot(this.map.town, this.townState, 'home');
+      const lot = lotIndex >= 0 ? this.map.town.lots[lotIndex] : undefined;
+      npc.home = lot ? { ...lot.yard } : undefined;
+      if (lot) this.townState.lots[npc.data.id] = lotIndex;
       this.npcs.push(npc);
       this.announceLocation();
       this.warren.refreshHatch();
@@ -1130,7 +1159,11 @@ export class PlanetScene extends Phaser.Scene {
       });
       const st = session.store;
       if (st && !this.shot) {
-        st.createReplicant(row).then((saved) => { Object.assign(npc.data, saved); })
+        st.createReplicant(row).then((saved) => {
+          const lotIndex = this.townState.lots.pending;
+          Object.assign(npc.data, saved);
+          if (lotIndex !== undefined) { delete this.townState.lots.pending; this.townState.lots[saved.id] = lotIndex; this.markTown(); }
+        })
           .catch((e) => console.warn('copy save failed', e));
         this.pending.npcTick ??= Date.now();
       }
@@ -1146,28 +1179,75 @@ export class PlanetScene extends Phaser.Scene {
     this.tweens.add({ targets: t, alpha: 0, delay: 2200, duration: 600, onComplete: () => t.destroy() });
   }
 
-  private spawnNpcs(rows: ReplicantSave[], save: PlanetSave | null) {
-    // screenshots: ?copies=3 shows made-up copies
+  /** Screenshots: ?copies=3 shows made-up copies, already themselves (a body from the kit, a visor color, a name). */
+  private withScreenshotCopies(rows: ReplicantSave[]) {
     const fake = Number(new URLSearchParams(location.search).get('copies') ?? 0);
-    if (this.shot && fake && session.replicant) {
-      let parent = session.replicant;
-      const kit = kitLists();
-      const at = <T>(a: T[], k: number) => a[k % a.length];
-      for (let i = 0; i < fake; i++) {
-        const r = { ...replicate(parent, this.planet.star, this.planet.planetIndex, 0, 0), id: `fake${i}` } as ReplicantSave;
-        // already themselves: a body from the kit, a visor color, a name
-        const body = { head: at(kit.head, i * 5 + 1), visor: at(kit.visor, i * 3), torso: at(kit.torso, i * 2 + 1), arms: at(kit.arms, i), legs: at(kit.legs, i * 2), back: at(kit.back, i + 1), headgear: (i * 2 + 1) % 7, primary: at(kit.colors, i * 7 + 2), secondary: at(kit.colors, i * 11 + 5), accent: at(kit.colors, i * 13 + 8) };
-        r.traits = { ...r.traits, blank: false, body, feature: at(kit.visorLights, i + 1), trail: kit.colorIndex[body.accent], gear: body.headgear };
-        r.name = at(['Ash', 'Wren', 'Pip', 'Moth', 'Ferro', 'Lark'], i);
-        rows.push(r);
-        parent = r;
-      }
+    if (!this.shot || !fake || !session.replicant) return rows;
+    rows = [...rows];
+    let parent = session.replicant;
+    const kit = kitLists();
+    const at = <T>(a: T[], k: number) => a[k % a.length];
+    for (let i = 0; i < fake; i++) {
+      const r = { ...replicate(parent, this.planet.star, this.planet.planetIndex, 0, 0), id: `fake${i}` } as ReplicantSave;
+      const body = { head: at(kit.head, i * 5 + 1), visor: at(kit.visor, i * 3), torso: at(kit.torso, i * 2 + 1), arms: at(kit.arms, i), legs: at(kit.legs, i * 2), back: at(kit.back, i + 1), headgear: (i * 2 + 1) % 7, primary: at(kit.colors, i * 7 + 2), secondary: at(kit.colors, i * 11 + 5), accent: at(kit.colors, i * 13 + 8) };
+      r.traits = { ...r.traits, blank: false, body, feature: at(kit.visorLights, i + 1), trail: kit.colorIndex[body.accent], gear: body.headgear };
+      r.name = at(['Ash', 'Wren', 'Pip', 'Moth', 'Ferro', 'Lark'], i);
+      rows.push(r);
+      parent = r;
     }
+    return rows;
+  }
+
+  /**
+   * The town: a save from before it (no layout) moves into it once (every build onto its builder's lot, buildings onto
+   * civic lots, the hatch into the square, old-world indexes reset), written back through the usual delta; then every
+   * copy without a lot gets the next free one, in birth order.
+   */
+  private settleTown(save: PlanetSave | null, rows: ReplicantSave[]) {
+    const town = this.map.town;
+    const ids = rows.map((r) => r.id);
+    const data = save?.data;
+    if (data && (data.layout ?? 0) < TOWN_LAYOUT) {
+      const oldNodes = Object.keys(data.nodes ?? {});
+      const res = migrateToTown(data, town, ids, this.map.base.pad);
+      this.migrated = true;
+      const p = this.pending;
+      p.layout = TOWN_LAYOUT;
+      p.structures = data.structures ?? [];
+      if (data.buildings) p.buildings = structuredClone(data.buildings);
+      if (data.warren) p.warren = structuredClone(data.warren);
+      p.felled = [];
+      for (const k of oldNodes) p.nodes[k] = { hits: 0, at: 0 };
+      if (res.stray.length) console.warn('town: no place for', res.stray.join(', '));
+      console.info(`town: moved ${res.moved} builds and ${data.buildings?.length ?? 0} buildings into the town (layout ${TOWN_LAYOUT})`);
+    }
+    this.townState = structuredClone(data?.town ?? { lots: {}, civic: {} });
+    if (assignHomes(town, this.townState, ids).length || this.migrated) this.markTown();
+  }
+
+  /** Town assignments changed: write them with the next flush. */
+  markTown() {
+    this.pending.town = structuredClone(this.townState);
+  }
+
+  /** The lot a copy lives on (undefined when the town is full). */
+  homeLot(id: string): Lot | undefined {
+    const i = this.townState.lots[id];
+    return i === undefined ? undefined : this.map.town.lots[i];
+  }
+
+  private spawnNpcs(rows: ReplicantSave[], save: PlanetSave | null) {
     const c = this.map.base.center;
     rows.forEach((r, i) => {
+      const lot = this.homeLot(r.id);
       let x = r.pos_x ?? 0, y = r.pos_y ?? 0;
-      if (!x || !this.isWalkable(x, y)) { x = c.x - 30 + (i % 3) * 30; y = c.y + 50 + Math.floor(i / 3) * 18; }
-      this.npcs.push(new Npc(this, r, x, y));
+      // at home when the saved spot is no good, or belongs to the layout before the town
+      if (!x || !this.isWalkable(x, y) || this.migrated) {
+        if (lot) { x = lot.yard.x + (i % 2 ? 8 : -8); y = lot.yard.y; } else { x = c.x - 30 + (i % 3) * 30; y = c.y + 50 + Math.floor(i / 3) * 18; }
+      }
+      const npc = new Npc(this, r, x, y);
+      npc.home = lot ? { ...lot.yard } : undefined;
+      this.npcs.push(npc);
     });
     this.setupMinds();
     // Embers the copies gathered while nobody was here
@@ -1282,8 +1362,7 @@ export class PlanetScene extends Phaser.Scene {
     const me = session.replicant;
     const mine: Record<string, number> = {};
     for (const s of this.village.structures) if (s.by === npc.data.id) mine[s.type] = (mine[s.type] ?? 0) + 1;
-    const base = this.baseCenter;
-    const treesNear = this.trees.filter((t) => t.alive && Math.hypot(t.x - base.x, t.y - base.y) < 200).length;
+    const treesNear = this.treesNearBase(npc);
     const wd = this.warren.data;
     const nameOf = (id: string) => this.npcs.find((n) => n.data.id === id)?.data.name ?? this.everyone.find((r) => r.id === id)?.name ?? (id === me?.id ? me.name : 'someone');
     return {
@@ -1446,9 +1525,7 @@ export class PlanetScene extends Phaser.Scene {
 
   /** A copy clears the nearest standing tree near the base: walks over, swings, the tree falls (and its timber goes to the hatch). */
   cutTree(npc: Npc) {
-    const base = this.baseCenter;
-    const tree = this.trees
-      .filter((t) => t.alive && Math.hypot(t.x - base.x, t.y - base.y) < 240)
+    const tree = this.woodTrees(npc)
       .sort((a, b) => Math.hypot(a.x - npc.x, a.y - npc.y) - Math.hypot(b.x - npc.x, b.y - npc.y))[0];
     if (!tree) return false;
     return npc.startChore({

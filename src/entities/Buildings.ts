@@ -1,5 +1,5 @@
-// Surface buildings the copies design (design_building) and raise together. A proposal is placed on clear ground
-// around the base and waits for the original's word (journal: approve / veto; after autoApproveMinutes it goes
+// Surface buildings the copies design (design_building) and raise together. A proposal is placed on a free civic lot
+// of the town (src/world/town.ts; else a home lot nobody lives on) and waits for the original's word (journal: approve / veto; after autoApproveMinutes it goes
 // ahead anyway). The first copy to join pays its material; every copy that joins adds hammer blows to one shared
 // progress, and the building rises row by row (src/world/buildingPaint.ts draws it from its blueprint). Saved in
 // planet_states.data.buildings; blueprints share the warren's shape so a building can get an interior later.
@@ -11,6 +11,7 @@ import type { Light } from '../fx/Lighting';
 import type { Building, MindAction } from '../net/store';
 import type { PlanetScene } from '../scenes/PlanetScene';
 import { paintBuilding, roofHeight } from '../world/buildingPaint';
+import { buildingSpot, lotForBuilding } from '../world/town';
 import type { Npc } from './Npc';
 
 interface Placed { b: Building; sprite: Phaser.GameObjects.Image; light?: Light; glow?: Phaser.GameObjects.Image; solid?: Phaser.GameObjects.Zone; height: number }
@@ -73,24 +74,9 @@ export class Buildings {
     }
   }
 
-  /** A clear footprint in the ring around the base, away from the base's own things. */
-  private findSpot(w: number, h: number): { x: number; y: number } | null {
-    const base = this.scene.baseCenter;
-    const avoid = [base, this.scene.replicatorSpot, this.scene.vesselPos, this.scene.warren.hatch];
-    const pw = w * 16 + 10, ph = h * 8 + 10;
-    let best: { x: number; y: number; score: number } | null = null;
-    for (let i = 0; i < 80; i++) {
-      const a = Math.random() * Math.PI * 2, r = BUILDINGS.ringMin + Math.random() * (BUILDINGS.ringMax - BUILDINGS.ringMin);
-      const x = Math.round(base.x + Math.cos(a) * r), y = Math.round(base.y + 10 + Math.sin(a) * r * 0.7);
-      if (!this.scene.isClear(x, y, pw, ph)) continue;
-      if (avoid.some((p) => Math.hypot(p.x - x, p.y - y) < 44 + w * 6)) continue;
-      if (this.scene.nodes.some((n) => n.alive && Math.hypot(n.x - x, n.y - y) < 20 + w * 8)) continue;
-      if (this.list.some((o) => !o.vetoed && Math.abs(o.x - x) < (o.w + w) * 8 + 8 && Math.abs(o.y - y) < (o.h + h) * 4 + 12)) continue;
-      const near = this.list.filter((o) => !o.vetoed).map((o) => Math.hypot(o.x - x, o.y - y));
-      const score = (near.length ? -Math.min(...near) : 0) - r * 0.3 + Math.random() * 10;
-      if (!best || score > best.score) best = { x, y, score };
-    }
-    return best;
+  /** A free lot for a building: a civic lot of the town, else a home lot nobody lives on (-1: the town is full). */
+  private findLot() {
+    return lotForBuilding(this.scene.map.town, this.scene.townState);
   }
 
   /** design_building: the copy's blueprint, placed; null when nothing fits. */
@@ -98,8 +84,9 @@ export class Buildings {
     const [minW, minH] = BUILDINGS.minFootprint, [maxW, maxH] = BUILDINGS.maxFootprint;
     const w = Math.max(minW, Math.min(maxW, Math.round(Number(a.width) || 3))), h = Math.max(minH, Math.min(maxH, Math.round(Number(a.height) || 2)));
     const material = a.material && a.material in BUILDINGS.materials ? a.material : 'wood';
-    const spot = this.findSpot(w, h);
-    if (!spot) return null;
+    const lotIndex = this.findLot();
+    if (lotIndex < 0) return null;
+    const spot = buildingSpot(this.scene.map.town.lots[lotIndex]);
     const cost: Record<string, number> = { [material]: Math.ceil(w * h * (BUILDINGS.materials as Record<string, { perTile: number }>)[material].perTile) };
     const b: Building = {
       id: `b${Date.now().toString(36)}${this.list.length}`, name: (a.name ?? 'Shelter').replace(/[^A-Za-z' -]/g, '').trim().slice(0, 18) || 'Shelter',
@@ -109,6 +96,8 @@ export class Buildings {
       approved: !!kind, progress: 0, built: false, helpers: [], cost, paid: false, at: Date.now(), ...(kind ? { kind } : {}),
     };
     this.list.push(b);
+    this.scene.townState.civic[b.id] = lotIndex;
+    this.scene.markTown();
     this.place(b, false);
     this.save();
     if (kind) {
@@ -136,6 +125,9 @@ export class Buildings {
     const b = this.list.find((x) => x.id === id);
     if (!b || b.built) return;
     b.vetoed = true;
+    // its lot is free again
+    delete this.scene.townState.civic[b.id];
+    this.scene.markTown();
     const p = this.placed.get(id);
     if (p) { p.sprite.destroy(); p.light && this.scene.lighting.remove(p.light); p.glow?.destroy(); p.solid?.destroy(); this.placed.delete(id); }
     this.save();
