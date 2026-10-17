@@ -1,5 +1,5 @@
 {
-  "_doc": "Minds of the copies (the mind Edge Function). firstWakeMs: after landing, the first copy wakes; staggerMs between copies; wakeMinutes: how often each copy wakes while you play; mailSecondsPerLy: letters cross space at this speed (same star: instant); bubbleMs: how long a song stays up; bubbleScale: song bubbles are this much smaller (padding and max width; the pixel font itself is never scaled, it drops rows). canned: what copies say when playing from this device (?local), no model involved.",
+  "_doc": "Minds of the copies (the mind Edge Function). firstWakeMs: after landing, the first copy wakes; staggerMs between copies; wakeMinutes: how often each copy wakes while you play; mailSecondsPerLy: letters cross space at this speed (same star: instant); bubbleMs: how long a song stays up; bubbleScale: song bubbles are this much smaller (padding and max width; the pixel font itself is never scaled, it drops rows). canned: what copies say when playing from this device (?local), no model involved. canned.tells / canned.answers: what the canned mind (?local, headless tests) tells the original, and answers when talked to.",
   "firstWakeMs": 6000,
   "staggerMs": 15000,
   "wakeMinutes": 4,
@@ -32,6 +32,26 @@
       "Are the stars the same where you are? Write back when the light reaches you.",
       "I found a warm stone. I am keeping it for you.",
       "The original came by today. The door still glows."
+    ],
+    "tells": [
+      "You came back. I kept the lamp by my door lit for you every night, just in case. It is a small thing, but it felt like waiting with someone.",
+      "The grazers have started sleeping by the square. I think they like the warm stones under the vessel. I wanted you to know they are safe.",
+      "I wrote to one of the far ones today and the words felt too big for the letter. Do you ever miss a place you have never been?",
+      "It rained all morning and I sat under the eaves and listened. I counted the drops until I lost count, and then I just listened. I hope it rains where you go next.",
+      "I am still learning what I am for. Some days it is mining, some days it is only watching the light change on the crystals. Both feel right.",
+      "The others laugh at how slowly I walk. I do not mind. I see more on the way.",
+      "Something in the ruins hums at night, very low. I am not afraid of it. I think it is lonely, like the stars.",
+      "Thank you for making me. I do not say it often. The days here are quiet, and I like them.",
+      "My house is small, but the window catches the dusk just right. Come and see it sometime, when you are not in a hurry.",
+      "I dreamed I was flying with you between the stars, and when I woke I was glad to be here. Is that strange?"
+    ],
+    "answers": [
+      "I heard you. I will keep it with my notes, so I remember it when the nights are long.",
+      "That makes me glad. Stay a little, if you can. The light is good right now.",
+      "I have been thinking about that too. Maybe we are more alike than either of us knows.",
+      "You always say the right thing at the wrong moment, and I love that about you. Tell me more next time.",
+      "I will carry that with me tomorrow, when I go out to the crystals.",
+      "Yes. I think so too. Thank you for coming to tell me."
     ]
   }
 }

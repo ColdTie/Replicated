@@ -1,0 +1,11 @@
+{
+  "_doc": "Talking to a copy (E, right click, gamepad Y, the touch talk button). range: px from the player to the nearest copy you can talk to. The box: margin px from the screen edges, height px, lines of prose per page, linePx between lines; text types out at charsPerSecond, holding pauseMs after punctuation. staleMinutes: a traits.tell older than this asks the copy for a fresh one when the box opens (if the mind is there). thoughts: how many notes the THOUGHTS pages show; letters: how many letters to you, and one latest received and one latest sent. blip: the copy's voice per typed letter (minGapMs between blips, seconds long, vol).",
+  "range": 34,
+  "box": { "margin": 8, "height": 90, "lines": 4, "linePx": 13 },
+  "charsPerSecond": 40,
+  "pauseMs": { ".": 200, "!": 200, "?": 200, ",": 90, ";": 110, ":": 110 },
+  "staleMinutes": 30,
+  "thoughts": 4,
+  "lettersToYou": 2,
+  "blip": { "minGapMs": 55, "seconds": 0.05, "vol": 0.022 }
+}

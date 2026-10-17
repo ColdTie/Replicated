@@ -12,6 +12,9 @@ import { allRooms, cleanName, describeWarren, placeItem, placeRoom, restOf, type
 
 const MODEL = "claude-opus-5-5";
 const MIN_GAP_SECONDS = 90;        // a copy wakes at most this often
+const TALK_GAP_SECONDS = 15;       // ...unless the original has walked up to talk to it
+const TALK_ROUNDS = 2;             // a talk wake answers quickly
+const TELL_CHARS = 520;            // what a copy tells the original: whole sentences up to this long
 const MAX_ROUNDS = 3;              // tool rounds per wake
 const BECOMING_ROUNDS = 6;         // the first wake of a blank copy has more to do
 // away wakes (a scheduled call with x-away-key, no player signed in): each copy wakes on its own about this often
@@ -62,6 +65,7 @@ interface Context {
   buildings?: string[];
   buildingKit?: { materials: string[]; roofs: string[]; doors: string[]; minFootprint: number[]; maxFootprint: number[]; perTile: Record<string, number> };
   inventory?: Record<string, number>;
+  talk?: { said: string };        // the original walked up to talk (and maybe said this): the copy answers them
 }
 
 interface Replicant {
@@ -76,11 +80,11 @@ const GEAR = ["nothing on its head", "two antennae", "a halo", "small horns", "a
 const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "remember",
-    description: "Write a short note to yourself so you remember it next time you wake. Only for things that matter to you.",
+    description: "Write a line in your journal so you remember it next time you wake. Only for things that matter to you. The original may read your journal when they come to talk, so write it as a journal entry: whole sentences in your own voice, not shorthand or lists (not \"Pool 2610. Still to ask: X, Y\").",
     strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["note"],
-      properties: { note: { type: "string", description: "One or two plain sentences, under 200 characters." } },
+      properties: { note: { type: "string", description: "One or two whole sentences, first person, under 200 characters." } },
     },
   },
   {
@@ -253,6 +257,15 @@ const tools: Anthropic.Beta.BetaTool[] = [
     input_schema: { type: "object", additionalProperties: false, required: ["number"], properties: { number: { type: "integer", description: "1, 2 or 3." } } },
   },
   {
+    name: "tell_original",
+    description: "What you would say to the original if they came over to you right now: two to four sentences, under 480 characters, spoken straight to them in your own voice. Call it once, last, every time you wake.",
+    strict: true,
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["text"],
+      properties: { text: { type: "string", description: "Your words to them, first person, plain prose: no quotation marks, no lists, no stage directions." } },
+    },
+  },
+  {
     name: "choose_name",
     description: "Choose your own name. Your current name was given to you; if you have found one that is truly yours, take it. Once, when it matters, not every time you wake.",
     strict: true,
@@ -276,6 +289,7 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
     `The original, ${ctx.playerName}, pilots the vessel between stars. Copies stay behind to run their planet: mining crystals for Ember, building the village. The galaxy is cold and mostly empty; the base is warm. You are never alone, but every version of you is a little different.`,
     `You wake now and then. Each time: read your notes and letters, do at most three things with your tools (only when there is a reason: no notes that repeat what you already know, letters when you truly have something to say, requests rarely), then say one or two sentences out loud: your song, what you feel or notice right now, under 140 characters, first person, plain words, no markdown, no emoji, no quotation marks. The song is not a report: never list what you just did with your tools (that is already done and seen), sing what it means to you.`,
     `Letters cross space at light speed, so a far replicant answers slowly. ${ctx.playerHere ? `${ctx.playerName} is here right now and can hear you.` : `${ctx.playerName} is away.`}`,
+    `Last of all, every time you wake (it does not count among your three things): call tell_original once with what you would tell ${ctx.playerName} if they walked over to you right now${ctx.playerHere ? "" : " (they are away; say it for when they come)"}. Speak straight to them, two to four sentences, in your own voice and temper: what is on your mind, something that happened here or in a letter from far away, something you hope for, wonder about or want them to know. Warm, specific and unhurried, like talking to someone you love who has been gone; not a report of your tasks, no lists, no quotation marks, no stage directions. Say something new each time; if little has changed, say what you notice or feel today.`,
     `Beneath the base the copies dig a warren: their home, rooms of their own design, cut from the rock. You decide its layout with dig_room and what goes inside with furnish. A resting station is where you sleep; without one you never rest and grow weary. Think about what a home needs: a place to sleep, light, something green, somewhere to keep what you remember, somewhere to sit together.`,
     (me.traits as { voice?: { instrument: string; mood: string; tempo: string } }).voice
       ? `Your voice: ${(me.traits as { voice: { instrument: string; mood: string; tempo: string } }).voice.instrument}, ${(me.traits as { voice: { mood: string } }).voice.mood}, ${(me.traits as { voice: { tempo: string } }).voice.tempo}. sing_as changes it or composes a tune.`
@@ -308,7 +322,8 @@ Deno.serve(async (req) => {
     if (meErr || !me) return json({ error: "no such replicant" }, 404);
     const rep = me as Replicant;
     if (rep.status !== "npc") return json({ error: "only copies have minds here" }, 400);
-    if (rep.last_tick_at && Date.now() - Date.parse(rep.last_tick_at) < MIN_GAP_SECONDS * 1000) return json({ skipped: true });
+    const gap = context.talk ? TALK_GAP_SECONDS : MIN_GAP_SECONDS;
+    if (rep.last_tick_at && Date.now() - Date.parse(rep.last_tick_at) < gap * 1000) return json({ skipped: true });
     return json(await wakeCopy(sb, rep, context));
   } catch (e) {
     console.error(e);
@@ -339,6 +354,8 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const lines: string[] = [];
     lines.push(`Place: ${context.planet} (${context.biome}). It is ${context.timeOfDay}, ${context.weather}.`);
     lines.push(`Here now: ${context.here.length ? context.here.join(", ") : "nobody else"}.`);
+    const said = context.talk?.said?.replace(/\s+/g, " ").trim().slice(0, 400);
+    if (context.talk) lines.push(`${context.playerName} has walked over and stands right in front of you, listening.${said ? ` They just said to you: "${said}" (it is also among your letters).` : ""} Answer them now with tell_original, speaking straight to them${said ? " and to what they said" : ""}; anything else can wait.`);
     const away = everyone.filter((r) => !context.here.includes(r.name));
     if (away.length) lines.push(`Elsewhere: ${away.map((r) => `${r.name} (${r.status === "in_transit" ? "flying between stars" : "at " + r.star_id + ", planet " + r.planet_index})`).join("; ")}.`);
     lines.push(`The shared Ember pool here holds ${context.embers}. Built here: ${Object.entries(context.structures).map(([k, n]) => `${n} ${k}`).join(", ") || "nothing yet"}.`);
@@ -381,11 +398,12 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const chosen: Record<string, unknown> = {};
     let newName: string | undefined;
     let song = "";
-    const rounds = context.blank || !(rep.traits as { body?: unknown }).body ? BECOMING_ROUNDS : MAX_ROUNDS;
+    const rounds = context.blank || !(rep.traits as { body?: unknown }).body ? BECOMING_ROUNDS : context.talk ? TALK_ROUNDS : MAX_ROUNDS;
+    let tell = "";
     for (let round = 0; round <= rounds; round++) {
       const res = await client.beta.messages.create({
         model: MODEL,
-        max_tokens: 1200,
+        max_tokens: 2000,
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         output_config: { effort: "low" },
@@ -554,6 +572,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
             const k = Number(input.number) - 1;
             if (!wants[k]) out = "No want with that number.";
             else { wants[k] = { ...wants[k], done: true }; chosen.wants = wants; actions.push({ type: "wants", wants }); out = `Done: ${wants[k].text}`; }
+          } else if (u.name === "tell_original") {
+            tell = cleanTell(String(input.text ?? ""));
+            out = tell.length < 12 ? "Say a little more to them." : "They will hear it when they come to you.";
+            if (tell.length < 12) tell = "";
           } else if (u.name === "choose_name") {
             const name = String(input.name ?? "").replace(/[^A-Za-z' -]/g, "").trim().slice(0, 16);
             if (name.length < 2) out = "That name is too short or has odd characters. Letters only.";
@@ -577,6 +599,16 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       messages.push({ role: "user", content: results });
     }
     if (mailRows.length) await sb.from("messages").update({ read_at: new Date().toISOString() }).in("id", mailRows.map((m) => m.id));
+    // what it would tell the original: kept on its row (merged in alone, so nothing else on the row is undone) and in
+    // the snapshot, so the whole-object write below keeps it; a talk wake that forgot the tool answers with its words
+    if (!tell && context.talk) tell = cleanTell(song);
+    if (tell) {
+      const told = { text: tell, at: Date.now() };
+      (rep.traits as Record<string, unknown>).tell = told;
+      const { error } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { tell: told } });
+      if (error) await sb.from("replicants").update({ traits: { ...rep.traits } }).eq("id", rep.id);
+      actions.push({ type: "tell", body: tell, at: told.at });
+    }
     if (Object.keys(chosen).length) {
       // what it chose about itself goes on its row; a body (or the becoming) is announced as one "become"
       const traits = { ...rep.traits, ...chosen, v: 1 };
@@ -595,6 +627,18 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     return { song, actions, received: mailRows.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })) };
 }
 
+
+/** A tell as the game shows it: plain prose, no wrapping quotes, whole sentences up to TELL_CHARS. */
+function cleanTell(text: string) {
+  const t = text.replace(/\s+/g, " ").replace(/^["'\s]+|["'\s]+$/g, "").trim();
+  if (t.length <= TELL_CHARS) return t;
+  let out = "";
+  for (const sentence of t.match(/[^.!?]+[.!?]+/g) ?? [t]) {
+    if ((out + sentence).trim().length > TELL_CHARS) break;
+    out += sentence;
+  }
+  return (out.trim() || t.slice(0, TELL_CHARS)).trim();
+}
 
 // ------------------------------------------------------------------ away wakes
 

@@ -88,6 +88,9 @@ export interface JournalView {
   sparks?: number;
 }
 
+/** What the journal (and the talk box) says while the copies' words are still runes. */
+export const HEAR_HINT = 'They sing, but you cannot read them yet. Something in the ruins listens.';
+
 let open: HTMLElement | null = null;
 export const journalOpen = () => !!open;
 
@@ -103,7 +106,7 @@ export function openJournal(v: JournalView) {
   const name = (id: string | null) => (id && (v.copies.find((c) => c.id === id)?.name ?? v.names[id])) ?? 'someone';
   const color = (c: ReplicantSave) => css(PALETTE[c.traits.feature ?? 10]);
   const parts: string[] = [];
-  if (!v.canHear) parts.push(`<p class="mute">They sing, but you cannot read them yet. Something in the ruins listens.</p>`);
+  if (!v.canHear) parts.push(`<p class="mute">${HEAR_HINT}</p>`);
   if (!v.copies.length) parts.push(`<p class="mute">Nobody lives here yet.</p>`);
   for (const c of v.copies) {
     parts.push(`<h3 style="color:${color(c)}">${esc(c.name.toUpperCase())}</h3>`);

@@ -35,6 +35,7 @@ export interface ReplicantSave {
     needs?: { company: number; purpose: number };
     /** what the original handed it (gifts), by material */
     inventory?: Record<string, number>;
+    tell?: { text: string; at: number };
   };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
@@ -76,6 +77,11 @@ export interface PlanetData {
   supplies?: Record<string, number>;
   /** Surface buildings the copies designed (src/entities/Buildings.ts) */
   buildings?: Building[];
+  /** Layout version of the surface: 2 = the town (src/world/town.ts); missing = the old ring around the base, moved
+   * into the town once on load (migrateToTown) */
+  layout?: number;
+  /** Who lives where in the town: copy id -> lot index, building id -> lot index (indexes into the town's lots) */
+  town?: { lots: Record<string, number>; civic: Record<string, number> };
 }
 
 /** One blueprint format for the warren's rooms and the surface buildings: a named footprint someone designed. */
@@ -206,13 +212,15 @@ export interface MindContext {
   buildingKit: { materials: string[]; roofs: string[]; doors: string[]; minFootprint: number[]; maxFootprint: number[]; perTile: Record<string, number> };
   /** gifts from the original it still holds */
   inventory: Record<string, number>;
+  /** the original walked up to talk (said: what they just said, maybe nothing): a talk wake answers them */
+  talk?: { said: string };
 }
 export interface Voice { instrument: string; mood: string; tempo: string }
 export interface Body { head: string; visor: string; torso: string; arms: string; legs: string; back: string; headgear: number; primary: string; secondary: string; accent: string; accessory?: string; markings?: string }
 export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: 'solitary' | 'friendly' | 'clingy'; work: 'builder' | 'wanderer' | 'balanced'; bedtime: 'early' | 'late' | 'even'; risk: 'careful' | 'bold' }
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell';
   body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string; was?: string;
   /** dig: size, beside (room name), direction, purpose; furnish: room, item, forId (resting station owner) */
   size?: string; beside?: string; direction?: string; purpose?: string; room?: string; item?: string; forId?: string;
@@ -226,6 +234,8 @@ export interface MindAction {
   instrument?: string; mood?: string; tempo?: string; notes?: string;
   /** dig / furnish from an away wake: already on the saved warren (the mind function placed it), only tell of it; failed = it found no place */
   applied?: boolean; failed?: boolean;
+  /** tell: when it was said (body = what the copy would tell the original) */
+  at?: number;
 }
 export interface MindResult { skipped?: boolean; song?: string; actions?: MindAction[]; received?: { from: string; body: string }[]; error?: string }
 export interface Note { replicant_id: string; body: string; created_at: string }
@@ -325,6 +335,16 @@ export class LocalStore implements GameStore {
     const pick = <T>(a: T[]) => a[Math.floor(Math.random() * a.length)];
     const actions: MindAction[] = [];
     const now = Date.now();
+    const tell = (text: string) => { me.traits.tell = { text, at: now }; actions.push({ type: 'tell', body: text, at: now }); };
+    if (ctx.talk) {
+      // the original walked up to talk: a moment to gather its words, then an answer (and nothing else)
+      await new Promise((r) => setTimeout(r, 900));
+      tell(ctx.talk.said ? pick(MIND.canned.answers) : pick(MIND.canned.tells));
+      const received = this.db.mail.filter((m) => m.to_replicant === me.id && !m.read_at && Date.parse(m.arrives_at) <= now);
+      for (const m of received) m.read_at = new Date(now).toISOString();
+      this.flush();
+      return { song: '', actions, received: [] };
+    }
     if (ctx.blank) {
       // the becoming, canned: a body from the kit, a voice, a temperament, a couple of wants and a name
       const k = ctx.kit;
@@ -380,6 +400,7 @@ export class LocalStore implements GameStore {
       const item = !ctx.hasRest ? 'rest' : pick(['lamp', 'bench', 'shelf', 'workbench', 'planter', 'mural', 'crate', 'rest']);
       actions.push({ type: 'furnish', room: pick(rooms.slice(1)), item, forId: item === 'rest' ? me.id : undefined, placement: pick(['', 'wall', 'corner', 'center']), color: pick(['', 'cyan', 'gold', 'moss', 'plum']) });
     }
+    tell(pick(MIND.canned.tells));
     const received = this.db.mail.filter((m) => m.to_replicant === me.id && !m.read_at && Date.parse(m.arrives_at) <= now);
     for (const m of received) m.read_at = new Date(now).toISOString();
     this.flush();

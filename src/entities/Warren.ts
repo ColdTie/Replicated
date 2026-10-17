@@ -1,4 +1,4 @@
-// The warren at runtime: the hole by the vessel the first copy digs, which copy goes down to dig or to rest, how
+// The warren at runtime: the hole in a corner of the town square the first copy digs, which copy goes down to dig or to rest, how
 // far each dig has come, the planet's supplies (stone, soil, wood, scrap; Ember is the pool) and the
 // save. The copies decide the layout themselves (their minds call dig_room / furnish; the canned mind does too);
 // this turns those decisions into rooms (src/world/warren.ts), pays for them in wood, stone and the rest
@@ -80,21 +80,9 @@ export class Warren {
   get planned() { return this.data.rooms.filter((r) => !r.dug); }
   get supplies() { return this.scene.supplies; }
 
-  /** A clear patch a few tiles from the vessel for the way down, kept for good once chosen. */
+  /** The way down: the hatch spot in a corner of the town square (src/world/town.ts), out of every walking line. */
   private findHatchSpot() {
-    const v = this.scene.vesselPos, c = this.scene.baseCenter;
-    const tries = [[46, 24], [-46, 24], [56, 6], [-56, 6], [42, 44], [-42, 44], [0, 52], [64, 30], [-64, 30]];
-    for (let i = 0; i < 80; i++) {
-      const [ox, oy] = i < tries.length ? tries[i] : [(Math.random() - 0.5) * 180, (Math.random() - 0.3) * 90];
-      const x = Math.round(v.x + ox), y = Math.round(v.y + oy);
-      if (!this.scene.isClear(x, y, 36, 22)) continue;
-      const r = this.scene.replicatorSpot;
-      if (Math.hypot(x - r.x, y - r.y) < 36 || Math.hypot(x - v.x, y - v.y) < 36 || Math.hypot(x - c.x, y - c.y) < 30) continue;
-      if (Math.abs(x - v.x) < 22 && y > v.y && y < v.y + 30) continue; // the boarding ring
-      if (this.scene.nodes.some((n) => n.alive && Math.hypot(n.x - x, n.y - y) < 26)) continue;
-      return { x, y };
-    }
-    return { x: Math.round(v.x + 46), y: Math.round(v.y + 24) };
+    return { ...this.scene.map.town.hatch };
   }
 
   /** Nothing until a copy lives here; then the mark, the pit, the open hole. */
@@ -296,7 +284,7 @@ export class Warren {
       return null;
     }
     const wood = Math.floor(this.supplies.wood ?? 0);
-    const canCut = this.scene.treesNearBase() > 0 && this.clock > (this.nextWood.get(npc) ?? 0);
+    const canCut = this.scene.treesNearBase(npc) > 0 && this.clock > (this.nextWood.get(npc) ?? 0);
     const cut = () => { this.nextWood.set(npc, this.clock + 45_000); return { task: 'wood' } as WarrenTask; };
     // rooms that open off a dug room: the warren grows out from the ladder, never as islands
     const dug = new Set(['entrance', ...this.data.rooms.filter((r) => r.dug).map((r) => r.id)]);
@@ -364,7 +352,7 @@ export class Warren {
         this.refreshHatch();
         this.scene.fx.dust(h.x, h.y + 2, 12);
         if (Math.hypot(this.scene.player.x - h.x, this.scene.player.y - h.y) < 240) sound.build();
-        this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} dug the way down into the warren, by the vessel` });
+        this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} dug the way down into the warren, in a corner of the square` });
         if (this.scene.canHear()) this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} DUG THE WAY DOWN`);
       },
     });

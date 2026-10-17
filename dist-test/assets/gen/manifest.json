@@ -1,0 +1,1116 @@
+{
+  "sprites": {
+    "beacon": {
+      "frameWidth": 32,
+      "frameHeight": 48,
+      "frames": 3,
+      "animations": {
+        "lit": {
+          "fps": 2,
+          "frames": [
+            1,
+            2
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "beacon.png"
+      }
+    },
+    "bird": {
+      "frameWidth": 8,
+      "frameHeight": 8,
+      "frames": 4,
+      "animations": {
+        "sit": {
+          "fps": 2,
+          "frames": [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "repeat": -1
+        },
+        "fly": {
+          "fps": 14,
+          "frames": [
+            2,
+            3
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "bird.png"
+      }
+    },
+    "butterfly": {
+      "frameWidth": 5,
+      "frameHeight": 5,
+      "frames": 2,
+      "animations": {
+        "fly": {
+          "fps": 10,
+          "frames": [
+            0,
+            1
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "butterfly.png"
+      }
+    },
+    "core": {
+      "frameWidth": 10,
+      "frameHeight": 8,
+      "frames": 3,
+      "animations": {
+        "pulse": {
+          "fps": 6,
+          "frames": [
+            0,
+            1,
+            2,
+            1
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "core.png"
+      }
+    },
+    "cradle": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 2,
+      "animations": {},
+      "tinted": true,
+      "files": {
+        "earth": "cradle.earth.png",
+        "solace": "cradle.solace.png",
+        "verdant": "cradle.verdant.png",
+        "frost": "cradle.frost.png",
+        "dune": "cradle.dune.png",
+        "spore": "cradle.spore.png",
+        "ember": "cradle.ember.png",
+        "moon": "cradle.moon.png"
+      }
+    },
+    "crystal": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "animations": {},
+      "tinted": true,
+      "files": {
+        "earth": "crystal.earth.png",
+        "solace": "crystal.solace.png",
+        "verdant": "crystal.verdant.png",
+        "frost": "crystal.frost.png",
+        "dune": "crystal.dune.png",
+        "spore": "crystal.spore.png",
+        "ember": "crystal.ember.png",
+        "moon": "crystal.moon.png"
+      }
+    },
+    "decor": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 13,
+      "animations": {},
+      "tinted": true,
+      "files": {
+        "earth": "decor.earth.png",
+        "solace": "decor.solace.png",
+        "verdant": "decor.verdant.png",
+        "frost": "decor.frost.png",
+        "dune": "decor.dune.png",
+        "spore": "decor.spore.png",
+        "ember": "decor.ember.png",
+        "moon": "decor.moon.png"
+      }
+    },
+    "flag": {
+      "frameWidth": 16,
+      "frameHeight": 24,
+      "frames": 3,
+      "animations": {
+        "wave": {
+          "fps": 5,
+          "frames": [
+            0,
+            1,
+            2,
+            1
+          ]
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "flag.png"
+      }
+    },
+    "garden": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 2,
+      "animations": {
+        "sway": {
+          "fps": 2,
+          "frames": [
+            0,
+            1
+          ]
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "garden.png"
+      }
+    },
+    "gear": {
+      "frameWidth": 16,
+      "frameHeight": 12,
+      "frames": 7,
+      "animations": {},
+      "tinted": false,
+      "files": {
+        "*": "gear.png"
+      }
+    },
+    "grazer": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 7,
+      "animations": {
+        "idle": {
+          "fps": 2,
+          "frames": [
+            0,
+            0,
+            0,
+            1,
+            1,
+            0
+          ],
+          "repeat": -1
+        },
+        "walk": {
+          "fps": 8,
+          "frames": [
+            2,
+            3,
+            4,
+            5
+          ],
+          "repeat": -1
+        },
+        "happy": {
+          "fps": 1,
+          "frames": [
+            6
+          ],
+          "repeat": 0
+        }
+      },
+      "tinted": true,
+      "files": {
+        "earth": "grazer.earth.png",
+        "solace": "grazer.solace.png",
+        "verdant": "grazer.verdant.png",
+        "frost": "grazer.frost.png",
+        "dune": "grazer.dune.png",
+        "spore": "grazer.spore.png",
+        "ember": "grazer.ember.png",
+        "moon": "grazer.moon.png"
+      }
+    },
+    "guardian": {
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 14,
+      "animations": {
+        "sleep": {
+          "fps": 1,
+          "frames": [
+            0,
+            1
+          ],
+          "repeat": -1
+        },
+        "idle": {
+          "fps": 2,
+          "frames": [
+            2,
+            3
+          ],
+          "repeat": -1
+        },
+        "walk": {
+          "fps": 6,
+          "frames": [
+            4,
+            5,
+            6,
+            7
+          ],
+          "repeat": -1
+        },
+        "windup": {
+          "fps": 1,
+          "frames": [
+            8
+          ],
+          "repeat": 0
+        },
+        "charge": {
+          "fps": 10,
+          "frames": [
+            9,
+            10
+          ],
+          "repeat": -1
+        },
+        "slamUp": {
+          "fps": 1,
+          "frames": [
+            11
+          ],
+          "repeat": 0
+        },
+        "slamDown": {
+          "fps": 1,
+          "frames": [
+            12
+          ],
+          "repeat": 0
+        },
+        "stunned": {
+          "fps": 1,
+          "frames": [
+            13
+          ],
+          "repeat": 0
+        }
+      },
+      "tinted": true,
+      "files": {
+        "earth": "guardian.earth.png",
+        "solace": "guardian.solace.png",
+        "verdant": "guardian.verdant.png",
+        "frost": "guardian.frost.png",
+        "dune": "guardian.dune.png",
+        "spore": "guardian.spore.png",
+        "ember": "guardian.ember.png",
+        "moon": "guardian.moon.png"
+      }
+    },
+    "hatch": {
+      "frameWidth": 32,
+      "frameHeight": 24,
+      "frames": 4,
+      "animations": {},
+      "tinted": true,
+      "files": {
+        "earth": "hatch.earth.png",
+        "solace": "hatch.solace.png",
+        "verdant": "hatch.verdant.png",
+        "frost": "hatch.frost.png",
+        "dune": "hatch.dune.png",
+        "spore": "hatch.spore.png",
+        "ember": "hatch.ember.png",
+        "moon": "hatch.moon.png"
+      }
+    },
+    "heart": {
+      "frameWidth": 7,
+      "frameHeight": 6,
+      "frames": 1,
+      "animations": {},
+      "tinted": false,
+      "files": {
+        "*": "heart.png"
+      }
+    },
+    "hopper": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "animations": {
+        "idle": {
+          "fps": 3,
+          "frames": [
+            0,
+            1
+          ],
+          "repeat": -1
+        },
+        "crouch": {
+          "fps": 1,
+          "frames": [
+            2
+          ],
+          "repeat": 0
+        },
+        "air": {
+          "fps": 1,
+          "frames": [
+            3
+          ],
+          "repeat": 0
+        }
+      },
+      "tinted": true,
+      "files": {
+        "earth": "hopper.earth.png",
+        "solace": "hopper.solace.png",
+        "verdant": "hopper.verdant.png",
+        "frost": "hopper.frost.png",
+        "dune": "hopper.dune.png",
+        "spore": "hopper.spore.png",
+        "ember": "hopper.ember.png",
+        "moon": "hopper.moon.png"
+      }
+    },
+    "hut": {
+      "frameWidth": 32,
+      "frameHeight": 20,
+      "frames": 1,
+      "animations": {},
+      "tinted": false,
+      "files": {
+        "*": "hut.png"
+      }
+    },
+    "lamp": {
+      "frameWidth": 16,
+      "frameHeight": 24,
+      "frames": 2,
+      "animations": {
+        "flicker": {
+          "fps": 7,
+          "frames": [
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            0
+          ]
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "lamp.png"
+      }
+    },
+    "module": {
+      "frameWidth": 12,
+      "frameHeight": 12,
+      "frames": 4,
+      "animations": {},
+      "tinted": false,
+      "files": {
+        "*": "module.png"
+      }
+    },
+    "pad": {
+      "frameWidth": 32,
+      "frameHeight": 16,
+      "frames": 3,
+      "animations": {
+        "ready": {
+          "fps": 4,
+          "frames": [
+            1,
+            2
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "pad.png"
+      }
+    },
+    "player": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 14,
+      "animations": {
+        "idle": {
+          "fps": 5,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "repeat": -1
+        },
+        "walk": {
+          "fps": 12,
+          "frames": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "repeat": -1
+        },
+        "attack": {
+          "fps": 20,
+          "frames": [
+            10,
+            11,
+            12
+          ],
+          "repeat": 0
+        },
+        "hurt": {
+          "fps": 1,
+          "frames": [
+            13
+          ],
+          "repeat": 0
+        }
+      },
+      "tinted": false,
+      "files": {
+        "f10": "player.f10.png",
+        "f18": "player.f18.png",
+        "f12": "player.f12.png",
+        "f28": "player.f28.png",
+        "f9": "player.f9.png",
+        "f11": "player.f11.png",
+        "f17": "player.f17.png",
+        "f8": "player.f8.png"
+      },
+      "featured": true,
+      "anchors": [
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          6
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          9,
+          6
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          6,
+          6
+        ]
+      ]
+    },
+    "replicant": {
+      "frameWidth": 16,
+      "frameHeight": 20,
+      "frames": 14,
+      "animations": {
+        "idle": {
+          "fps": 5,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "repeat": -1
+        },
+        "walk": {
+          "fps": 12,
+          "frames": [
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "repeat": -1
+        },
+        "attack": {
+          "fps": 20,
+          "frames": [
+            10,
+            11,
+            12
+          ],
+          "repeat": 0
+        },
+        "hurt": {
+          "fps": 1,
+          "frames": [
+            13
+          ],
+          "repeat": 0
+        }
+      },
+      "tinted": false,
+      "files": {
+        "f10": "replicant.f10.png",
+        "f18": "replicant.f18.png",
+        "f12": "replicant.f12.png",
+        "f28": "replicant.f28.png",
+        "f9": "replicant.f9.png",
+        "f11": "replicant.f11.png",
+        "f17": "replicant.f17.png",
+        "f8": "replicant.f8.png"
+      },
+      "featured": true,
+      "anchors": [
+        [
+          8,
+          5
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          8,
+          6
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          7,
+          5
+        ],
+        [
+          9,
+          5
+        ],
+        [
+          8,
+          5
+        ],
+        [
+          7,
+          5
+        ]
+      ]
+    },
+    "replicator": {
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 2,
+      "animations": {
+        "idle": {
+          "fps": 3,
+          "frames": [
+            0,
+            1
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "replicator.png"
+      }
+    },
+    "shard": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "animations": {
+        "twinkle": {
+          "fps": 6,
+          "frames": [
+            0,
+            0,
+            1,
+            2,
+            3,
+            0,
+            0,
+            0
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "shard.png"
+      }
+    },
+    "sign": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 3,
+      "animations": {},
+      "tinted": false,
+      "files": {
+        "*": "sign.png"
+      }
+    },
+    "skitter": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "animations": {
+        "walk": {
+          "fps": 10,
+          "frames": [
+            0,
+            1
+          ],
+          "repeat": -1
+        },
+        "windup": {
+          "fps": 14,
+          "frames": [
+            2,
+            3
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": true,
+      "files": {
+        "earth": "skitter.earth.png",
+        "solace": "skitter.solace.png",
+        "verdant": "skitter.verdant.png",
+        "frost": "skitter.frost.png",
+        "dune": "skitter.dune.png",
+        "spore": "skitter.spore.png",
+        "ember": "skitter.ember.png",
+        "moon": "skitter.moon.png"
+      }
+    },
+    "slash": {
+      "frameWidth": 24,
+      "frameHeight": 24,
+      "frames": 3,
+      "animations": {
+        "slash": {
+          "fps": 24,
+          "frames": [
+            0,
+            1,
+            2
+          ],
+          "repeat": 0
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "slash.png"
+      }
+    },
+    "spark": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "animations": {
+        "twinkle": {
+          "fps": 6,
+          "frames": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "spark.png"
+      }
+    },
+    "spitter": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 4,
+      "animations": {
+        "idle": {
+          "fps": 2,
+          "frames": [
+            0,
+            1
+          ],
+          "repeat": -1
+        },
+        "windup": {
+          "fps": 12,
+          "frames": [
+            2,
+            3
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": true,
+      "files": {
+        "earth": "spitter.earth.png",
+        "solace": "spitter.solace.png",
+        "verdant": "spitter.verdant.png",
+        "frost": "spitter.frost.png",
+        "dune": "spitter.dune.png",
+        "spore": "spitter.spore.png",
+        "ember": "spitter.ember.png",
+        "moon": "spitter.moon.png"
+      }
+    },
+    "spore": {
+      "frameWidth": 6,
+      "frameHeight": 6,
+      "frames": 2,
+      "animations": {
+        "spin": {
+          "fps": 10,
+          "frames": [
+            0,
+            1
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "spore.png"
+      }
+    },
+    "supplies": {
+      "frameWidth": 8,
+      "frameHeight": 8,
+      "frames": 7,
+      "animations": {},
+      "tinted": false,
+      "files": {
+        "*": "supplies.png"
+      }
+    },
+    "talkhint": {
+      "frameWidth": 11,
+      "frameHeight": 7,
+      "frames": 1,
+      "animations": {},
+      "tinted": false,
+      "files": {
+        "*": "talkhint.png"
+      }
+    },
+    "tiles": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 22,
+      "animations": {},
+      "tinted": true,
+      "files": {
+        "earth": "tiles.earth.png",
+        "solace": "tiles.solace.png",
+        "verdant": "tiles.verdant.png",
+        "frost": "tiles.frost.png",
+        "dune": "tiles.dune.png",
+        "spore": "tiles.spore.png",
+        "ember": "tiles.ember.png",
+        "moon": "tiles.moon.png"
+      }
+    },
+    "totem": {
+      "frameWidth": 16,
+      "frameHeight": 24,
+      "frames": 1,
+      "animations": {},
+      "tinted": false,
+      "files": {
+        "*": "totem.png"
+      }
+    },
+    "tower": {
+      "frameWidth": 32,
+      "frameHeight": 48,
+      "frames": 2,
+      "animations": {},
+      "tinted": true,
+      "files": {
+        "earth": "tower.earth.png",
+        "solace": "tower.solace.png",
+        "verdant": "tower.verdant.png",
+        "frost": "tower.frost.png",
+        "dune": "tower.dune.png",
+        "spore": "tower.spore.png",
+        "ember": "tower.ember.png",
+        "moon": "tower.moon.png"
+      }
+    },
+    "tree": {
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 3,
+      "animations": {
+        "sway": {
+          "fps": 2,
+          "frames": [
+            0,
+            1
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": true,
+      "files": {
+        "earth": "tree.earth.png",
+        "solace": "tree.solace.png",
+        "verdant": "tree.verdant.png",
+        "frost": "tree.frost.png",
+        "dune": "tree.dune.png",
+        "spore": "tree.spore.png",
+        "ember": "tree.ember.png",
+        "moon": "tree.moon.png"
+      }
+    },
+    "vessel": {
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 2,
+      "animations": {
+        "idle": {
+          "fps": 2,
+          "frames": [
+            0,
+            1
+          ],
+          "repeat": -1
+        }
+      },
+      "tinted": false,
+      "files": {
+        "*": "vessel.png"
+      }
+    },
+    "warren": {
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 9,
+      "animations": {},
+      "tinted": true,
+      "files": {
+        "earth": "warren.earth.png",
+        "solace": "warren.solace.png",
+        "verdant": "warren.verdant.png",
+        "frost": "warren.frost.png",
+        "dune": "warren.dune.png",
+        "spore": "warren.spore.png",
+        "ember": "warren.ember.png",
+        "moon": "warren.moon.png"
+      }
+    }
+  },
+  "font": {
+    "file": "font.png",
+    "width": 6,
+    "height": 8,
+    "chars": "0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ.,!?-:/'+x%"
+  },
+  "fonts": {
+    "prose": {
+      "file": "font-prose.png",
+      "width": 6,
+      "height": 11,
+      "chars": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .,!?-:;'\"()[]/\\|%+=&*#<>^~_@",
+      "widths": [
+        4,
+        3,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        5,
+        5,
+        5,
+        5,
+        4,
+        4,
+        5,
+        5,
+        3,
+        4,
+        5,
+        4,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        4,
+        4,
+        4,
+        4,
+        4,
+        3,
+        4,
+        4,
+        1,
+        3,
+        4,
+        2,
+        5,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        3,
+        4,
+        5,
+        5,
+        4,
+        4,
+        4,
+        3,
+        1,
+        2,
+        1,
+        4,
+        3,
+        1,
+        2,
+        1,
+        3,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        1,
+        5,
+        3,
+        3,
+        5,
+        3,
+        5,
+        3,
+        3,
+        3,
+        5,
+        4,
+        5,
+        3,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "spacing": 1
+    },
+    "pixel": {
+      "file": "font.png",
+      "width": 6,
+      "height": 8,
+      "chars": "0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ.,!?-:/'+x%"
+    }
+  }
+}

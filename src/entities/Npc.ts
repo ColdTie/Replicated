@@ -1,10 +1,12 @@
-// A copy left behind to run the planet. It wanders the base, mines nearby crystals, carries Embers back to the
-// Replicator, and greets you when you come close. Its drift (visor, headgear, trail) tells it apart at a glance.
+// A copy left behind to run the planet. It lives on its own lot in the town (src/world/town.ts), strolls around its
+// home and its street, mines crystals near home, carries Embers back to the Replicator, and greets you when you come
+// close. Its drift (visor, headgear, trail) tells it apart at a glance.
 import Phaser from 'phaser';
 import { sound, type Instrument, type Mood, type Tempo } from '../audio/Sound';
 import { anim } from '../core/assets';
 import { bodyFor, ensureBodyTexture, kitColor } from '../core/body';
 import { BUILDINGS, MIND, NEEDS, PALETTE, PLAYER, SUPPLIES, VILLAGE, WARREN } from '../core/data';
+import { TOWN_TUNING, surfaceRoute } from '../world/town';
 import { DRIFT, stat } from '../core/drift';
 import { session } from '../core/session';
 import type { Light } from '../fx/Lighting';
@@ -16,7 +18,7 @@ import type { BelowTask } from './Warren';
 import type { WarrenRoom } from '../net/store';
 import { squash, type Player } from './Player';
 
-type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below' | 'blank' | 'visit';
+type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below' | 'blank' | 'visit' | 'talk';
 /** Something a copy decided to do with its hands: walk there, swing a few times, then it happens. */
 interface Chore { x: number; y: number; swings: number; swing: () => void; done: () => void }
 type Pt = { x: number; y: number };
@@ -49,6 +51,12 @@ export class Npc {
   private visitWith?: Npc;
   /** hop height, added on top of the walking position */
   z = 0;
+  /** where it lives: the yard of its lot in the town (px); strolls and crystal trips start from here */
+  home?: Pt;
+  /** a way round something in the way (waypoints over open ground) toward `routeFor` */
+  private route: Pt[] | null = null;
+  private routeFor: Pt | null = null;
+  private reroutes = 0;
   /** 0 rested .. 1 weary: climbs while awake, cleared by a sleep in a resting station */
   weary = 0;
   /** company and purpose: 0 empty .. 1 full (src/data/needs.json); rest is 1 - weary. They do not eat or drink. */
@@ -252,7 +260,7 @@ export class Npc {
     // say hello when you come close: turn, hop, chirp (a solitary copy waits for you to come closer)
     const soc = this.temper?.sociability;
     const greetAt = soc === 'solitary' ? 18 : soc === 'clingy' ? 44 : 30;
-    if (dp < greetAt && time > this.nextGreet && p.alive && this.state !== 'mine') {
+    if (dp < greetAt && time > this.nextGreet && p.alive && this.state !== 'mine' && this.state !== 'talk') {
       this.nextGreet = time + (soc === 'solitary' ? 34_000 : soc === 'clingy' ? 11_000 : 20_000);
       this.state = 'greet';
       this.until = time + 900;
@@ -273,6 +281,11 @@ export class Npc {
         break;
       case 'walk':
       case 'carry':
+        // going to be with someone: follow them if they have moved on
+        if (this.seek?.who && this.target) {
+          const w = this.seek.who, to = { x: w.x + (this.x < w.x ? -14 : 14), y: w.y + 2 };
+          if (Math.hypot(to.x - this.target.x, to.y - this.target.y) > 20 && this.scene.isWalkable(to.x, to.y)) this.target = to;
+        }
         if (this.target && this.walkTo(this.target, dt)) {
           if (this.state === 'carry') this.deliver(time);
           else if (this.mineAt) { this.state = 'mine'; this.swings = 0; this.until = time; }
@@ -373,6 +386,7 @@ export class Npc {
 
   private think(time: number) {
     const base = this.scene.baseCenter;
+    const home = this.home ?? { x: base.x, y: base.y + 20 };
     // the warren first: a room waiting to be dug, or bed when it is night and there is a bed
     const down = this.scene.warren.pickTask(this, this.scene.env.night);
     if (down?.task === 'entrance') { this.scene.warren.digEntrance(this); return; }
@@ -404,38 +418,68 @@ export class Npc {
       }
       this.nextBuild = time + (work === 'builder' ? 4000 : 9000) + Math.random() * 6000;
     }
-    // time for a trip: go mine the nearest healthy crystal near the base (bold copies range further)
+    // time for a trip: go mine the nearest healthy crystal near home (bold copies range further)
     const risk = this.temper?.risk;
     const range = risk === 'bold' ? 330 : risk === 'careful' ? 150 : 220;
     if (time > this.nextTrip) {
       this.nextTrip = time + DRIFT.tripMs / stat(this.data, 'gather');
-      const node = this.scene.nodes.filter((n) => n.alive && Math.hypot(n.x - base.x, n.y - base.y) < range)
+      // stand on the open side of it (crystals like to grow against rock); one walled in on both sides is skipped
+      const standAt = (n: { x: number; y: number }) => {
+        const sides = this.x < n.x ? [-12, 12] : [12, -12];
+        const dx = sides.find((d) => this.scene.isWalkable(n.x + d, n.y + 4) && this.scene.surfaceAt(n.x + d, n.y + 4) !== 'void');
+        return dx === undefined ? null : { x: n.x + dx, y: n.y + 4 };
+      };
+      const node = this.scene.nodes.filter((n) => n.alive && Math.hypot(n.x - home.x, n.y - home.y) < range && standAt(n))
         .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))[0];
       if (node) {
         this.mineAt = { x: node.x, y: node.y };
-        this.target = { x: node.x + (this.x < node.x ? -12 : 12), y: node.y + 4 };
+        this.target = standAt(node)!;
         this.state = 'walk';
         return;
       }
     }
     this.mineAt = null;
-    const a = Math.random() * Math.PI * 2, r = (20 + Math.random() * 70) * (work === 'wanderer' ? 1.9 : 1);
-    this.target = { x: base.x + Math.cos(a) * r, y: base.y + 20 + Math.sin(a) * r * 0.6 };
+    const lot = this.scene.homeLot(this.data.id);
+    if (lot && Math.random() < TOWN_TUNING.streetStroll * (work === 'wanderer' ? 1.8 : 1)) {
+      // a stroll down its street toward the square
+      const k = Math.random(), sq = this.scene.map.town.square;
+      const to = { x: (sq.x + sq.w / 2) * 16, y: (sq.y + sq.h / 2) * 16 + 16 };
+      this.target = { x: lot.front.x + (to.x - lot.front.x) * k + (Math.random() - 0.5) * 12, y: lot.front.y + (to.y - lot.front.y) * k + (Math.random() - 0.5) * 8 };
+    } else {
+      const [lo, hi] = TOWN_TUNING.homeWander;
+      const a = Math.random() * Math.PI * 2, r = (lo + Math.random() * (hi - lo)) * (work === 'wanderer' ? 1.9 : 1);
+      this.target = { x: home.x + Math.cos(a) * r, y: home.y + Math.sin(a) * r * 0.6 };
+    }
     this.state = 'walk';
   }
 
-  /** Steps toward a point; true when arrived. Gives up (clears target) when blocked. */
+  /**
+   * Steps toward a point; true when arrived. When rock or a ruin wall is in the way it finds a way round over open
+   * ground once (src/world/town.ts surfaceRoute) and follows it; it gives up (clears target) only when there is none.
+   */
   private walkTo(t: Pt, dt: number) {
-    const dx = t.x - this.x, dy = t.y - this.y, d = Math.hypot(dx, dy);
-    if (d < 3) return true;
+    if (this.routeFor !== t) { this.route = null; this.routeFor = t; this.reroutes = 0; }
+    const goal = this.route?.[0] ?? t;
+    const dx = goal.x - this.x, dy = goal.y - this.y, d = Math.hypot(dx, dy);
+    if (d < 3) {
+      if (!this.route) return true;
+      this.route.shift();
+      if (!this.route.length) { this.route = null; return Math.hypot(t.x - this.x, t.y - this.y) < 3; }
+      return false;
+    }
     const speed = PLAYER.speed * 0.55 * stat(this.data, 'speed') * this.pace * (1 - 0.3 * this.weary);
-    const nx = this.x + (dx / d) * speed * dt / 1000, ny = this.y + (dy / d) * speed * dt / 1000;
+    const step = Math.min(d, speed * dt / 1000);
+    const nx = this.x + (dx / d) * step, ny = this.y + (dy / d) * step;
     if (this.scene.isWalkable(nx, ny) && this.scene.surfaceAt(nx, ny) !== 'void') {
       this.x = nx; this.y = ny;
       if (Math.abs(dx) > 1) this.sprite.setFlipX(dx < 0);
-    } else if (this.scene.isWalkable(nx, this.y)) this.x = nx;
-    else if (this.scene.isWalkable(this.x, ny)) this.y = ny;
-    else { this.target = null; this.mineAt = null; }
+    } else if (this.scene.isWalkable(nx, this.y) && Math.abs(nx - this.x) > 0.05) this.x = nx;
+    else if (this.scene.isWalkable(this.x, ny) && Math.abs(ny - this.y) > 0.05) this.y = ny;
+    else {
+      const way = this.reroutes < 3 ? surfaceRoute(this.scene.map, this, t) : null;
+      if (way) { this.route = way; this.reroutes++; return false; }
+      this.route = null; this.target = null; this.mineAt = null;
+    }
     return false;
   }
 
@@ -465,8 +509,8 @@ export class Npc {
   private startSeek(time: number) {
     this.nextSeek = time + NEEDS.seek.cooldownMs * (0.7 + Math.random() * 0.6);
     const hall = this.scene.buildings.gatheringSpot();
-    const others = this.scene.npcs.filter((o) => o !== this && (o.state === 'idle' || o.state === 'walk' || o.state === 'greet' || o.state === 'visit'));
     const d = (p: Pt) => Math.hypot(p.x - this.x, p.y - this.y);
+    const others = this.scene.npcs.filter((o) => o !== this && !o.below && d(o) < NEEDS.seek.reachPx && (o.state === 'idle' || o.state === 'walk' || o.state === 'greet' || o.state === 'visit'));
     const p = this.scene.player;
     let spot: Pt | null = null;
     if (hall) { spot = { x: hall.x + (Math.random() - 0.5) * 36, y: hall.y + 8 + Math.random() * 10 }; this.seek = {}; }
@@ -474,6 +518,8 @@ export class Npc {
       const who = others.sort((a, b) => d(a) - d(b))[0];
       spot = { x: who.x + (this.x < who.x ? -14 : 14), y: who.y + 2 };
       this.seek = { who };
+      // the one it goes to waits for it (homes stand a street apart)
+      who.joinVisit(this, time + NEEDS.seek.waitMs);
     } else if (p?.alive && !this.scene.visit && d(p) < 300) { spot = { x: p.x + (this.x < p.x ? -16 : 16), y: p.y + 2 }; this.seek = { player: true }; }
     if (!spot || !this.scene.isWalkable(spot.x, spot.y)) { this.seek = null; return false; }
     this.mineAt = null;
@@ -510,6 +556,8 @@ export class Npc {
 
   /** Someone lonely came over: stop and stand with it (only when not busy). */
   joinVisit(other: Npc, until: number) {
+    // already waiting for this one: it has arrived, stay as long as it does
+    if (this.state === 'visit' && this.visitWith === other) { this.until = until; return; }
     if (this.state !== 'idle' && this.state !== 'walk' && this.state !== 'greet') return;
     this.target = null; this.mineAt = null;
     if (this.job) { this.scene.village.release(this.job); this.job = null; }
@@ -532,7 +580,7 @@ export class Npc {
 
   /** Go and do something by hand (cut a tree, take a build down). Drops whatever it was doing. */
   startChore(c: Chore) {
-    if (this.state === 'born' || this.state === 'below' || this.state === 'blank') return false;
+    if (this.state === 'born' || this.state === 'below' || this.state === 'blank' || this.state === 'talk') return false;
     if (this.job) { this.scene.village.release(this.job); this.job = null; }
     if (this.carried) { this.carried.destroy(); this.carried = undefined; }
     this.mineAt = null;
@@ -553,6 +601,7 @@ export class Npc {
     if (this.job) { sc.village.release(this.job); this.job = null; }
     this.carried?.destroy(); this.carried = undefined;
     this.bubble?.destroy(); this.bubble = undefined;
+    this.talkHint?.destroy(); this.talkHint = undefined;
     this.state = 'born';
     const beam = sc.add.rectangle(this.x, this.y + 2, 10, 260, 0xffffff, 0).setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setDepth(6150);
     sc.tweens.add({ targets: beam, fillAlpha: 0.55, duration: 500, yoyo: true, hold: 900, onComplete: () => beam.destroy() });
@@ -591,6 +640,49 @@ export class Npc {
     this.nextBuild = this.scene.time.now + 3000;
     this.sync();
     this.hop();
+  }
+
+  // --- talking with the original ---
+
+  /** what it was doing when the original stopped to talk, and how long that had left */
+  private talkResume: { state: State; left: number } | null = null;
+  private talkHint?: Phaser.GameObjects.Image;
+  private hintShown = 0;
+
+  /** The original stops to talk: it leaves what it was doing as it is, turns to face them, hops and chirps. */
+  startTalk() {
+    if (this.state === 'born' || this.state === 'below' || this.state === 'blank' || this.state === 'talk') return false;
+    const now = this.scene.time.now;
+    this.talkResume = { state: this.state, left: Math.max(0, this.until - now) };
+    this.state = 'talk';
+    this.sprite.setFlipX(this.scene.player.x < this.x);
+    this.sprite.play(anim(this.key, 'idle'), true);
+    this.hop();
+    sound.pet();
+    return true;
+  }
+
+  /** The talk is over: back to exactly what it was doing (no greeting straight away). */
+  endTalk() {
+    const r = this.talkResume;
+    this.talkResume = null;
+    if (this.state !== 'talk') return;
+    const now = this.scene.time.now;
+    this.state = r?.state ?? 'idle';
+    this.until = now + (r?.left ?? 800);
+    this.nextGreet = Math.max(this.nextGreet, now + 20_000);
+  }
+
+  /** The little speech bubble over the head of the copy you can talk to, in its visor color. */
+  setTalkHint(on: boolean) {
+    if (on && !this.talkHint) {
+      this.talkHint = this.scene.add.image(0, 0, 'talkhint').setOrigin(0.5, 1).setDepth(6210).setAlpha(0);
+    }
+    if (!this.talkHint) return;
+    this.hintShown = on ? 1 : 0;
+    this.talkHint.setTint(this.data.traits.blank ? PALETTE[21] : PALETTE[this.data.traits.feature ?? 10]);
+    this.scene.tweens.killTweensOf(this.talkHint);
+    this.scene.tweens.add({ targets: this.talkHint, alpha: this.hintShown, duration: on ? 160 : 120 });
   }
 
   // --- the copy's voice ---
@@ -658,6 +750,12 @@ export class Npc {
     this.gear.sync();
     this.bubble?.setPosition(x, y - 24 - Math.round(this.z));
     this.updateBubble(this.scene.time.now);
+    if (this.talkHint) {
+      // above the head (or above its song bubble), bobbing a pixel
+      const top = this.bubble ? this.bubble.y - (this.bubble.getBounds().height || 12) - 2 : y - 23 - Math.round(this.z);
+      this.talkHint.setPosition(x + 1, top + Math.round(Math.sin(this.scene.time.now / 320)));
+      this.talkHint.setVisible(this.sprite.visible);
+    }
   }
 }
 

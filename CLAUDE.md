@@ -111,7 +111,11 @@ src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by too
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
 src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalStore (localStorage)
 src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, enemies, decor, glows,
-                         trees/towers + blockers, fixed base layout (vessel, cradle, build pad)
+                         trees/towers + blockers, fixed base layout (vessel, cradle, build pad), the town kept open
+src/world/town.ts        the town (tunables src/data/town.json): a paved square at the base (vessel, Replicator, cradle,
+                         the hatch in its corner), streets out from it, home lots along them (named build slots, two
+                         lamp posts) and civic lots for buildings; lot assignment (data.town), slotFor(), the one-time
+                         migration of older saves (migrateToTown) and surfaceRoute() for copies walking round things
 src/world/groundPaint.ts painted floor: one full-color image per planet (relief-shaded noise, soil/cover blend,
                          per-kind detail: grass blades, snow ridges, sand ripples, spore pores, glowing basalt
                          cracks, craters; pebbles, ruin slabs, wall shadows, pond banks). Styles in src/data/floor.json.
@@ -158,8 +162,13 @@ src/core/body.ts         bodyFor(): the texture for a replicant (composed and ca
 src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star, tap again for its system: planets as live globes
                          on temperature-tinted orbits, tap one to pick it), launch or look-only
 src/scenes/TravelScene   departure orbit (globe, giant behind a moon), warp, real-time cruise + ETA, visits, arrival
-src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame
+src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame (attack, dash, interact; the talk
+                         box's next/back/close/reply while it is open)
 src/ui/overlay.ts        HTML forms over the canvas (sign-in, new profile)
+src/ui/talk.ts           what a copy says when you talk to it: pages SAYS (traits.tell), THOUGHTS (journal notes),
+                         WANTS (and a feeling), LETTERS (to you first), wrapped for the box (pure; src/data/talk.json)
+src/ui/dialogue.ts       the talk box at the bottom (portrait, name, pages, typing in the copy's voice, reply line);
+                         drawn in the 'prose' font (tools/sprites/font-prose.json: mixed case with descenders)
 src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Planet (world, saving) + UI (counter, title, touch)
                          Planet <-> StarMap (overlay) -> Travel -> Planet (arrival); Home goes to Travel while in flight
 supabase/migrations/     schema applied to the "Replicated" Supabase project (keep in sync when changing the DB)
@@ -173,6 +182,9 @@ Saving: the shared Ember pool, node damage, structures (Replicator and the copie
 building work live in `planet_states` and are written as atomic deltas
 (`apply_planet_delta` RPC) every 4s and when the page is hidden; the server value wins so every profile shares one
 pool. The replicant row stores position, planet and `traits.awake` (Earth's wake-up intro plays once per replicant).
+A planet saved before the town (no `data.layout`, or below `town.json layout`) moves into it once on load: builds go to
+their builder's lot, buildings to civic lots, the hatch into the square, node damage and felled trees reset (the world
+was regenerated bigger); `data.town` keeps who lives on which lot.
 Journeys store `from_planet` / `to_planet` (migration 0006). Every table is scoped by `galaxy_id` with row level
 security; `ensure_family_galaxy()` creates the galaxy on first sign-in.
 
@@ -197,6 +209,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | state | `weary`, `sleptAt` | tiredness carried over; last sleep |
 | state | `needs` | `{ company, purpose }` 0 empty .. 1 full (`src/data/needs.json`); rest is `1 - weary`. No food or water (Steve, 2026-10-08). |
 | state | `inventory` | `{ material: count }` gifts from the original the copy still holds |
+| voice | `tell` | `{ text, at }` what it would tell the original if they came over now (`tell_original`, every wake); the talk box's first page |
 
 Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`,
 `node tools/playtest.mjs` (scripted headless playtest of the ruin puzzle, dash, combo, spore reflect, petting),
@@ -206,6 +219,10 @@ Commands: `npm run dev` (local server), `npm run build`, `npm run sprites -- --p
 `node tools/playtest-buildings.mjs` (a proposal, approval in the journal, paid and raised by three copies, talk, give),
 `node tools/playtest-together.mjs` (a lonely copy seeks company, the Meeting Hall starts itself and gathers them, a
 room is improved, an away wake plays out, a Spark awakens a copy as a player),
+`node tools/playtest-town.mjs [seed.json] [--port n] [--shots]` (an old save moves into the town once, nothing lost; the
+world is open; copies reach what they need; with a snapshot of the live data it checks the real planet),
+`node tools/playtest-talk.mjs` (the talk hint, E / right click open the box, pages, back, close, the reply line, runes,
+a blank copy, dash still on Shift, the real talk wake with the canned mind),
 `node --experimental-strip-types tools/body-preview.mjs [--random 6]` (composed bodies side by side -> `screenshots/bodies.png`),
 `node tools/fps.mjs "<query>"` (headless frame rate; software GL, only for comparing builds),
 `node tools/sim-live.mjs <seed.json> <out.json> --minutes 10` (gives planets simulated play time from a snapshot of
@@ -215,8 +232,10 @@ Saving a copy: needs, weariness, sleep and gifts go through `GameStore.patchTrai
 migration 0009), which merges only those keys, so a game left open never undoes a body, voice or name chosen since.
 
 Controls: move WASD/arrows/left stick/left-side touch drag. Attack Space/J/Enter/Z, left click, gamepad A/X/R1, tap right
-side (three quick attacks = heavy combo finisher; presses during the cooldown are buffered). Dash Shift/K/X, right click,
-gamepad B/L1/R2, swipe on the right side. M or the speaker icon (top right) mutes.
+side (three quick attacks = heavy combo finisher; presses during the cooldown are buffered). Dash Shift/K/X, gamepad
+B/L1/R2, swipe on the right side. Talk to the copy beside you (a speech mark shows over it): E, right click, gamepad Y,
+or the touch talk button; in the box E / Space / Enter / click = next, Left = back, Esc / Tab / gamepad B = close,
+R = reply (a letter it answers at once). M or the speaker icon (top right) mutes.
 
 URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
 screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond|ruin` for other spots, `&kid` for kid mode),
@@ -860,3 +879,33 @@ whether they keep it or get to choose again (then the mind's `choose_body` is op
   The deployed `warren.ts` differs from the repo copy only by the final newline.
 - Open body requests (kit cannot draw): Lumen's glowing antenna tips, Umbra's speckled shawl, Gleaner's glowing
   satchel, Shade's shuttered lantern (`NEEDS.md`).
+
+### Session 12 (2026-10-17): a town you can walk around, and residents you can talk to (Steve: "walk around a small town ... talk to a resident ... a large text box at the bottom")
+Measured first on a snapshot of the live Earth: all 38 builds sat within 125 px of the vessel (one screen), rock stopped
+you 6 to 10 tiles north of the base, 32% of points 15 to 40 tiles out needed a >30% detour, and walking south off the
+ship dropped you down the hatch.
+- **Bigger, open worlds.** Every world is about 1.4x per side (Earth 146x112) with far less rock (Earth 1.9% of land;
+  median open run from the base 46 tiles; 90th percentile detour 1.08x, none over 1.3x). Fixed counts scale with area.
+- **A town** (`src/world/town.ts`, `src/data/town.json`): a flagstone square at the base (vessel, Replicator, cradle, the
+  hatch tucked in its corner), dirt streets east, west, north and south with lamp posts, home lots along them and civic
+  lots for buildings. Every copy has a home lot (birth order, `data.town`); its builds go into named slots there (house
+  at the back, shed, gardens, flag, totem, sign, two lamps), and a full lot is the cap. Buildings take civic lots.
+  Streets are painted worn as far out as someone lives, with a footpath to each door. Copies wander around home, mine
+  from the open side of a crystal, and a lonely one's partner waits for it.
+- **Migration.** A save without `data.layout` moves into the town once on load (Earth: all 37 builds on their builders'
+  lots, the Watchtower on a civic lot, the hatch in the square, nothing lost; reload changes nothing). Node damage and
+  felled trees reset (the world was regenerated). A backup of every planet and replicant row was exported before release.
+- **Talking.** E, right click, gamepad Y or the touch talk button opens a box at the bottom (`src/ui/dialogue.ts`,
+  `src/ui/talk.ts`) in a new mixed-case pixel font (`font-prose.json`): the copy's portrait and name, typed in its own
+  voice, pages SAYS (what it wants to tell you), THOUGHTS (its journal), WANTS (and how it feels), LETTERS (to you first,
+  then from and to far copies, with their worlds). R writes a reply; it arrives as a letter and the copy answers in the
+  box. Dash moved off right click (Shift/K/X, gamepad, swipe stay).
+- **Minds speak to Steve.** New tool `tell_original` (every wake, `traits.tell`, merged in alone so nothing else on the
+  row is undone): what the copy would say if you came over now. Talking to a copy whose word is older than 30 minutes
+  (or answering a reply) runs a talk wake (`PlanetScene.requestTalk`, `context.talk`, 2 rounds, 15 s gap). Notes are
+  now asked for as journal entries in whole sentences. Canned tells/answers for `?local`.
+- Verified: build, Deno check of the function, all nine playtests (two new: `playtest-town.mjs` on the live Earth
+  snapshot, `playtest-talk.mjs`), headless frame rate up (14 -> 17 fps day, 12 -> 15 night, software GL), load about
+  0.8 s longer for twice the area. Screenshots `town-*.png`, `talk-*.png`, `font-prose.png`.
+
+Next: the first live talks will show how the model's tells read; watch that the far worlds migrate cleanly when visited.
