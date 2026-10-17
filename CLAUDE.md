@@ -879,3 +879,33 @@ whether they keep it or get to choose again (then the mind's `choose_body` is op
   The deployed `warren.ts` differs from the repo copy only by the final newline.
 - Open body requests (kit cannot draw): Lumen's glowing antenna tips, Umbra's speckled shawl, Gleaner's glowing
   satchel, Shade's shuttered lantern (`NEEDS.md`).
+
+### Session 12 (2026-10-17): a town you can walk around, and residents you can talk to (Steve: "walk around a small town ... talk to a resident ... a large text box at the bottom")
+Measured first on a snapshot of the live Earth: all 38 builds sat within 125 px of the vessel (one screen), rock stopped
+you 6 to 10 tiles north of the base, 32% of points 15 to 40 tiles out needed a >30% detour, and walking south off the
+ship dropped you down the hatch.
+- **Bigger, open worlds.** Every world is about 1.4x per side (Earth 146x112) with far less rock (Earth 1.9% of land;
+  median open run from the base 46 tiles; 90th percentile detour 1.08x, none over 1.3x). Fixed counts scale with area.
+- **A town** (`src/world/town.ts`, `src/data/town.json`): a flagstone square at the base (vessel, Replicator, cradle, the
+  hatch tucked in its corner), dirt streets east, west, north and south with lamp posts, home lots along them and civic
+  lots for buildings. Every copy has a home lot (birth order, `data.town`); its builds go into named slots there (house
+  at the back, shed, gardens, flag, totem, sign, two lamps), and a full lot is the cap. Buildings take civic lots.
+  Streets are painted worn as far out as someone lives, with a footpath to each door. Copies wander around home, mine
+  from the open side of a crystal, and a lonely one's partner waits for it.
+- **Migration.** A save without `data.layout` moves into the town once on load (Earth: all 37 builds on their builders'
+  lots, the Watchtower on a civic lot, the hatch in the square, nothing lost; reload changes nothing). Node damage and
+  felled trees reset (the world was regenerated). A backup of every planet and replicant row was exported before release.
+- **Talking.** E, right click, gamepad Y or the touch talk button opens a box at the bottom (`src/ui/dialogue.ts`,
+  `src/ui/talk.ts`) in a new mixed-case pixel font (`font-prose.json`): the copy's portrait and name, typed in its own
+  voice, pages SAYS (what it wants to tell you), THOUGHTS (its journal), WANTS (and how it feels), LETTERS (to you first,
+  then from and to far copies, with their worlds). R writes a reply; it arrives as a letter and the copy answers in the
+  box. Dash moved off right click (Shift/K/X, gamepad, swipe stay).
+- **Minds speak to Steve.** New tool `tell_original` (every wake, `traits.tell`, merged in alone so nothing else on the
+  row is undone): what the copy would say if you came over now. Talking to a copy whose word is older than 30 minutes
+  (or answering a reply) runs a talk wake (`PlanetScene.requestTalk`, `context.talk`, 2 rounds, 15 s gap). Notes are
+  now asked for as journal entries in whole sentences. Canned tells/answers for `?local`.
+- Verified: build, Deno check of the function, all nine playtests (two new: `playtest-town.mjs` on the live Earth
+  snapshot, `playtest-talk.mjs`), headless frame rate up (14 -> 17 fps day, 12 -> 15 night, software GL), load about
+  0.8 s longer for twice the area. Screenshots `town-*.png`, `talk-*.png`, `font-prose.png`.
+
+Next: the first live talks will show how the model's tells read; watch that the far worlds migrate cleanly when visited.
