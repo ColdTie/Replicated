@@ -1,9 +1,10 @@
-// Screen-space layer: ember counter, landing title card, and touch controls.
+// Screen-space layer: ember counter, landing title card, the talk box, and touch controls.
 import Phaser from 'phaser';
 import { PALETTE } from '../core/data';
 import { isKid, session } from '../core/session';
 import { touch } from '../input/Controls';
 import { sound } from '../audio/Sound';
+import { TalkBox } from '../ui/dialogue';
 
 const STICK_RADIUS = 26;
 
@@ -21,6 +22,13 @@ export class UIScene extends Phaser.Scene {
   private stickOrigin = new Phaser.Math.Vector2();
   private touchUi!: Phaser.GameObjects.Container;
   private swipes = new Map<number, { x: number; y: number; t: number; done: boolean }>();
+  /** the talk box (PlanetScene opens it, routes the buttons to it and closes it) */
+  talkBox!: TalkBox;
+  private talking = false;
+  /** touch: a small round talk button beside the action button, while a copy is in range */
+  private talkBtn!: Phaser.GameObjects.Container;
+  private talkBtnCore!: Phaser.GameObjects.Arc;
+  private talkTarget: number | null = null;
 
   constructor() { super('ui'); }
 
@@ -46,6 +54,7 @@ export class UIScene extends Phaser.Scene {
     this.game.events.on('titlecard', this.titleCard, this);
     this.game.events.on('location', this.showLocation, this);
     this.game.events.on('notice', this.notice, this);
+    this.game.events.on('talkable', this.onTalkable, this);
     (this.scene.get('planet') as unknown as { announceLocation?: () => void }).announceLocation?.(); // the planet announced before this layer existed
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('embers', this.onEmbers, this);
@@ -53,7 +62,11 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off('titlecard', this.titleCard, this);
       this.game.events.off('location', this.showLocation, this);
       this.game.events.off('notice', this.notice, this);
+      this.game.events.off('talkable', this.onTalkable, this);
     });
+    this.talkBox = new TalkBox(this);
+    this.talking = false;
+    this.talkTarget = null;
 
     // Touch controls: floating stick on the left half, big action button on the right
     this.input.addPointer(2);
@@ -66,8 +79,14 @@ export class UIScene extends Phaser.Scene {
     const glyph = this.add.image(1, 0, 'slash', 1).setScale(0.75).setAlpha(0.9);
     this.actionBtn = this.add.container(bx, by, [ring, core, glyph]);
     const hint = this.add.circle(52, height - 52, STICK_RADIUS, PALETTE[24], 0.25).setStrokeStyle(1, PALETTE[21], 0.4);
-    this.touchUi = this.add.container(0, 0, [hint, this.actionBtn]);
+    // talk: a speech mark in the copy's visor color, up and left of the action button
+    const talkRing = this.add.circle(0, 0, 13, PALETTE[24], 0.45).setStrokeStyle(1, PALETTE[21], 0.7);
+    this.talkBtnCore = this.add.circle(0, 0, 9, PALETTE[10], 0.3);
+    const talkGlyph = this.add.image(0, 1, 'talkhint');
+    this.talkBtn = this.add.container(bx - 46, by - 24, [talkRing, this.talkBtnCore, talkGlyph]).setVisible(false);
+    this.touchUi = this.add.container(0, 0, [hint, this.actionBtn, this.talkBtn]);
     this.touchUi.setVisible(this.sys.game.device.input.touch);
+    const onTalkBtn = (p: Phaser.Input.Pointer) => this.talkBtn.visible && this.touchUi.visible && Math.hypot(p.x - this.talkBtn.x, p.y - this.talkBtn.y) < 17;
 
     // Sound toggle: a tiny speaker in the top right corner (M on the keyboard)
     const speaker = this.add.graphics().setPosition(width - 16, 6).setAlpha(0.45);
@@ -90,14 +109,27 @@ export class UIScene extends Phaser.Scene {
 
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (onSpeaker(p)) { toggleSound(); return; }
-      // Mouse: left click attacks / interacts, right click dashes
+      // the talk box is open: a tap or a click turns the page (or taps REPLY), nothing else
+      if (this.talking) {
+        if (this.talkBox.hitReply(p.x, p.y)) touch.replyQueued = true;
+        else if (!p.wasTouch && p.button === 2) touch.interactQueued = true;
+        else touch.actionQueued = true;
+        return;
+      }
+      // Mouse: left click attacks / interacts, right click talks to the copy beside you
       if (!p.wasTouch) {
         if (p.button === 0) touch.actionQueued = true;
-        else if (p.button === 2) { touch.dashQueued = true; touch.dashX = 0; touch.dashY = 0; }
+        else if (p.button === 2) touch.interactQueued = true;
         return;
       }
       touch.active = true;
       this.touchUi.setVisible(true);
+      this.talkBox.replyLabel = 'REPLY';
+      if (onTalkBtn(p)) {
+        touch.interactQueued = true;
+        this.tweens.add({ targets: this.talkBtn, scale: { from: 0.8, to: 1 }, duration: 140, ease: 'Back.easeOut' });
+        return;
+      }
       // a tap on the corner label (place and who lives here) opens the journal
       if (p.x < 130 && p.y > 14 && p.y < 70) { this.game.events.emit('journal'); return; }
       if (p.x < width * 0.45 && this.stickPointer === null) {
@@ -153,6 +185,28 @@ export class UIScene extends Phaser.Scene {
     this.input.on('pointerupoutside', release);
   }
 
+  update(time: number, dt: number) {
+    this.talkBox.update(time, dt);
+  }
+
+  /** The talk box opened or closed: taps turn its pages, the touch controls step aside. */
+  setTalking(on: boolean) {
+    this.talking = on;
+    if (on) { this.stickPointer = null; touch.x = 0; touch.y = 0; this.stickBase.setVisible(false); this.stickKnob.setVisible(false); this.swipes.clear(); }
+    this.tweens.add({ targets: this.touchUi, alpha: on ? 0 : 1, duration: 160 });
+    this.onTalkable(on ? null : this.talkTarget, true);
+  }
+
+  /** A copy came into talking range (its visor color), or none is (null): the touch talk button shows or hides. */
+  private onTalkable(color: number | null, keep = false) {
+    if (!keep) this.talkTarget = color;
+    const show = color !== null && !this.talking;
+    if (show) { this.talkBtnCore.setFillStyle(color, 0.35); (this.talkBtn.list[2] as Phaser.GameObjects.Image).setTint(color); }
+    if (show === this.talkBtn.visible) return;
+    this.talkBtn.setVisible(show);
+    if (show) this.tweens.add({ targets: this.talkBtn, scale: { from: 0.6, to: 1 }, alpha: { from: 0, to: 1 }, duration: 160, ease: 'Back.easeOut' });
+  }
+
   private onEmbers(n: number, quiet = false) {
     this.counterText.setText(String(n));
     if (quiet) return;
@@ -187,7 +241,8 @@ export class UIScene extends Phaser.Scene {
   /** A short one-line notice ("STEVE GETS +20% DASH") that rises in and fades, lower middle of the screen. */
   private notice(text: string) {
     const { width, height } = this.scale;
-    const y = height * 0.72;
+    // above the talk box while it is open
+    const y = this.talking ? this.talkBox.y - 16 : height * 0.72;
     const label = this.add.bitmapText(width / 2, y + 6, 'pixel', text).setOrigin(0.5).setTint(PALETTE[11]).setAlpha(0).setDepth(20);
     const lineW = label.width / 2 + 8;
     const lines = this.add.graphics().setAlpha(0).setDepth(20);

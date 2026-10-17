@@ -1,0 +1,25 @@
+{
+  "_doc": "A tiny speech bubble over the head of the copy you can talk to (E, right click, gamepad Y). Drawn white with a dark rim and dots; the game tints it with the copy's visor color.",
+  "size": [
+    11,
+    7
+  ],
+  "tinted": false,
+  "legend": {
+    ".": null,
+    "#": 19,
+    "o": 25
+  },
+  "animations": {},
+  "frames": [
+    [
+      ".ooooooooo.",
+      "o#########o",
+      "o##o#o#o##o",
+      "o#########o",
+      ".o##oooooo.",
+      ".o#o.......",
+      "..o........"
+    ]
+  ]
+}

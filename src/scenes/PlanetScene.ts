@@ -2,7 +2,11 @@ import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
 import { BACKEND, BEACON, BUILDINGS, ENEMIES, ITEMS, MIND, PALETTE, PLANETS, PLAYER, STRUCTURES, SUPPLIES, VILLAGE, WARREN, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
-import { closeJournal, journalOpen, openJournal } from '../ui/journal';
+import { HEAR_HINT, closeJournal, journalOpen, openJournal } from '../ui/journal';
+import { openReplyInput, type TalkBox, type TalkWho } from '../ui/dialogue';
+import { composeTalk, type Exchange, type TalkPage } from '../ui/talk';
+import TALK from '../data/talk.json';
+import type { UIScene } from './UIScene';
 import { DRIFT, replicate, stat } from '../core/drift';
 import { session } from '../core/session';
 import { Base } from '../entities/Base';
@@ -15,7 +19,7 @@ import { Village } from '../entities/Village';
 import { Warren } from '../entities/Warren';
 import { Buildings } from '../entities/Buildings';
 import { allRooms, demoWarren, describeWarren, restOf } from '../world/warren';
-import { PARTS } from '../core/body';
+import { PARTS, bodyFor } from '../core/body';
 import { planetAt } from '../world/system';
 import { Player, squash } from '../entities/Player';
 import { CrystalNode, Shard, Spark } from '../entities/Resources';
@@ -28,8 +32,8 @@ import { Environment } from '../fx/Environment';
 import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
-import { Controls } from '../input/Controls';
-import type { AwayItem, Building, DoorState, MindContext, NodeState, PlanetData, PlanetSave, ReplicantSave, ReplicantSummary, WarrenData } from '../net/store';
+import { Controls, type InputFrame } from '../input/Controls';
+import type { AwayItem, Building, DoorState, Journal, MindContext, NodeState, PlanetData, PlanetSave, ReplicantSave, ReplicantSummary, WarrenData } from '../net/store';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
@@ -65,6 +69,24 @@ interface InitData {
 
 const SAVE_EVERY_MS = 4000;
 const POS_SAVE_EVERY_MS = 10000;
+
+/** An open talk with a copy: what it has loaded, what you said, what it is working on. */
+interface TalkSession {
+  npc: Npc;
+  /** your hp when it opened: a hit ends the talk */
+  hp: number;
+  name: string;
+  journal: Journal | null;
+  exchanges: Exchange[];
+  /** a fresh word is being asked of its mind (requestTalk) */
+  composing: boolean;
+  /** what it told you since the box opened (requestTalk's answer, or traits.tell from a 'tell' event) */
+  fresh: { text: string; at: number } | null;
+  /** close() of the reply input while it is open */
+  reply: (() => void) | null;
+}
+/** A frame with nothing pressed: what the player gets while the talk box has the buttons. */
+const NO_INPUT: InputFrame = { x: 0, y: 0, attack: false, dash: false, interact: false, back: false, forward: false, cancel: false, reply: false };
 
 export class PlanetScene extends Phaser.Scene {
   planet!: PlanetDef;
@@ -695,7 +717,7 @@ export class PlanetScene extends Phaser.Scene {
   update(time: number, dt: number) {
     if (!this.player) return; // still loading the save
     dt = Math.min(dt, 50) * this.slow;
-    const input = this.controls.read();
+    const input = this.routeTalk(time, this.controls.read());
     if (!this.stopped) {
       this.player.update(time, dt, input);
       if (!this.frozen) for (const e of this.enemies) e.update(time, dt);
@@ -726,7 +748,7 @@ export class PlanetScene extends Phaser.Scene {
     else this.village.update(time, 0, 0);
     this.updateVesselCue(time, dt);
     this.warren.update(dt);
-    if (time > this.hatchReadyAt && this.player.alive && !this.player.locked && !this.stopped && this.warren.playerOnHatch()) this.descend();
+    if (time > this.hatchReadyAt && this.player.alive && !this.player.locked && !this.talk && !this.stopped && this.warren.playerOnHatch()) this.descend();
     this.tickMinds(dt);
     this.watchFps(time);
     this.env.update(dt);
@@ -734,6 +756,188 @@ export class PlanetScene extends Phaser.Scene {
     this.atmosphere.update(dt);
     if (time - this.lastSaveAt > SAVE_EVERY_MS) { this.lastSaveAt = time; void this.flushPlanet(); }
     if (time - this.lastPosSaveAt > POS_SAVE_EVERY_MS) { this.lastPosSaveAt = time; void this.saveReplicant(); }
+  }
+
+  // --- talking to a copy (E, right click, gamepad Y, the touch talk button) ---
+
+  private talk: TalkSession | null = null;
+  /** the copy whose talk hint is showing */
+  private talkable: Npc | null = null;
+  private talkClosedAt = -Infinity;
+
+  private get talkBox(): TalkBox | undefined { return (this.scene.get('ui') as UIScene | null)?.talkBox; }
+
+  /** The mind's talk wake, when this build has one (PlanetScene.requestTalk): what the copy says, or null. */
+  private requestTalkFn() {
+    return (this as unknown as { requestTalk?: (n: Npc, said?: string) => Promise<string | null> }).requestTalk;
+  }
+
+  /** The copy you can talk to: the nearest one up here within reach (not being born, not below). */
+  private talkTarget(): Npc | null {
+    const p = this.player;
+    if (!p.alive || p.locked || p.isHidden || this.stopped || this.launching || this.replicating || journalOpen() || !this.talkBox) return null;
+    let best: Npc | null = null, bd = TALK.range;
+    for (const n of this.npcs) {
+      if (n.below || n.state === 'born') continue;
+      const d = Math.hypot(n.x - p.x, n.y - p.y);
+      if (d < bd) { bd = d; best = n; }
+    }
+    return best;
+  }
+
+  /**
+   * Every frame's buttons go through here first. While the talk box is open they turn its pages and the player
+   * stands still; otherwise the nearest copy in reach shows its talk hint and interact opens the box.
+   */
+  private routeTalk(time: number, raw: InputFrame): InputFrame {
+    if (this.talk) { this.updateTalk(raw); return NO_INPUT; }
+    const target = this.talkTarget();
+    if (target !== this.talkable) {
+      if (this.talkable && this.npcs.includes(this.talkable)) this.talkable.setTalkHint(false);
+      target?.setTalkHint(true);
+      this.talkable = target;
+      this.game.events.emit('talkable', target ? this.visorOf(target) : null);
+    }
+    if (raw.interact && target) { this.openTalk(target); return NO_INPUT; }
+    // the press that closed the box must not also swing, dash or board the vessel
+    if (time - this.talkClosedAt < 150) return { ...raw, attack: false, dash: false, interact: false };
+    return raw;
+  }
+
+  private visorOf(n: Npc) { return n.data.traits.blank ? PALETTE[21] : PALETTE[n.data.traits.feature ?? PLAYER.feature[1]]; }
+
+  /** A press waiting in the player's attack buffer must not fire once the talk ends. */
+  private dropAttackBuffer() { (this.player as unknown as { attackBufferedUntil: number }).attackBufferedUntil = 0; }
+
+  private openTalk(npc: Npc) {
+    const box = this.talkBox, ui = this.scene.get('ui') as UIScene;
+    if (!box) return;
+    this.talkable?.setTalkHint(false);
+    this.talkable = null;
+    this.game.events.emit('talkable', null);
+    const t: TalkSession = { npc, hp: this.player.hp, name: npc.data.name, journal: null, exchanges: [], composing: false, fresh: null, reply: null };
+    this.talk = t;
+    this.controls.modal = true;
+    this.dropAttackBuffer();
+    if (!npc.blank) npc.startTalk();
+    ui.setTalking(true);
+    box.canReply = !npc.blank && !!session.replicant && !!session.store;
+    const look = (): ReturnType<TalkWho['look']> => {
+      const l = bodyFor(this, npc.data);
+      const blank = !!npc.data.traits.blank;
+      return { key: l.key, anchors: l.anchors, gear: blank ? 0 : npc.data.traits.gear ?? 0, gearTint: npc.trailColor, model: l.model, blank };
+    };
+    box.show({ name: () => npc.data.name, color: () => this.visorOf(npc), look, seed: npc.voiceSeed, voice: () => npc.data.traits.voice }, this.talkPages());
+    this.game.events.on('tell', this.onTell, this);
+    // its notes and letters: SAYS shows at once while they load
+    session.store?.journal([npc.data.id]).then((j) => { if (this.talk === t) { t.journal = j; this.refreshTalk(); } }).catch((e) => console.warn('talk journal', e));
+    // what it last wanted to tell you is old (or there is nothing): ask its mind for a fresh word
+    const rt = this.requestTalkFn(), tell = npc.data.traits.tell;
+    if (rt && !npc.blank && (!tell || Date.now() - tell.at > TALK.staleMinutes * 60_000)) {
+      t.composing = true;
+      this.refreshTalk();
+      rt.call(this, npc).then((text) => {
+        if (this.talk !== t) return;
+        t.composing = false;
+        if (text && !t.fresh) t.fresh = { text, at: Date.now() };
+        this.refreshTalk();
+      }).catch(() => { if (this.talk === t) { t.composing = false; this.refreshTalk(); } });
+    }
+  }
+
+  /** Its mind set traits.tell (a talk wake finished): SAYS shows it. */
+  private onTell(id: string) {
+    const t = this.talk;
+    if (!t || t.npc.data.id !== id) return;
+    const tell = t.npc.data.traits.tell;
+    if (tell) t.fresh = { text: tell.text, at: tell.at };
+    t.composing = false;
+    this.refreshTalk();
+  }
+
+  private talkPages(): TalkPage[] {
+    const t = this.talk!, n = t.npc, me = session.replicant, box = this.talkBox!;
+    const who = (id: string | null) => {
+      if (!id) return { name: 'someone' };
+      if (me && id === me.id) return { name: me.name };
+      const here = this.npcs.find((x) => x.data.id === id);
+      if (here) return { name: here.data.name };
+      const r = this.everyone.find((x) => x.id === id);
+      if (!r) return { name: 'someone' };
+      if (r.star_id === this.planet.star && r.planet_index === this.planet.planetIndex) return { name: r.name };
+      const where = r.star_id === this.planet.star ? planetAt(r.star_id, r.planet_index)?.name : starById(r.star_id)?.name;
+      return { name: r.name, where: where ?? r.star_id };
+    };
+    // an answer it just gave you is not told twice
+    const tell = t.fresh ?? n.data.traits.tell;
+    const told = tell && t.exchanges.some((x) => x.answer && x.answer === tell.text) ? undefined : tell;
+    const low = n.lowNeeds();
+    return composeTalk({
+      copyId: n.data.id, name: n.data.name, blank: !!n.data.traits.blank, canHear: this.canHear(), hint: HEAR_HINT, now: Date.now(),
+      playerId: me?.id, tell: told ?? undefined, tellNew: !!t.fresh, composing: t.composing,
+      notes: t.journal ? t.journal.notes.filter((x) => x.replicant_id === n.data.id) : null,
+      mail: t.journal ? t.journal.mail : null,
+      wants: n.data.traits.wants ?? [],
+      feeling: { mood: n.moodWord, weariness: n.weariness, lonely: low.some((x) => x.startsWith('lonely')), aimless: low.some((x) => x.startsWith('aimless')) },
+      exchanges: t.exchanges, who,
+    }, { width: box.tw, lines: TALK.box.lines, measure: box.measure, thoughts: TALK.thoughts, lettersToYou: TALK.lettersToYou, staleMs: TALK.staleMinutes * 60_000 });
+  }
+
+  private refreshTalk(jumpTo?: string) {
+    if (!this.talk) return;
+    this.talk.name = this.talk.npc.data.name;
+    this.talkBox?.setPages(this.talkPages(), jumpTo);
+  }
+
+  /** The talk box has the buttons: next, back, close, reply. It also ends by itself if you are hurt or the copy goes. */
+  private updateTalk(raw: InputFrame) {
+    const t = this.talk!, box = this.talkBox;
+    if (!box || !this.player.alive || this.player.hp < t.hp || !this.npcs.includes(t.npc) || t.npc.below) { this.closeTalk(); return; }
+    if (t.reply) return; // the reply line has the keys
+    if (t.npc.data.name !== t.name) this.refreshTalk(); // renamed mid-talk
+    if (raw.cancel) this.closeTalk();
+    else if (raw.reply) this.openReply();
+    else if (raw.back) box.back();
+    else if (raw.forward) box.forward();
+    else if ((raw.attack || raw.interact) && !box.advance()) this.closeTalk();
+  }
+
+  private closeTalk() {
+    const t = this.talk;
+    if (!t) return;
+    this.talk = null;
+    t.reply?.();
+    t.npc.endTalk();
+    this.controls.modal = false;
+    this.controls.clear();
+    this.dropAttackBuffer();
+    this.talkClosedAt = this.time.now;
+    this.game.events.off('tell', this.onTell, this);
+    this.talkBox?.hide();
+    (this.scene.get('ui') as UIScene | null)?.setTalking?.(false);
+  }
+
+  /** R: a line of your own, sent as a letter (it arrives at once); the copy's answer comes as a new SAYS page. */
+  private openReply() {
+    const t = this.talk, box = this.talkBox;
+    if (!t || !box || t.reply || !box.canReply) return;
+    t.reply = openReplyInput(this.game.canvas, box.textRect, `say something to ${t.npc.data.name}`, (text) => void this.sendReply(t, text), () => { t.reply = null; });
+  }
+
+  private async sendReply(t: TalkSession, text: string) {
+    const me = session.replicant, st = session.store;
+    if (!me || !st || this.talk !== t) return;
+    const npc = t.npc;
+    try { await st.sendMessage(me, npc.data.id, text); } catch (e) { console.warn('talk failed', e); sound.denied(); return; }
+    npc.receiveLetter();
+    const x: Exchange = { said: text };
+    t.exchanges.push(x);
+    const rt = this.requestTalkFn();
+    if (!rt) x.answer = null;
+    this.refreshTalk(`x${t.exchanges.length - 1}:0`);
+    if (!rt) return;
+    try { x.answer = (await rt.call(this, npc, text)) ?? null; } catch { x.answer = null; }
+    if (this.talk === t) this.refreshTalk();
   }
 
   // --- saving ---

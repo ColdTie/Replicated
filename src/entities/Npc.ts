@@ -16,7 +16,7 @@ import type { BelowTask } from './Warren';
 import type { WarrenRoom } from '../net/store';
 import { squash, type Player } from './Player';
 
-type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below' | 'blank' | 'visit';
+type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below' | 'blank' | 'visit' | 'talk';
 /** Something a copy decided to do with its hands: walk there, swing a few times, then it happens. */
 interface Chore { x: number; y: number; swings: number; swing: () => void; done: () => void }
 type Pt = { x: number; y: number };
@@ -252,7 +252,7 @@ export class Npc {
     // say hello when you come close: turn, hop, chirp (a solitary copy waits for you to come closer)
     const soc = this.temper?.sociability;
     const greetAt = soc === 'solitary' ? 18 : soc === 'clingy' ? 44 : 30;
-    if (dp < greetAt && time > this.nextGreet && p.alive && this.state !== 'mine') {
+    if (dp < greetAt && time > this.nextGreet && p.alive && this.state !== 'mine' && this.state !== 'talk') {
       this.nextGreet = time + (soc === 'solitary' ? 34_000 : soc === 'clingy' ? 11_000 : 20_000);
       this.state = 'greet';
       this.until = time + 900;
@@ -532,7 +532,7 @@ export class Npc {
 
   /** Go and do something by hand (cut a tree, take a build down). Drops whatever it was doing. */
   startChore(c: Chore) {
-    if (this.state === 'born' || this.state === 'below' || this.state === 'blank') return false;
+    if (this.state === 'born' || this.state === 'below' || this.state === 'blank' || this.state === 'talk') return false;
     if (this.job) { this.scene.village.release(this.job); this.job = null; }
     if (this.carried) { this.carried.destroy(); this.carried = undefined; }
     this.mineAt = null;
@@ -553,6 +553,7 @@ export class Npc {
     if (this.job) { sc.village.release(this.job); this.job = null; }
     this.carried?.destroy(); this.carried = undefined;
     this.bubble?.destroy(); this.bubble = undefined;
+    this.talkHint?.destroy(); this.talkHint = undefined;
     this.state = 'born';
     const beam = sc.add.rectangle(this.x, this.y + 2, 10, 260, 0xffffff, 0).setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setDepth(6150);
     sc.tweens.add({ targets: beam, fillAlpha: 0.55, duration: 500, yoyo: true, hold: 900, onComplete: () => beam.destroy() });
@@ -591,6 +592,49 @@ export class Npc {
     this.nextBuild = this.scene.time.now + 3000;
     this.sync();
     this.hop();
+  }
+
+  // --- talking with the original ---
+
+  /** what it was doing when the original stopped to talk, and how long that had left */
+  private talkResume: { state: State; left: number } | null = null;
+  private talkHint?: Phaser.GameObjects.Image;
+  private hintShown = 0;
+
+  /** The original stops to talk: it leaves what it was doing as it is, turns to face them, hops and chirps. */
+  startTalk() {
+    if (this.state === 'born' || this.state === 'below' || this.state === 'blank' || this.state === 'talk') return false;
+    const now = this.scene.time.now;
+    this.talkResume = { state: this.state, left: Math.max(0, this.until - now) };
+    this.state = 'talk';
+    this.sprite.setFlipX(this.scene.player.x < this.x);
+    this.sprite.play(anim(this.key, 'idle'), true);
+    this.hop();
+    sound.pet();
+    return true;
+  }
+
+  /** The talk is over: back to exactly what it was doing (no greeting straight away). */
+  endTalk() {
+    const r = this.talkResume;
+    this.talkResume = null;
+    if (this.state !== 'talk') return;
+    const now = this.scene.time.now;
+    this.state = r?.state ?? 'idle';
+    this.until = now + (r?.left ?? 800);
+    this.nextGreet = Math.max(this.nextGreet, now + 20_000);
+  }
+
+  /** The little speech bubble over the head of the copy you can talk to, in its visor color. */
+  setTalkHint(on: boolean) {
+    if (on && !this.talkHint) {
+      this.talkHint = this.scene.add.image(0, 0, 'talkhint').setOrigin(0.5, 1).setDepth(6210).setAlpha(0);
+    }
+    if (!this.talkHint) return;
+    this.hintShown = on ? 1 : 0;
+    this.talkHint.setTint(this.data.traits.blank ? PALETTE[21] : PALETTE[this.data.traits.feature ?? 10]);
+    this.scene.tweens.killTweensOf(this.talkHint);
+    this.scene.tweens.add({ targets: this.talkHint, alpha: this.hintShown, duration: on ? 160 : 120 });
   }
 
   // --- the copy's voice ---
@@ -658,6 +702,12 @@ export class Npc {
     this.gear.sync();
     this.bubble?.setPosition(x, y - 24 - Math.round(this.z));
     this.updateBubble(this.scene.time.now);
+    if (this.talkHint) {
+      // above the head (or above its song bubble), bobbing a pixel
+      const top = this.bubble ? this.bubble.y - (this.bubble.getBounds().height || 12) - 2 : y - 23 - Math.round(this.z);
+      this.talkHint.setPosition(x + 1, top + Math.round(Math.sin(this.scene.time.now / 320)));
+      this.talkHint.setVisible(this.sprite.visible);
+    }
   }
 }
 

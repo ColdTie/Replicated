@@ -12,9 +12,18 @@ export interface SpriteEntry {
   files: Record<string, string>;
 }
 
+export interface FontEntry {
+  file: string; width: number; height: number; chars: string;
+  /** proportional fonts: each glyph's width (in chars order) and the gap between letters */
+  widths?: number[]; spacing?: number;
+}
+
 export interface Manifest {
   sprites: Record<string, SpriteEntry>;
-  font: { file: string; width: number; height: number; chars: string } | null;
+  /** the pixel font (same as fonts.pixel) */
+  font: FontEntry | null;
+  /** every font by name: 'pixel' (caps, tools/sprites/font.json), 'prose' (the talk box, font-prose.json) */
+  fonts?: Record<string, FontEntry>;
 }
 
 export const GEN_URL = `${import.meta.env.BASE_URL}assets/gen/`;

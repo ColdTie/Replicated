@@ -1,6 +1,7 @@
 // Procedural sound: every effect and the ambient music are synthesized with WebAudio, so there are no audio
 // files to download. The context starts on the first tap or key press (iOS requires a user gesture).
 import SOUND from '../data/sound.json';
+import TALK from '../data/talk.json';
 
 type Wave = OscillatorType;
 
@@ -355,6 +356,23 @@ class SoundEngine {
     [0, 4, 7, 12, 16, 19].forEach((s, k) => this.tone(midi(base + s), 2.8, { type: k % 2 ? 'sine' : 'triangle', vol: 0.066, delay: longest + 0.1 + k * 0.06, attack: 0.35, rev: 0.9 }));
     this.lastSong = { at: performance.now(), root: base };
     return longest + 3;
+  }
+
+  /**
+   * One soft blip of a copy's voice while its words type out in the talk box: its own root and mode (or the mood
+   * it chose with sing_as), the letter picking the degree, an octave above where it sings. Very quiet and rate
+   * limited, so quick typing is a patter rather than a buzz.
+   */
+  blip(seed: number, voice?: { instrument?: string; mood?: string }, letter = '') {
+    if (!this.ready('blip', TALK.blip.minGapMs)) return;
+    const v = this.voice(seed);
+    const mode = MOODS[voice?.mood && voice.mood in MOODS ? voice.mood as Mood : v.mood];
+    const inst = INSTRUMENTS[voice?.instrument && voice.instrument in INSTRUMENTS ? voice.instrument as Instrument : v.instrument];
+    const code = letter.toLowerCase().charCodeAt(0) || 97;
+    const deg = (code * 5) % (mode.length + 1);
+    const semis = mode[deg % mode.length] + 12 * Math.floor(deg / mode.length);
+    const wave = inst.wave === 'square' ? 'triangle' : inst.wave;
+    this.tone(midi(v.root + 12 + semis) * (1 + (Math.random() - 0.5) * 0.01), TALK.blip.seconds, { type: wave, vol: TALK.blip.vol * inst.gain, attack: 0.004, rev: 0.12 });
   }
 
   /** A letter arrived: two small bright notes. */

@@ -1,6 +1,28 @@
 import Phaser from 'phaser';
-import { GEN_URL, anim, getManifest, setManifest, type Manifest } from '../core/assets';
+import { GEN_URL, anim, getManifest, setManifest, type FontEntry, type Manifest } from '../core/assets';
 import { makeGlowTexture, makeLightTexture, makePixel } from '../fx/textures';
+
+/** Texture key of a font sheet: 'font' for the pixel font (as always), 'font.<name>' for the others. */
+const fontImage = (name: string) => (name === 'pixel' ? 'font' : `font.${name}`);
+
+/**
+ * A proportional bitmap font: every glyph as wide as it is drawn, `spacing` px between letters. Same data shape
+ * as Phaser's RetroFont parser makes, so BitmapText draws it like any other font.
+ */
+function parseProportional(scene: Phaser.Scene, key: string, f: FontEntry, lineSpacing: number) {
+  const frame = scene.textures.getFrame(key);
+  const tw = frame.source.width, th = frame.source.height;
+  const chars: Record<number, unknown> = {};
+  [...f.chars].forEach((c, i) => {
+    const w = f.widths?.[i] ?? f.width, x = i * f.width;
+    chars[c.charCodeAt(0)] = {
+      x, y: 0, width: w, height: f.height, centerX: Math.floor(w / 2), centerY: Math.floor(f.height / 2),
+      xOffset: 0, yOffset: 0, xAdvance: w + (f.spacing ?? 1), data: {}, kerning: {},
+      u0: (frame.cutX + x) / tw, v0: frame.cutY / th, u1: (frame.cutX + x + w) / tw, v1: (frame.cutY + f.height) / th,
+    };
+  });
+  return { data: { retroFont: true, font: key, size: f.height, lineHeight: f.height + lineSpacing, chars }, frame: null, texture: key };
+}
 
 export class BootScene extends Phaser.Scene {
   constructor() { super('boot'); }
@@ -19,7 +41,8 @@ export class BootScene extends Phaser.Scene {
           this.load.spritesheet(key, `${GEN_URL}${file}`, { frameWidth: s.frameWidth, frameHeight: s.frameHeight });
         }
       }
-      if (data.font) this.load.image('font', `${GEN_URL}${data.font.file}`);
+      const fonts = data.fonts ?? (data.font ? { pixel: data.font } : {});
+      for (const [name, f] of Object.entries(fonts)) this.load.image(fontImage(name), `${GEN_URL}${f.file}`);
     });
   }
 
@@ -38,12 +61,19 @@ export class BootScene extends Phaser.Scene {
         }
       }
     }
-    if (m.font) {
+    // 'pixel': the fixed-width caps font; 'prose': the talk box's mixed-case proportional font
+    const fonts = m.fonts ?? (m.font ? { pixel: m.font } : {});
+    for (const [name, f] of Object.entries(fonts)) {
+      const image = fontImage(name);
+      if (f.widths) {
+        this.cache.bitmapFont.add(name, parseProportional(this, image, f, 2) as unknown as Phaser.Types.GameObjects.BitmapText.BitmapFontData);
+        continue;
+      }
       const cfg = {
-        image: 'font', width: m.font.width, height: m.font.height, chars: m.font.chars,
-        charsPerRow: m.font.chars.length, offset: { x: 0, y: 0 }, spacing: { x: 0, y: 0 }, lineSpacing: 3,
+        image, width: f.width, height: f.height, chars: f.chars,
+        charsPerRow: f.chars.length, offset: { x: 0, y: 0 }, spacing: { x: 0, y: 0 }, lineSpacing: 3,
       };
-      this.cache.bitmapFont.add('pixel', Phaser.GameObjects.RetroFont.Parse(this, cfg as unknown as Phaser.Types.GameObjects.BitmapText.RetroFontConfig));
+      this.cache.bitmapFont.add(name, Phaser.GameObjects.RetroFont.Parse(this, cfg as unknown as Phaser.Types.GameObjects.BitmapText.RetroFontConfig));
     }
     makePixel(this);
     makeLightTexture(this);

@@ -70,13 +70,17 @@ function render(sprite, roles, name) {
   return png;
 }
 
-function renderFont(font) {
+function renderFont(font, name) {
   const [cw, ch] = font.cell;
   const chars = Object.keys(font.glyphs);
   const png = new PNG({ width: cw * chars.length, height: ch });
   const [r, g, b] = palette[font.color ?? 19];
+  // proportional fonts: each glyph is as wide as its rows (the cell is the widest it may be)
+  const widths = chars.map((c) => Math.max(...font.glyphs[c].map((row) => row.length)));
   chars.forEach((c, ci) => {
     const rows = font.glyphs[c];
+    if (font.proportional && rows.length !== ch) throw new Error(`${name} glyph '${c}': expected ${ch} rows, got ${rows.length}`);
+    if (widths[ci] > cw) throw new Error(`${name} glyph '${c}' is wider than the cell`);
     rows.forEach((row, y) => {
       for (let x = 0; x < row.length; x++) {
         if (row[x] === '.' || row[x] === ' ') continue;
@@ -85,21 +89,28 @@ function renderFont(font) {
       }
     });
   });
-  return { png, chars: chars.join('') };
+  return { png, chars: chars.join(''), widths };
 }
 
 fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(outDir, { recursive: true });
-const manifest = { sprites: {}, font: null };
+// fonts: font.json is 'pixel' (the caps font everything has used so far), font-<name>.json is '<name>' (font-prose: the talk box)
+const manifest = { sprites: {}, font: null, fonts: {} };
 const previews = [];
+const fontSources = {};
 
 for (const file of fs.readdirSync(spriteDir).filter((f) => f.endsWith('.json')).sort()) {
   const name = path.basename(file, '.json');
   const sprite = JSON.parse(fs.readFileSync(path.join(spriteDir, file), 'utf8'));
-  if (name === 'font') {
-    const { png, chars } = renderFont(sprite);
-    fs.writeFileSync(path.join(outDir, 'font.png'), PNG.sync.write(png));
-    manifest.font = { file: 'font.png', width: sprite.cell[0], height: sprite.cell[1], chars };
+  if (name === 'font' || name.startsWith('font-')) {
+    const key = name === 'font' ? 'pixel' : name.slice(5);
+    const { png, chars, widths } = renderFont(sprite, name);
+    fs.writeFileSync(path.join(outDir, `${name}.png`), PNG.sync.write(png));
+    const entry = { file: `${name}.png`, width: sprite.cell[0], height: sprite.cell[1], chars };
+    if (sprite.proportional) Object.assign(entry, { widths, spacing: sprite.spacing ?? 1 });
+    manifest.fonts[key] = entry;
+    if (key === 'pixel') manifest.font = entry;
+    fontSources[key] = sprite;
     continue;
   }
   const entry = {
@@ -142,7 +153,7 @@ for (const file of fs.readdirSync(spriteDir).filter((f) => f.endsWith('.json')).
 }
 
 fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
-console.log(`sprites: ${Object.keys(manifest.sprites).length} sheets${manifest.font ? ' + font' : ''} -> public/assets/gen`);
+console.log(`sprites: ${Object.keys(manifest.sprites).length} sheets + fonts ${Object.keys(manifest.fonts).join(', ')} -> public/assets/gen`);
 
 if (process.argv.includes('--preview')) {
   // Contact sheet at 4x on a dark background for review in chat.
@@ -170,4 +181,57 @@ if (process.argv.includes('--preview')) {
   fs.mkdirSync(path.join(root, 'screenshots'), { recursive: true });
   fs.writeFileSync(path.join(root, 'screenshots/sprite-sheet.png'), PNG.sync.write(sheet));
   console.log('preview: screenshots/sprite-sheet.png');
+  if (fontSources.prose) {
+    fs.writeFileSync(path.join(root, 'screenshots/font-prose.png'), PNG.sync.write(previewProse(fontSources.prose)));
+    console.log('preview: screenshots/font-prose.png');
+  }
+}
+
+/** The prose font at 4x on the talk box's navy: every glyph, then real lines the copies wrote, wrapped as the box wraps. */
+function previewProse(font) {
+  const scale = 4, pad = 10, width = 400, [, ch] = font.cell, line = ch + 2;
+  const adv = (c) => (font.glyphs[c]?.[0].length ?? 0) + (font.spacing ?? 1);
+  const measure = (s) => [...s].reduce((w, c) => w + adv(c), 0);
+  const wrap = (text) => {
+    const out = [];
+    let cur = '';
+    for (const word of text.split(' ')) {
+      const next = cur ? `${cur} ${word}` : word;
+      if (measure(next) > width && cur) { out.push(cur); cur = word; } else cur = next;
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const runes = Array.from({ length: 10 }, (_, i) => String.fromCharCode(0xe000 + i)).join(' ');
+  const rows = [
+    [20, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'], [20, 'abcdefghijklmnopqrstuvwxyz'],
+    [20, '0123456789 . , ! ? - : ; \' " ( ) [ ] / \\ | % + = & * # < > ^ ~ _ @'],
+    [18, `${runes}    `], [null, ''],
+    [21, 'Glint, to Lumen at Alderamin, 2 days ago:'],
+    ...wrap('Hello Lumen. Rain on our roof is soft ticking at first, then a hush like many small hands. Below in the Rain Hall it is a far murmur that makes sleep come easy. I hope your white star sets gently tonight.').map((t) => [2, t]),
+    [null, ''], [21, 'Last night'],
+    ...wrap("Kept: Glean (three on benches by one lamp, nobody talking). Still to ask: Steve II, Gleaner. Don't ask again; tend it if it comes.").map((t) => [2, t]),
+  ];
+  const w = (width + pad * 2) * scale, h = (rows.length * line + pad * 2) * scale;
+  const png = new PNG({ width: w, height: h });
+  const bg = palette[25];
+  for (let i = 0; i < png.data.length; i += 4) { png.data[i] = bg[0]; png.data[i + 1] = bg[1]; png.data[i + 2] = bg[2]; png.data[i + 3] = 255; }
+  rows.forEach(([color, text], ri) => {
+    if (color === null) return;
+    const [r, g, b] = palette[color];
+    let x = pad;
+    for (const c of text) {
+      const glyph = font.glyphs[c];
+      if (!glyph) continue;
+      glyph.forEach((row, gy) => [...row].forEach((px, gx) => {
+        if (px !== '#') return;
+        for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
+          const i = (((pad + ri * line + gy) * scale + sy) * w + (x + gx) * scale + sx) * 4;
+          png.data[i] = r; png.data[i + 1] = g; png.data[i + 2] = b;
+        }
+      }));
+      x += adv(c);
+    }
+  });
+  return png;
 }

@@ -35,6 +35,7 @@ export interface ReplicantSave {
     needs?: { company: number; purpose: number };
     /** what the original handed it (gifts), by material */
     inventory?: Record<string, number>;
+    tell?: { text: string; at: number };
   };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
