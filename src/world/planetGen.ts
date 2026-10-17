@@ -1,7 +1,9 @@
-// Seeded planet surface: a floating island of floor and rock, a few ruins, resource nodes and enemy spawns.
+// Seeded planet surface: a floating island of floor and rock, a few ruins, resource nodes and enemy spawns, and the
+// town at the landing site (src/world/town.ts) kept open: no rock, water, ruins, creatures or crystals on it.
 import type { PlanetDef } from '../core/data';
 import { fbm, mulberry32, randInt, type Rng } from '../core/rng';
 import { BEACON } from '../core/data';
+import { TOWN_TUNING, layoutTown, townMask, type Town } from './town';
 
 export const enum Cell { Void = 0, Floor = 1, Rock = 2, Ruin = 3, Water = 4 }
 
@@ -42,6 +44,10 @@ export interface PlanetMap {
   base: { vessel: Point; cradle: Point; pad: Point; center: Point };
   /** Beacon worlds: the monolith (feet, pixels), where its keeper sleeps, and the stone plaza (tiles) */
   beacon?: { x: number; y: number; guardian: Point; plaza: { x: number; y: number; w: number; h: number } };
+  /** The town around the base: square, streets, lots, lamp spots, the hatch (src/world/town.ts) */
+  town: Town;
+  /** Per tile: 3 the square and streets, 2 a lot, 1 open ground around the town, 0 elsewhere (townMask) */
+  townMask: Uint8Array;
 }
 
 export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
@@ -77,7 +83,13 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     cells.set(next);
   }
 
-  // 3. Clear the landing site
+  // 3. Clear the landing site and the whole town (square, streets, lots and the ground around them) to open floor
+  const town = layoutTown(w, h, cx, cy, def.islandRadius);
+  const { mask: tmask, dist: tdist } = townMask(town, w, h);
+  for (let i = 0; i < cells.length; i++) if (tmask[i]) cells[i] = Cell.Floor;
+  // how far (tiles from the paved streets and the lots) each kind of thing keeps away from the town
+  const keep = TOWN_TUNING.keepOut;
+  const townFar = (x: number, y: number, d: number) => x < 0 || y < 0 || x >= w || y >= h || tdist[idx(x, y)] >= d;
   for (let y = cy - 6; y <= cy + 6; y++) for (let x = cx - 7; x <= cx + 7; x++) {
     if (Math.hypot((x - cx) / 7, (y - cy) / 6) <= 1) cells[idx(x, y)] = Cell.Floor;
   }
@@ -92,7 +104,7 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     const rx = randInt(r, 4, w - rw - 5), ry = randInt(r, 4, h - rh - 6);
     if (Math.hypot(rx + rw / 2 - cx, ry + rh / 2 - cy) < 16) continue;
     let ok = true;
-    for (let y = ry - 2; y < ry + rh + 3 && ok; y++) for (let x = rx - 2; x < rx + rw + 2; x++) if (at(x, y) === Cell.Void) { ok = false; break; }
+    for (let y = ry - 2; y < ry + rh + 3 && ok; y++) for (let x = rx - 2; x < rx + rw + 2; x++) if (at(x, y) === Cell.Void || !townFar(x, y, keep.ruins)) { ok = false; break; }
     if (!ok || ruinRects.some((o) => rx < o.x + o.w + 4 && rx + rw + 4 > o.x && ry < o.y + o.h + 4 && ry + rh + 4 > o.y)) continue;
     ruinRects.push({ x: rx, y: ry, w: rw, h: rh });
     const doorX = rx + Math.floor(rw / 2);
@@ -200,11 +212,12 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
   const isOpen = (x: number, y: number) => at(x, y) === Cell.Floor && !solid(at(x, y - 1));
   const taken: Point[] = [];
   const farFrom = (x: number, y: number, list: Point[], d: number) => list.every((p) => Math.hypot(p.x - x, p.y - y) >= d);
-  const scatter = (count: number, minCenter: number, spacing: number, score: (x: number, y: number) => boolean, rr: Rng) => {
+  // townGap: how many tiles from the town's streets and lots it must stay (1 = anywhere off them: gaps, the margin)
+  const scatter = (count: number, minCenter: number, spacing: number, score: (x: number, y: number) => boolean, rr: Rng, townGap: number) => {
     const out: Point[] = [];
     for (let attempt = 0; attempt < count * 80 && out.length < count; attempt++) {
       const x = randInt(rr, 2, w - 3), y = randInt(rr, 2, h - 3);
-      if (!isOpen(x, y) || Math.hypot(x - cx, y - cy) < minCenter) continue;
+      if (!isOpen(x, y) || Math.hypot(x - cx, y - cy) < minCenter || !townFar(x, y, townGap)) continue;
       if (ruinFloor[idx(x, y)] || !score(x, y) || !farFrom(x, y, out, spacing) || !farFrom(x, y, taken, 2)) continue;
       out.push({ x, y });
     }
@@ -216,26 +229,27 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (solid(at(x + dx, y + dy))) return true;
     return false;
   };
-  const nodes = scatter(Math.ceil(def.resourceNodes * 0.7), 6, 6, nearRock, r);
-  nodes.push(...scatter(def.resourceNodes - nodes.length, 6, 6, () => true, r));
+  const nodes = scatter(Math.ceil(def.resourceNodes * 0.7), 6, 6, nearRock, r, keep.crystals);
+  nodes.push(...scatter(def.resourceNodes - nodes.length, 6, 6, () => true, r, keep.crystals));
 
   const enemies: PlanetMap['enemies'] = [];
   for (const [type, count] of Object.entries(def.enemies)) {
-    for (const p of scatter(count, 13, 7, () => true, r)) enemies.push({ type, ...p });
+    for (const p of scatter(count, 13, 7, () => true, r, keep.creatures)) enemies.push({ type, ...p });
   }
 
   // 7b. Landmarks: overgrown towers and trees
   const props: PlanetMap['props'] = [];
   const blockers: PlanetMap['blockers'] = [];
   const towerSpot = (x: number, y: number) => isOpen(x + 1, y) && isOpen(x, y - 1) && isOpen(x + 1, y - 1) && isOpen(x, y - 2) && isOpen(x + 1, y - 2);
-  for (const p of scatter(def.towers ?? 0, 9, 14, towerSpot, r)) {
+  for (const p of scatter(def.towers ?? 0, 9, 14, (x, y) => towerSpot(x, y) && townFar(x, y - 2, keep.towers), r, keep.towers)) {
     props.push({ sprite: 'tower', frame: r() < 0.5 ? 0 : 1, x: p.x * 16 + 16, y: p.y * 16 + 16 });
     blockers.push({ x: p.x * 16 + 16, y: p.y * 16 + 11, w: 28, h: 10 });
     taken.push({ x: p.x + 1, y: p.y }, { x: p.x, y: p.y - 1 }, { x: p.x + 1, y: p.y - 1 });
   }
   if (def.trees) {
     const treeCount = Math.round(w * h * def.trees * 0.25);
-    for (const p of scatter(treeCount, 6, 3, (x, y) => isOpen(x, y - 1), r)) {
+    // trees grow around the town and in the gaps between its lots, so it reads as a clearing in the forest
+    for (const p of scatter(treeCount, 6, 3, (x, y) => isOpen(x, y - 1) && townFar(x, y - 1, 1), r, 1)) {
       props.push({ sprite: 'tree', frame: r() < 0.7 ? 0 : 2, x: p.x * 16 + 8, y: p.y * 16 + 14 });
       blockers.push({ x: p.x * 16 + 8, y: p.y * 16 + 12, w: 8, h: 5 });
     }
@@ -243,7 +257,7 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
 
   // 8. Decor: tufts and pebbles everywhere, mushrooms and spore pods on moss
   for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
-    if (!isOpen(x, y) || Math.hypot(x - cx, y - cy) < 3.5 || ruinFloor[idx(x, y)]) continue;
+    if (!isOpen(x, y) || Math.hypot(x - cx, y - cy) < 3.5 || ruinFloor[idx(x, y)] || tmask[idx(x, y)] === 3) continue;
     if (taken.some((p) => p.x === x && p.y === y)) continue;
     if (r() > def.decorDensity) continue;
     const onMoss = ground[y][x] === TILE.moss[0] || ground[y][x] === TILE.moss[1];
@@ -262,6 +276,7 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     for (const p of [...taken, ...nodes]) blocked[idx(p.x, p.y)] = 1;
     for (const b of blockers) blocked[idx(Math.floor(b.x / 16), Math.floor(b.y / 16))] = 1;
     for (const e of enemies) blocked[idx(e.x, e.y)] = 1;
+    for (let i = 0; i < blocked.length; i++) if (tdist[i] < keep.ponds) blocked[i] = 1;
     for (const rr of ruinRects) for (let y = rr.y - 2; y < rr.y + rr.h + 2; y++) for (let x = rr.x - 2; x < rr.x + rr.w + 2; x++) if (x >= 0 && y >= 0 && x < w && y < h) blocked[idx(x, y)] = 1;
     let made = 0;
     for (let attempt = 0; attempt < 300 && made < (def.ponds ?? 0); attempt++) {
@@ -292,24 +307,27 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
       if (!isOpen(x, y) || blocked[idx(x, y)]) continue;
       const bank = isWater(x - 1, y) || isWater(x + 1, y) || isWater(x, y - 1) || isWater(x, y + 1);
       if (bank && r2() < 0.35) decor.push({ frame: DECOR.reeds, x: x * 16 + randInt(r2, 4, 12), y: y * 16 + randInt(r2, 10, 15) });
-      else if (!bank && def.flowers && r2() < def.flowers && Math.hypot(x - cx, y - cy) > 3.5 && !ruinFloor[idx(x, y)]) {
+      else if (!bank && def.flowers && r2() < def.flowers && Math.hypot(x - cx, y - cy) > 3.5 && !ruinFloor[idx(x, y)] && tmask[idx(x, y)] < 3) {
         decor.push({ frame: DECOR.flower, x: x * 16 + randInt(r2, 3, 13), y: y * 16 + randInt(r2, 8, 15) });
       }
     }
   }
 
-  // 10. Starter crystals: a small cluster just outside the base so no landing ever feels barren.
-  // Placed last with its own rng and appended to the end of `nodes`, so existing planets keep their
-  // layout and saved node damage (indexed by position in `nodes`) stays valid.
+  // 10. Starter crystals: a pair in each quarter between the town's streets, just off the lots, so no landing ever
+  // feels barren and every home has crystals a short walk away. Its own rng, appended to the end of `nodes`.
   {
     const r3 = mulberry32(seed ^ 0x51a7);
     const starters: Point[] = [];
-    for (let attempt = 0; attempt < 400 && starters.length < 3; attempt++) {
-      const a = r3() * Math.PI * 2, d = 8 + r3() * 5;
-      const x = Math.round(cx + Math.cos(a) * d), y = Math.round(cy + Math.sin(a) * d);
-      if (x < 2 || y < 2 || x >= w - 2 || y >= h - 2 || !isOpen(x, y) || ruinFloor[idx(x, y)]) continue;
-      if (!farFrom(x, y, starters, 3) || !farFrom(x, y, taken, 2) || !farFrom(x, y, nodes, 4)) continue;
-      starters.push({ x, y });
+    const b = town.bounds, g = town.margin;
+    for (const [qx, qy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      for (let attempt = 0, got = 0; attempt < 300 && got < 2; attempt++) {
+        const x = Math.round(cx + qx * (3 + r3() * (b.w / 2 + g))), y = Math.round(cy + qy * (3 + r3() * (b.h / 2 + g)));
+        if (x < 2 || y < 2 || x >= w - 2 || y >= h - 2 || !isOpen(x, y) || ruinFloor[idx(x, y)] || !townFar(x, y, keep.crystals)) continue;
+        if (townFar(x, y, keep.crystals + 2) && attempt < 200) continue; // hug the lots
+        if (!farFrom(x, y, starters, 5) || !farFrom(x, y, taken, 2) || !farFrom(x, y, nodes, 3)) continue;
+        starters.push({ x, y });
+        got++;
+      }
     }
     taken.push(...starters);
     nodes.push(...starters);
@@ -328,7 +346,7 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
       if (at(px, py) !== Cell.Floor || !seen[idx(px, py)]) return false;
       for (let y = py - hh; y <= py + hh; y++) for (let x = px - hw; x <= px + hw; x++) {
         const c = at(x, y);
-        if (c === Cell.Void || c === Cell.Water || c === Cell.Ruin || ruinFloor[idx(x, y)]) return false;
+        if (c === Cell.Void || c === Cell.Water || c === Cell.Ruin || ruinFloor[idx(x, y)] || !townFar(x, y, keep.ruins)) return false;
         if (Math.abs(x - px) <= 1 && y <= py - hh + 5 && nodes.some((n) => n.x === x && n.y === y)) return false;
       }
       return true;
@@ -374,5 +392,5 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     cradle: { x: c.x, y: c.y + 22 },
     pad: { x: c.x + 46, y: c.y + 12 },
   };
-  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, enemies, decor, glows, props, blockers, ruins, base, beacon };
+  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, enemies, decor, glows, props, blockers, ruins, base, beacon, town, townMask: tmask };
 }

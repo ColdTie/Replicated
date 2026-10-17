@@ -1,5 +1,5 @@
 {
-  "_doc": "Surface buildings the copies design (design_building): a footprint in tiles, a purpose, a wall material, a roof, a door side, two kit colors and a name, drawn by src/world/buildingPaint.ts from parts (no hand art). A proposal waits for the original's word (journal: approve / veto; autoApproveMinutes later it goes ahead anyway), costs perTile of its material (paid when the first copy joins), and takes swingsPerTile hammer blows that any copy may add to (a shared project; progress shows as the building rising). Blueprints share the warren's shape (name, purpose, w, h, x, y, by) so a building can get an interior later. Placed ringMin..ringMax px from the base center on clear ground. communal: when the planet's store of a material is at least whenFull of its capacity and the village has no shared building underway, the copies start the next of these on their own (already approved: Steve, 2026-10-08, \"approve all the things they want\"), one at a time: the Meeting Hall (lonely copies gather at its door and sing together there), the Workshop (finished work gives 1.5x purpose, workshopPurpose) and the Lookout (a tall light over the village; copies gather lookoutGather times the Ember while you are away).",
+  "_doc": "Surface buildings the copies design (design_building): a footprint in tiles, a purpose, a wall material, a roof, a door side, two kit colors and a name, drawn by src/world/buildingPaint.ts from parts (no hand art). A proposal waits for the original's word (journal: approve / veto; autoApproveMinutes later it goes ahead anyway), costs perTile of its material (paid when the first copy joins), and takes swingsPerTile hammer blows that any copy may add to (a shared project; progress shows as the building rising). Blueprints share the warren's shape (name, purpose, w, h, x, y, by) so a building can get an interior later. Placed on a free civic lot of the town (src/data/town.json civicAt: the square's north edge first, then the street ends), else on a home lot nobody lives on. communal: when the planet's store of a material is at least whenFull of its capacity and the village has no shared building underway, the copies start the next of these on their own (already approved: Steve, 2026-10-08, \"approve all the things they want\"), one at a time: the Meeting Hall (lonely copies gather at its door and sing together there), the Workshop (finished work gives 1.5x purpose, workshopPurpose) and the Lookout (a tall light over the village; copies gather lookoutGather times the Ember while you are away).",
   "minFootprint": [
     2,
     2
@@ -8,8 +8,6 @@
     6,
     5
   ],
-  "ringMin": 70,
-  "ringMax": 180,
   "swingsPerTile": 3,
   "autoApproveMinutes": 30,
   "offlineSwingsPerCopyHour": 30,

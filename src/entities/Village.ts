@@ -1,11 +1,14 @@
-// The village the copies raise around the base while you are away: lamps, signs, flags, gardens, huts, totems.
+// The village the copies raise in the town while you are away: lamps, signs, flags, gardens, huts, totems.
 // Work accrues per copy (offline from planet_states.data.npcTick, slowly while you watch) into one shared pool;
-// a copy with enough work picks a project it likes, walks to a free spot and hammers it up. Builds are saved per
-// planet in data.structures (with the builder, tint and variant) so the whole family sees the same village.
+// a copy with enough work picks a project it likes that still has a free slot on its own lot (src/world/town.ts:
+// the house at the back, gardens, a flag by the path, lamps at the frontage or along the street), walks there and
+// hammers it up. A full lot builds nothing more. Builds are saved per planet in data.structures (with the builder,
+// tint and variant) so the whole family sees the same village.
 import Phaser from 'phaser';
 import { anim } from '../core/assets';
 import { PALETTE, VILLAGE } from '../core/data';
 import { hashId } from '../world/system';
+import { slotFor } from '../world/town';
 import type { Light } from '../fx/Lighting';
 import type { StructureSave } from '../net/store';
 import type { PlanetScene } from '../scenes/PlanetScene';
@@ -113,53 +116,43 @@ export class Village {
     this.scene.pending.structures = this.structures;
   }
 
-  private builtBy(npcId: string) {
-    return this.structures.filter((s) => s.by === npcId).length + this.claimed.filter((j) => j.by === npcId).length;
-  }
-
-  /** What this copy would like to build next: its own taste (from its id) weighs the project weights. */
-  private pickProject(npc: Npc) {
+  /** What this copy would like to build next, of what still fits: its own taste (from its id) weighs the project weights. */
+  private pickProject(npc: Npc, fits: (type: string) => boolean) {
     const h = hashId(npc.data.id);
     const entries = Object.entries(PROJECTS);
     const weights = entries.map(([type, def], i) => {
+      if (!fits(type)) return 0;
       const taste = 0.4 + (((h >>> (i * 4)) & 15) / 15) * 1.6;      // 0.4 .. 2.0
       const have = this.structures.filter((s) => s.type === type).length;
       return def.weight * taste / (1 + have * 0.35);                  // variety: fewer of what the village has plenty of
     });
     const total = weights.reduce((a, b) => a + b, 0);
+    if (total <= 0) return null;
     let r = Math.random() * total;
-    for (let i = 0; i < entries.length; i++) { r -= weights[i]; if (r <= 0) return entries[i]; }
-    return entries[entries.length - 1];
+    for (let i = 0; i < entries.length; i++) { r -= weights[i]; if (r <= 0 && weights[i] > 0) return entries[i]; }
+    return entries.filter((_, i) => weights[i] > 0).pop() ?? null;
   }
 
-  /** A free spot in the ring around the base, near other builds when there are some (so it reads as a village). */
-  private findSpot(def: ProjectDef): { x: number; y: number } | null {
-    const base = this.scene.baseCenter;
-    const avoid = [base, this.scene.replicatorSpot, this.scene.vesselPos, ...(this.scene.warren ? [this.scene.warren.hatch] : [])];
-    const taken = [...this.structures.map((s) => ({ x: s.x, y: s.y })), ...this.claimed.map((j) => ({ x: j.x, y: j.y }))];
-    const w = def.solid?.[0] ?? 12;
-    let best: { x: number; y: number; score: number } | null = null;
-    for (let i = 0; i < 60; i++) {
-      const a = Math.random() * Math.PI * 2, r = VILLAGE.ringMin + Math.random() * (VILLAGE.ringMax - VILLAGE.ringMin);
-      const x = Math.round(base.x + Math.cos(a) * r), y = Math.round(base.y + 10 + Math.sin(a) * r * 0.7);
-      if (!this.scene.isClear(x, y, w + 6, 10)) continue;
-      if (avoid.some((p) => Math.hypot(p.x - x, p.y - y) < 36)) continue;
-      if (this.scene.nodes.some((n) => n.alive && Math.hypot(n.x - x, n.y - y) < 20)) continue;
-      const near = taken.map((p) => Math.hypot(p.x - x, p.y - y));
-      if (near.some((d) => d < VILLAGE.minSpacing)) continue;
-      // like being near the others, but not far out alone
-      const score = (near.length ? -Math.min(...near) : 0) - r * 0.2 + Math.random() * 8;
-      if (!best || score > best.score) best = { x, y, score };
-    }
-    return best;
+  /** Spots built on or claimed for a build. */
+  private get taken() {
+    return [...this.structures.map((s) => ({ x: s.x, y: s.y })), ...this.claimed.map((j) => ({ x: j.x, y: j.y }))];
   }
 
-  /** A job for this copy if the pool has the work and the ring has room; the spot is reserved until done. */
+  /**
+   * A job for this copy if the pool has the work and its lot has room for something it likes; the slot is reserved
+   * until done. A copy with no lot (the town is full) or a full lot builds nothing.
+   */
   requestJob(npc: Npc): BuildJob | null {
-    if (this.builtBy(npc.data.id) >= VILLAGE.maxPerCopy) return null;
-    const [type, def] = this.pickProject(npc);
+    const lot = this.scene.homeLot(npc.data.id);
+    if (!lot) return null;
+    const town = this.scene.map.town, taken = this.taken;
+    const spots = new Map<string, { x: number; y: number } | null>();
+    const spotFor = (type: string) => { if (!spots.has(type)) spots.set(type, slotFor(town, lot, type, taken)); return spots.get(type)!; };
+    const pick = this.pickProject(npc, (type) => !!spotFor(type));
+    if (!pick) return null;
+    const [type, def] = pick;
     if (this.work < def.work) return null;
-    const spot = this.findSpot(def);
+    const spot = spotFor(type);
     if (!spot) return null;
     const job: BuildJob = { type, def, x: spot.x, y: spot.y, variant: def.variants ? Math.floor(Math.random() * def.variants) : 0, tint: def.tint ? npc.data.traits.trail ?? 10 : undefined, by: npc.data.id };
     this.claimed.push(job);

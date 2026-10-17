@@ -1,10 +1,12 @@
-// A copy left behind to run the planet. It wanders the base, mines nearby crystals, carries Embers back to the
-// Replicator, and greets you when you come close. Its drift (visor, headgear, trail) tells it apart at a glance.
+// A copy left behind to run the planet. It lives on its own lot in the town (src/world/town.ts), strolls around its
+// home and its street, mines crystals near home, carries Embers back to the Replicator, and greets you when you come
+// close. Its drift (visor, headgear, trail) tells it apart at a glance.
 import Phaser from 'phaser';
 import { sound, type Instrument, type Mood, type Tempo } from '../audio/Sound';
 import { anim } from '../core/assets';
 import { bodyFor, ensureBodyTexture, kitColor } from '../core/body';
 import { BUILDINGS, MIND, NEEDS, PALETTE, PLAYER, SUPPLIES, VILLAGE, WARREN } from '../core/data';
+import { TOWN_TUNING, surfaceRoute } from '../world/town';
 import { DRIFT, stat } from '../core/drift';
 import { session } from '../core/session';
 import type { Light } from '../fx/Lighting';
@@ -49,6 +51,12 @@ export class Npc {
   private visitWith?: Npc;
   /** hop height, added on top of the walking position */
   z = 0;
+  /** where it lives: the yard of its lot in the town (px); strolls and crystal trips start from here */
+  home?: Pt;
+  /** a way round something in the way (waypoints over open ground) toward `routeFor` */
+  private route: Pt[] | null = null;
+  private routeFor: Pt | null = null;
+  private reroutes = 0;
   /** 0 rested .. 1 weary: climbs while awake, cleared by a sleep in a resting station */
   weary = 0;
   /** company and purpose: 0 empty .. 1 full (src/data/needs.json); rest is 1 - weary. They do not eat or drink. */
@@ -373,6 +381,7 @@ export class Npc {
 
   private think(time: number) {
     const base = this.scene.baseCenter;
+    const home = this.home ?? { x: base.x, y: base.y + 20 };
     // the warren first: a room waiting to be dug, or bed when it is night and there is a bed
     const down = this.scene.warren.pickTask(this, this.scene.env.night);
     if (down?.task === 'entrance') { this.scene.warren.digEntrance(this); return; }
@@ -404,12 +413,12 @@ export class Npc {
       }
       this.nextBuild = time + (work === 'builder' ? 4000 : 9000) + Math.random() * 6000;
     }
-    // time for a trip: go mine the nearest healthy crystal near the base (bold copies range further)
+    // time for a trip: go mine the nearest healthy crystal near home (bold copies range further)
     const risk = this.temper?.risk;
     const range = risk === 'bold' ? 330 : risk === 'careful' ? 150 : 220;
     if (time > this.nextTrip) {
       this.nextTrip = time + DRIFT.tripMs / stat(this.data, 'gather');
-      const node = this.scene.nodes.filter((n) => n.alive && Math.hypot(n.x - base.x, n.y - base.y) < range)
+      const node = this.scene.nodes.filter((n) => n.alive && Math.hypot(n.x - home.x, n.y - home.y) < range)
         .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))[0];
       if (node) {
         this.mineAt = { x: node.x, y: node.y };
@@ -419,23 +428,47 @@ export class Npc {
       }
     }
     this.mineAt = null;
-    const a = Math.random() * Math.PI * 2, r = (20 + Math.random() * 70) * (work === 'wanderer' ? 1.9 : 1);
-    this.target = { x: base.x + Math.cos(a) * r, y: base.y + 20 + Math.sin(a) * r * 0.6 };
+    const lot = this.scene.homeLot(this.data.id);
+    if (lot && Math.random() < TOWN_TUNING.streetStroll * (work === 'wanderer' ? 1.8 : 1)) {
+      // a stroll down its street toward the square
+      const k = Math.random(), sq = this.scene.map.town.square;
+      const to = { x: (sq.x + sq.w / 2) * 16, y: (sq.y + sq.h / 2) * 16 + 16 };
+      this.target = { x: lot.front.x + (to.x - lot.front.x) * k + (Math.random() - 0.5) * 12, y: lot.front.y + (to.y - lot.front.y) * k + (Math.random() - 0.5) * 8 };
+    } else {
+      const [lo, hi] = TOWN_TUNING.homeWander;
+      const a = Math.random() * Math.PI * 2, r = (lo + Math.random() * (hi - lo)) * (work === 'wanderer' ? 1.9 : 1);
+      this.target = { x: home.x + Math.cos(a) * r, y: home.y + Math.sin(a) * r * 0.6 };
+    }
     this.state = 'walk';
   }
 
-  /** Steps toward a point; true when arrived. Gives up (clears target) when blocked. */
+  /**
+   * Steps toward a point; true when arrived. When rock or a ruin wall is in the way it finds a way round over open
+   * ground once (src/world/town.ts surfaceRoute) and follows it; it gives up (clears target) only when there is none.
+   */
   private walkTo(t: Pt, dt: number) {
-    const dx = t.x - this.x, dy = t.y - this.y, d = Math.hypot(dx, dy);
-    if (d < 3) return true;
+    if (this.routeFor !== t) { this.route = null; this.routeFor = t; this.reroutes = 0; }
+    const goal = this.route?.[0] ?? t;
+    const dx = goal.x - this.x, dy = goal.y - this.y, d = Math.hypot(dx, dy);
+    if (d < 3) {
+      if (!this.route) return true;
+      this.route.shift();
+      if (!this.route.length) { this.route = null; return Math.hypot(t.x - this.x, t.y - this.y) < 3; }
+      return false;
+    }
     const speed = PLAYER.speed * 0.55 * stat(this.data, 'speed') * this.pace * (1 - 0.3 * this.weary);
-    const nx = this.x + (dx / d) * speed * dt / 1000, ny = this.y + (dy / d) * speed * dt / 1000;
+    const step = Math.min(d, speed * dt / 1000);
+    const nx = this.x + (dx / d) * step, ny = this.y + (dy / d) * step;
     if (this.scene.isWalkable(nx, ny) && this.scene.surfaceAt(nx, ny) !== 'void') {
       this.x = nx; this.y = ny;
       if (Math.abs(dx) > 1) this.sprite.setFlipX(dx < 0);
-    } else if (this.scene.isWalkable(nx, this.y)) this.x = nx;
-    else if (this.scene.isWalkable(this.x, ny)) this.y = ny;
-    else { this.target = null; this.mineAt = null; }
+    } else if (this.scene.isWalkable(nx, this.y) && Math.abs(nx - this.x) > 0.05) this.x = nx;
+    else if (this.scene.isWalkable(this.x, ny) && Math.abs(ny - this.y) > 0.05) this.y = ny;
+    else {
+      const way = this.reroutes < 3 ? surfaceRoute(this.scene.map, this, t) : null;
+      if (way) { this.route = way; this.reroutes++; return false; }
+      this.route = null; this.target = null; this.mineAt = null;
+    }
     return false;
   }
 

@@ -1,10 +1,14 @@
 // Painted floor: one continuous, full-color ground image per planet instead of repeating 16px floor tiles.
 // Relief-shaded noise fields blend bare soil and cover (grass, snow, sand, moss, ash), then the surface kind adds
 // its own detail (blades, ripples, pores, glowing cracks, craters), pebbles, ruin slabs, shadows under rock and damp
-// pond banks. Styles live in src/data/floor.json. Deterministic per planet seed.
+// pond banks. The town is painted in: fitted stone flags (or packed earth) on the square, worn dirt streets with
+// grass creeping in at their edges (bare as far out as someone lives, a faint track beyond) and a footpath to every
+// home's door. Styles live in src/data/floor.json and town.json (paint). Deterministic per planet seed.
 import FLOOR from '../data/floor.json';
+import TOWN from '../data/town.json';
 import { fbm, mulberry32, valueNoise, type Rng } from '../core/rng';
 import { Cell, TILE, type PlanetMap } from './planetGen';
+import { footpath, type Pt, type Rect } from './town';
 
 type Kind = 'grass' | 'snow' | 'sand' | 'spore' | 'basalt' | 'regolith';
 interface FloorStyle {
@@ -61,9 +65,94 @@ function coarseField(W: number, H: number, step: number, scale: number, seed: nu
   };
 }
 
+/** coarseField over a window (x0, y0, w, h) of the planet; outside it the edge values hold. */
+function windowField(x0: number, y0: number, w: number, h: number, step: number, scale: number, seed: number, octaves = 4) {
+  const f = coarseField(w, h, step, scale, seed, octaves);
+  return (x: number, y: number) => f(Math.max(0, Math.min(w - 1, x - x0)), Math.max(0, Math.min(h - 1, y - y0)));
+}
+
+/** Smooth value noise on a fixed lattice (cell px wide), hashed once per lattice point instead of per pixel. */
+function latticeNoise(W: number, H: number, cell: number, seed: number) {
+  const gw = Math.ceil(W / cell) + 2, gh = Math.ceil(H / cell) + 2;
+  const g = new Float32Array(gw * gh);
+  for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) g[y * gw + x] = hash(x, y, seed);
+  return (x: number, y: number) => {
+    const fx = x / cell, fy = y / cell, ix = fx | 0, iy = fy | 0;
+    let tx = fx - ix, ty = fy - iy;
+    tx = tx * tx * (3 - 2 * tx); ty = ty * ty * (3 - 2 * ty);
+    const i = iy * gw + ix;
+    const a = g[i] + (g[i + 1] - g[i]) * tx;
+    const b = g[i + gw] + (g[i + gw + 1] - g[i + gw]) * tx;
+    return a + (b - a) * ty;
+  };
+}
+
 export interface PaintedGround { width: number; height: number; data: Uint8ClampedArray<ArrayBuffer> }
 
-export function paintGround(map: PlanetMap, styleId: string, seed: number): PaintedGround {
+interface TownPaint { square: 'flags' | 'earth'; streetWear: number; trackWear: number; edgePx: number }
+const townPaint = (id: string): TownPaint => ((TOWN.paint as Record<string, TownPaint>)[id] ?? TOWN.paint.default) as TownPaint;
+
+/** Signed distance (px) from a point to a rounded rectangle given in px (negative inside). */
+function rectSd(px: number, py: number, x0: number, y0: number, x1: number, y1: number, r: number) {
+  const qx = Math.abs(px - (x0 + x1) / 2) - (x1 - x0) / 2 + r, qy = Math.abs(py - (y0 + y1) / 2) - (y1 - y0) / 2 + r;
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
+}
+
+/**
+ * How the town marks the ground, per pixel of a window around it: pave = the square's flags (0..1), wear = bare
+ * trodden earth on the streets and footpaths (0..1). Streets are worn bare out to just past the furthest lot someone
+ * lives on (occupied: lot index -> the door its footpath leads to) and fade to a faint, narrower track beyond.
+ */
+function townMarks(map: PlanetMap, W: number, H: number, edgeNoise: (x: number, y: number) => number, tp: TownPaint, occupied: Map<number, { door: Pt; half: number }>) {
+  const town = map.town, T = 16;
+  const b = town.bounds;
+  const x0 = Math.max(0, (b.x - 2) * T), y0 = Math.max(0, (b.y - 2) * T);
+  const x1 = Math.min(W, (b.x + b.w + 2) * T), y1 = Math.min(H, (b.y + b.h + 2) * T);
+  const rw = x1 - x0, rh = y1 - y0;
+  const pave = new Float32Array(rw * rh), wear = new Float32Array(rw * rh);
+  const smooth = (a: number, c: number, v: number) => { const t = Math.max(0, Math.min(1, (v - a) / (c - a))); return t * t * (3 - 2 * t); };
+  // stamps a value field over a px box; f returns 0..1 at a pixel, the arrays keep the max
+  const stamp = (arr: Float32Array, bx0: number, by0: number, bx1: number, by1: number, f: (x: number, y: number) => number) => {
+    for (let y = Math.max(y0, Math.floor(by0)); y < Math.min(y1, Math.ceil(by1)); y++) for (let x = Math.max(x0, Math.floor(bx0)); x < Math.min(x1, Math.ceil(bx1)); x++) {
+      const v = f(x, y);
+      const i = (y - y0) * rw + (x - x0);
+      if (v > arr[i]) arr[i] = v;
+    }
+  };
+  const box = (r: Rect) => [r.x * T, r.y * T, (r.x + r.w) * T, (r.y + r.h) * T];
+  // the square: fitted flags with a soft, slightly ragged edge
+  const [sx0, sy0, sx1, sy1] = box(town.square);
+  stamp(pave, sx0 - 8, sy0 - 8, sx1 + 8, sy1 + 8, (x, y) => smooth(3, -2, rectSd(x, y, sx0, sy0, sx1, sy1, 10) + (edgeNoise(x, y) - 0.5) * 7));
+  // how far out each street is lived on (tiles from the square's edge)
+  const reach: Record<string, number> = {};
+  for (const i of occupied.keys()) { const l = town.lots[i]; if (l) reach[l.street] = Math.max(reach[l.street] ?? 0, l.reach); }
+  const E = tp.edgePx;
+  for (const st of town.streets) {
+    const [ax0, ay0, ax1, ay1] = box(st.rect);
+    const worn = ((reach[st.dir] ?? 0) + 1.5) * T;
+    const along = (x: number, y: number) => (st.dir === 'w' ? sx0 - x : st.dir === 'e' ? x - sx1 : st.dir === 'n' ? sy0 - y : y - sy1);
+    stamp(wear, ax0 - E - 4, ay0 - E - 4, ax1 + E + 4, ay1 + E + 4, (x, y) => {
+      const lived = smooth(worn + 72, worn, along(x, y));
+      // past the last home the street narrows to a track
+      const sd = rectSd(x, y, ax0, ay0, ax1, ay1, 6) + (1 - lived) * 9 + (edgeNoise(x, y) - 0.5) * E * 1.4;
+      return smooth(E * 0.6, -E * 0.5, sd) * (tp.trackWear + (tp.streetWear - tp.trackWear) * lived);
+    });
+  }
+  // footpaths: from the street to each lived-in home's door (and to every building)
+  for (const [i, o] of occupied) {
+    const l = town.lots[i];
+    if (!l) continue;
+    const path = footpath(l, o.door, o.half);
+    for (let k = 1; k < path.length; k++) {
+      const a = path[k - 1], c = path[k];
+      const px0 = Math.min(a.x, c.x) - 4.5, px1 = Math.max(a.x, c.x) + 4.5, py0 = Math.min(a.y, c.y) - 4, py1 = Math.max(a.y, c.y) + 4;
+      stamp(wear, px0 - 4, py0 - 4, px1 + 4, py1 + 4, (x, y) => smooth(2.5, -1.5, rectSd(x, y, px0, py0, px1, py1, 3) + (edgeNoise(y, x) - 0.5) * 4) * tp.streetWear * 0.85);
+    }
+  }
+  return { x0, y0, rw, rh, pave, wear };
+}
+
+export function paintGround(map: PlanetMap, styleId: string, seed: number, occupied: Map<number, { door: Pt; half: number }> = new Map()): PaintedGround {
   const st = floorStyle(styleId);
   const T = 16, W = map.w * T, H = map.h * T;
   const data = new Uint8ClampedArray(W * H * 4);
@@ -79,16 +168,41 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number): Pain
   const lush = coarseField(W, H, 4, 130, seed + 23);
   const tone = coarseField(W, H, 8, 260, seed + 37, 3);
   const heat = coarseField(W, H, 8, 170, seed + 41, 3);
+  const tp = townPaint(styleId);
+  const tb = map.town.bounds;
+  const edgeNoise = windowField((tb.x - 3) * T, (tb.y - 3) * T, (tb.w + 6) * T, (tb.h + 6) * T, 3, 14, seed + 71, 2);
+  const marks = townMarks(map, W, H, edgeNoise, tp, occupied);
+  const markAt = (arr: Float32Array, x: number, y: number) => {
+    const mx = x - marks.x0, my = y - marks.y0;
+    return mx < 0 || my < 0 || mx >= marks.rw || my >= marks.rh ? 0 : arr[my * marks.rw + mx];
+  };
+  // fitted flagstones: jittered voronoi cells; flag() leaves the joint distance and the stone's id and bevel here
+  const FLAG = 11;
+  let fEdge = 0, fId = 0, fLit = 0;
+  const flag = (x: number, y: number) => {
+    const gx = Math.floor(x / FLAG), gy = Math.floor(y / FLAG);
+    let f1 = 1e9, f2 = 1e9, ddx = 0, ddy = 0;
+    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+      const cx = gx + ox, cy = gy + oy;
+      const dx = (cx + 0.2 + hash(cx, cy, seed + 5) * 0.6) * FLAG - x, dy = (cy + 0.2 + hash(cx, cy, seed + 6) * 0.6) * FLAG * 0.92 - y * 0.92;
+      const d = dx * dx + dy * dy;
+      if (d < f1) { f2 = f1; f1 = d; fId = hash(cx, cy, seed + 7); ddx = dx; ddy = dy; } else if (d < f2) f2 = d;
+    }
+    fEdge = Math.sqrt(f2) - Math.sqrt(f1);
+    // lit toward the top-left of each stone (the center lies down-right of a top-left pixel)
+    fLit = Math.max(-1, Math.min(1, (ddx + ddy) / (FLAG * 0.9)));
+  };
 
   // Per-pixel height (coarse relief + fine grain) for slope shading. NaN marks pixels that are not open floor.
   // Everything below walks the planet cell by cell so neighbor checks happen once per 16x16 cell, not per pixel.
   const hb = new Float32Array(W * H).fill(NaN);
   const fine = new Float32Array(W * H);
+  const grain = latticeNoise(W, H, 3.2, seed + 5);
   for (let ty = 0; ty < map.h; ty++) for (let tx = 0; tx < map.w; tx++) {
     if (cellAt(tx, ty) !== Cell.Floor) continue;
     for (let y = ty * T; y < ty * T + T; y++) for (let x = tx * T; x < tx * T + T; x++) {
       const i = y * W + x;
-      const f = valueNoise(x / 3.2, y / 3.2, seed + 5);
+      const f = grain(x, y);
       fine[i] = f;
       const hc = height(x, y);
       let h = hc + (f - 0.5) * 0.012;
@@ -163,11 +277,13 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number): Pain
         continue;
       }
 
-      // Cover mask: where grass, snow or drift lies; worn bare around the base
+      // Cover mask: where grass, snow or drift lies; worn bare around the base, on the streets and the footpaths
       const bx = x - base.x, by = y - base.y;
       const worn = smoothstep(84, 34, Math.sqrt(bx * bx + by * by) + (f - 0.5) * 40);
+      const trod = markAt(marks.wear, x, y), paved = markAt(marks.pave, x, y);
       let m = smoothstep(thr - 0.05, thr + 0.05, lush(x, y) + (f - 0.5) * 0.16 + (wn - 0.5) * 0.05);
       m *= 1 - worn * (st.kind === 'grass' ? 0.8 : 0.5);
+      m *= 1 - Math.max(trod * (0.85 + (wn - 0.5) * 0.3), paved);
       coverMask[i] = Math.round(m * 255);
 
       const tv = (tone(x, y) - 0.5) * 0.7;
@@ -184,7 +300,7 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number): Pain
         if (valueNoise((x - y) * 0.05, (x + y) * 0.5, seed + 3) > 0.78) ts += 0.3;
       } else if (st.kind === 'basalt') {
         plate(x, y);
-        if (pEdge < 1.4) {
+        if (pEdge < 1.4 && trod < 0.4 && paved < 0.4) {
           // crack: dark, and in hot regions a glowing seam (bright core, orange halo)
           const seam = smoothstep(0.5, 0.62, heat(x, y));
           ramp(soil, 0.02, cs);
@@ -201,9 +317,27 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number): Pain
         hot = smoothstep(0.52, 0.66, heat(x, y)) * smoothstep(5, 1.4, pEdge);
       }
 
+      // trodden earth is packed a little lighter and smoother
+      ts += trod * (0.1 - (f - 0.5) * 0.12);
       ramp(soil, ts, cs);
       ramp(cover, tc, cc);
-      const R = cs[0] + (cc[0] - cs[0]) * m + 70 * hot, G = cs[1] + (cc[1] - cs[1]) * m + 18 * hot, B = cs[2] + (cc[2] - cs[2]) * m;
+      let R = cs[0] + (cc[0] - cs[0]) * m + 70 * hot, G = cs[1] + (cc[1] - cs[1]) * m + 18 * hot, B = cs[2] + (cc[2] - cs[2]) * m;
+      if (paved > 0) {
+        // the square: fitted flags (each its own tone, dark joints, a lit top-left bevel, moss in the joints on green
+        // worlds) or packed earth, blended in over its ragged edge
+        if (tp.square === 'flags') {
+          flag(x, y);
+          let t = 0.42 + fId * 0.3 + (f - 0.5) * 0.18 + (wn - 0.5) * 0.06 + shade * 0.4 + fLit * 0.07;
+          if (fEdge < 1.7) t -= 0.18 * (1 - fEdge / 1.7);
+          ramp(stone, t, cc);
+          if (fEdge < 1.1) { cc[0] *= 0.55; cc[1] *= 0.55; cc[2] *= 0.6; }
+          if (grassy && fEdge < 1.5 && lush(x, y) + (wn - 0.5) * 0.3 > 0.5) { ramp(cover, 0.25 + wn * 0.3, cs); cc[0] += (cs[0] - cc[0]) * 0.7; cc[1] += (cs[1] - cc[1]) * 0.7; cc[2] += (cs[2] - cc[2]) * 0.7; }
+        } else {
+          ramp(soil, 0.62 + (f - 0.5) * 0.25 + (wn - 0.5) * 0.08 + shade * 0.5, cc);
+        }
+        const k = paved * paved;
+        R += (cc[0] - R) * k; G += (cc[1] - G) * k; B += (cc[2] - B) * k;
+      }
 
       let ao = 0;
       if (sU && ly < 13) ao = 0.62 * Math.pow(1 - ly / 13, 1.5);
@@ -350,7 +484,7 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number): Pain
     for (let c = 0; c < n; c++) {
       const cx = r() * W, cy = r() * H, rad = 3 + Math.pow(r(), 2.2) * 16;
       for (let y = Math.floor(cy - rad * 1.4); y <= cy + rad * 1.4; y++) for (let x = Math.floor(cx - rad * 1.4); x <= cx + rad * 1.4; x++) {
-        if (!open(x, y)) continue;
+        if (!open(x, y) || markAt(marks.pave, x, y) > 0.2 || markAt(marks.wear, x, y) > 0.3) continue;
         const dx = (x - cx) / rad, dy = (y - cy) / (rad * 0.8), d = Math.hypot(dx, dy);
         if (d < 1) scale(x, y, 0.74 + (dx + dy) * 0.22 * d);
         else if (d < 1.35) scale(x, y, 1 + -(dx + dy) / d * 0.22 * (1 - (d - 1) / 0.35));
@@ -366,7 +500,7 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number): Pain
   // Pebbles everywhere: lit top-left, dark bottom-right, a cast shadow on the ground below
   for (let c = 0; c < area * st.pebbles / 10000; c++) {
     const px = Math.floor(r() * W), py = Math.floor(r() * H);
-    if (!open(px, py)) continue;
+    if (!open(px, py) || markAt(marks.pave, px, py) > 0.3) continue;
     const pw = 1 + Math.floor(r() * 3), ph = 1 + Math.floor(r() * 2), tint = r() * 0.35;
     for (let x = -1; x <= pw; x++) scale(px + x, py + ph, 0.62);
     for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) {

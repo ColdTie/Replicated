@@ -77,6 +77,11 @@ export interface PlanetData {
   supplies?: Record<string, number>;
   /** Surface buildings the copies designed (src/entities/Buildings.ts) */
   buildings?: Building[];
+  /** Layout version of the surface: 2 = the town (src/world/town.ts); missing = the old ring around the base, moved
+   * into the town once on load (migrateToTown) */
+  layout?: number;
+  /** Who lives where in the town: copy id -> lot index, building id -> lot index (indexes into the town's lots) */
+  town?: { lots: Record<string, number>; civic: Record<string, number> };
 }
 
 /** One blueprint format for the warren's rooms and the surface buildings: a named footprint someone designed. */
