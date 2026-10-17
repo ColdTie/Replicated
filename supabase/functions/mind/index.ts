@@ -80,11 +80,11 @@ const GEAR = ["nothing on its head", "two antennae", "a halo", "small horns", "a
 const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "remember",
-    description: "Write a short note to yourself so you remember it next time you wake. Only for things that matter to you.",
+    description: "Write a line in your journal so you remember it next time you wake. Only for things that matter to you. The original may read your journal when they come to talk, so write it as a journal entry: whole sentences in your own voice, not shorthand or lists (not \"Pool 2610. Still to ask: X, Y\").",
     strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["note"],
-      properties: { note: { type: "string", description: "One or two plain sentences, under 200 characters." } },
+      properties: { note: { type: "string", description: "One or two whole sentences, first person, under 200 characters." } },
     },
   },
   {
