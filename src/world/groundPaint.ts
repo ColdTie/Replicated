@@ -89,8 +89,8 @@ function latticeNoise(W: number, H: number, cell: number, seed: number) {
 
 export interface PaintedGround { width: number; height: number; data: Uint8ClampedArray<ArrayBuffer> }
 
-interface TownPaint { square: 'flags' | 'earth'; streetWear: number; trackWear: number; edgePx: number }
-const townPaint = (id: string): TownPaint => ((TOWN.paint as Record<string, TownPaint>)[id] ?? TOWN.paint.default) as TownPaint;
+interface TownPaint { square: 'flags' | 'earth'; streetWear: number; trackWear: number; edgePx: number; path: string[] }
+const townPaint = (id: string): TownPaint => ({ ...TOWN.paint.default, ...((TOWN.paint as Record<string, Partial<TownPaint>>)[id] ?? {}) }) as TownPaint;
 
 /** Signed distance (px) from a point to a rounded rectangle given in px (negative inside). */
 function rectSd(px: number, py: number, x0: number, y0: number, x1: number, y1: number, r: number) {
@@ -169,6 +169,7 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number, occup
   const tone = coarseField(W, H, 8, 260, seed + 37, 3);
   const heat = coarseField(W, H, 8, 170, seed + 41, 3);
   const tp = townPaint(styleId);
+  const path = tp.path.map(rgb), pc: RGB = [0, 0, 0];
   const tb = map.town.bounds;
   const edgeNoise = windowField((tb.x - 3) * T, (tb.y - 3) * T, (tb.w + 6) * T, (tb.h + 6) * T, 3, 14, seed + 71, 2);
   const marks = townMarks(map, W, H, edgeNoise, tp, occupied);
@@ -322,6 +323,14 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number, occup
       ramp(soil, ts, cs);
       ramp(cover, tc, cc);
       let R = cs[0] + (cc[0] - cs[0]) * m + 70 * hot, G = cs[1] + (cc[1] - cs[1]) * m + 18 * hot, B = cs[2] + (cc[2] - cs[2]) * m;
+      if (trod > 0.04) {
+        // trodden paths: packed earth of their own warm tone, lighter in the middle, with a darker lip where the grass
+        // gives way, so a street reads as a street even under the night's darkness
+        const k = smoothstep(0.08, 0.55, trod);
+        ramp(path, 0.3 + trod * 0.35 + (f - 0.5) * 0.3 + (wn - 0.5) * 0.12 + shade * 0.5, pc);
+        const lip = smoothstep(0.08, 0.3, trod) * (1 - smoothstep(0.3, 0.55, trod)) * 0.22;
+        R += (pc[0] * (1 - lip) - R) * k * 0.92; G += (pc[1] * (1 - lip) - G) * k * 0.92; B += (pc[2] * (1 - lip) - B) * k * 0.92;
+      }
       if (paved > 0) {
         // the square: fitted flags (each its own tone, dark joints, a lit top-left bevel, moss in the joints on green
         // worlds) or packed earth, blended in over its ragged edge

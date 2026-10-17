@@ -124,8 +124,8 @@ try {
     const out = [];
     for (const n of s.npcs) {
       const can = from(n.home ?? n);
-      const targets = [['hatch', s.warren.hatch], ['replicator', s.replicatorSpot], ...s.npcs.filter((o) => o !== n).map((o) => [o.data.name, o.home ?? o]), ...s.nodes.filter((c) => Math.hypot(c.x - n.home.x, c.y - n.home.y) < 330).map((c) => ['crystal', { x: c.x + 12, y: c.y + 4 }]), ...s.trees.filter((t) => t.alive && Math.hypot(t.x - n.home.x, t.y - n.home.y) < 300).map((t) => ['tree', { x: t.x + 12, y: t.y + 3 }])];
-      const miss = targets.filter(([, t]) => !can(t)).map(([k]) => k);
+      const targets = [['hatch', s.warren.hatch], ['replicator', s.replicatorSpot], ...s.npcs.filter((o) => o !== n).map((o) => [o.data.name, o.home ?? o]), ...s.nodes.filter((c) => Math.hypot(c.x - n.home.x, c.y - n.home.y) < 330).map((c) => ['crystal', [{ x: c.x + 12, y: c.y + 4 }, { x: c.x - 12, y: c.y + 4 }]]), ...s.trees.filter((t) => t.alive && Math.hypot(t.x - n.home.x, t.y - n.home.y) < 300).map((t) => ['tree', { x: t.x + 12, y: t.y + 3 }])];
+      const miss = targets.filter(([, t]) => !(Array.isArray(t) ? t.some(can) : can(t))).map(([k]) => k);
       out.push({ name: n.data.name, crystals: targets.filter(([k]) => k === 'crystal').length, trees: targets.filter(([k]) => k === 'tree').length, miss });
     }
     return out;

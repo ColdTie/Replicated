@@ -281,6 +281,11 @@ export class Npc {
         break;
       case 'walk':
       case 'carry':
+        // going to be with someone: follow them if they have moved on
+        if (this.seek?.who && this.target) {
+          const w = this.seek.who, to = { x: w.x + (this.x < w.x ? -14 : 14), y: w.y + 2 };
+          if (Math.hypot(to.x - this.target.x, to.y - this.target.y) > 20 && this.scene.isWalkable(to.x, to.y)) this.target = to;
+        }
         if (this.target && this.walkTo(this.target, dt)) {
           if (this.state === 'carry') this.deliver(time);
           else if (this.mineAt) { this.state = 'mine'; this.swings = 0; this.until = time; }
@@ -418,11 +423,17 @@ export class Npc {
     const range = risk === 'bold' ? 330 : risk === 'careful' ? 150 : 220;
     if (time > this.nextTrip) {
       this.nextTrip = time + DRIFT.tripMs / stat(this.data, 'gather');
-      const node = this.scene.nodes.filter((n) => n.alive && Math.hypot(n.x - home.x, n.y - home.y) < range)
+      // stand on the open side of it (crystals like to grow against rock); one walled in on both sides is skipped
+      const standAt = (n: { x: number; y: number }) => {
+        const sides = this.x < n.x ? [-12, 12] : [12, -12];
+        const dx = sides.find((d) => this.scene.isWalkable(n.x + d, n.y + 4) && this.scene.surfaceAt(n.x + d, n.y + 4) !== 'void');
+        return dx === undefined ? null : { x: n.x + dx, y: n.y + 4 };
+      };
+      const node = this.scene.nodes.filter((n) => n.alive && Math.hypot(n.x - home.x, n.y - home.y) < range && standAt(n))
         .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))[0];
       if (node) {
         this.mineAt = { x: node.x, y: node.y };
-        this.target = { x: node.x + (this.x < node.x ? -12 : 12), y: node.y + 4 };
+        this.target = standAt(node)!;
         this.state = 'walk';
         return;
       }
@@ -498,8 +509,8 @@ export class Npc {
   private startSeek(time: number) {
     this.nextSeek = time + NEEDS.seek.cooldownMs * (0.7 + Math.random() * 0.6);
     const hall = this.scene.buildings.gatheringSpot();
-    const others = this.scene.npcs.filter((o) => o !== this && (o.state === 'idle' || o.state === 'walk' || o.state === 'greet' || o.state === 'visit'));
     const d = (p: Pt) => Math.hypot(p.x - this.x, p.y - this.y);
+    const others = this.scene.npcs.filter((o) => o !== this && !o.below && d(o) < NEEDS.seek.reachPx && (o.state === 'idle' || o.state === 'walk' || o.state === 'greet' || o.state === 'visit'));
     const p = this.scene.player;
     let spot: Pt | null = null;
     if (hall) { spot = { x: hall.x + (Math.random() - 0.5) * 36, y: hall.y + 8 + Math.random() * 10 }; this.seek = {}; }
@@ -507,6 +518,8 @@ export class Npc {
       const who = others.sort((a, b) => d(a) - d(b))[0];
       spot = { x: who.x + (this.x < who.x ? -14 : 14), y: who.y + 2 };
       this.seek = { who };
+      // the one it goes to waits for it (homes stand a street apart)
+      who.joinVisit(this, time + NEEDS.seek.waitMs);
     } else if (p?.alive && !this.scene.visit && d(p) < 300) { spot = { x: p.x + (this.x < p.x ? -16 : 16), y: p.y + 2 }; this.seek = { player: true }; }
     if (!spot || !this.scene.isWalkable(spot.x, spot.y)) { this.seek = null; return false; }
     this.mineAt = null;
@@ -543,6 +556,8 @@ export class Npc {
 
   /** Someone lonely came over: stop and stand with it (only when not busy). */
   joinVisit(other: Npc, until: number) {
+    // already waiting for this one: it has arrived, stay as long as it does
+    if (this.state === 'visit' && this.visitWith === other) { this.until = until; return; }
     if (this.state !== 'idle' && this.state !== 'walk' && this.state !== 'greet') return;
     this.target = null; this.mineAt = null;
     if (this.job) { this.scene.village.release(this.job); this.job = null; }

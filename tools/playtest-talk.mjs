@@ -298,10 +298,29 @@ try {
   log('requestTalk calls', JSON.stringify(calls));
   if (calls.length !== 2 || calls[0].said !== null || !/Moss/.test(calls[1].said ?? '')) fail('requestTalk was not called on open and with the reply');
   const wakes1 = await ev((id) => { const s = window.__scene, n = s.npcs.find((q) => q.data.id === id); return s.nextWake.get(n) ?? null; }, prismId);
-  if (wakes1 !== wakes0) fail('the reply scheduled the old quick wake');
+  // the journal's TALK pulls the next wake in to 3 s; a reply from the box must not (an ordinary wake may push it later)
+  if (wakes0 !== null && wakes1 !== null && wakes1 < wakes0) fail('the reply scheduled the old quick wake');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   if ((await box()).open) fail('Esc did not close after the reply');
+
+  // 10. the real talk wake (PlanetScene.requestTalk) with the canned mind: a copy with nothing fresh to tell gathers its
+  // words and answers; a reply gets an answer; its ordinary wake moves later, not sooner
+  const real = await ev(async () => {
+    const s = window.__scene;
+    delete s.requestTalk; // back to the scene's own talk wake
+    const st = window.__session.store;
+    st.mindTick = Object.getPrototypeOf(st).mindTick; // ?sim keeps the minds asleep; this part wants the canned one
+    const n = s.npcs.find((q) => q.data.name === 'Glint') ?? s.npcs[0];
+    n.data.traits.tell = undefined;
+    const before = s.nextWake.get(n) ?? 0;
+    const told = await s.requestTalk(n);
+    const answer = await s.requestTalk(n, 'The rain is coming back tonight.');
+    return { name: n.data.name, told, answer, tell: n.data.traits.tell?.text ?? null, later: (s.nextWake.get(n) ?? 0) >= before };
+  });
+  log('real talk', JSON.stringify(real));
+  if (!real.told || !real.answer || real.tell !== real.answer) fail('the real talk wake did not answer (or did not keep traits.tell)');
+  if (!real.later) fail('a talk wake pulled the ordinary wake in');
   log('swings during all of it', JSON.stringify(await ev(() => window.__count)));
   if (await ev(() => window.__count.attack + window.__count.interact)) fail('something swung or boarded while talking');
 } finally { await b.close(); try { process.kill(-server.pid); } catch {} }

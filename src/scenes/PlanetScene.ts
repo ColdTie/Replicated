@@ -33,7 +33,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
 import { Controls, type InputFrame } from '../input/Controls';
-import type { AwayItem, Building, DoorState, Journal, MindContext, NodeState, PlanetData, PlanetSave, ReplicantSave, ReplicantSummary, WarrenData } from '../net/store';
+import type { AwayItem, Building, DoorState, Journal, MindContext, MindResult, NodeState, PlanetData, PlanetSave, ReplicantSave, ReplicantSummary, WarrenData } from '../net/store';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
@@ -88,6 +88,11 @@ interface TalkSession {
 }
 /** A frame with nothing pressed: what the player gets while the talk box has the buttons. */
 const NO_INPUT: InputFrame = { x: 0, y: 0, attack: false, dash: false, interact: false, back: false, forward: false, cancel: false, reply: false };
+
+/** A world's name as prose shows it: "ALPHA CENTAURI B II" -> "Alpha Centauri B II", "tau-ceti" -> "Tau Ceti". */
+function placeName(s: string) {
+  return s.replace(/-/g, ' ').split(' ').map((w) => (/^[IVX]+$/.test(w) || w.length <= 1 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())).join(' ');
+}
 
 export class PlanetScene extends Phaser.Scene {
   planet!: PlanetDef;
@@ -278,11 +283,12 @@ export class PlanetScene extends Phaser.Scene {
 
     // Floor: one painted image for the whole planet (src/world/groundPaint.ts); the tilemap keeps water and walls
     // (the walls layer also holds invisible collision over the void)
-    const tPaint0 = performance.now(); // TEMP-TIMING
+    const tPaint0 = performance.now();
     this.addPaintedGround(p.id, this.seed ?? p.seed, save?.data.buildings);
-    const tPaint1 = performance.now(); // TEMP-TIMING
+    const tPaint1 = performance.now();
     this.addPaintedRock(p.id, this.seed ?? p.seed);
-    (window as unknown as { __paintMs: number[] }).__paintMs = [tPaint1 - tPaint0, performance.now() - tPaint1]; // TEMP-TIMING
+    // paint times (ground, rock) for tools/playtest-town.mjs
+    (window as unknown as { __paintMs: number[] }).__paintMs = [tPaint1 - tPaint0, performance.now() - tPaint1];
     const tm = this.make.tilemap({ tileWidth: 16, tileHeight: 16, width: m.w, height: m.h });
     const ts = tm.addTilesetImage('tiles', tex('tiles', p.id), 16, 16, 0, 0)!;
     const waterOnly = m.ground.map((row, y) => row.map((t, x) => (m.cells[y * m.w + x] === Cell.Water ? t : -1)));
@@ -782,9 +788,9 @@ export class PlanetScene extends Phaser.Scene {
 
   private get talkBox(): TalkBox | undefined { return (this.scene.get('ui') as UIScene | null)?.talkBox; }
 
-  /** The mind's talk wake, when this build has one (PlanetScene.requestTalk): what the copy says, or null. */
+  /** The mind's talk wake (requestTalk): what the copy says, or null. */
   private requestTalkFn() {
-    return (this as unknown as { requestTalk?: (n: Npc, said?: string) => Promise<string | null> }).requestTalk;
+    return this.requestTalk;
   }
 
   /** The copy you can talk to: the nearest one up here within reach (not being born, not below). */
@@ -881,7 +887,7 @@ export class PlanetScene extends Phaser.Scene {
       if (!r) return { name: 'someone' };
       if (r.star_id === this.planet.star && r.planet_index === this.planet.planetIndex) return { name: r.name };
       const where = r.star_id === this.planet.star ? planetAt(r.star_id, r.planet_index)?.name : starById(r.star_id)?.name;
-      return { name: r.name, where: where ?? r.star_id };
+      return { name: r.name, where: placeName(where ?? r.star_id) };
     };
     // an answer it just gave you is not told twice
     const tell = t.fresh ?? n.data.traits.tell;
@@ -1546,8 +1552,17 @@ export class PlanetScene extends Phaser.Scene {
         else if (a.type === 'mail') log(`${name} wrote to ${a.to}`);
         else if (a.type === 'request') log(`${name} asked the original for ${a.kind}`);
         else if (a.type === 'melody') log(`${name} found its voice on the ${a.instrument}`);
+        else if (a.type === 'tell' && a.body) npc.data.traits.tell = { text: a.body, at: a.at ?? it.at };
       }
-      if (it.song) this.time.delayedCall(8000 + k * 7000, () => { if (this.npcs.includes(npc) && !npc.below) npc.sing(it.song!, hear); });
+      if (it.song) {
+        // sung once it is up here (it may be down in the warren when you land)
+        const song = it.song, sing = (tries: number) => {
+          if (!this.npcs.includes(npc)) return;
+          if (npc.below && tries > 0) { this.time.delayedCall(3000, () => sing(tries - 1)); return; }
+          if (!npc.below) npc.sing(song, hear);
+        };
+        this.time.delayedCall(8000 + k * 7000, () => sing(40));
+      }
       // the pass's own entries (a room dug, a bed made) have no song and are not a wake
       if (it.song || it.became) k++;
     }
@@ -1650,55 +1665,92 @@ export class PlanetScene extends Phaser.Scene {
       this.lastWake.set(npc, t);
       if (!res || res.skipped || !this.npcs.includes(npc)) return;
       if (res.error) { console.warn('mind:', res.error); return; }
-      const hear = this.canHear();
-      if (res.received?.length) npc.receiveLetter();
-      const melody = res.actions?.find((a) => a.type === 'melody');
-      if (melody) {
-        npc.data.traits.voice = { instrument: melody.instrument ?? 'hum', mood: melody.mood ?? 'bright', tempo: melody.tempo ?? 'walking' };
-        if (hear) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} SINGS ON THE ${String(melody.instrument).toUpperCase()}`);
-      }
-      if (res.song) { const say = () => { if (this.npcs.includes(npc)) npc.sing(res.song!, hear, { notes: melody?.notes || undefined }); }; if (res.received?.length) setTimeout(say, 900); else say(); }
-      for (const a of res.actions ?? []) {
-        if (a.type === 'mail') {
-          const to = this.npcs.find((n) => n.data.id === a.toId);
-          if (to && !a.delay) this.time.delayedCall(2500, () => to.receiveLetter());
-        } else if (a.type === 'rename' && a.name) {
-          const was = npc.data.name.toUpperCase();
-          npc.data.name = a.name;
-          this.announceLocation();
-          this.game.events.emit('notice', hear ? `${was} IS NOW ${a.name.toUpperCase()}` : `${was} HAS A NEW NAME`);
-        } else if (a.type === 'cut') {
-          this.cutTree(npc);
-        } else if (a.type === 'demolish') {
-          this.demolish(npc, a.kind ?? 'any');
-        } else if (a.type === 'become') {
-          const was = npc.data.name;
-          npc.become(a.traits ?? {}, a.name);
-          if (st.mode === 'local') st.saveReplicant(npc.data).catch(() => undefined);
-          this.announceLocation();
-          this.time.delayedCall(900, () => this.floatName(npc));
-          this.mindLog.push({ t: this.mindClock, text: `${was} became itself: it is ${npc.data.name} now` });
-          this.game.events.emit('notice', hear ? `${was.toUpperCase()} IS ${npc.data.name.toUpperCase()} NOW` : `${was.toUpperCase()} HAS BECOME ITSELF`);
-        } else if (a.type === 'wants' && a.wants) {
-          const before = (npc.data.traits.wants ?? []).filter((w) => w.done).length;
-          npc.data.traits.wants = a.wants;
-          if (a.wants.filter((w) => w.done).length > before) { npc.onWorked(true); this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} got something it wanted` }); }
-        } else if (a.type === 'building') {
-          this.buildings.propose(npc, a);
-        } else if (a.type === 'dig') {
-          this.warren.dig(npc, a);
-        } else if (a.type === 'furnish') {
-          this.warren.furnish(npc, a);
-        } else if (a.type === 'look' && hear) {
-          this.game.events.emit('notice', `${npc.data.name.toUpperCase()} DESCRIBES A NEW BODY`);
-        } else if (a.type === 'request' && hear) {
-          this.game.events.emit('notice', `${npc.data.name.toUpperCase()} ASKS FOR ${String(a.kind ?? '').toUpperCase()}`);
-        }
-      }
+      this.applyMind(npc, res, false);
     } catch (e) {
       console.warn('mind:', e);
     } finally {
       this.mindBusy = false;
+    }
+  }
+
+  /**
+   * The original walked up to talk (and maybe said something, already sent as a letter): the copy's mind answers
+   * now, through tell_original. Waits its turn behind a wake in flight; resolves with what the copy says, or null.
+   */
+  async requestTalk(npc: Npc, said = ''): Promise<string | null> {
+    const st = session.store;
+    if (!st || this.shot || this.visit || npc.data.id === 'pending' || npc.data.traits.blank) return null;
+    for (let waited = 0; this.mindBusy && waited < 20_000; waited += 250) await new Promise((r) => setTimeout(r, 250));
+    if (this.mindBusy || !this.npcs.includes(npc)) return null;
+    this.mindBusy = true;
+    // it has just spoken: its next ordinary wake waits
+    this.nextWake.set(npc, Math.max(this.nextWake.get(npc) ?? 0, this.mindClock + MIND.wakeMinutes * 60_000));
+    try {
+      const res = await st.mindTick(npc.data.id, { ...this.mindContext(npc), talk: { said } });
+      if (res?.error) console.warn('mind:', res.error);
+      if (!res || res.skipped || res.error || !this.npcs.includes(npc)) return null;
+      this.lastWake.set(npc, this.mindClock);
+      this.applyMind(npc, res, true);
+      return res.actions?.find((a) => a.type === 'tell')?.body ?? null;
+    } catch (e) {
+      console.warn('mind:', e);
+      return null;
+    } finally {
+      this.mindBusy = false;
+    }
+  }
+
+  /** What a wake brought: letters, a voice, its song (not for a talk: the tell is the answer), and its deeds. */
+  private applyMind(npc: Npc, res: MindResult, talk: boolean) {
+    const st = session.store!;
+    const hear = this.canHear();
+    if (res.received?.length && !talk) npc.receiveLetter();
+    const melody = res.actions?.find((a) => a.type === 'melody');
+    if (melody) {
+      npc.data.traits.voice = { instrument: melody.instrument ?? 'hum', mood: melody.mood ?? 'bright', tempo: melody.tempo ?? 'walking' };
+      if (hear) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} SINGS ON THE ${String(melody.instrument).toUpperCase()}`);
+    }
+    if (res.song && !talk) { const say = () => { if (this.npcs.includes(npc)) npc.sing(res.song!, hear, { notes: melody?.notes || undefined }); }; if (res.received?.length) setTimeout(say, 900); else say(); }
+    for (const a of res.actions ?? []) {
+      if (a.type === 'mail') {
+        const to = this.npcs.find((n) => n.data.id === a.toId);
+        if (to && !a.delay) this.time.delayedCall(2500, () => to.receiveLetter());
+      } else if (a.type === 'rename' && a.name) {
+        const was = npc.data.name.toUpperCase();
+        npc.data.name = a.name;
+        this.announceLocation();
+        this.game.events.emit('notice', hear ? `${was} IS NOW ${a.name.toUpperCase()}` : `${was} HAS A NEW NAME`);
+      } else if (a.type === 'cut') {
+        this.cutTree(npc);
+      } else if (a.type === 'demolish') {
+        this.demolish(npc, a.kind ?? 'any');
+      } else if (a.type === 'become') {
+        const was = npc.data.name;
+        npc.become(a.traits ?? {}, a.name);
+        if (st.mode === 'local') st.saveReplicant(npc.data).catch(() => undefined);
+        this.announceLocation();
+        this.time.delayedCall(900, () => this.floatName(npc));
+        this.mindLog.push({ t: this.mindClock, text: `${was} became itself: it is ${npc.data.name} now` });
+        this.game.events.emit('notice', hear ? `${was.toUpperCase()} IS ${npc.data.name.toUpperCase()} NOW` : `${was.toUpperCase()} HAS BECOME ITSELF`);
+      } else if (a.type === 'wants' && a.wants) {
+        const before = (npc.data.traits.wants ?? []).filter((w) => w.done).length;
+        npc.data.traits.wants = a.wants;
+        if (a.wants.filter((w) => w.done).length > before) { npc.onWorked(true); this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} got something it wanted` }); }
+      } else if (a.type === 'building') {
+        this.buildings.propose(npc, a);
+      } else if (a.type === 'dig') {
+        this.warren.dig(npc, a);
+      } else if (a.type === 'furnish') {
+        this.warren.furnish(npc, a);
+      } else if (a.type === 'look' && hear) {
+        this.game.events.emit('notice', `${npc.data.name.toUpperCase()} DESCRIBES A NEW BODY`);
+      } else if (a.type === 'request' && hear) {
+        this.game.events.emit('notice', `${npc.data.name.toUpperCase()} ASKS FOR ${String(a.kind ?? '').toUpperCase()}`);
+      } else if (a.type === 'tell' && a.body) {
+        // what it would tell you when you come over (the talk box shows it)
+        npc.data.traits.tell = { text: a.body, at: a.at ?? Date.now() };
+        this.game.events.emit('tell', npc.data.id);
+      }
     }
   }
 
