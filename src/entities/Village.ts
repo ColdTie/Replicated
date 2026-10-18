@@ -187,6 +187,19 @@ export class Village {
     this.markWorkDirty();
   }
 
+  /** Builds the original granted a copy (a gift): placed at once where the scene found room, popping up. */
+  grant(type: string, by: string, spots: { x: number; y: number }[], tint?: number) {
+    const def = PROJECTS[type];
+    if (!def || !spots.length) return false;
+    for (const [k, p] of spots.entries()) {
+      const save: StructureSave = { type, x: Math.round(p.x), y: Math.round(p.y), at: Date.now() + k, by, variant: 0, tint: def.tint ? tint : undefined };
+      this.structures = [...this.structures, save];
+      this.scene.time.delayedCall(400 + k * 260, () => this.built.push(new Structure(this.scene, save, def, true)));
+    }
+    this.scene.pending.structures = this.structures;
+    return true;
+  }
+
   /** A copy takes one of its builds down (never the Replicator). Returns what fell, or null. */
   remove(save: StructureSave) {
     if (save.type === 'replicator') return null;

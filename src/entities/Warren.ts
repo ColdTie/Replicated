@@ -64,7 +64,9 @@ export class Warren {
     this.data = data ? structuredClone(data) : { rooms: [], items: [] };
     // warrens from before the entrance was its own dig (session 9): a dug room means the hole is open
     this.data.entrance ??= { dug: this.data.rooms.some((r) => r.dug), swings: 0 };
-    this.hatch = this.data.hatch ?? this.findHatchSpot();
+    // the way down is always the town's, in a corner of the square out of every walking line (a stale saved spot
+    // from an old layout or the away pass never wins)
+    this.hatch = { ...scene.map.town.hatch };
     this.data.hatch = this.hatch;
     const { x, y } = this.hatch;
     this.hatchSprite = scene.add.sprite(x, y + 4, tex('hatch', scene.planet.id), 0).setOrigin(0.5, 1).setDepth(52);
@@ -79,11 +81,6 @@ export class Warren {
   get opened() { return !!this.data.entrance?.dug; }
   get planned() { return this.data.rooms.filter((r) => !r.dug); }
   get supplies() { return this.scene.supplies; }
-
-  /** The way down: the hatch spot in a corner of the town square (src/world/town.ts), out of every walking line. */
-  private findHatchSpot() {
-    return { ...this.scene.map.town.hatch };
-  }
 
   /** Nothing until a copy lives here; then the mark, the pit, the open hole. */
   refreshHatch() {

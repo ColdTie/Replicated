@@ -4,3 +4,4 @@ public/assets/gen
 *.log
 .DS_Store
 dist-sim
+dist-test

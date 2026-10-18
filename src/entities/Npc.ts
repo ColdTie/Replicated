@@ -610,7 +610,7 @@ export class Npc {
     sc.tweens.add({
       targets: [s, this.gear.image], y: '-=40', alpha: 0, delay: 600, duration: 1100, ease: 'Quad.easeIn',
       onComplete: () => {
-        s.destroy(); this.shadow.destroy(); this.gear.image.destroy();
+        s.destroy(); this.shadow.destroy(); this.gear.destroy();
         sc.lighting.remove(this.light);
         done?.();
       },

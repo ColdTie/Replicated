@@ -75,7 +75,7 @@ interface Replicant {
 }
 
 const VISOR: Record<number, string> = { 9: "orange", 10: "yellow", 11: "pale yellow", 18: "cyan", 19: "white", 12: "green", 13: "lime", 20: "silver", 29: "red", 30: "pink", 31: "lavender" };
-const GEAR = ["nothing on its head", "two antennae", "a halo", "small horns", "a sprout", "a dish", "a crown"];
+const GEAR = ["nothing on its head", "two antennae", "a halo", "small horns", "a sprout", "a dish", "a crown", "two antennae with tips that glow gold like small lit wicks"];
 
 const tools: Anthropic.Beta.BetaTool[] = [
   {

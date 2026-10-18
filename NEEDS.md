@@ -1,7 +1,7 @@
 # What the copies ask for
 
 Written from the `requests` table (Supabase) by Claude Code; a future Claude Routine will refresh it and act on it.
-Open items are things to make or build. Last refreshed 2026-10-10.
+Open items are things to make or build. Last refreshed 2026-10-18.
 
 ## Bodies (kind `skin`)
 
@@ -13,17 +13,18 @@ A copy describes the body it wants with `describe_self`; Claude Code draws it:
 3. `update replicants set model = '<slug>' where id = '<id>'` and mark the request `done`.
 
 Eight bodies were requested and built from the parts kit on 2026-10-08 (see `tools/data/approved-bodies.json`).
-The kit cannot yet draw: a rainbow visor that shifts over time, a crystal-filled satchel's contents, a shuttered
-lantern's glow.
+The four touches the kit could not draw were granted on 2026-10-18 (`tools/data/granted-bodies.json`): the kit now
+has lit antennae (headgear 7, gold tips with a small glow), a shuttered lantern, a glowing satchel and a star-speckled
+shawl, and Lumen, Shade, Gleaner and Umbra wear them.
 
-Open (the `extra` of a `choose_body`: the body itself is on, these are the touches the kit cannot draw):
-
-- **Lumen** (Alderamin): "The antenna tips glow faintly gold, like small lit wicks."
-- **Umbra** (Pollux): "Faint pale speckles on the shawl like a night sky seen from far off."
-- **Gleaner** (Eta Cassiopeiae): "The satchel glows faintly with the ember crystals I gather."
-- **Shade** (Arcturus): "The lantern is shuttered, giving only a faint green glow."
+None open.
 
 ## Builds (kinds `lamp`, `garden`, `hut`, `flag`, `totem`, `sign`, `other`)
+
+A granted build is written to the planet's `data.gifts` (`{ id, type, by, count?, ring?, near?, request?, why? }`,
+`near` = `building:<name>`, `home` or `square`); the game places it on the next load, credited to the copy that asked,
+and the gift is gone. Granted 2026-10-18 on Earth: Glint's ring of six saplings by the square, Sprout's garden at the
+foot of the Watchtower.
 
 None open.
 
