@@ -79,7 +79,8 @@ try {
 
   // 4. an away wake plays out: the queue is taken once, its song is sung, its room planned
   const away = await ev(async () => {
-    const s = window.__scene, st = window.__session.store, n = s.npcs[1];
+    // a copy that is up here: one that went down to improve a room sings only once it climbs out (up to half a minute)
+    const s = window.__scene, st = window.__session.store, up = s.npcs.findIndex((x) => !x.below), i = up >= 0 ? up : 1, n = s.npcs[i];
     const key = `${s.planet.star}:${s.planet.planetIndex}`;
     st.db.planets[key] ??= { star_id: s.planet.star, planet_index: s.planet.planetIndex, seed: 1, embers: 0, data: {} };
     st.db.planets[key].data.awayQueue = [
@@ -91,14 +92,14 @@ try {
     const again = await st.takeMindQueue(s.planet.star, s.planet.planetIndex);
     const rooms0 = s.warren.data.rooms.length;
     s.replayAway(q);
-    return { taken: q.length, again: again.length, rooms: s.warren.data.rooms.length - rooms0, log: s.mindLog.slice(-4).map((e) => e.text) };
+    return { i, taken: q.length, again: again.length, rooms: s.warren.data.rooms.length - rooms0, log: s.mindLog.slice(-4).map((e) => e.text) };
   });
   log('away', JSON.stringify(away));
   if (away.taken !== 2 || away.again !== 0) fail('the away queue was not taken exactly once');
   if (away.rooms !== 1) fail('the away dig was not played out (or an applied one was placed again)');
   if (!away.log.some((t) => t.includes('marked out Hollow')) || !away.log.some((t) => t.includes('resting station'))) fail('applied away deeds were not told');
   if (away.log.some((t) => t.includes('Nowhere'))) fail('a failed away deed was told');
-  await page.waitForFunction(() => !!window.__scene.npcs[1].bubble, null, { timeout: 20000 }).catch(() => fail('the away song was never sung'));
+  await page.waitForFunction((i) => !!window.__scene.npcs[i].bubble, away.i, { timeout: 45000 }).catch(() => fail('the away song was never sung'));
 
   // 5. a Spark awakens a copy: a profile in its name, its row active, the copy gone from the planet
   const woke = await ev(async () => {
