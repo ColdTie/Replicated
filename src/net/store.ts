@@ -54,6 +54,11 @@ export interface DoorState { open: boolean; taken?: boolean }
 /** One copy's wake while nobody played (the mind function's away run): queued on its planet for the game. */
 export interface AwayItem { id: string; name: string; at: number; song?: string; actions?: MindAction[]; became?: boolean }
 
+/** A granted request: `count` builds of `type` (a village project) credited to `by`, placed on open ground near
+ * `near` ("building:<name>" beside a building's front, "home" for the copy's lot, "square" for the town square), in a
+ * ring of radius `ring` px when given; `request` is the requests row it answers. */
+export interface Gift { id: string; type: string; by: string; count?: number; near?: string; ring?: number; request?: string; why?: string }
+
 export interface PlanetData {
   /** "EARTH - SOL" and the biome's words, kept for the minds' away wakes */
   label?: string; biome?: string;
@@ -80,6 +85,9 @@ export interface PlanetData {
   /** Layout version of the surface: 2 = the town (src/world/town.ts); missing = the old ring around the base, moved
    * into the town once on load (migrateToTown) */
   layout?: number;
+  /** What the original granted a copy (written from outside the game when Steve says yes to a request): placed as
+   * builds credited to the copy on the next load, then removed */
+  gifts?: Gift[];
   /** Who lives where in the town: copy id -> lot index, building id -> lot index (indexes into the town's lots) */
   town?: { lots: Record<string, number>; civic: Record<string, number> };
 }

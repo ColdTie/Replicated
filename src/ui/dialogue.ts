@@ -362,7 +362,7 @@ export function openReplyInput(canvas: HTMLCanvasElement, rect: { x: number; y: 
   root.addEventListener('pointerdown', (e) => { if (e.target === root) close(); });
   for (const ev of ['keydown', 'keyup', 'keypress'] as const) root.addEventListener(ev, (e) => e.stopPropagation());
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); close(); }
     else if (e.key === 'Enter') { e.preventDefault(); const t = input.value.trim(); close(); if (t) onSend(t); }
   });
   document.body.appendChild(root);

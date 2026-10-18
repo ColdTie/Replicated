@@ -1,0 +1,13 @@
+{
+  "_doc": "Body requests granted in session 13 (Steve, 2026-10-18: \"accept the changes and requests the replicants ask for and give it to them\"). Each is the copy's body with the new part it asked for; written to traits.body (and traits.gear for Lumen's lit antennae).",
+  "bodies": [
+    { "name": "Lumen", "id": "113748bc-91cb-4fe0-8229-07ab35310359", "feature": 10, "asked": "The antenna tips glow faintly gold, like small lit wicks.",
+      "body": { "arms": "thin", "back": "shawl", "head": "round", "legs": "long", "torso": "slim", "visor": "wide", "accent": "orange", "primary": "pale", "headgear": 7, "markings": "flecks", "accessory": "lantern", "secondary": "slate" } },
+    { "name": "Shade", "id": "2911867f-5c4e-4cd4-bd88-c765e6559d23", "feature": 12, "asked": "The lantern is shuttered, giving only a faint green glow.",
+      "body": { "arms": "thin", "back": "longcape", "head": "hooded", "legs": "long", "torso": "slim", "visor": "slit", "accent": "moss", "primary": "ink", "headgear": 4, "markings": "flecks", "accessory": "shutteredlantern", "secondary": "slate" } },
+    { "name": "Gleaner", "id": "654c3620-bc2e-46da-b316-433f25bcc497", "feature": 10, "asked": "The satchel glows faintly with the ember crystals I gather.",
+      "body": { "arms": "thin", "back": "shawl", "head": "round", "legs": "sturdy", "torso": "slim", "visor": "band", "accent": "red", "primary": "sand", "headgear": 2, "markings": "flecks", "accessory": "glowsatchel", "secondary": "umber" } },
+    { "name": "Umbra", "id": "39b3aa60-f2ef-429d-ad16-a0ef6729d828", "feature": 12, "asked": "Faint pale speckles on the shawl like a night sky seen from far off.",
+      "body": { "arms": "thin", "back": "starshawl", "head": "hooded", "legs": "long", "torso": "slim", "visor": "slit", "accent": "moss", "primary": "ink", "headgear": 5, "markings": "speckles", "accessory": "spyglass", "secondary": "slate" } }
+  ]
+}

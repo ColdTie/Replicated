@@ -184,7 +184,9 @@ building work live in `planet_states` and are written as atomic deltas
 pool. The replicant row stores position, planet and `traits.awake` (Earth's wake-up intro plays once per replicant).
 A planet saved before the town (no `data.layout`, or below `town.json layout`) moves into it once on load: builds go to
 their builder's lot, buildings to civic lots, the hatch into the square, node damage and felled trees reset (the world
-was regenerated bigger); `data.town` keeps who lives on which lot.
+was regenerated bigger); `data.town` keeps who lives on which lot. `data.gifts` holds builds the original granted
+(a copy's `garden` request and the like): the next load places each on open ground near what it names
+(`building:<name>`, `home`, `square`), credited to the copy that asked, and drops it (`PlanetScene.grantGifts`).
 Journeys store `from_planet` / `to_planet` (migration 0006). Every table is scoped by `galaxy_id` with row level
 security; `ensure_family_galaxy()` creates the galaxy on first sign-in.
 
@@ -199,7 +201,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | --- | --- | --- |
 | look | `body` | `{ head, visor, torso, arms, legs, back, accessory, markings, headgear, primary, secondary, accent }`: names from `src/data/parts.json`; composed at load time (`src/core/bodyRender.ts`). Absent = a hand-made model (`replicants.model`). |
 | look | `feature` | visor light color (palette index; the dark one is its pair in `player.json featureColors`) |
-| look | `gear`, `trail` | headgear frame (`gear.json`), trail / flag / mural color (palette index) |
+| look | `gear`, `trail` | headgear frame (`gear.json`; 7 = lit antennae), trail / flag / mural color (palette index) |
 | look | `look` | free text the kit cannot draw (open `requests` row of kind `skin`, hand art) |
 | voice | `voice` | `{ instrument, mood, tempo }` (`sing_as`) |
 | mind | `temperament` | `{ pace, sociability, work, bedtime, risk }` (`set_temperament`): walking pace, greeting range, build vs wander, when it turns in, how far it ranges |
@@ -909,3 +911,22 @@ ship dropped you down the hatch.
   0.8 s longer for twice the area. Screenshots `town-*.png`, `talk-*.png`, `font-prose.png`.
 
 Next: the first live talks will show how the model's tells read; watch that the far worlds migrate cleanly when visited.
+
+### Session 13 (2026-10-18): what they asked for (Steve: "accept the changes and requests the replicants ask for and give it to them")
+- **Every open request granted.** The four body touches the kit could not draw are in the kit now and on the copies
+  (`tools/data/granted-bodies.json`): Lumen's lit antennae (headgear 7: the antennae with a gold pixel and a small warm
+  glow at each tip, `Gear.ts`), Shade's shuttered lantern (`shutteredlantern`, a dark lantern with one green slit),
+  Gleaner's glowing satchel (`glowsatchel`), Umbra's star-speckled shawl (`starshawl`). The minds' kit lists them too.
+- **Gifts.** Build requests are granted through `planet_states.data.gifts`; the game places them on the next load
+  (see Saving above). Earth got Glint's ring of six saplings south of the square (new `sapling` project, gift only)
+  and Sprout's garden beside the Watchtower's front. Every request row is `done`; `NEEDS.md` lists none open.
+- **Review fixes from Session 12's code.** Planet and copy loads retry once; a planet that still fails plays without
+  saving (it never overwrites the real save), and the town migration waits for the copies to load. Buildings snap
+  onto their civic lot; a birth holds its lot under a pending key until the row exists. The hatch is always the
+  town's. Talk: the opening word is kept while a reply is pending, the box tracks hp, R's reply line closes with Esc /
+  Tab, a copy's tree cutting or demolishing waits until the talk ends, a talk waits for a running wake and the server's
+  gap (and retries a skipped one) while ordinary wakes hold. A rising (awakened) copy takes its headgear lights along.
+- `dist-test/` (a frozen build for the playtests) had been committed by mistake; it is untracked and ignored now.
+- Verified: build, Deno check of the function, all nine playtests, a gift run on a snapshot of the live Earth
+  (`screenshots/gift-saplings.png`, `gift-tower-garden.png`, `gift-lit-antennae.png`); the four bodies in
+  `screenshots/bodies-granted.png`.

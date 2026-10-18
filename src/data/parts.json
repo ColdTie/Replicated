@@ -664,7 +664,7 @@
     }
   },
   "back": {
-    "_doc": "Drawn first (behind the body). Each pose is a grid at the anchor.",
+    "_doc": "Drawn first (behind the body). Each pose is a grid at the anchor. starshawl (Umbra: pale speckles like a night sky seen from far off) was drawn for a request.",
     "variants": {
       "cape": {
         "anchor": [
@@ -861,6 +861,41 @@
           ]
         }
       },
+      "starshawl": {
+        "anchor": [
+          2,
+          8
+        ],
+        "poses": {
+          "still": [
+            "....ccsc....",
+            "..cscccccc..",
+            ".cccccccscc.",
+            ".csccsccccc.",
+            ".ccc....csc.",
+            "..cs....cc..",
+            "..c......c.."
+          ],
+          "sway": [
+            "....ccsc....",
+            "..cscccccc..",
+            ".cccccccscc.",
+            ".csccsccccc.",
+            ".ccc....csc.",
+            "..cs....cc..",
+            "..c......c.."
+          ],
+          "flare": [
+            "....ccsc....",
+            "..cscccccc..",
+            ".cccccccscc.",
+            ".csccsccccc.",
+            ".ccc....csc.",
+            "..cs....cc..",
+            "..c......c.."
+          ]
+        }
+      },
       "shawl": {
         "anchor": [
           2,
@@ -911,7 +946,7 @@
     "t": 3
   },
   "accessory": {
-    "_doc": "Front pieces. anchor + rows like the back pieces; hand: true draws the rows at the right hand of each pose (offset).",
+    "_doc": "Front pieces. anchor + rows like the back pieces; hand: true draws the rows at the right hand of each pose (offset). shutteredlantern (Shade: shuttered, a faint green glow) and glowsatchel (Gleaner: the ember it gathers glows inside) were drawn for their requests.",
     "variants": {
       "none": {
         "anchor": [
@@ -968,6 +1003,32 @@
           "kk",
           "yo",
           "kk"
+        ]
+      },
+      "shutteredlantern": {
+        "hand": true,
+        "offset": [
+          0,
+          1
+        ],
+        "rows": [
+          "kk",
+          "kg",
+          "kk"
+        ]
+      },
+      "glowsatchel": {
+        "anchor": [
+          5,
+          9
+        ],
+        "rows": [
+          ".....n",
+          "....n.",
+          "...n..",
+          "nnm...",
+          "nyo...",
+          "mom..."
         ]
       },
       "spyglass": {

@@ -1,5 +1,5 @@
 {
-  "_doc": "What the copies build around the base while you are away, and while you watch. work = effort units. Each copy earns workPerHour (times its gather stat) per real hour counted from planet_states.data.npcTick, up to offlineCapHours, into the planet's shared work pool (data.village.work); liveWorkPerHour accrues while someone plays. A copy with enough pooled work picks a project by taste (its id hash weights the project weights) among those that still have a free slot on its own lot in the town (src/data/town.json slots: the house at the back, gardens, flag, totem, sign, the two lamp posts at the frontage, then street lamp spots nearby), walks there, hammers hammerSwings times and the build appears; builds are saved in data.structures with the builder (by), tint and variant. A copy whose lot is full builds nothing more. light = light the build casts (palette color). tint = painted in the builder's trail color. variants = pictogram frames (sign). solid = [w, h] blocking box. smoke = chimney puffs.",
+  "_doc": "What the copies build around the base while you are away, and while you watch. work = effort units. Each copy earns workPerHour (times its gather stat) per real hour counted from planet_states.data.npcTick, up to offlineCapHours, into the planet's shared work pool (data.village.work); liveWorkPerHour accrues while someone plays. A copy with enough pooled work picks a project by taste (its id hash weights the project weights) among those that still have a free slot on its own lot in the town (src/data/town.json slots: the house at the back, gardens, flag, totem, sign, the two lamp posts at the frontage, then street lamp spots nearby), walks there, hammers hammerSwings times and the build appears; builds are saved in data.structures with the builder (by), tint and variant. A copy whose lot is full builds nothing more. light = light the build casts (palette color). tint = painted in the builder's trail color. variants = pictogram frames (sign). solid = [w, h] blocking box. smoke = chimney puffs. sapling (weight 0): a young tree, planted only as a gift (planet_states.data.gifts).",
   "workPerHour": 1.6,
   "offlineCapHours": 12,
   "liveWorkPerHour": 1.6,
@@ -58,6 +58,12 @@
         8
       ],
       "smoke": true
+    },
+    "sapling": {
+      "sprite": "sapling",
+      "work": 1,
+      "weight": 0,
+      "anim": "sway"
     },
     "totem": {
       "sprite": "totem",

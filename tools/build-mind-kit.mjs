@@ -18,7 +18,7 @@ const colorName = (i) => names(PARTS.colors).find((k) => PARTS.colors[k] === i) 
 const kit = {
   head: names(PARTS.head.variants), visor: names(PARTS.visor.variants), torso: names(PARTS.torso.variants), arms: names(PARTS.arms.variants),
   legs: names(PARTS.legs.variants), back: names(PARTS.back.variants), accessory: names(PARTS.accessory?.variants), markings: names(PARTS.markings?.variants),
-  headgear: ['nothing', 'antennae', 'halo', 'horns', 'sprout', 'dish', 'crown'], colors: names(PARTS.colors),
+  headgear: ['nothing', 'antennae', 'halo', 'horns', 'sprout', 'dish', 'crown', 'lit antennae'], colors: names(PARTS.colors),
   visors: PLAYER.featureColors.map((f) => colorName(f[1])), visorLights: PLAYER.featureColors.map((f) => f[1]), colorIndex,
 };
 const out = {
