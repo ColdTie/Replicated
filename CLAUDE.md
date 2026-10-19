@@ -175,6 +175,11 @@ src/ui/talk.ts           what a copy says when you talk to it: pages SAYS (trait
                          WANTS (and a feeling), LETTERS (to you first), wrapped for the box (pure; src/data/talk.json)
 src/ui/dialogue.ts       the talk box at the bottom (portrait, name, pages, typing in the copy's voice, reply line);
                          drawn in the 'prose' font (tools/sprites/font-prose.json: mixed case with descenders)
+src/scenes/planet/       PlanetScene's parts, each a class holding the scene as `s` and made once with it: Talk (the
+                         talk box), Minds (wakes, mind context, away replay, chorus, the journal and its actions,
+                         copies' chores), Saving (planet delta, replicant row), Town (migration, lots, gifts),
+                         Departure (board ring, star map, lift-off); shared.ts holds their helpers. The scene keeps
+                         one-line delegates for what entities and playtests reach (scene.mindLog, scene.requestTalk...)
 src/scenes/              Boot (assets) -> Home (sign-in, profile picker) -> Planet (world, saving) + UI (counter, title, touch)
                          Planet <-> StarMap (overlay) -> Travel -> Planet (arrival); Home goes to Travel while in flight
 supabase/migrations/     schema applied to the "Replicated" Supabase project (keep in sync when changing the DB)
@@ -400,3 +405,9 @@ Spark, the `mind_runs` table).
 
 **S6, housekeeping.** Sessions 1 to 11 moved to `docs/history.md` (CLAUDE.md 99 KB -> 38 KB). The screenshots all
 stay: the ones no tool rewrites are the per-biome references the history names.
+
+**S2, the planet scene split.** `PlanetScene.ts` 2,312 -> about 1,400 lines; Talk, Minds, Saving, Town and Departure
+moved into `src/scenes/planet/` by a script that moved each member with its comment and rewrote `this.x` by owner (no
+logic touched). Controllers are made once with the scene object, as their fields were, so nothing resets differently.
+Two captures of the same build differ in 13% of pixels (particles, wind), so a pixel diff proves nothing here; the
+whole `npm test` passed before and after.

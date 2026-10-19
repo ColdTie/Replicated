@@ -1,12 +1,7 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
-import { BACKEND, BEACON, BUILDINGS, ENEMIES, ITEMS, MIND, PALETTE, PLANETS, PLAYER, STRUCTURES, SUPPLIES, VILLAGE, WARREN, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
-import { HEAR_HINT, closeJournal, journalOpen, openJournal } from '../ui/journal';
-import { openReplyInput, type TalkBox, type TalkWho } from '../ui/dialogue';
-import { composeTalk, type Exchange, type TalkPage } from '../ui/talk';
-import TALK from '../data/talk.json';
-import type { UIScene } from './UIScene';
+import { BACKEND, BEACON, BUILDINGS, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, SUPPLIES, VILLAGE, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
 import { DRIFT, replicate, stat } from '../core/drift';
 import { session } from '../core/session';
 import { Base } from '../entities/Base';
@@ -18,8 +13,7 @@ import { Npc } from '../entities/Npc';
 import { Village } from '../entities/Village';
 import { Warren } from '../entities/Warren';
 import { Buildings } from '../entities/Buildings';
-import { allRooms, demoWarren, describeWarren, restOf } from '../world/warren';
-import { PARTS, bodyFor } from '../core/body';
+import { demoWarren } from '../world/warren';
 import { planetAt } from '../world/system';
 import { Player, squash } from '../entities/Player';
 import { CrystalNode, Shard, Spark } from '../entities/Resources';
@@ -32,31 +26,21 @@ import { Environment } from '../fx/Environment';
 import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
-import { Controls, type InputFrame } from '../input/Controls';
-import type { AwayItem, Building, DoorState, Gift, Journal, MindContext, MindHealth, MindResult, NodeState, PlanetData, PlanetSave, ReplicantSave, ReplicantSummary, WarrenData } from '../net/store';
+import { Controls } from '../input/Controls';
+import type { AwayItem, Building, DoorState, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
-import { TOWN_LAYOUT, TOWN_TUNING, assignHomes, birthOrder, buildingSpot, inRect, migrateToTown, nextFreeLot, occupiedLots, type Lot, type TownState } from '../world/town';
-import { TRAVEL, distanceLy, fuelFor, planetFor, starById, travelMs } from '../world/galaxy';
-import type { StarMapData } from './StarMapScene';
+import { TOWN_TUNING, birthOrder, nextFreeLot, occupiedLots, type TownState } from '../world/town';
+import { planetFor, starById } from '../world/galaxy';
+import { Departure } from './planet/Departure';
+import { Minds } from './planet/Minds';
+import { Saving } from './planet/Saving';
+import { Talk } from './planet/Talk';
+import { Town } from './planet/Town';
+import { kitLists } from './planet/shared';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
-
-const GEAR_NAMES = ['nothing', 'antennae', 'halo', 'horns', 'sprout', 'dish', 'crown', 'lit antennae'];
-
-/** The parts kit as lists of names, for a blank copy's becoming (the mind picks from these). */
-function kitLists(): MindContext['kit'] {
-  const names = (o: Record<string, unknown>) => Object.keys(o).filter((k) => !k.startsWith('_'));
-  const colorIndex: Record<string, number> = {};
-  for (const k of names(PARTS.colors)) colorIndex[k] = PARTS.colors[k];
-  const colorName = (i: number) => names(PARTS.colors).find((k) => PARTS.colors[k] === i) ?? `color ${i}`;
-  return {
-    head: names(PARTS.head.variants), visor: names(PARTS.visor.variants), torso: names(PARTS.torso.variants), arms: names(PARTS.arms.variants),
-    legs: names(PARTS.legs.variants), back: names(PARTS.back.variants), accessory: names(PARTS.accessory?.variants ?? {}), markings: names(PARTS.markings?.variants ?? {}), headgear: GEAR_NAMES, colors: names(PARTS.colors),
-    visors: PLAYER.featureColors.map((f) => colorName(f[1])), visorLights: PLAYER.featureColors.map((f) => f[1]), colorIndex,
-  };
-}
 
 interface InitData {
   planetId?: string;
@@ -71,43 +55,6 @@ interface InitData {
 const SAVE_EVERY_MS = 4000;
 const POS_SAVE_EVERY_MS = 10000;
 
-/** An open talk with a copy: what it has loaded, what you said, what it is working on. */
-interface TalkSession {
-  npc: Npc;
-  /** your hp when it opened: a hit ends the talk */
-  hp: number;
-  name: string;
-  journal: Journal | null;
-  exchanges: Exchange[];
-  /** a fresh word is being asked of its mind (requestTalk) */
-  composing: boolean;
-  /** what it told you since the box opened (requestTalk's answer, or traits.tell from a 'tell' event) */
-  fresh: { text: string; at: number } | null;
-  /** what it had to tell you when the box opened (kept when a reply's answer replaces traits.tell) */
-  opening: { text: string; at: number } | null;
-  /** close() of the reply input while it is open */
-  reply: (() => void) | null;
-}
-/** A frame with nothing pressed: what the player gets while the talk box has the buttons. */
-const NO_INPUT: InputFrame = { x: 0, y: 0, attack: false, dash: false, interact: false, back: false, forward: false, cancel: false, reply: false };
-
-/** The mind function answers a talk wake at most this often per copy (TALK_GAP_SECONDS there, plus a margin). */
-const TALK_GAP_MS = 16_000;
-
-/** A world's name as prose shows it: "ALPHA CENTAURI B II" -> "Alpha Centauri B II", "tau-ceti" -> "Tau Ceti". */
-function placeName(s: string) {
-  return s.replace(/-/g, ' ').split(' ').map((w) => (/^[IVX]+$/.test(w) || w.length <= 1 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())).join(' ');
-}
-
-/** The journal's warning when the latest wakes all failed (mind.json health), or undefined while the minds are well. */
-function quietMinds(h: MindHealth | null): { since: string; error: string } | undefined {
-  if (!h || h.failuresSinceOk < MIND.health.quietAfter || !h.firstFailureAt) return undefined;
-  const at = new Date(h.firstFailureAt);
-  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const since = at.toDateString() === new Date().toDateString() ? time : `${at.toLocaleDateString([], { weekday: 'long' })} ${time}`;
-  return { since, error: (h.lastError ?? 'no answer').slice(0, 140) };
-}
-
 export class PlanetScene extends Phaser.Scene {
   planet!: PlanetDef;
   map!: PlanetMap;
@@ -121,7 +68,7 @@ export class PlanetScene extends Phaser.Scene {
   spores: Spore[] = [];
   beacon?: Beacon;
   guardian?: Guardian;
-  private litBeacons: string[] = [];
+  litBeacons: string[] = [];
   ruins: Ruin[] = [];
   npcs: Npc[] = [];
   village!: Village;
@@ -149,15 +96,15 @@ export class PlanetScene extends Phaser.Scene {
   private fpsSamples: number[] = [];
   private nextFpsSample = 0;
   private lowQuality = new URLSearchParams(location.search).has('low');
-  private controls!: Controls;
+  controls!: Controls;
   private walls!: Phaser.Tilemaps.TilemapLayer;
   private solids!: Phaser.Physics.Arcade.StaticGroup;
-  private vessel!: Phaser.GameObjects.Sprite;
+  vessel!: Phaser.GameObjects.Sprite;
   private cradle?: Phaser.GameObjects.Image;
   private vesselCue?: { group: Phaser.GameObjects.Container; icon: Phaser.GameObjects.Image; arrow: Phaser.GameObjects.Graphics; shown: number };
-  private base!: Base;
+  base!: Base;
   private home = new Phaser.Math.Vector2();
-  private stopped = false;
+  stopped = false;
   private seed?: number;
   shot = false;
   /** Screenshot mode: enemies hold still. */
@@ -168,41 +115,51 @@ export class PlanetScene extends Phaser.Scene {
   /** who lives on which lot of the town (planet_states.data.town) */
   townState: TownState = { lots: {}, civic: {} };
   /** this load moved an old save into the town: saved positions of the player and the copies are ignored once */
-  private migrated = false;
+  migrated = false;
   /** the copies did not load (or the planet did not): an old save is not moved into the town / nothing is saved */
-  private npcsLoaded = true;
-  private loadFailed = false;
-  private replicating = false;
+  npcsLoaded = true;
+  loadFailed = false;
+  replicating = false;
   /** Hologram visit while the replicant's ship is flying elsewhere: no position saves, no launching */
   visit: { star: string; planetIndex: number } | null = null;
-  private arrival = false;
-  private launching = false;
-  private boardSpot = { x: 0, y: 0 };
+  arrival = false;
+  launching = false;
+  boardSpot = { x: 0, y: 0 };
   private boardRing?: Phaser.GameObjects.Ellipse;
   /** after climbing out of the warren, the hatch waits a moment before it takes you again */
   private hatchReadyAt = 0;
-  private npcTickAt = 0;
-  // the copies' minds: when each wakes next, what happened since, who exists in the galaxy (for letters)
-  private nextWake = new Map<Npc, number>();
-  private lastWake = new Map<Npc, number>();
-  private wakeCount = new Map<Npc, number>();
-  private firstWakeAt?: number;
-  private mindBusy = false;
-  /** talks waiting for their turn with a mind (ordinary wakes hold off meanwhile) */
-  private talkWaiting = 0;
-  /** when each copy's mind was last called (the function answers a talk at most every TALK_GAP_MS) */
-  private lastMindCallAt = new Map<Npc, number>();
-  mindLog: { t: number; text: string }[] = [];
-  private everyone: ReplicantSummary[] = [];
-  private chorusAt = Infinity;
-  /** ms the minds have been running: advanced by this scene, and by the warren while the planet is paused */
-  mindClock = 0;
   trees: { index: number; x: number; y: number; sprite: Phaser.GameObjects.Sprite; zone: Phaser.GameObjects.Zone; alive: boolean }[] = [];
-  private saving = false;
-  private lastSaveAt = 0;
-  private lastPosSaveAt = 0;
+  // the scene's parts (src/scenes/planet/): made once, like the scene object they belong to
+  readonly talker = new Talk(this);
+  readonly minds = new Minds(this);
+  readonly saver = new Saving(this);
+  readonly towner = new Town(this);
+  readonly departure = new Departure(this);
 
   constructor() { super('planet'); }
+
+  // what entities, the warren view and the playtests reach on the scene
+  get mindLog() { return this.minds.mindLog; }
+  get mindClock() { return this.minds.mindClock; }
+  set mindClock(v: number) { this.minds.mindClock = v; }
+  get nextWake() { return this.minds.nextWake; }
+  get talkable() { return this.talker.talkable; }
+  tickMinds(dt: number) { this.minds.tickMinds(dt); }
+  /** A talk wake (Talk asks for it through here, so a playtest can stand in for the mind). */
+  requestTalk(npc: Npc, said = '') { return this.minds.requestTalk(npc, said); }
+  mindContext(npc: Npc) { return this.minds.mindContext(npc); }
+  wake(npc: Npc) { return this.minds.wake(npc); }
+  replayAway(items: AwayItem[]) { this.minds.replayAway(items); }
+  chorus(force = false) { this.minds.chorus(force); }
+  cutTree(npc: Npc) { return this.minds.cutTree(npc); }
+  toggleJournal() { return this.minds.toggleJournal(); }
+  talkTo(id: string, text: string) { return this.minds.talkTo(id, text); }
+  giveTo(id: string) { this.minds.giveTo(id); }
+  awakenCopy(id: string) { return this.minds.awakenCopy(id); }
+  flushPlanet() { return this.saver.flushPlanet(); }
+  homeLot(id: string) { return this.towner.homeLot(id); }
+  markTown() { this.towner.markTown(); }
+  canLaunch() { return this.departure.canLaunch(); }
 
   init(data: InitData) {
     const r = session.replicant;
@@ -295,7 +252,7 @@ export class PlanetScene extends Phaser.Scene {
     const m = this.map;
     const pw = m.w * 16, ph = m.h * 16;
     npcRows = this.withScreenshotCopies(npcRows);
-    this.settleTown(save, npcRows);
+    this.towner.settleTown(save, npcRows);
     this.embers = save?.embers ?? 0;
     this.supplies = { ...(save?.data.supplies ?? {}) };
     this.awayHours = 0;
@@ -404,7 +361,7 @@ export class PlanetScene extends Phaser.Scene {
     // the way down to the warren the copies dig (hatch spot kept per planet); it moved on while nobody was here
     this.warren = new Warren(this, save?.data.warren);
     this.buildings = new Buildings(this, save?.data.buildings);
-    this.time.delayedCall(2500, () => this.grantGifts(save?.data.gifts));
+    this.time.delayedCall(2500, () => this.towner.grantGifts(save?.data.gifts));
     if (!this.shot && !this.visit) { this.warren.applyOffline(this.awayHours); this.buildings.applyOffline(this.awayHours); }
     for (const e of m.enemies) {
       const def = ENEMIES[e.type];
@@ -461,7 +418,7 @@ export class PlanetScene extends Phaser.Scene {
     this.add.image(0, 0, 'vignette').setOrigin(0).setScrollFactor(0).setDepth(DEPTH.vignette);
 
     this.game.events.emit('embers', this.embers);
-    this.setupSaving();
+    this.saver.setupSaving();
 
     this.scene.launch('ui'); // (re)starts the overlay; the previous planet's shutdown stopped it
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scene.stop('ui'));
@@ -615,7 +572,7 @@ export class PlanetScene extends Phaser.Scene {
           squash(this, pl.sprite, 1.35, 0.7, 120);
           this.fx.dust(ex, ey + 2, 6);
           pl.locked = false;
-          this.markAwake();
+          this.saver.markAwake();
           this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
         },
       });
@@ -633,7 +590,7 @@ export class PlanetScene extends Phaser.Scene {
       squash(this, pl.sprite, 0.7, 1.3, 140);
       this.fx.sparks(pl.x, pl.y - 8, PALETTE[10], 8);
       pl.locked = false;
-      this.markAwake();
+      this.saver.markAwake();
       this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
     });
   }
@@ -697,7 +654,7 @@ export class PlanetScene extends Phaser.Scene {
         squash(this, pl.sprite, 1.35, 0.7, 120);
         this.fx.dust(ex, ey + 2, 6);
         pl.locked = false;
-        this.markAwake();
+        this.saver.markAwake();
         this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
       },
     });
@@ -764,7 +721,7 @@ export class PlanetScene extends Phaser.Scene {
   update(time: number, dt: number) {
     if (!this.player) return; // still loading the save
     dt = Math.min(dt, 50) * this.slow;
-    const input = this.routeTalk(time, this.controls.read());
+    const input = this.talker.routeTalk(time, this.controls.read());
     if (!this.stopped) {
       this.player.update(time, dt, input);
       if (!this.frozen) for (const e of this.enemies) e.update(time, dt);
@@ -785,8 +742,8 @@ export class PlanetScene extends Phaser.Scene {
     this.base.update(time, this.embers);
     this.base.updateSpot(time, this.canReplicate());
     if (this.boardRing) {
-      const ready = this.canLaunch() || !!this.visit;
-      const on = this.playerOnBoardSpot();
+      const ready = this.departure.canLaunch() || !!this.visit;
+      const on = this.departure.playerOnBoardSpot();
       this.boardRing.setStrokeStyle(1, ready ? PALETTE[9] : PALETTE[22], ready ? 0.5 + 0.4 * Math.sin(time / 300) : 0.3)
         .setFillStyle(PALETTE[9], ready && on ? 0.3 : 0);
     }
@@ -795,288 +752,17 @@ export class PlanetScene extends Phaser.Scene {
     else this.village.update(time, 0, 0);
     this.updateVesselCue(time, dt);
     this.warren.update(dt);
-    if (time > this.hatchReadyAt && this.player.alive && !this.player.locked && !this.talk && !this.stopped && this.warren.playerOnHatch()) this.descend();
-    this.tickMinds(dt);
+    if (time > this.hatchReadyAt && this.player.alive && !this.player.locked && !this.talker.talk && !this.stopped && this.warren.playerOnHatch()) this.descend();
+    this.minds.tickMinds(dt);
     this.watchFps(time);
     this.env.update(dt);
     this.lighting.update(dt);
     this.atmosphere.update(dt);
-    if (time - this.lastSaveAt > SAVE_EVERY_MS) { this.lastSaveAt = time; void this.flushPlanet(); }
-    if (time - this.lastPosSaveAt > POS_SAVE_EVERY_MS) { this.lastPosSaveAt = time; void this.saveReplicant(); }
+    if (time - this.saver.lastSaveAt > SAVE_EVERY_MS) { this.saver.lastSaveAt = time; void this.saver.flushPlanet(); }
+    if (time - this.saver.lastPosSaveAt > POS_SAVE_EVERY_MS) { this.saver.lastPosSaveAt = time; void this.saver.saveReplicant(); }
   }
 
   // --- talking to a copy (E, right click, gamepad Y, the touch talk button) ---
-
-  private talk: TalkSession | null = null;
-  /** the copy whose talk hint is showing */
-  private talkable: Npc | null = null;
-  private talkClosedAt = -Infinity;
-  /** a tree to cut or a build to take down that a copy's mind chose while you were talking to it: done when you part */
-  private afterTalk = new Map<Npc, (() => void)[]>();
-
-  private get talkBox(): TalkBox | undefined { return (this.scene.get('ui') as UIScene | null)?.talkBox; }
-
-  /** The mind's talk wake (requestTalk): what the copy says, or null. */
-  private requestTalkFn() {
-    return this.requestTalk;
-  }
-
-  /** The copy you can talk to: the nearest one up here within reach (not being born, not below). */
-  private talkTarget(): Npc | null {
-    const p = this.player;
-    if (!p.alive || p.locked || p.isHidden || this.stopped || this.launching || this.replicating || journalOpen() || !this.talkBox) return null;
-    let best: Npc | null = null, bd = TALK.range;
-    for (const n of this.npcs) {
-      if (n.below || n.state === 'born') continue;
-      const d = Math.hypot(n.x - p.x, n.y - p.y);
-      if (d < bd) { bd = d; best = n; }
-    }
-    return best;
-  }
-
-  /**
-   * Every frame's buttons go through here first. While the talk box is open they turn its pages and the player
-   * stands still; otherwise the nearest copy in reach shows its talk hint and interact opens the box.
-   */
-  private routeTalk(time: number, raw: InputFrame): InputFrame {
-    if (this.talk) { this.updateTalk(raw); return NO_INPUT; }
-    const target = this.talkTarget();
-    if (target !== this.talkable) {
-      if (this.talkable && this.npcs.includes(this.talkable)) this.talkable.setTalkHint(false);
-      target?.setTalkHint(true);
-      this.talkable = target;
-      this.game.events.emit('talkable', target ? this.visorOf(target) : null);
-    }
-    if (raw.interact && target) { this.openTalk(target); return NO_INPUT; }
-    // the press that closed the box must not also swing, dash or board the vessel
-    if (time - this.talkClosedAt < 150) return { ...raw, attack: false, dash: false, interact: false };
-    return raw;
-  }
-
-  private visorOf(n: Npc) { return n.data.traits.blank ? PALETTE[21] : PALETTE[n.data.traits.feature ?? PLAYER.feature[1]]; }
-
-  /** A press waiting in the player's attack buffer must not fire once the talk ends. */
-  private dropAttackBuffer() { (this.player as unknown as { attackBufferedUntil: number }).attackBufferedUntil = 0; }
-
-  private openTalk(npc: Npc) {
-    const box = this.talkBox, ui = this.scene.get('ui') as UIScene;
-    if (!box) return;
-    this.talkable?.setTalkHint(false);
-    this.talkable = null;
-    this.game.events.emit('talkable', null);
-    const t: TalkSession = { npc, hp: this.player.hp, name: npc.data.name, journal: null, exchanges: [], composing: false, fresh: null, opening: npc.data.traits.tell ?? null, reply: null };
-    this.talk = t;
-    this.controls.modal = true;
-    this.dropAttackBuffer();
-    if (!npc.blank) npc.startTalk();
-    ui.setTalking(true);
-    box.canReply = !npc.blank && !!session.replicant && !!session.store;
-    const look = (): ReturnType<TalkWho['look']> => {
-      const l = bodyFor(this, npc.data);
-      const blank = !!npc.data.traits.blank;
-      return { key: l.key, anchors: l.anchors, gear: blank ? 0 : npc.data.traits.gear ?? 0, gearTint: npc.trailColor, model: l.model, blank };
-    };
-    box.show({ name: () => npc.data.name, color: () => this.visorOf(npc), look, seed: npc.voiceSeed, voice: () => npc.data.traits.voice }, this.talkPages());
-    this.game.events.on('tell', this.onTell, this);
-    // its notes and letters: SAYS shows at once while they load
-    session.store?.journal([npc.data.id]).then((j) => { if (this.talk === t) { t.journal = j; this.refreshTalk(); } }).catch((e) => console.warn('talk journal', e));
-    // what it last wanted to tell you is old (or there is nothing): ask its mind for a fresh word
-    const rt = this.requestTalkFn(), tell = npc.data.traits.tell;
-    if (rt && !npc.blank && (!tell || Date.now() - tell.at > TALK.staleMinutes * 60_000)) {
-      t.composing = true;
-      this.refreshTalk();
-      rt.call(this, npc).then((text) => {
-        if (this.talk !== t) return;
-        t.composing = false;
-        if (text && !t.fresh) t.fresh = { text, at: Date.now() };
-        this.refreshTalk();
-      }).catch(() => { if (this.talk === t) { t.composing = false; this.refreshTalk(); } });
-    }
-  }
-
-  /** Its mind set traits.tell (a talk wake finished): SAYS shows it. */
-  private onTell(id: string) {
-    const t = this.talk;
-    if (!t || t.npc.data.id !== id) return;
-    const tell = t.npc.data.traits.tell;
-    // an answer to your reply arrives through the exchange; this is for its own fresh word
-    if (tell && !t.exchanges.some((x) => x.answer === undefined)) t.fresh = { text: tell.text, at: tell.at };
-    t.composing = false;
-    this.refreshTalk();
-  }
-
-  private talkPages(): TalkPage[] {
-    const t = this.talk!, n = t.npc, me = session.replicant, box = this.talkBox!;
-    const who = (id: string | null) => {
-      if (!id) return { name: 'someone' };
-      if (me && id === me.id) return { name: me.name };
-      const here = this.npcs.find((x) => x.data.id === id);
-      if (here) return { name: here.data.name };
-      const r = this.everyone.find((x) => x.id === id);
-      if (!r) return { name: 'someone' };
-      if (r.star_id === this.planet.star && r.planet_index === this.planet.planetIndex) return { name: r.name };
-      const where = r.star_id === this.planet.star ? planetAt(r.star_id, r.planet_index)?.name : starById(r.star_id)?.name;
-      return { name: r.name, where: placeName(where ?? r.star_id) };
-    };
-    // an answer it just gave you is not told twice
-    const tell = t.fresh ?? t.opening ?? n.data.traits.tell;
-    const told = tell && t.exchanges.some((x) => x.answer && x.answer === tell.text) ? undefined : tell;
-    const low = n.lowNeeds();
-    return composeTalk({
-      copyId: n.data.id, name: n.data.name, blank: !!n.data.traits.blank, canHear: this.canHear(), hint: HEAR_HINT, now: Date.now(),
-      playerId: me?.id, tell: told ?? undefined, tellNew: !!t.fresh, composing: t.composing,
-      notes: t.journal ? t.journal.notes.filter((x) => x.replicant_id === n.data.id) : null,
-      mail: t.journal ? t.journal.mail : null,
-      wants: n.data.traits.wants ?? [],
-      feeling: { mood: n.moodWord, weariness: n.weariness, lonely: low.some((x) => x.startsWith('lonely')), aimless: low.some((x) => x.startsWith('aimless')) },
-      exchanges: t.exchanges, who,
-    }, { width: box.tw, lines: TALK.box.lines, measure: box.measure, thoughts: TALK.thoughts, lettersToYou: TALK.lettersToYou, staleMs: TALK.staleMinutes * 60_000 });
-  }
-
-  private refreshTalk(jumpTo?: string) {
-    if (!this.talk) return;
-    this.talk.name = this.talk.npc.data.name;
-    this.talkBox?.setPages(this.talkPages(), jumpTo);
-  }
-
-  /** The talk box has the buttons: next, back, close, reply. It also ends by itself if you are hurt or the copy goes. */
-  private updateTalk(raw: InputFrame) {
-    const t = this.talk!, box = this.talkBox;
-    if (!box || !this.player.alive || this.player.hp < t.hp || !this.npcs.includes(t.npc) || t.npc.below) { this.closeTalk(); return; }
-    t.hp = this.player.hp; // any hit from here on ends it (health may have come back meanwhile)
-    if (t.reply) { if (raw.cancel) t.reply(); return; } // the reply line has the keys (Esc still closes it if it lost focus)
-    if (t.npc.data.name !== t.name) this.refreshTalk(); // renamed mid-talk
-    if (raw.cancel) this.closeTalk();
-    else if (raw.reply) this.openReply();
-    else if (raw.back) box.back();
-    else if (raw.forward) box.forward();
-    else if ((raw.attack || raw.interact) && !box.advance()) this.closeTalk();
-  }
-
-  private closeTalk() {
-    const t = this.talk;
-    if (!t) return;
-    this.talk = null;
-    t.reply?.();
-    t.npc.endTalk();
-    const later = this.afterTalk.get(t.npc) ?? [];
-    this.afterTalk.delete(t.npc);
-    later.forEach((f, k) => this.time.delayedCall(600 + k * 3000, () => { if (this.npcs.includes(t.npc) && !t.npc.below) f(); }));
-    this.controls.modal = false;
-    this.controls.clear();
-    this.dropAttackBuffer();
-    this.talkClosedAt = this.time.now;
-    this.game.events.off('tell', this.onTell, this);
-    this.talkBox?.hide();
-    (this.scene.get('ui') as UIScene | null)?.setTalking?.(false);
-  }
-
-  /** R: a line of your own, sent as a letter (it arrives at once); the copy's answer comes as a new SAYS page. */
-  private openReply() {
-    const t = this.talk, box = this.talkBox;
-    if (!t || !box || t.reply || !box.canReply) return;
-    t.reply = openReplyInput(this.game.canvas, box.textRect, `say something to ${t.npc.data.name}`, (text) => void this.sendReply(t, text), () => { t.reply = null; });
-  }
-
-  private async sendReply(t: TalkSession, text: string) {
-    const me = session.replicant, st = session.store;
-    if (!me || !st || this.talk !== t) return;
-    const npc = t.npc;
-    try { await st.sendMessage(me, npc.data.id, text); } catch (e) { console.warn('talk failed', e); sound.denied(); return; }
-    npc.receiveLetter();
-    const x: Exchange = { said: text };
-    t.exchanges.push(x);
-    const rt = this.requestTalkFn();
-    if (!rt) x.answer = null;
-    this.refreshTalk(`x${t.exchanges.length - 1}:0`);
-    if (!rt) return;
-    try { x.answer = (await rt.call(this, npc, text)) ?? null; } catch { x.answer = null; }
-    if (this.talk === t) this.refreshTalk();
-  }
-
-  // --- saving ---
-
-  private setupSaving() {
-    const flushAll = () => { void this.flushPlanet(); void this.saveReplicant(); };
-    const onHide = () => { if (document.visibilityState === 'hidden') flushAll(); };
-    document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pagehide', flushAll);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      document.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('pagehide', flushAll);
-    });
-  }
-
-  private markAwake() {
-    const r = session.replicant;
-    if (!r || r.traits.awake) return;
-    r.traits.awake = true;
-    void this.saveReplicant();
-  }
-
-  private async saveReplicant() {
-    const r = session.replicant, st = session.store;
-    if (!r || !st || this.shot || this.visit || this.launching || !this.player.alive || this.player.locked) return;
-    r.star_id = this.planet.star;
-    r.planet_index = this.planet.planetIndex;
-    r.pos_x = Math.round(this.player.x);
-    r.pos_y = Math.round(this.player.y);
-    try { await st.saveReplicant(r); } catch (e) { console.warn('replicant save failed', e); }
-  }
-
-  /** Send queued ember / node / structure changes. Server value wins so family members share one pool. */
-  async flushPlanet() {
-    const st = session.store;
-    if (!st || this.shot || this.saving || this.loadFailed) return;
-    const p = this.pending;
-    // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
-    if (this.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
-    if (p.npcTick !== undefined) this.npcTickAt = Date.now();
-    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && !p.town && !p.layout && !p.gifts && p.npcTick === undefined) return;
-    this.pending = { embers: 0, nodes: {}, doors: {} };
-    this.saving = true;
-    try {
-      const data: PlanetData = { nodes: p.nodes };
-      if (Object.keys(p.doors).length) data.doors = p.doors;
-      if (p.npcTick !== undefined) data.npcTick = p.npcTick;
-      if (p.structures) data.structures = p.structures;
-      if (p.village) data.village = p.village;
-      if (p.beacon) data.beacon = p.beacon;
-      if (p.felled) data.felled = p.felled;
-      if (p.warren) data.warren = p.warren;
-      if (p.supplies) data.supplies = p.supplies;
-      if (p.buildings) data.buildings = p.buildings;
-      if (p.label) { data.label = p.label; data.biome = p.biome; }
-      if (p.town) data.town = p.town;
-      if (p.gifts) data.gifts = p.gifts;
-      if (p.layout) data.layout = p.layout;
-      const row = await st.applyPlanetDelta(this.planet.star, this.planet.planetIndex, p.embers, data);
-      if (row) {
-        this.embers = row.embers + this.pending.embers;
-        session.planet = row;
-        this.game.events.emit('embers', this.embers, true);
-      }
-    } catch (e) {
-      console.warn('planet save failed, will retry', e);
-      this.pending.embers += p.embers;
-      this.pending.nodes = { ...p.nodes, ...this.pending.nodes };
-      this.pending.doors = { ...p.doors, ...this.pending.doors };
-      this.pending.npcTick ??= p.npcTick;
-      this.pending.structures ??= p.structures;
-      this.pending.village ??= p.village;
-      this.pending.beacon ??= p.beacon;
-      this.pending.felled ??= p.felled;
-      this.pending.warren ??= p.warren;
-      this.pending.supplies ??= p.supplies;
-      this.pending.buildings ??= p.buildings;
-      this.pending.label ??= p.label; this.pending.biome ??= p.biome;
-      this.pending.town ??= p.town; this.pending.layout ??= p.layout;
-    } finally {
-      this.saving = false;
-    }
-  }
-
-  // --- services used by entities ---
 
   /** Supplies changed: write them with the next flush. */
   markSupplies() {
@@ -1091,7 +777,7 @@ export class PlanetScene extends Phaser.Scene {
   }
 
   /** Trees a copy may cut for wood: near the base or near its own home (the town itself is kept clear of trees). */
-  private woodTrees(npc?: Npc) {
+  woodTrees(npc?: Npc) {
     const base = this.baseCenter, home = npc?.home;
     return this.trees.filter((t) => t.alive && (Math.hypot(t.x - base.x, t.y - base.y) < TOWN_TUNING.woodRadiusPx
       || (!!home && Math.hypot(t.x - home.x, t.y - home.y) < TOWN_TUNING.woodHomeRadiusPx)));
@@ -1195,7 +881,7 @@ export class PlanetScene extends Phaser.Scene {
 
   /** The action button does something other than attack here (build). Returns true if it did. */
   tryInteract(): boolean {
-    if (this.playerOnBoardSpot()) return this.tryBoard();
+    if (this.departure.playerOnBoardSpot()) return this.departure.tryBoard();
     if (this.base.playerOnSpot()) return this.tryReplicate();
     if (!this.base.playerOnPad() || !this.base.canBuild(this.embers)) return false;
     const cost = STRUCTURES.replicator.cost;
@@ -1208,7 +894,7 @@ export class PlanetScene extends Phaser.Scene {
     this.base.build(this.player.x, this.player.y, () => {
       this.player.locked = false;
       this.village.addStructure({ type: 'replicator', x: this.base.x, y: this.base.y, at: Date.now() });
-      void this.flushPlanet();
+      void this.saver.flushPlanet();
     });
     return true;
   }
@@ -1248,115 +934,6 @@ export class PlanetScene extends Phaser.Scene {
   }
 
   // --- leaving the planet ---
-
-  private playerOnBoardSpot() {
-    const p = this.player;
-    return Math.abs(p.x - this.boardSpot.x) < 13 && Math.abs(p.y - this.boardSpot.y) < 9;
-  }
-
-  /** Someone has to stay behind: you can launch once this planet has a copy (travel.json needCopy). */
-  canLaunch() {
-    return !this.visit && (!TRAVEL.needCopy || this.npcs.length > 0);
-  }
-
-  private tryBoard(): boolean {
-    if (this.visit) {
-      // hologram visit: the vessel takes you back to your ship in flight
-      void this.returnToShip();
-      return true;
-    }
-    if (!this.canLaunch()) {
-      sound.denied();
-      this.tweens.add({ targets: this.vessel, x: this.vessel.x + 1, duration: 40, yoyo: true, repeat: 3 });
-      // hint without words: a ghost of a copy blinks by the Replicator (or the build pad)
-      const ghost = this.add.image(this.base.x + 24, this.base.y + 10, this.player.sprite.texture.key, 0).setOrigin(0.5, 1)
-        .setTintFill(PALETTE[18]).setAlpha(0).setDepth(6110).setBlendMode(Phaser.BlendModes.ADD);
-      this.tweens.add({ targets: ghost, alpha: 0.6, duration: 300, yoyo: true, repeat: 3, onComplete: () => ghost.destroy() });
-      return true;
-    }
-    this.player.locked = true;
-    this.player.body.setVelocity(0, 0);
-    sound.coreHum();
-    const data: StarMapData = {
-      mode: 'launch',
-      from: this.planet.star,
-      fromPlanet: this.planet.planetIndex,
-      embers: this.embers,
-      lit: this.litBeacons,
-      onLaunch: (to, planet) => this.launch(to, planet),
-      onClose: () => { this.player.locked = false; this.scene.resume(); },
-    };
-    this.scene.pause();
-    this.scene.launch('starmap', data);
-    return true;
-  }
-
-  private async returnToShip() {
-    const r = session.replicant, st = session.store;
-    const j = r && st ? await st.activeJourney(r).catch(() => null) : null;
-    this.cameras.main.fadeOut(400, 24, 20, 37);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      if (j) this.scene.start('travel', { journey: j });
-      else this.scene.start('planet', {});
-    });
-  }
-
-  /** Fuel paid, the replicant hops in, the vessel lifts off, then the flight begins. */
-  private launch(to: string, toPlanet: number) {
-    this.scene.resume();
-    const ly = distanceLy(this.planet.star, to);
-    const fuel = fuelFor(ly);
-    this.launching = true;
-    this.embers -= fuel;
-    this.pending.embers -= fuel;
-    this.game.events.emit('embers', this.embers);
-    void this.flushPlanet();
-    const pl = this.player, v = this.vessel;
-    pl.locked = true;
-    // hop into the vessel
-    const hop = { t: 0 };
-    const sx = pl.x, sy = pl.y, ex = v.x, ey = v.y - 8;
-    this.tweens.add({
-      targets: hop, t: 1, duration: 360,
-      onUpdate: () => { pl.setPosition(sx + (ex - sx) * hop.t, sy + (ey - sy) * hop.t); pl.sprite.y -= Math.sin(hop.t * Math.PI) * 12; },
-      onComplete: () => { pl.hide(); this.liftOff(to, toPlanet, ly); },
-    });
-  }
-
-  private liftOff(to: string, toPlanet: number, ly: number) {
-    const v = this.vessel;
-    const thrust = this.add.particles(0, 0, 'px', {
-      lifespan: { min: 200, max: 500 }, speedY: { min: 60, max: 140 }, speedX: { min: -20, max: 20 },
-      scale: { start: 1.6, end: 0 }, tint: [PALETTE[10], PALETTE[9], PALETTE[11]], blendMode: Phaser.BlendModes.ADD, frequency: 8,
-    }).setDepth(DEPTH.fx);
-    const light = this.lighting.add({ x: v.x, y: v.y, radius: 70, color: PALETTE[9], intensity: 1 });
-    sound.build();
-    this.shake(900, 0.004);
-    for (let i = 0; i < 8; i++) this.fx.dust(v.x - 20 + i * 6, v.y, 5);
-    this.cameras.main.stopFollow();
-    this.tweens.add({
-      targets: v, y: v.y - 320, duration: 2600, ease: 'Quad.easeIn', delay: 500,
-      onUpdate: () => { thrust.setPosition(v.x, v.y - 4); light.x = v.x; light.y = v.y; this.cameras.main.centerOn(v.x, Math.max(v.y + 40, this.boardSpot.y - 200)); },
-    });
-    this.time.delayedCall(2400, () => this.cameras.main.fadeOut(700, 24, 20, 37));
-    const arrivesAt = new Date(Date.now() + travelMs(ly));
-    const r = session.replicant, st = session.store;
-    const journeyP = r && st && !this.shot
-      ? st.startJourney(r, to, toPlanet, arrivesAt)
-      : Promise.resolve({
-        id: 'local', replicant_id: r?.id ?? '', from_star: this.planet.star, to_star: to, from_planet: this.planet.planetIndex, to_planet: toPlanet,
-        departs_at: new Date().toISOString(), arrives_at: arrivesAt.toISOString(),
-      });
-    this.time.delayedCall(3200, () => {
-      journeyP.then((journey) => this.scene.start('travel', { journey, depart: true }))
-        .catch((e) => {
-          console.warn('launch failed', e);
-          this.scene.start('planet', {}); // back on the ground; nothing was saved
-        });
-    });
-  }
-
-  // --- replication ---
 
   canReplicate() {
     return this.base.built && !this.replicating && !!session.replicant && this.embers >= DRIFT.cost && this.npcs.length < DRIFT.maxPerPlanet;
@@ -1408,7 +985,7 @@ export class PlanetScene extends Phaser.Scene {
         st.createReplicant(row).then((saved) => {
           const lotIndex = this.townState.lots[lotKey];
           Object.assign(npc.data, saved);
-          if (lotIndex !== undefined) { delete this.townState.lots[lotKey]; this.townState.lots[saved.id] = lotIndex; this.markTown(); }
+          if (lotIndex !== undefined) { delete this.townState.lots[lotKey]; this.townState.lots[saved.id] = lotIndex; this.towner.markTown(); }
         })
           .catch((e) => { console.warn('copy save failed', e); delete this.townState.lots[lotKey]; });
         this.pending.npcTick ??= Date.now();
@@ -1444,109 +1021,10 @@ export class PlanetScene extends Phaser.Scene {
     return rows;
   }
 
-  /**
-   * The town: a save from before it (no layout) moves into it once (every build onto its builder's lot, buildings onto
-   * civic lots, the hatch into the square, old-world indexes reset), written back through the usual delta; then every
-   * copy without a lot gets the next free one, in birth order.
-   */
-  private settleTown(save: PlanetSave | null, rows: ReplicantSave[]) {
-    const town = this.map.town;
-    const ids = rows.map((r) => r.id);
-    const data = save?.data;
-    // only with the copies in hand: their builds go to their own lots (a failed load tries again next time)
-    if (data && (data.layout ?? 0) < TOWN_LAYOUT && this.npcsLoaded) {
-      const oldNodes = Object.keys(data.nodes ?? {});
-      const res = migrateToTown(data, town, ids, this.map.base.pad);
-      this.migrated = true;
-      const p = this.pending;
-      p.layout = TOWN_LAYOUT;
-      p.structures = data.structures ?? [];
-      if (data.buildings) p.buildings = structuredClone(data.buildings);
-      if (data.warren) p.warren = structuredClone(data.warren);
-      p.felled = [];
-      for (const k of oldNodes) p.nodes[k] = { hits: 0, at: 0 };
-      if (res.stray.length) console.warn('town: no place for', res.stray.join(', '));
-      console.info(`town: moved ${res.moved} builds and ${data.buildings?.length ?? 0} buildings into the town (layout ${TOWN_LAYOUT})`);
-    }
-    this.townState = structuredClone(data?.town ?? { lots: {}, civic: {} });
-    // buildings stand on their civic lots (a stale write from an old layout cannot move them for good)
-    let moved = false;
-    for (const b of data?.buildings ?? []) {
-      const i = this.townState.civic[b.id], lot = i === undefined ? undefined : town.lots[i];
-      if (!lot || b.vetoed) continue;
-      const at = buildingSpot(lot);
-      if (b.x !== at.x || b.y !== at.y) { b.x = at.x; b.y = at.y; moved = true; }
-    }
-    if (moved && data?.buildings) this.pending.buildings = structuredClone(data.buildings);
-    // a birth whose row never saved must not hold a lot
-    let stale = false;
-    for (const k of Object.keys(this.townState.lots)) if (k.startsWith('pending')) { delete this.townState.lots[k]; stale = true; }
-    if (assignHomes(town, this.townState, ids).length || this.migrated || stale) this.markTown();
-  }
-
-  /**
-   * What the original granted (data.gifts): each gift becomes builds credited to the copy that asked, on open ground
-   * near what it asked for (a building's door, its home, the square), in a ring when asked; then the gift is gone.
-   * A gift that finds no room stays for the next load.
-   */
-  private grantGifts(gifts: Gift[] | undefined) {
-    if (!gifts?.length || this.shot || this.visit || !this.village) return;
-    const town = this.map.town, T = 16;
-    const paved = (x: number, y: number) => {
-      const tx = Math.floor(x / T), ty = Math.floor(y / T);
-      return inRect(town.square, tx, ty) || town.streets.some((s) => inRect(s.rect, tx, ty));
-    };
-    const taken = this.village.structures.map((s) => ({ x: s.x, y: s.y }));
-    const open = (x: number, y: number, spacing: number) => this.isClear(x, y, 14, 8) && !paved(x - 7, y) && !paved(x + 7, y) && !paved(x, y + 6)
-      && taken.every((q) => Math.hypot(q.x - x, q.y - y) >= spacing) && this.nodes.every((n) => Math.hypot(n.x - x, n.y - y) >= 18);
-    const left: Gift[] = [];
-    for (const g of gifts) {
-      const npc = this.npcs.find((n) => n.data.id === g.by);
-      const count = Math.max(1, Math.min(12, g.count ?? 1));
-      // where it should be: beside a building's front (never on its doorstep), at the copy's home, or by the square
-      let anchor = { x: town.hatch.x, y: town.hatch.y + 40 };
-      if (g.near?.startsWith('building:')) {
-        const want = g.near.slice(9).toLowerCase();
-        const b = this.buildings.list.find((x) => !x.vetoed && (x.id === want || x.name.toLowerCase() === want));
-        if (b) anchor = { x: b.x + b.w * 8 + 14, y: b.y + 4 };
-      } else if (g.near === 'home' && npc?.home) anchor = { ...npc.home };
-      else if (g.near === 'square') anchor = { x: (town.square.x + town.square.w / 2) * T, y: (town.square.y + town.square.h) * T + 28 };
-      // the nearest spot (spiralling out) where every build of it fits
-      let spots: { x: number; y: number }[] = [];
-      search: for (let r = 0; r <= 220; r += 8) {
-        for (let a = 0; a < (r ? 16 : 1); a++) {
-          const cx = anchor.x + Math.cos((a / 16) * Math.PI * 2) * r, cy = anchor.y + Math.sin((a / 16) * Math.PI * 2) * r * 0.75;
-          const pts = count === 1 ? [{ x: cx, y: cy }] : Array.from({ length: count }, (_, k) => {
-            const t = (k / count) * Math.PI * 2, rr = g.ring ?? 22;
-            return { x: cx + Math.cos(t) * rr, y: cy + Math.sin(t) * rr * 0.7 };
-          });
-          if (pts.every((q) => open(q.x, q.y, 16))) { spots = pts; break search; }
-        }
-      }
-      if (!spots.length || !this.village.grant(g.type, g.by, spots, npc?.data.traits.trail)) { left.push(g); continue; }
-      taken.push(...spots);
-      const name = npc?.data.name ?? 'a copy';
-      this.mindLog.push({ t: this.mindClock, text: `${session.replicant?.name ?? 'the original'} granted ${name}'s wish: ${g.why ?? `${count} ${g.type}`}` });
-      if (npc) { npc.onWorked(true); this.fx.sparks(npc.x, npc.y - 16, npc.trailColor, 6); }
-    }
-    this.pending.gifts = left;
-  }
-
-  /** Town assignments changed: write them with the next flush. */
-  markTown() {
-    this.pending.town = structuredClone(this.townState);
-  }
-
-  /** The lot a copy lives on (undefined when the town is full). */
-  homeLot(id: string): Lot | undefined {
-    const i = this.townState.lots[id];
-    return i === undefined ? undefined : this.map.town.lots[i];
-  }
-
   private spawnNpcs(rows: ReplicantSave[], save: PlanetSave | null) {
     const c = this.map.base.center;
     rows.forEach((r, i) => {
-      const lot = this.homeLot(r.id);
+      const lot = this.towner.homeLot(r.id);
       let x = r.pos_x ?? 0, y = r.pos_y ?? 0;
       // at home when the saved spot is no good, or belongs to the layout before the town
       if (!x || !this.isWalkable(x, y) || this.migrated) {
@@ -1556,7 +1034,7 @@ export class PlanetScene extends Phaser.Scene {
       npc.home = lot ? { ...lot.yard } : undefined;
       this.npcs.push(npc);
     });
-    this.setupMinds();
+    this.minds.setupMinds();
     // Embers the copies gathered while nobody was here
     if (!this.npcs.length || this.shot) return;
     const tick = save?.data.npcTick;
@@ -1590,464 +1068,6 @@ export class PlanetScene extends Phaser.Scene {
     const star = starById(this.planet.star);
     const sp = planetAt(this.planet.star, this.planet.planetIndex);
     return sp?.moon ? `${this.planet.name} - ${sp.name}` : `${this.planet.name} - ${star?.name ?? '?'}`;
-  }
-
-  private setupMinds() {
-    const params = new URLSearchParams(location.search);
-    const kb = this.input.keyboard;
-    if (kb) {
-      kb.addCapture('TAB');
-      const toggle = () => void this.toggleJournal();
-      kb.on('keydown-TAB', toggle);
-      kb.on('keydown-I', toggle);
-    }
-    const onJournal = () => void this.toggleJournal();
-    this.game.events.on('journal', onJournal);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.game.events.off('journal', onJournal); closeJournal(); });
-    if (params.has('chorus')) this.time.delayedCall(2500, () => this.chorus(true));
-    if (params.has('sing')) this.time.delayedCall(1500, () => this.npcs[0]?.sing(MIND.canned.songs[0], this.canHear()));
-    if (this.shot || this.visit) return;
-    const me = session.replicant;
-    this.mindLog.push({ t: this.mindClock, text: `${me?.name ?? 'the original'} ${this.arrival ? 'landed here in the vessel' : 'is here'}` });
-    this.chorusAt = this.mindClock + 30_000 + Math.random() * 40_000;
-    session.store?.listReplicants().then((all) => { this.everyone = all; }).catch(() => undefined);
-    // kept on the planet for the minds' away wakes; then whatever they did while nobody was here plays out
-    this.pending.label = this.placeLabel;
-    this.pending.biome = this.planet.subtitle ?? this.planet.id;
-    const st = session.store;
-    if (st && this.npcs.length) st.takeMindQueue(this.planet.star, this.planet.planetIndex)
-      .then((q) => this.time.delayedCall(2500, () => this.replayAway(q))).catch((e) => console.warn('away queue', e));
-  }
-
-  /** What the copies did in their away wakes (the mind function, while nobody played), played out now. */
-  private replayAway(items: AwayItem[]) {
-    if (!items?.length || this.stopped) return;
-    const hear = this.canHear();
-    let k = 0, proposals = 0;
-    for (const it of [...items].sort((a, b) => a.at - b.at)) {
-      const npc = this.npcs.find((n) => n.data.id === it.id);
-      if (!npc) continue;
-      const name = npc.data.name;
-      const log = (text: string) => this.mindLog.push({ t: this.mindClock, text: `while you were away, ${text}` });
-      if (it.became) log(`${it.name} became itself: it is ${name} now`);
-      for (const a of it.actions ?? []) {
-        const later = (ms: number, f: () => void) => this.time.delayedCall(ms, () => { if (this.npcs.includes(npc) && !npc.below) f(); });
-        if (a.applied) {
-          // the away wake put it on the saved warren itself (it loaded with the planet): only say so
-          if (a.failed) continue;
-          if (a.type === 'dig') log(`${name} marked out ${a.name ?? 'a room'} in the warren`);
-          else if (a.type === 'furnish') log(a.item === 'rest' ? `${name} made a resting station${a.forId && a.forId !== npc.data.id ? ` for ${this.npcs.find((n) => n.data.id === a.forId)?.data.name ?? 'someone'}` : ''} in ${a.room ?? 'the warren'}` : `${name} put a ${a.item ?? 'thing'} in ${a.room ?? 'the warren'}`);
-        }
-        else if (a.type === 'dig') this.warren.dig(npc, a);
-        else if (a.type === 'furnish') this.warren.furnish(npc, a);
-        else if (a.type === 'building') this.buildings.propose(npc, a);
-        else if (a.type === 'cut') later(5000 + k * 4000, () => this.cutTree(npc));
-        else if (a.type === 'demolish') later(5000 + k * 4000, () => this.demolish(npc, a.kind ?? 'any'));
-        else if (a.type === 'wants' && a.wants) npc.data.traits.wants = a.wants;
-        else if (a.type === 'rename') log(`${a.was ?? 'a copy'} took the name ${a.name}`);
-        else if (a.type === 'note') log(`${name} wrote itself a note`);
-        else if (a.type === 'mail') log(`${name} wrote to ${a.to}`);
-        else if (a.type === 'request') log(`${name} asked the original for ${a.kind}`);
-        else if (a.type === 'propose') {
-          log(`${name} read the code of the world and proposed a change to it: ${a.detail ?? 'something'}`);
-          // after the "while you were away" notice, one at a time
-          if (hear) this.time.delayedCall(4000 * ++proposals, () => this.game.events.emit('notice', `${name.toUpperCase()} PROPOSES A CHANGE TO THE GAME`));
-        }
-        else if (a.type === 'melody') log(`${name} found its voice on the ${a.instrument}`);
-        else if (a.type === 'tell' && a.body) npc.data.traits.tell = { text: a.body, at: a.at ?? it.at };
-      }
-      if (it.song) {
-        // sung once it is up here (it may be down in the warren when you land)
-        const song = it.song, sing = (tries: number) => {
-          if (!this.npcs.includes(npc)) return;
-          if (npc.below && tries > 0) { this.time.delayedCall(3000, () => sing(tries - 1)); return; }
-          if (!npc.below) npc.sing(song, hear);
-        };
-        this.time.delayedCall(8000 + k * 7000, () => sing(40));
-      }
-      // the pass's own entries (a room dug, a bed made) have no song and are not a wake
-      if (it.song || it.became) k++;
-    }
-    if (k) this.game.events.emit('notice', `WHILE YOU WERE AWAY ${k} ${k === 1 ? 'COPY' : 'COPIES'} WOKE`);
-  }
-
-  /** What a copy knows when it wakes. */
-  private mindContext(npc: Npc): MindContext {
-    const h = this.env.hourOfDay;
-    const timeOfDay = h < 5 ? 'deep night' : h < 7 ? 'dawn' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 20 ? 'dusk' : 'night';
-    const structures: Record<string, number> = {};
-    for (const s of this.village.structures) structures[s.type] = (structures[s.type] ?? 0) + 1;
-    const delays: Record<string, number> = {};
-    for (const r of this.everyone) delays[r.id] = r.star_id === this.planet.star ? 0 : Math.round(distanceLy(this.planet.star, r.star_id) * MIND.mailSecondsPerLy);
-    const since = this.lastWake.get(npc) ?? -1;
-    const me = session.replicant;
-    const mine: Record<string, number> = {};
-    for (const s of this.village.structures) if (s.by === npc.data.id) mine[s.type] = (mine[s.type] ?? 0) + 1;
-    const treesNear = this.treesNearBase(npc);
-    const wd = this.warren.data;
-    const nameOf = (id: string) => this.npcs.find((n) => n.data.id === id)?.data.name ?? this.everyone.find((r) => r.id === id)?.name ?? (id === me?.id ? me.name : 'someone');
-    return {
-      mine,
-      treesNear,
-      warren: describeWarren(wd, npc.data.id, nameOf),
-      warrenRooms: allRooms(wd).map((r) => r.name),
-      hasRest: !!restOf(wd, npc.data.id),
-      warrenFull: wd.rooms.length >= WARREN.maxRooms,
-      where: npc.below ? 'warren' : 'surface',
-      weariness: npc.weariness,
-      around: this.aroundNpc(npc),
-      reflect: (this.wakeCount.get(npc) ?? 0) % 5 === 4,
-      blank: !!npc.data.traits.blank,
-      kit: kitLists(),
-      supplies: { ...this.supplies, ember: this.embers },
-      recipes: SUPPLIES.recipes,
-      roomWood: SUPPLIES.roomWood,
-      hasWorkbench: this.warren.hasWorkbench,
-      entranceDug: this.warren.opened,
-      shortages: [...this.warren.shortages(), ...this.buildings.shortages()],
-      needs: npc.lowNeeds(),
-      mood: npc.moodWord,
-      buildings: this.buildings.describe(nameOf),
-      buildingKit: { materials: Object.keys(BUILDINGS.materials), roofs: BUILDINGS.roofs, doors: BUILDINGS.doors, minFootprint: BUILDINGS.minFootprint, maxFootprint: BUILDINGS.maxFootprint, perTile: Object.fromEntries(Object.entries(BUILDINGS.materials).map(([k, v]) => [k, v.perTile])) },
-      inventory: npc.data.traits.inventory ?? {},
-      wants: (npc.data.traits.wants ?? []).map((w, i) => `${i + 1}. ${w.text} (${w.category}${w.done ? ', done' : ''})`),
-      planet: this.placeLabel,
-      biome: this.planet.subtitle ?? this.planet.id,
-      timeOfDay,
-      weather: this.env.isRaining ? 'raining' : 'dry',
-      playerName: me?.name ?? 'the original',
-      playerHere: !this.visit && !!me,
-      embers: this.embers,
-      structures,
-      here: [...(me && !this.visit ? [me.name] : []), ...this.npcs.map((n) => n.data.name)],
-      events: this.mindLog.filter((e) => e.t > since).map((e) => e.text),
-      delays,
-    };
-  }
-
-  /** What a copy can see from where it stands: the original, crystals, the hatch, its neighbours. */
-  private aroundNpc(npc: Npc): string[] {
-    const out: string[] = [];
-    const d = (p: { x: number; y: number }) => Math.hypot(p.x - npc.x, p.y - npc.y);
-    if (npc.below) {
-      const b = this.warren.below.get(npc);
-      out.push(b?.task === 'dig' ? `the rock face of ${b.room?.name ?? 'a room'} you are digging` : b?.task === 'rest' ? 'your resting station' : b?.task === 'linger' && b.item ? `the ${b.item.kind} in ${this.warren.nameOfRoom(b.item.room)} you are resting by` : 'the warren around you');
-      const others = [...this.warren.below.keys()].filter((n) => n !== npc);
-      if (others.length) out.push(`${others.map((n) => n.data.name).join(' and ')} ${others.length > 1 ? 'are' : 'is'} down here too`);
-      return out;
-    }
-    const me = session.replicant;
-    if (me && !this.visit && this.player.alive) {
-      const dp = d(this.player);
-      if (dp < 40) out.push(`${me.name} stands right beside you`);
-      else if (dp < 170) out.push(`${me.name} is near`);
-    }
-    for (const n of this.npcs) if (n !== npc && !n.below && d(n) < 48) out.push(`${n.data.name} is beside you`);
-    const node = this.nodes.filter((n) => n.alive).sort((a, b) => d(a) - d(b))[0];
-    if (node && d(node) < 120) out.push(d(node) < 30 ? 'a crystal within reach' : 'a crystal a few steps away');
-    if (d(this.warren.hatch) < 70 && this.warren.data.rooms.length) out.push(this.warren.opened ? 'the hatch down to the warren' : 'the dig mark where the warren will begin');
-    if (this.base.built && d(this.replicatorSpot) < 70) out.push('the Replicator');
-    if (d(this.vesselPos) < 90) out.push('the vessel');
-    const build = this.village.structures.filter((s) => s.type !== 'replicator').sort((a, b) => d(a) - d(b))[0];
-    if (build && d(build) < 40) out.push(`a ${build.type}${build.by === npc.data.id ? ' you built' : ''}`);
-    const sleeping = [...this.warren.below.values()].filter((b) => b.task === 'rest').map((b) => b.npc.data.name);
-    if (sleeping.length) out.push(`${sleeping.join(' and ')} ${sleeping.length > 1 ? 'are' : 'is'} asleep in the warren`);
-    return out;
-  }
-
-  /** Wake one copy: it reads, acts (notes, letters, requests, a new name) and sings. */
-  private async wake(npc: Npc) {
-    const st = session.store;
-    if (!st || this.mindBusy) return;
-    this.mindBusy = true;
-    this.wakeCount.set(npc, (this.wakeCount.get(npc) ?? 0) + 1);
-    const t = this.mindClock;
-    try {
-      this.lastMindCallAt.set(npc, Date.now());
-      const res = await st.mindTick(npc.data.id, this.mindContext(npc));
-      this.lastWake.set(npc, t);
-      if (res?.reason === 'budget') { this.mindsRest(); return; }
-      if (!res || res.skipped || !this.npcs.includes(npc)) return;
-      if (res.error) { console.warn('mind:', res.error); return; }
-      this.applyMind(npc, res, false);
-    } catch (e) {
-      console.warn('mind:', e);
-    } finally {
-      this.mindBusy = false;
-    }
-  }
-
-  /**
-   * The original walked up to talk (and maybe said something, already sent as a letter): the copy's mind answers
-   * now, through tell_original. Waits its turn behind a wake in flight; resolves with what the copy says, or null.
-   */
-  async requestTalk(npc: Npc, said = ''): Promise<string | null> {
-    const st = session.store;
-    if (!st || this.shot || this.visit || npc.data.id === 'pending' || npc.data.traits.blank) return null;
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-    // ordinary wakes wait while a talk waits for its turn
-    this.talkWaiting++;
-    try {
-      for (let waited = 0; this.mindBusy && waited < 30_000; waited += 250) await sleep(250);
-    } finally { this.talkWaiting--; }
-    if (this.mindBusy || !this.npcs.includes(npc)) return null;
-    this.mindBusy = true;
-    try {
-      // a word came meanwhile (another talk wake for it finished): nothing to ask
-      const tell = npc.data.traits.tell;
-      if (!said && tell && Date.now() - tell.at < TALK.staleMinutes * 60_000) return tell.text;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        // the function answers a talk at most every TALK_GAP s per copy: wait out the rest of it
-        const since = Date.now() - (this.lastMindCallAt.get(npc) ?? 0), gap = st.mode === 'local' ? 0 : TALK_GAP_MS;
-        if (since < gap) await sleep(gap - since);
-        if (!this.npcs.includes(npc)) return null;
-        this.lastMindCallAt.set(npc, Date.now());
-        const res = await st.mindTick(npc.data.id, { ...this.mindContext(npc), talk: { said } });
-        if (res?.error) console.warn('mind:', res.error);
-        if (res?.reason === 'budget') { this.mindsRest(); return null; }
-        if (res?.skipped) continue;
-        if (!res || res.error || !this.npcs.includes(npc)) return null;
-        // it has just spoken: its next ordinary wake waits
-        this.nextWake.set(npc, Math.max(this.nextWake.get(npc) ?? 0, this.mindClock + MIND.wakeMinutes * 60_000));
-        this.lastWake.set(npc, this.mindClock);
-        this.applyMind(npc, res, true);
-        return res.actions?.find((a) => a.type === 'tell')?.body ?? null;
-      }
-      return null;
-    } catch (e) {
-      console.warn('mind:', e);
-      return null;
-    } finally {
-      this.mindBusy = false;
-    }
-  }
-
-  /** The day's budget for the minds is spent: no copy asks again for half an hour (the function would only say no). */
-  private mindsRest() {
-    for (const n of this.npcs) this.nextWake.set(n, Math.max(this.nextWake.get(n) ?? 0, this.mindClock + 30 * 60_000));
-  }
-
-  /** What a wake brought: letters, a voice, its song (not for a talk: the tell is the answer), and its deeds. */
-  private applyMind(npc: Npc, res: MindResult, talk: boolean) {
-    const st = session.store!;
-    const hear = this.canHear();
-    if (res.received?.length && !talk) npc.receiveLetter();
-    const melody = res.actions?.find((a) => a.type === 'melody');
-    if (melody) {
-      npc.data.traits.voice = { instrument: melody.instrument ?? 'hum', mood: melody.mood ?? 'bright', tempo: melody.tempo ?? 'walking' };
-      if (hear) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} SINGS ON THE ${String(melody.instrument).toUpperCase()}`);
-    }
-    if (res.song && !talk) { const say = () => { if (this.npcs.includes(npc)) npc.sing(res.song!, hear, { notes: melody?.notes || undefined }); }; if (res.received?.length) setTimeout(say, 900); else say(); }
-    for (const a of res.actions ?? []) {
-      if (a.type === 'mail') {
-        const to = this.npcs.find((n) => n.data.id === a.toId);
-        if (to && !a.delay) this.time.delayedCall(2500, () => to.receiveLetter());
-      } else if (a.type === 'rename' && a.name) {
-        const was = npc.data.name.toUpperCase();
-        npc.data.name = a.name;
-        this.announceLocation();
-        this.game.events.emit('notice', hear ? `${was} IS NOW ${a.name.toUpperCase()}` : `${was} HAS A NEW NAME`);
-      } else if (a.type === 'cut' || a.type === 'demolish') {
-        const chore = a.type === 'cut' ? () => this.cutTree(npc) : () => this.demolish(npc, a.kind ?? 'any');
-        if (this.talk?.npc === npc) this.afterTalk.set(npc, [...(this.afterTalk.get(npc) ?? []), chore]);
-        else chore();
-      } else if (a.type === 'become') {
-        const was = npc.data.name;
-        npc.become(a.traits ?? {}, a.name);
-        if (st.mode === 'local') st.saveReplicant(npc.data).catch(() => undefined);
-        this.announceLocation();
-        this.time.delayedCall(900, () => this.floatName(npc));
-        this.mindLog.push({ t: this.mindClock, text: `${was} became itself: it is ${npc.data.name} now` });
-        this.game.events.emit('notice', hear ? `${was.toUpperCase()} IS ${npc.data.name.toUpperCase()} NOW` : `${was.toUpperCase()} HAS BECOME ITSELF`);
-      } else if (a.type === 'wants' && a.wants) {
-        const before = (npc.data.traits.wants ?? []).filter((w) => w.done).length;
-        npc.data.traits.wants = a.wants;
-        if (a.wants.filter((w) => w.done).length > before) { npc.onWorked(true); this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} got something it wanted` }); }
-      } else if (a.type === 'building') {
-        this.buildings.propose(npc, a);
-      } else if (a.type === 'dig') {
-        this.warren.dig(npc, a);
-      } else if (a.type === 'furnish') {
-        this.warren.furnish(npc, a);
-      } else if (a.type === 'look' && hear) {
-        this.game.events.emit('notice', `${npc.data.name.toUpperCase()} DESCRIBES A NEW BODY`);
-      } else if (a.type === 'request' && hear) {
-        this.game.events.emit('notice', `${npc.data.name.toUpperCase()} ASKS FOR ${String(a.kind ?? '').toUpperCase()}`);
-      } else if (a.type === 'propose' && hear) {
-        this.game.events.emit('notice', `${npc.data.name.toUpperCase()} PROPOSES A CHANGE TO THE GAME`);
-      } else if (a.type === 'tell' && a.body) {
-        // what it would tell you when you come over (the talk box shows it)
-        npc.data.traits.tell = { text: a.body, at: a.at ?? Date.now() };
-        this.game.events.emit('tell', npc.data.id);
-      }
-    }
-  }
-
-  /** Advances the minds' clock; the warren view calls this too, so the copies keep waking while you are below. */
-  tickMinds(dt: number) {
-    if (this.shot || this.visit || this.stopped || !session.store || !this.npcs.length) return;
-    this.mindClock += dt;
-    const time = this.mindClock;
-    this.firstWakeAt ??= time + MIND.firstWakeMs;
-    this.npcs.forEach((n, i) => { if (!this.nextWake.has(n)) this.nextWake.set(n, this.firstWakeAt! + i * MIND.staggerMs); });
-    if (!this.mindBusy && !this.talkWaiting) {
-      for (const n of this.npcs) {
-        if (n.data.id === 'pending') continue; // its row is still being written
-        if (time < this.nextWake.get(n)!) continue;
-        this.nextWake.set(n, time + MIND.wakeMinutes * 60_000 + Math.random() * 20_000);
-        void this.wake(n);
-        break;
-      }
-    }
-    // copies standing together sing sooner
-    const visiting = this.npcs.filter((n) => n.state === 'visit');
-    if (visiting.length >= 2 && this.chorusAt - time > 45_000 && visiting.some((a) => visiting.some((b) => a !== b && Math.hypot(a.x - b.x, a.y - b.y) < 60))) this.chorusAt = time + 6000 + Math.random() * 6000;
-    if (time > this.chorusAt && !this.warren.view) {
-      this.chorusAt = time + (4 + Math.random() * 3) * 60_000;
-      this.chorus();
-    }
-  }
-
-  /** A copy clears the nearest standing tree near the base: walks over, swings, the tree falls (and its timber goes to the hatch). */
-  cutTree(npc: Npc) {
-    const tree = this.woodTrees(npc)
-      .sort((a, b) => Math.hypot(a.x - npc.x, a.y - npc.y) - Math.hypot(b.x - npc.x, b.y - npc.y))[0];
-    if (!tree) return false;
-    return npc.startChore({
-      x: tree.x, y: tree.y, swings: 6,
-      swing: () => {
-        this.fx.sparks(tree.x + (Math.random() - 0.5) * 6, tree.y - 10 - Math.random() * 8, PALETTE[this.planet.accent[1]], 3);
-        if (Math.hypot(this.player.x - tree.x, this.player.y - tree.y) < 180) sound.hit();
-        this.tweens.add({ targets: tree.sprite, angle: { from: -3, to: 3 }, duration: 60, yoyo: true, repeat: 1 });
-      },
-      done: () => {
-        if (!tree.alive) return;
-        tree.alive = false;
-        tree.zone.destroy();
-        const dir = npc.x < tree.x ? 1 : -1;
-        this.tweens.add({ targets: tree.sprite, angle: 84 * dir, duration: 700, ease: 'Quad.easeIn', onComplete: () => {
-          this.fx.dust(tree.x + dir * 12, tree.y, 10);
-          if (Math.hypot(this.player.x - tree.x, this.player.y - tree.y) < 220) sound.stomp();
-          this.tweens.add({ targets: tree.sprite, alpha: 0, duration: 1200, delay: 600, onComplete: () => tree.sprite.destroy() });
-        } });
-        this.pending.felled = [...new Set([...(session.planet?.data.felled ?? []), ...(this.pending.felled ?? []), tree.index])];
-        this.time.delayedCall(1500, () => this.flyMaterial('wood', { x: tree.x, y: tree.y }, this.warren.hatch, SUPPLIES.treeWood));
-        this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} cut down a tree near the base (${SUPPLIES.treeWood} wood)` });
-        if (this.canHear()) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} CUT DOWN A TREE`);
-      },
-    });
-  }
-
-  /** A copy takes down one of its own builds (nearest of that kind). */
-  private demolish(npc: Npc, kind: string) {
-    const s = this.village.ownBuilds(npc.data.id, kind, npc)[0];
-    if (!s) return;
-    npc.startChore({
-      x: s.x, y: s.y, swings: 4,
-      swing: () => {
-        this.fx.sparks(s.x + (Math.random() - 0.5) * 8, s.y - 6 - Math.random() * 8, PALETTE[21], 3);
-        if (Math.hypot(this.player.x - s.x, this.player.y - s.y) < 180) sound.hit();
-      },
-      done: () => {
-        if (!this.village.remove(s)) return;
-        if (Math.hypot(this.player.x - s.x, this.player.y - s.y) < 220) sound.pop();
-        this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} took down its ${s.type}` });
-        if (this.canHear()) this.game.events.emit('notice', `${npc.data.name.toUpperCase()} TOOK DOWN A ${s.type.toUpperCase()}`);
-      },
-    });
-  }
-
-  /** The copies gather their voices and sing one line together as a round. */
-  chorus(force = false) {
-    const singers = force ? this.npcs : this.npcs.filter((n) => n.state === 'idle' || n.state === 'walk' || n.state === 'greet' || n.state === 'visit');
-    if (singers.length < (force ? 1 : 2)) return;
-    const lines = MIND.chorusLines;
-    const line = lines[Math.floor(Math.random() * lines.length)];
-    const hear = this.canHear();
-    sound.chorus(singers.map((n) => n.voiceSeed), line);
-    singers.forEach((n, i) => this.time.delayedCall(i * 500, () => {
-      if (!this.npcs.includes(n)) return;
-      n.sing(line, hear, { silent: true });
-      this.fx.sparks(n.x, n.y - 12, n.trailColor, 5);
-    }));
-  }
-
-  /** Tab / I, or a tap on the corner label: what the copies here remember, write and ask for. */
-  private async toggleJournal() {
-    if (journalOpen()) { closeJournal(); return; }
-    const st = session.store;
-    if (!st) return;
-    const [j, spent, health] = await Promise.all([st.journal(this.npcs.map((n) => n.data.id)), st.mindSpend().catch(() => null), st.mindHealth().catch(() => null)]);
-    const names: Record<string, string> = {};
-    for (const r of this.everyone) names[r.id] = r.name;
-    if (session.replicant) names[session.replicant.id] = session.replicant.name;
-    const nameOf = (id: string) => names[id] ?? this.npcs.find((n) => n.data.id === id)?.data.name ?? 'someone';
-    const feelings: Record<string, string> = {};
-    for (const n of this.npcs) feelings[n.data.id] = `${n.moodWord}${n.lowNeeds().length ? ': ' + n.lowNeeds().join(', ') : ''}`;
-    const actions = {
-      approve: (id: string) => { this.buildings.approve(id); void this.toggleJournal().then(() => this.toggleJournal()); },
-      veto: (id: string) => { this.buildings.veto(id); void this.toggleJournal().then(() => this.toggleJournal()); },
-      talk: (id: string, text: string) => void this.talkTo(id, text),
-      give: (id: string) => this.giveTo(id),
-      awaken: (id: string) => void this.awakenCopy(id),
-      vetoChange: (id: string) => { void st.vetoRequest(id).catch((e) => console.warn('veto', e)).then(() => { closeJournal(); return this.toggleJournal(); }); },
-    };
-    openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j, feelings, actions,
-      buildings: this.buildings.describe(nameOf), pending: this.buildings.list.filter((b) => !b.vetoed && !b.approved && !b.built).map((b) => ({ id: b.id, name: b.name })), warren: this.warren.data.rooms.length ? describeWarren(this.warren.data, null, nameOf) : [], supplies: this.npcs.length ? this.warren.describeSupplies() : undefined, shortages: this.warren.shortages() });
-  }
-
-  /** The original speaks to a copy: a letter that arrives at once; the copy reads it at its next wake. */
-  private async talkTo(id: string, text: string) {
-    const me = session.replicant, st = session.store;
-    const npc = this.npcs.find((n) => n.data.id === id);
-    if (!me || !st || !npc || !text.trim()) return;
-    try { await st.sendMessage(me, id, text.trim()); } catch (e) { console.warn('talk failed', e); return; }
-    npc.receiveLetter();
-    this.mindLog.push({ t: this.mindClock, text: `${me.name} spoke to ${npc.data.name}` });
-    // let it answer soon
-    this.nextWake.set(npc, Math.min(this.nextWake.get(npc) ?? Infinity, this.mindClock + 3000));
-  }
-
-  /**
-   * The handoff (core loop step 6): a Spark awakens a copy as a player of its own. It gets a profile in its name on
-   * the home screen and plays as itself from then on, here on its planet; it is no longer a copy with a mind.
-   */
-  private async awakenCopy(id: string) {
-    const me = session.replicant, st = session.store;
-    const npc = this.npcs.find((n) => n.data.id === id);
-    if (!me || !st || !npc || npc.blank || npc.below || (me.traits.sparks ?? 0) < 1 || this.visit) { sound.denied(); return; }
-    const fake = this.shot || npc.data.id.startsWith('fake') || npc.data.id === 'pending';
-    if (!fake) {
-      try { await st.awaken(npc.data, me); } catch (e) { console.warn('awaken failed', e); sound.denied(); return; }
-    }
-    me.traits.sparks = Math.max(0, (me.traits.sparks ?? 0) - 1);
-    this.game.events.emit('sparks', me.traits.sparks);
-    this.npcs = this.npcs.filter((n) => n !== npc);
-    sound.spark();
-    this.time.delayedCall(500, () => sound.beacon());
-    this.cameras.main.flash(300, 255, 255, 255);
-    npc.ascend(() => this.announceLocation());
-    const name = npc.data.name;
-    this.mindLog.push({ t: this.mindClock, text: `${me.name} spent a Spark and awakened ${name}: it plays as itself now` });
-    this.game.events.emit('notice', `${name.toUpperCase()} IS AWAKE: IT PLAYS AS ITSELF NOW`);
-  }
-
-  /** A gift of Embers from the pool into the copy's own hands: company and purpose lift, and it may spend them. */
-  private giveTo(id: string) {
-    const npc = this.npcs.find((n) => n.data.id === id);
-    const n = 5;
-    if (!npc || this.embers < n) { sound.denied(); return; }
-    this.addEmbers(-n);
-    const inv = (npc.data.traits.inventory ??= {});
-    inv.ember = (inv.ember ?? 0) + n;
-    npc.needs.company = Math.min(1, npc.needs.company + 0.3);
-    npc.needs.purpose = Math.min(1, npc.needs.purpose + 0.15);
-    const st = session.store;
-    if (st && !this.shot && npc.data.id !== 'pending' && !npc.data.id.startsWith('fake')) st.patchTraits(npc.data.id, { inventory: inv }).catch(() => undefined);
-    for (let i = 0; i < n; i++) this.time.delayedCall(i * 90, () => { const s = this.add.image(this.player.x, this.player.y - 14, 'shard').setDepth(6300); this.tweens.add({ targets: s, x: npc.x, y: npc.y - 14, duration: 500, ease: 'Quad.easeIn', onComplete: () => { s.destroy(); this.fx.sparks(npc.x, npc.y - 14, PALETTE[10], 2); } }); });
-    sound.collect();
-    this.mindLog.push({ t: this.mindClock, text: `${session.replicant?.name ?? 'the original'} gave ${npc.data.name} ${n} Ember` });
-    this.nextWake.set(npc, Math.min(this.nextWake.get(npc) ?? Infinity, this.mindClock + 3000));
   }
 
   /** Copies bring in what they gathered while you were away: a stream of Embers into the Replicator. */
@@ -2158,7 +1178,7 @@ export class PlanetScene extends Phaser.Scene {
     b.ignite();
     if (!this.litBeacons.includes(this.planet.star)) this.litBeacons.push(this.planet.star);
     this.pending.beacon = { lit: true, at: Date.now(), by: session.replicant?.id };
-    void this.flushPlanet();
+    void this.saver.flushPlanet();
     const sx = g?.x ?? b.x, sy = g?.y ?? b.y + 30;
     this.time.delayedCall(700, () => this.sparks.push(new Spark(this, sx, sy)));
   }
@@ -2171,7 +1191,7 @@ export class PlanetScene extends Phaser.Scene {
     if (r && !this.visit) {
       r.traits.sparks = (r.traits.sparks ?? 0) + 1;
       n = r.traits.sparks;
-      void this.saveReplicant();
+      void this.saver.saveReplicant();
     }
     this.fx.sparks(x, y - 4, PALETTE[19], 6);
     this.fx.floatIcon(this.player.x, this.player.y - 24, 'spark');
@@ -2180,7 +1200,7 @@ export class PlanetScene extends Phaser.Scene {
 
   onDoorChanged(r: Ruin) {
     this.pending.doors[r.index] = { open: r.open, taken: r.taken };
-    void this.flushPlanet();
+    void this.saver.flushPlanet();
   }
 
   onModuleTaken(r: Ruin) {
@@ -2188,19 +1208,19 @@ export class PlanetScene extends Phaser.Scene {
     const rep = session.replicant;
     if (rep) {
       rep.traits.mods = [...(rep.traits.mods ?? []), r.kind];
-      void this.saveReplicant();
+      void this.saver.saveReplicant();
     }
     this.fx.floatIcon(this.player.x, this.player.y - 24, 'module');
     const who = (rep?.name ?? session.profile?.name ?? 'YOU').toUpperCase();
     if (r.kind === 'listen') {
       // the Plaything moment: from now on their songs are words, and they greet it with a chorus
       this.game.events.emit('notice', `${who} HEARS THEM NOW`);
-      this.mindLog.push({ t: this.mindClock, text: `${rep?.name ?? 'the original'} found the listening module in a ruin and can understand you from now on` });
-      this.time.delayedCall(1400, () => this.chorus(true));
+      this.minds.mindLog.push({ t: this.minds.mindClock, text: `${rep?.name ?? 'the original'} found the listening module in a ruin and can understand you from now on` });
+      this.time.delayedCall(1400, () => this.minds.chorus(true));
     } else {
       this.game.events.emit('notice', `${who} GETS +20% ${r.kind.toUpperCase()}`);
     }
-    this.mindLog.push({ t: this.mindClock, text: `${rep?.name ?? 'the original'} opened a ruin door and took its ${r.kind} module` });
+    this.minds.mindLog.push({ t: this.minds.mindClock, text: `${rep?.name ?? 'the original'} opened a ruin door and took its ${r.kind} module` });
   }
 
   surfaceAt(x: number, y: number): 'grass' | 'stone' | 'water' | 'void' {
