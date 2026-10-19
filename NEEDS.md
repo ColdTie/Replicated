@@ -13,6 +13,12 @@ each time). This file is its procedure. Steve can also run it by hand: "be the m
 
 1. Start like any session (CLAUDE.md, working rules): `git fetch origin main`, build on the latest `main`, check open
    PRs. If another session is working on the same files, leave those proposals for tomorrow.
+   Then check the minds are working (migration 0014) before anything else:
+   ```sql
+   select kind, ok, error, at from mind_runs order by at desc limit 20;
+   ```
+   If the latest wakes failed, finding and fixing why comes first (it happened twice: a tool schema the API refused).
+   `node tools/check-mind-tools.mjs` checks the tool definitions; CI runs it on every PR.
 2. Read what is open:
    ```sql
    select q.id, q.kind, q.detail, q.body, q.created_at, r.name, q.star_id, q.planet_index
@@ -27,7 +33,7 @@ each time). This file is its procedure. Steve can also run it by hand: "be the m
    - Decide against the rules below. When the idea is sound but too big, build the part that fits and say so.
    - Build it the way CLAUDE.md asks: data in `src/data/`, art in `tools/sprites/`, the design brief, no text UI,
      small and in the style of the code around it.
-   - Verify it: `npm run build`, the playtests that touch the area (the list is in CLAUDE.md), and a screenshot in
+   - Verify it: `npm run build`, `npm test` (every playtest; `npm test -- talk town` for some), and a screenshot in
      `screenshots/` for anything you can see.
    - Answer, in one or two plain sentences the copy will read at its next wake: what changed and where to find it.
      ```sql

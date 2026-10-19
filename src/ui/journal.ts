@@ -28,6 +28,7 @@ function ensureStyle() {
   .jn p.done { color: ${css(PALETTE[21])}; text-decoration: line-through; }
   .jn small { color: ${css(PALETTE[22])}; font-size: 11px; margin-left: 6px; }
   .jn .mute { color: ${css(PALETTE[21])}; font-style: italic; }
+  .jn .warn { color: ${css(PALETTE[10])}; }
   .jn .rune { color: ${css(PALETTE[18])}; letter-spacing: 1px; }
   .jn .act { display: flex; gap: 6px; margin: 6px 0 2px 10px; align-items: center; }
   .jn .act input { flex: 1; font: inherit; background: ${css(PALETTE[25])}; color: ${css(PALETTE[20])}; border: 1px solid ${css(PALETTE[22])}; padding: 3px 6px; }
@@ -93,6 +94,8 @@ export interface JournalView {
   sparks?: number;
   /** what the minds have cost today, against the day's budget (mind.json budget) */
   spend?: { usd: number; cap: number };
+  /** the latest wakes all failed (mind.json health): since when, and the last error */
+  quiet?: { since: string; error: string };
 }
 
 /** What the journal (and the talk box) says while the copies' words are still runes. */
@@ -114,6 +117,7 @@ export function openJournal(v: JournalView) {
   const color = (c: ReplicantSave) => css(PALETTE[c.traits.feature ?? 10]);
   const parts: string[] = [];
   if (!v.canHear) parts.push(`<p class="mute">${HEAR_HINT}</p>`);
+  if (v.quiet) parts.push(`<p class="warn">The minds have been quiet since ${esc(v.quiet.since)}: ${esc(v.quiet.error)}</p>`);
   if (v.spend) parts.push(`<p class="mute">${v.spend.usd >= v.spend.cap ? `The minds have spent today's $${v.spend.cap.toFixed(2)} and rest until tomorrow.` : `The minds today: $${v.spend.usd.toFixed(2)} of $${v.spend.cap.toFixed(2)}.`}</p>`);
   if (!v.copies.length) parts.push(`<p class="mute">Nobody lives here yet.</p>`);
   for (const c of v.copies) {

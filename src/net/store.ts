@@ -254,6 +254,9 @@ export interface Letter { id: string; from_replicant: string | null; to_replican
 export interface Request { id?: string; replicant_id: string; kind: string; detail: string; status: string; created_at: string; body?: string; reply?: string | null; done_at?: string | null }
 export interface Journal { notes: Note[]; mail: Letter[]; requests: Request[] }
 
+/** The minds' heartbeat (migration 0014): failuresSinceOk counts the wakes in a row that failed since the last good one. */
+export interface MindHealth { lastOkAt: string | null; failuresSinceOk: number; lastError: string | null; firstFailureAt: string | null }
+
 export interface GameStore {
   readonly mode: 'cloud' | 'local';
   /** Wake a copy's mind (null when minds are not available). */
@@ -292,6 +295,8 @@ export interface GameStore {
   vetoRequest(id: string): Promise<void>;
   /** What the minds have cost today in USD (migration 0013), or null where minds cost nothing (this device). */
   mindSpend(): Promise<number | null>;
+  /** How the minds are doing (migration 0014), or null where there are no real minds (this device) or it cannot be read. */
+  mindHealth(): Promise<MindHealth | null>;
   /**
    * The handoff: a Spark awakens a copy as a player of its own. A new profile is made in its name and visor
    * color and the copy becomes that profile's replicant (one row update); the giver spends the Spark.
@@ -547,6 +552,7 @@ export class LocalStore implements GameStore {
   }
 
   async mindSpend() { return null; }
+  async mindHealth() { return null; }
 
   async vetoRequest(id: string) {
     const r = this.db.requests.find((x) => x.id === id && x.status === 'open');
@@ -749,6 +755,13 @@ export class CloudStore implements GameStore {
   async mindSpend() {
     const { data, error } = await this.sb.rpc('mind_spend_today', { p_galaxy: this.galaxyId });
     return error ? null : Number(data ?? 0);
+  }
+
+  async mindHealth() {
+    const { data, error } = await this.sb.rpc('mind_health', { p_galaxy: this.galaxyId });
+    if (error || !data) return null;
+    const d = data as { last_ok_at: string | null; failures_since_ok: number; last_error: string | null; first_failure_at: string | null };
+    return { lastOkAt: d.last_ok_at, failuresSinceOk: Number(d.failures_since_ok ?? 0), lastError: d.last_error, firstFailureAt: d.first_failure_at };
   }
 
   async vetoRequest(id: string) {

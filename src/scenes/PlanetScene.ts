@@ -33,7 +33,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
 import { Controls, type InputFrame } from '../input/Controls';
-import type { AwayItem, Building, DoorState, Gift, Journal, MindContext, MindResult, NodeState, PlanetData, PlanetSave, ReplicantSave, ReplicantSummary, WarrenData } from '../net/store';
+import type { AwayItem, Building, DoorState, Gift, Journal, MindContext, MindHealth, MindResult, NodeState, PlanetData, PlanetSave, ReplicantSave, ReplicantSummary, WarrenData } from '../net/store';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
@@ -97,6 +97,15 @@ const TALK_GAP_MS = 16_000;
 /** A world's name as prose shows it: "ALPHA CENTAURI B II" -> "Alpha Centauri B II", "tau-ceti" -> "Tau Ceti". */
 function placeName(s: string) {
   return s.replace(/-/g, ' ').split(' ').map((w) => (/^[IVX]+$/.test(w) || w.length <= 1 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())).join(' ');
+}
+
+/** The journal's warning when the latest wakes all failed (mind.json health), or undefined while the minds are well. */
+function quietMinds(h: MindHealth | null): { since: string; error: string } | undefined {
+  if (!h || h.failuresSinceOk < MIND.health.quietAfter || !h.firstFailureAt) return undefined;
+  const at = new Date(h.firstFailureAt);
+  const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const since = at.toDateString() === new Date().toDateString() ? time : `${at.toLocaleDateString([], { weekday: 'long' })} ${time}`;
+  return { since, error: (h.lastError ?? 'no answer').slice(0, 140) };
 }
 
 export class PlanetScene extends Phaser.Scene {
@@ -1968,7 +1977,7 @@ export class PlanetScene extends Phaser.Scene {
     if (journalOpen()) { closeJournal(); return; }
     const st = session.store;
     if (!st) return;
-    const [j, spent] = await Promise.all([st.journal(this.npcs.map((n) => n.data.id)), st.mindSpend().catch(() => null)]);
+    const [j, spent, health] = await Promise.all([st.journal(this.npcs.map((n) => n.data.id)), st.mindSpend().catch(() => null), st.mindHealth().catch(() => null)]);
     const names: Record<string, string> = {};
     for (const r of this.everyone) names[r.id] = r.name;
     if (session.replicant) names[session.replicant.id] = session.replicant.name;
@@ -1983,7 +1992,7 @@ export class PlanetScene extends Phaser.Scene {
       awaken: (id: string) => void this.awakenCopy(id),
       vetoChange: (id: string) => { void st.vetoRequest(id).catch((e) => console.warn('veto', e)).then(() => { closeJournal(); return this.toggleJournal(); }); },
     };
-    openJournal({ spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j, feelings, actions,
+    openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j, feelings, actions,
       buildings: this.buildings.describe(nameOf), pending: this.buildings.list.filter((b) => !b.vetoed && !b.approved && !b.built).map((b) => ({ id: b.id, name: b.name })), warren: this.warren.data.rooms.length ? describeWarren(this.warren.data, null, nameOf) : [], supplies: this.npcs.length ? this.warren.describeSupplies() : undefined, shortages: this.warren.shortages() });
   }
 

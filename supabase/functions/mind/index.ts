@@ -353,6 +353,13 @@ function costOf(u: { input: number; cacheRead: number; cacheWrite: number; outpu
   return (u.input * p.input + u.cacheWrite * p.cacheWrite + u.cacheRead * p.cacheRead + u.output * p.output) / 1e6;
 }
 
+/** The minds' heartbeat (migration 0014): one row per wake, ok or with its error. Never throws. */
+async function logRun(sb: SupabaseClient, rep: Replicant, kind: "live" | "talk" | "away", err?: unknown) {
+  const error = err === undefined ? null : String((err as Error)?.message ?? err).slice(0, 500);
+  const { error: e } = await sb.rpc("log_mind_run", { p_galaxy: rep.galaxy_id, p_replicant: rep.id, p_kind: kind, p_ok: error === null, p_error: error });
+  if (e) console.error("mind run log", e.message);
+}
+
 /** What the minds of this galaxy have cost today (migration 0013); null when the ledger cannot be read. */
 async function spentToday(sb: SupabaseClient, galaxy: string): Promise<number | null> {
   const { data, error } = await sb.rpc("mind_spend_today", { p_galaxy: galaxy });
@@ -413,7 +420,15 @@ Deno.serve(async (req) => {
     // the day's budget (mind.json budget): once it is spent, nobody wakes until tomorrow; an unreadable ledger counts as spent
     const spent = await spentToday(sb, rep.galaxy_id);
     if (spent === null || spent >= MIND.budget.dailyUsd) return json({ skipped: true, reason: "budget" });
-    return json(await wakeCopy(sb, rep, context));
+    const kind = context.talk ? "talk" : "live";
+    try {
+      const res = await wakeCopy(sb, rep, context);
+      await logRun(sb, rep, kind);
+      return json(res);
+    } catch (e) {
+      await logRun(sb, rep, kind, e);
+      throw e;
+    }
   } catch (e) {
     console.error(e);
     return json({ error: (e as Error).message }, 500);
@@ -1148,8 +1163,10 @@ async function awayRun(req: Request) {
           const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone)), long: true, deadline }, p);
           p.items.push({ id: rep.id, name: rep.name, at: Date.now(), song: res.song, actions: res.actions.filter((a) => a.type !== "become"), became: res.actions.some((a) => a.type === "become") });
           woke.push({ id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type), usage: res.usage, usd: Math.round(res.usd * 1e5) / 1e5, read: res.read });
+          await logRun(sb, rep, "away");
         } catch (e) {
           console.error("away wake", rep.id, e);
+          await logRun(sb, rep, "away", e);
           // it did not really wake: give back its turn so the next run tries again
           await sb.from("replicants").update({ last_tick_at: rep.last_tick_at }).eq("id", rep.id);
           woke.push({ id: rep.id, error: (e as Error).message });

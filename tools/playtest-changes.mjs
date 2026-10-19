@@ -83,6 +83,23 @@ try {
   if (under !== 'The minds today: $0.21 of $0.50.') fail('the day\'s spend is not shown');
   if (!/rest until tomorrow/.test(over)) fail('a spent budget is not shown');
 
+  // 3b. the minds' heartbeat (migration 0014): three failed wakes in a row say so; two do not; a good one clears it
+  const quietLine = async (h) => ev(async (hh) => {
+    window.__session.store.mindHealth = async () => hh;
+    await window.__scene.toggleJournal();
+    if (!document.querySelector('.jn')) await window.__scene.toggleJournal();
+    const line = document.querySelector('.jn p.warn')?.textContent ?? '';
+    await window.__scene.toggleJournal();
+    return line;
+  }, h);
+  const at = new Date(Date.now() - 3_600_000).toISOString();
+  const quiet = await quietLine({ lastOkAt: null, failuresSinceOk: 3, lastError: 'compiled grammar is too large', firstFailureAt: at });
+  const two = await quietLine({ lastOkAt: at, failuresSinceOk: 2, lastError: 'overloaded', firstFailureAt: at });
+  const well = await quietLine({ lastOkAt: at, failuresSinceOk: 0, lastError: null, firstFailureAt: null });
+  log('quiet', JSON.stringify({ quiet, two, well }));
+  if (!/^The minds have been quiet since .+: compiled grammar is too large$/.test(quiet)) fail('failing minds are not shown in the journal');
+  if (two || well) fail('the quiet warning shows while the minds are well');
+
   // 4. a proposal made in an away wake is told on landing
   const told = await ev(async () => {
     const s = window.__scene, n = s.npcs[1];

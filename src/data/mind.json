@@ -8,6 +8,10 @@
   "bubbleScale": 0.9,
   "model": "claude-haiku-5-5",
   "effort": "low",
+  "health": {
+    "_doc": "The minds' heartbeat (migration 0014): every wake is logged ok or with its error. When quietAfter wakes in a row have failed, the journal says the minds have gone quiet, since when, and why.",
+    "quietAfter": 3
+  },
   "budget": {
     "_doc": "What the minds may cost per day (Steve's day, America/Los_Angeles), every wake included: live wakes while you play, talk wakes, long wakes while you are away. The mind function adds each wake's cost (from the API's token counts and prices below, USD per million tokens) to mind_spend (migration 0013) and wakes nobody once dailyUsd is spent; long wakes stop at awayShare of it, so the rest is kept for when you play. model / effort: the model every wake runs on (Haiku 5.5 keeps twice-daily long wakes for every copy inside $0.50; Opus 5.5 costs about 40 times as much).",
     "dailyUsd": 0.5,
