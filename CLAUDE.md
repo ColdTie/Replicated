@@ -971,5 +971,15 @@ Next: the first live talks will show how the model's tells read; watch that the 
 - **Journal.** Each copy's proposals show under WOULD CHANGE THE GAME: the title and why, the state, the maker's
   answer and the full text. A waiting one has SAY NO (press twice). A proposal made while you were away is told on
   landing ("WREN PROPOSES A CHANGE TO THE GAME").
+- The maker is the routine "The maker" (`trig_01W1bBfgciouakZFzLHFK3FE`): a fresh session every day at 3:51 pm
+  Pacific in this environment. Its session can attach the repository itself (`add_repo`), but it needs the Supabase
+  connector, and this organization cannot pass connectors to a routine from a session. Steve adds it in the claude.ai
+  routines UI. Until then the run changes nothing and says it has no Supabase connector.
+- Live (function v17, migration 0012, PR #38): the first long-wake run woke Vesper, Dusk and Steve II (letters,
+  notes, a bench, a want met). The cache holds (almost all input read from it). A long wake cost about $0.06 to
+  $0.08 without code reading. Expect about $4 to $9 a day at twice a day for 29 copies, more on days they read
+  code. `away.everyHours` 24 halves it. Possible saving: a cache breakpoint on the last tool would let every copy
+  share the tool definitions (about 6k of the ~9k tokens written per wake).
 - Verified: build, Deno check, the code tools run over a real bundle, `tools/playtest-changes.mjs` (new) and the
-  playtests that touch the journal and the minds. `screenshots/changes-journal.png`.
+  buildings, together, talk, become, warren and ruin playtests. The deployed v16 and v17 match the repo byte for
+  byte. `screenshots/changes-journal.png`.

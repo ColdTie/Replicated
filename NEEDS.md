@@ -6,8 +6,8 @@ nobody plays its planet. It can then read the game's own source (`code_map`, `se
 from `dist/code/source.json` on Pages) and propose a change. Everything they ask for lands in the `requests` table
 (Supabase project "Replicated", id `vgoijybibhopfichyirj`).
 
-**The maker** is the Claude Code routine that answers them once a day. This file is its procedure. Steve can also run
-it by hand: "be the maker" in a session.
+**The maker** is the Claude Code routine "The maker" that answers them once a day (3:51 pm Pacific, a fresh session
+each time). This file is its procedure. Steve can also run it by hand: "be the maker" in a session.
 
 ## The maker's run
 
