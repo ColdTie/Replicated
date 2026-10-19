@@ -145,6 +145,8 @@ export class StarMapScene extends Phaser.Scene {
     const st = session.store;
     if (st) {
       st.discoveredStars().then((s) => s.forEach((id) => this.discovered.add(id))).catch(() => undefined);
+      // the lattice also shows when the map opens from the ship in flight
+      if (!this.d.lit) st.litBeacons().then((l) => { this.d.lit = l; }).catch(() => undefined);
       st.listReplicants().then((r) => (this.replicants = r)).catch(() => undefined);
       st.openJourneys().then((j) => {
         const latest = new Map<string, Journey>();
@@ -428,6 +430,18 @@ export class StarMapScene extends Phaser.Scene {
       const f = Phaser.Math.Clamp((now - t0) / Math.max(1, t1 - t0), 0, 1);
       g.lineStyle(1, PALETTE[18], 0.5).lineBetween(a.sx, a.sy, b.sx, b.sy);
       g.fillStyle(PALETTE[18], 1).fillCircle(a.sx + (b.sx - a.sx) * f, a.sy + (b.sy - a.sy) * f, 2 + Math.sin(this.t * 6));
+    }
+
+    // The beacon lattice (beacon.json lattice): each lit beacon joined to the Sun and to the other lit ones; whole and
+    // brighter once all four are lit
+    const lattice = (this.d.lit ?? []).filter((id) => BEACONS.includes(id));
+    if (lattice.length) {
+      const sol = this.projected.find((p) => p.star.id === 'sol');
+      const pts = lattice.map((id) => this.projected.find((p) => p.star.id === id)).filter((p): p is NonNullable<typeof p> => !!p);
+      const whole = lattice.length >= BEACONS.length;
+      g.lineStyle(1, whole ? PALETTE[19] : PALETTE[18], (whole ? 0.55 : 0.3) + 0.15 * Math.sin(this.t * 2));
+      for (const p of pts) if (sol) g.lineBetween(sol.sx, sol.sy, p.sx, p.sy);
+      for (let i = 0; i < pts.length; i++) for (let k = i + 1; k < pts.length; k++) g.lineBetween(pts[i].sx, pts[i].sy, pts[k].sx, pts[k].sy);
     }
 
     // Stars

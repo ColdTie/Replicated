@@ -32,7 +32,7 @@ import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
 import { TOWN_TUNING, birthOrder, nextFreeLot, occupiedLots, type TownState } from '../world/town';
-import { planetFor, starById } from '../world/galaxy';
+import { BEACONS, planetFor, starById } from '../world/galaxy';
 import { Departure } from './planet/Departure';
 import { Hands } from './planet/Hands';
 import { Homecoming } from './planet/Homecoming';
@@ -1252,6 +1252,10 @@ export class PlanetScene extends Phaser.Scene {
     if (!b || b.lit) return;
     b.ignite();
     if (!this.litBeacons.includes(this.planet.star)) this.litBeacons.push(this.planet.star);
+    // the lattice around the Sun: how many points are lit now (beacon.json lattice)
+    const points = this.litBeacons.filter((id) => BEACONS.includes(id)).length;
+    this.time.delayedCall(4200, () => this.game.events.emit('notice', points >= BEACONS.length ? 'THE LATTICE IS WHOLE: EVERY LETTER ARRIVES AT ONCE' : `THE LATTICE: ${points} OF ${BEACONS.length} LIT`));
+    this.mindLog.push({ t: this.mindClock, text: points >= BEACONS.length ? 'the last beacon was lit: the lattice is whole, and every letter between the worlds now arrives at once' : `a beacon was lit: the lattice around the Sun is lit at ${points} of ${BEACONS.length} points, and letters near it arrive at once` });
     this.pending.beacon = { lit: true, at: Date.now(), by: session.replicant?.id };
     void this.saver.flushPlanet();
     const sx = g?.x ?? b.x, sy = g?.y ?? b.y + 30;

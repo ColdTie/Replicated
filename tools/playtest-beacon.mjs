@@ -69,9 +69,10 @@ try {
   if (after.alive) throw new Error('keeper did not fall');
   if (!fightShot) await shot(page, 'beacon-fight');
   await page.waitForTimeout(2600);
-  const lit = await ev(() => { const s = window.__scene; return { lit: s.beacon.lit, sparks: s.sparks.length, taken: window.__session.replicant.traits.sparks ?? 0, pending: !!s.pending.beacon }; });
+  const lit = await ev(() => { const s = window.__scene; return { lattice: s.mindLog.some((e) => /lattice around the Sun is lit at 1 of 4/.test(e.text)), lit: s.beacon.lit, sparks: s.sparks.length, taken: window.__session.replicant.traits.sparks ?? 0, pending: !!s.pending.beacon }; });
   log('lit', JSON.stringify(lit));
   if (!lit.lit || lit.sparks + lit.taken !== 1 || !lit.pending) throw new Error('beacon did not light or no spark');
+  if (!lit.lattice) throw new Error('lighting the beacon did not join the lattice');
   await shot(page, 'beacon-lit');
 
   // collect the spark
@@ -92,7 +93,7 @@ try {
   await shot(page, 'beacon-after');
 
   // the star map shows the lit beacon
-  await ev(() => { const s = window.__scene; s.scene.pause(); s.scene.launch('starmap', { mode: 'view', from: 'fomalhaut', lit: ['fomalhaut'] }); });
+  await ev(() => { const s = window.__scene; s.scene.pause(); s.scene.launch('starmap', { mode: 'view', from: 'fomalhaut', lit: ['fomalhaut', 'pollux'] }); });
   await page.waitForTimeout(1200);
   await shot(page, 'map-beacon-lit');
   log('errors', JSON.stringify(errors));

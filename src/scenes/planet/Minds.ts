@@ -8,7 +8,7 @@ import { Npc } from '../../entities/Npc';
 import { allRooms, describeWarren, restOf } from '../../world/warren';
 import { Spark } from '../../entities/Resources';
 import type { AwayItem, MindContext, MindResult, ReplicantSummary } from '../../net/store';
-import { distanceLy } from '../../world/galaxy';
+import { mailSeconds } from '../../world/galaxy';
 import type { PlanetScene } from '../PlanetScene';
 import { TALK_GAP_MS, kitLists, quietMinds } from './shared';
 
@@ -121,7 +121,7 @@ export class Minds {
     const structures: Record<string, number> = {};
     for (const s of this.s.village.structures) structures[s.type] = (structures[s.type] ?? 0) + 1;
     const delays: Record<string, number> = {};
-    for (const r of this.everyone) delays[r.id] = r.star_id === this.s.planet.star ? 0 : Math.round(distanceLy(this.s.planet.star, r.star_id) * MIND.mailSecondsPerLy);
+    for (const r of this.everyone) delays[r.id] = mailSeconds(this.s.planet.star, r.star_id, this.s.litBeacons, MIND.mailSecondsPerLy);
     const since = this.lastWake.get(npc) ?? -1;
     const me = session.replicant;
     const mine: Record<string, number> = {};
