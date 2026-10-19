@@ -20,7 +20,13 @@
     "ember": {
       "icon": 6,
       "color": 10
-    }
+    },
+    "iceglass": { "icon": 7, "color": 18 },
+    "salt": { "icon": 8, "color": 19 },
+    "obsidian": { "icon": 9, "color": 24 },
+    "silk": { "icon": 10, "color": 30 },
+    "seed": { "icon": 11, "color": 12 },
+    "regolith": { "icon": 12, "color": 21 }
   },
   "baseCap": 40,
   "shelfCap": 10,
@@ -78,6 +84,15 @@
     "crate": {
       "wood": 1
     }
+  },
+  "signature": {
+    "_doc": "Each world has a material only it makes (src/scenes/planet/Trade.ts): byWorld maps the world's id (planets.json / biomes.json) to it, names says it in words. The copies win perCopyHour of it each while you are away and while you play. The vessel's hold takes up to hold of this world's material when you launch and unloads it where you land (kept on the replicant as traits.cargo). Every kind of material from another world in the store lifts every copy's mood by importMood (up to importMoodMax): something from far away.",
+    "byWorld": { "earth": "seed", "verdant": "seed", "frost": "iceglass", "dune": "salt", "spore": "silk", "ember": "obsidian", "moon": "regolith", "solace": "regolith" },
+    "names": { "iceglass": "ice glass", "salt": "salt", "obsidian": "obsidian", "silk": "spore silk", "seed": "seed", "regolith": "regolith" },
+    "perCopyHour": 0.5,
+    "hold": 10,
+    "importMood": 0.04,
+    "importMoodMax": 0.12
   },
   "hands": {
     "_doc": "What the original does with their own hands (src/scenes/planet/Hands.ts). Hitting a tree treeHits times fells it for treeWood; hitting rock rockHits times breaks off rockYield stone (each rock tile once per rockCooldownMinutes); hitting an opened ruin's machine gives scrapPerRuin scrap (same cooldown as the copies' scavenging). The load rides above the head, up to carry of a material; more, or another material, flies to the store. Walking into a building waiting for that material, the hatch, or a copy hands it over (deliverRange px). A copy given a load: company + gift.company, purpose + gift.purpose. A swing at a building being raised counts swingWorth of a copy's blow. needRange: a copy whose building waits on a material shows it over its head when you come this close. hitsForgetMs: chips on a tree or rock heal after this long without a hit.",

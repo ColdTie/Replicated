@@ -8,6 +8,7 @@ const server = spawn('npx', ['vite', 'preview', '--port', String(port), '--stric
 for (;;) { try { if ((await fetch(`http://localhost:${port}/Replicated/`)).ok) break; } catch {} await new Promise((r) => setTimeout(r, 200)); }
 const errors = [];
 const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const fail = (m) => { errors.push(m); console.log('FAIL', m); };
 const log = (...a) => console.log(...a);
 try {
   const page = await b.newPage({ viewport: { width: 1440, height: 810 } });
@@ -28,7 +29,7 @@ try {
   const active = () => ev(() => window.__game.scene.getScenes(true).map((s) => s.scene.key).join(','));
 
   // walk to the board spot and press action
-  await ev(() => { const s = window.__scene; s.embers = 80; s.player.setPosition(s.boardSpot.x, s.boardSpot.y); s.player.locked = false; });
+  await ev(() => { const s = window.__scene; s.embers = 80; s.supplies.seed = 12; s.player.setPosition(s.boardSpot.x, s.boardSpot.y); s.player.locked = false; });
   await page.keyboard.press('Space');
   await page.waitForFunction(() => window.__game.scene.isActive('starmap'), null, { timeout: 10000 });
   log('scenes', await active());
@@ -41,6 +42,10 @@ try {
   await ev(() => window.__game.scene.getScene('starmap').launch());
   await page.waitForTimeout(1500);
   log('embers after fuel', await ev(() => window.__scene.embers));
+  // the hold takes this world's own material (Earth: seed), up to supplies.json signature.hold
+  const loaded = await ev(() => ({ cargo: window.__session.replicant.traits.cargo, left: window.__scene.supplies.seed }));
+  log('hold', JSON.stringify(loaded));
+  if (loaded.cargo?.material !== 'seed' || loaded.cargo?.n !== 10 || loaded.left !== 2) fail('the hold did not take the seed');
   await page.waitForFunction(() => window.__game.scene.isActive('travel'), null, { timeout: 30000 });
   log('scenes', await active());
   await page.waitForTimeout(2500);
@@ -54,6 +59,11 @@ try {
   await page.waitForFunction(() => window.__game.scene.isActive('planet') && window.__scene?.player && window.__scene.planet.star === 'alpha-cen', null, { timeout: 40000 });
   log('landed on', await ev(() => `${window.__scene.planet.name} (${window.__scene.planet.id}) replicant at ${window.__session.replicant.star_id}`));
   await page.waitForTimeout(9000);
+  // the hold was unloaded into the new world's store
+  const unloaded = await ev(() => ({ cargo: window.__session.replicant.traits.cargo ?? null, seed: window.__scene.supplies.seed ?? 0, own: window.__scene.trade.own, mood: window.__scene.trade.importMood }));
+  log('unloaded', JSON.stringify(unloaded));
+  if (unloaded.cargo || unloaded.seed < 10) fail('the hold was not unloaded on landing');
+  if (unloaded.own !== 'seed' && !(unloaded.mood > 0)) fail('an import did not lift the mood');
   await shot('m4-new-world');
 } finally { await b.close(); try { process.kill(-server.pid); } catch {} }
 console.log('errors', errors);

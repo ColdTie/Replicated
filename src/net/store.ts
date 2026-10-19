@@ -38,6 +38,8 @@ export interface ReplicantSave {
     tell?: { text: string; at: number };
     /** born with a Spark beside an older copy: it carries that copy's notes and remembers being it (drift.json spark) */
     inherit?: { from: string; name: string; wants?: string[] };
+    /** what the vessel's hold carries between worlds (supplies.json signature): set at launch, unloaded on landing */
+    cargo?: { material: string; n: number; from: string } | null;
   };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
@@ -151,11 +153,12 @@ export interface PlanetSave {
   data: PlanetData;
 }
 
-/** With fixed-length trips on (travel.json fixedSeconds), ships already flying on the old real-time schedule arrive
- * that many seconds after they left too. */
+/** With fixed-length trips or the short cruise on (travel.json), a ship still flying on an older, longer schedule
+ * arrives by the longest trip there is now. */
 function capJourney<J extends Journey>(j: J): J {
-  if (!(TRAVEL.fixedSeconds > 0)) return j;
-  const cap = Date.parse(j.departs_at) + TRAVEL.fixedSeconds * 1000;
+  const longest = TRAVEL.fixedSeconds > 0 ? TRAVEL.fixedSeconds : TRAVEL.cruise.enabled ? TRAVEL.cruise.maxSeconds : 0;
+  if (!longest) return j;
+  const cap = Date.parse(j.departs_at) + longest * 1000;
   return Date.parse(j.arrives_at) > cap ? { ...j, arrives_at: new Date(cap).toISOString() } : j;
 }
 

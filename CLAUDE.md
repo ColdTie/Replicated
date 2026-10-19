@@ -84,8 +84,9 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 
 These shape the data model now, even where the feature comes later.
 
-- **Travel runs on real-world time.** (Switched off 2026-10-06 at Steve's request: every trip takes 5 seconds via
-  `fixedSeconds` in `src/data/travel.json`; 0 restores real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
+- **Travel runs on real-world time.** (Switched off 2026-10-06 at Steve's request: every trip took 5 seconds via
+  `fixedSeconds` in `src/data/travel.json`. Since 2026-10-19 a trip is a 1 to 3 minute cruise, `travel.json cruise`;
+  `cruise.enabled` false and `fixedSeconds` 0 restore real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
 - **One shared galaxy per login.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
 - **Earth is the start.** Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
 - **Messages travel at light speed until FTL comms exist.** A message between replicants in different systems arrives after a delay based on distance (scaled like travel). Building or finding the FTL comms device makes messages from that system instant.
@@ -229,6 +230,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | mind | `wants` | `[{ text, category, done, at }]` 1 to 3 goals in its own words (`set_wants` / `finish_want`) |
 | state | `blank` | born and not yet itself (grey, still; the first wake is the becoming) |
 | state | `awake`, `mods`, `sparks` | intro played; ruin modules; Sparks held |
+| state | `cargo` | `{ material, n, from }` what the vessel's hold carries between worlds (supplies.json signature), or null |
 | state | `inherit` | `{ from, name, wants }`: born with a Spark beside that copy; it carries its notes and remembers being it |
 | state | `weary`, `sleptAt` | tiredness carried over; last sleep |
 | state | `needs` | `{ company, purpose }` 0 empty .. 1 full (`src/data/needs.json`); rest is `1 - weary`. No food or water (Steve, 2026-10-08). |
@@ -276,7 +278,7 @@ URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` sk
 screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond|ruin` for other spots, `&kid` for kid mode),
 `?planet=solace`, `?seed=123`, `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
 `?low` (force low-detail mode; also switches on by itself under 40 fps), `?perf` (the planet's load phases in seconds,
-bottom left, for 12 s: save, world, ground, rock, rest; also `window.__loadMs`), `?fast` (travel minutes become seconds),
+bottom left, for 12 s: save, world, ground, rock, rest; also `window.__loadMs`), `?fast` (travel minutes become seconds; a cruise takes a twelfth as long),
 `?shot=1&view=warren&copies=3` (a dug, lived-in warren, you at the foot of the ladder), `?shot=1&star=tau-ceti&pi=2` (preview planet 2 of another star, as a hologram visit), `?shot=1&at=fomalhaut&pi=1`
 (start the replicant on another world for real; `&view=beacon` stands you before the sleeping keeper, `&view=beacon-lit`
 shows the lit monolith).
@@ -489,3 +491,19 @@ ships daily) re-downloads only the game, 418 KB (142 KB gzipped) instead of 1.6 
 load goes. Headless (software GL): Earth 1.59 s, of which ground paint 1.02 s, rock 0.19, world 0.12, the rest 0.25.
 The paint cache from the plan is not built: the ground image is 2336 x 1792 (16.7 MB raw), so storing and decoding it
 would cost much of what it saves; decide on it after reading `?perf` on Steve's laptop.
+
+**M4, a galaxy worth crossing** (`src/scenes/planet/Trade.ts`, `supplies.json signature`, `travel.json cruise`).
+- A trip is a cruise of 60 s (the nearest stars) to 180 s (45 ly and beyond), growing with the square root of the
+  distance; 20 s inside a system. A ship still flying on an older, longer schedule arrives by 180 s (`capJourney`).
+- Every world makes one material only it has: Earth and verdant worlds seed, frost ice glass, dune salt, spore spore
+  silk, ember obsidian, moons and Solace regolith (icons 7 to 12 in `tools/sprites/supplies.json`). Each copy wins 0.5
+  an hour of it, while you play (a copy carries a piece to the hatch now and then) and while you are away.
+- Launching, the vessel's hold takes up to 10 of this world's material from the store (`traits.cargo`, saved with
+  `patchTraits`; no migration). Landing, it flies from the vessel to the hatch into the new world's store.
+- Each kind of material from another world in a store lifts every copy's mood there by 0.04 (up to 0.12): something
+  from far away. The minds see it in their supplies; the journal lists a world's own and imported materials once there
+  are some.
+- Not done from the plan: carried letters, and imports unlocking things to build (buildings and furnishings made of
+  them need new paint and a mind function deploy). The `bring` wish (M2) waits for those.
+- Verified: `playtest-travel.mjs` (the hold takes Earth's seed, the seed lands on Alpha Centauri B II, an ember world,
+  and lifts the mood).
