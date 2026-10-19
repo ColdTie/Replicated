@@ -132,6 +132,8 @@ export class PlanetScene extends Phaser.Scene {
   private boardRing?: Phaser.GameObjects.Ellipse;
   /** after climbing out of the warren, the hatch waits a moment before it takes you again */
   private hatchReadyAt = 0;
+  /** when this planet's load began (performance.now), for ?perf */
+  private loadT0 = 0;
   /** how long the player has stood on the open hatch, and the ring that fills meanwhile */
   private hatchDwell = 0;
   private hatchRing?: Phaser.GameObjects.Graphics;
@@ -211,6 +213,7 @@ export class PlanetScene extends Phaser.Scene {
 
   create() {
     // Loading the planet save is async; build the world once it arrives.
+    this.loadT0 = performance.now();
     this.cameras.main.setBackgroundColor(PALETTE[25]);
     const save = this.preloadSave().catch(() => this.preloadSave())
       .catch((e) => { console.warn('planet load failed, playing without saving', e); this.loadFailed = true; return null; });
@@ -257,11 +260,13 @@ export class PlanetScene extends Phaser.Scene {
   }
 
   private build(save: PlanetSave | null, npcRows: ReplicantSave[] = []) {
+    const tSaved = performance.now();
     npcRows = birthOrder(npcRows);
     session.planet = save;
     const p = this.planet;
     const { width, height } = this.scale;
     this.map = generatePlanet(p, this.seed ?? p.seed);
+    const tGen = performance.now();
     const m = this.map;
     const pw = m.w * 16, ph = m.h * 16;
     npcRows = this.withScreenshotCopies(npcRows);
@@ -451,6 +456,14 @@ export class PlanetScene extends Phaser.Scene {
       this.playReturn();
     }
     (window as unknown as { __scene: PlanetScene }).__scene = this;
+    // where the load went (ms): ?perf shows it on screen, so it can be read on the laptop it is played on
+    const t = performance.now(), paint = (window as unknown as { __paintMs: number[] }).__paintMs;
+    const phases = { save: tSaved - this.loadT0, world: tGen - tSaved, ground: paint[0], rock: paint[1], rest: t - tGen - paint[0] - paint[1], total: t - this.loadT0 };
+    (window as unknown as { __loadMs: typeof phases }).__loadMs = phases;
+    if (new URLSearchParams(location.search).has('perf')) {
+      const f = (ms: number) => (ms / 1000).toFixed(2);
+      this.time.delayedCall(600, () => this.game.events.emit('perf', `LOAD ${f(phases.total)}S  SAVE ${f(phases.save)}  WORLD ${f(phases.world)}  GROUND ${f(phases.ground)}  ROCK ${f(phases.rock)}  REST ${f(phases.rest)}`));
+    }
   }
 
   addSolid(x: number, y: number, w: number, h: number) {
