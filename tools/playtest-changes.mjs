@@ -1,6 +1,6 @@
 // Scripted headless playtest of session 14: the copies' proposals to change the game in the journal (waiting, built
-// with the maker's answer, not made, replaced ones hidden), the original's SAY NO (twice), and a proposal from an
-// away wake told on landing. Usage: npm run build && node tools/playtest-changes.mjs
+// with the maker's answer, not made, replaced ones hidden), the original's SAY NO (twice), the day's spend on the
+// minds, and a proposal from an away wake told on landing. Usage: npm run build && node tools/playtest-changes.mjs
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
 const port = 4189;
@@ -68,7 +68,22 @@ try {
   if (!after.open || after.button || !after.said) fail('the journal does not show the no');
   await ev(() => { document.querySelector('.jn')?.remove(); });
 
-  // 3. a proposal made in an away wake is told on landing
+  // 3. the day's spend on the minds, against the budget (the cloud store reads mind_spend; this device has none)
+  const spendLine = async (usd) => ev(async (u) => {
+    window.__session.store.mindSpend = async () => u;
+    // a journal removed by hand still counts as open: the first toggle only closes it
+    await window.__scene.toggleJournal();
+    if (!document.querySelector('.jn')) await window.__scene.toggleJournal();
+    const line = [...document.querySelectorAll('.jn p.mute')].map((p) => p.textContent).find((t) => /minds/.test(t)) ?? '';
+    await window.__scene.toggleJournal();
+    return line;
+  }, usd);
+  const under = await spendLine(0.21), over = await spendLine(0.5);
+  log('spend', JSON.stringify({ under, over }));
+  if (under !== 'The minds today: $0.21 of $0.50.') fail('the day\'s spend is not shown');
+  if (!/rest until tomorrow/.test(over)) fail('a spent budget is not shown');
+
+  // 4. a proposal made in an away wake is told on landing
   const told = await ev(async () => {
     const s = window.__scene, n = s.npcs[1];
     window.__notices = [];

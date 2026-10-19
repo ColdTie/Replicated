@@ -40,6 +40,7 @@ const out = {
   },
   mailSecondsPerLy: MIND.mailSecondsPerLy,
   away: MIND.away,
+  mind: { model: MIND.model, effort: MIND.effort, budget: MIND.budget, prices: MIND.prices },
   stars: Object.fromEntries(STARS.stars.map((s) => [s.id, [s.name, s.x, s.y, s.z]])),
 };
 const dest = new URL('../supabase/functions/mind/kit.json', import.meta.url);

@@ -54,8 +54,9 @@ the wording of their own mind's prompts and tool descriptions.
 
 Leave it open for Steve (status `open`, listed under "Waiting for Steve"):
 - database schema changes (migrations), new dependencies, paid or non-CC0 assets;
-- anything that changes the mind function's model, effort, wake frequency, rounds or reading budget (these cost
-  money: Steve's call);
+- anything that changes the mind function's model, effort, wake frequency, rounds, reading budget or the daily
+  budget (`src/data/mind.json` model, effort, budget, away; these cost money: Steve's call, $0.50 a day as of
+  2026-10-19);
 - anything that changes what the game is: CLAUDE.md "Out of scope", a new genre, a new core loop.
 
 Do not build it (status `dropped`, with a kind reason):

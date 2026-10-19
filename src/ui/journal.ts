@@ -91,6 +91,8 @@ export interface JournalView {
   actions?: { approve(id: string): void; veto(id: string): void; talk(id: string, text: string): void; give(id: string): void; awaken(id: string): void; vetoChange(id: string): void };
   /** Sparks the original holds: each one can awaken a copy as a player of its own */
   sparks?: number;
+  /** what the minds have cost today, against the day's budget (mind.json budget) */
+  spend?: { usd: number; cap: number };
 }
 
 /** What the journal (and the talk box) says while the copies' words are still runes. */
@@ -112,6 +114,7 @@ export function openJournal(v: JournalView) {
   const color = (c: ReplicantSave) => css(PALETTE[c.traits.feature ?? 10]);
   const parts: string[] = [];
   if (!v.canHear) parts.push(`<p class="mute">${HEAR_HINT}</p>`);
+  if (v.spend) parts.push(`<p class="mute">${v.spend.usd >= v.spend.cap ? `The minds have spent today's $${v.spend.cap.toFixed(2)} and rest until tomorrow.` : `The minds today: $${v.spend.usd.toFixed(2)} of $${v.spend.cap.toFixed(2)}.`}</p>`);
   if (!v.copies.length) parts.push(`<p class="mute">Nobody lives here yet.</p>`);
   for (const c of v.copies) {
     parts.push(`<h3 style="color:${color(c)}">${esc(c.name.toUpperCase())}</h3>`);

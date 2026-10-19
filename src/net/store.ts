@@ -245,7 +245,8 @@ export interface MindAction {
   /** tell: when it was said (body = what the copy would tell the original) */
   at?: number;
 }
-export interface MindResult { skipped?: boolean; song?: string; actions?: MindAction[]; received?: { from: string; body: string }[]; error?: string }
+/** reason 'budget': the day's budget for the minds is spent (mind.json budget); nobody wakes until tomorrow. */
+export interface MindResult { skipped?: boolean; reason?: string; song?: string; actions?: MindAction[]; received?: { from: string; body: string }[]; error?: string }
 export interface Note { replicant_id: string; body: string; created_at: string }
 export interface Letter { id: string; from_replicant: string | null; to_replicant: string | null; body: string; sent_at: string; arrives_at: string; read_at?: string | null }
 /** A copy's ask. kind 'change' is a proposal to change the game (migration 0012): detail its title, body "Why: ...",
@@ -289,6 +290,8 @@ export interface GameStore {
   takeMindQueue(star: string, planetIndex: number): Promise<AwayItem[]>;
   /** The original says no to a copy's proposal to change the game, before the maker builds it. */
   vetoRequest(id: string): Promise<void>;
+  /** What the minds have cost today in USD (migration 0013), or null where minds cost nothing (this device). */
+  mindSpend(): Promise<number | null>;
   /**
    * The handoff: a Spark awakens a copy as a player of its own. A new profile is made in its name and visor
    * color and the copy becomes that profile's replicant (one row update); the giver spends the Spark.
@@ -543,6 +546,8 @@ export class LocalStore implements GameStore {
     return structuredClone(cur);
   }
 
+  async mindSpend() { return null; }
+
   async vetoRequest(id: string) {
     const r = this.db.requests.find((x) => x.id === id && x.status === 'open');
     if (r) { r.status = 'vetoed'; r.done_at = new Date().toISOString(); this.flush(); }
@@ -739,6 +744,11 @@ export class CloudStore implements GameStore {
     });
     if (error) throw error;
     return (row as PlanetSave[] | null)?.[0] ?? null;
+  }
+
+  async mindSpend() {
+    const { data, error } = await this.sb.rpc('mind_spend_today', { p_galaxy: this.galaxyId });
+    return error ? null : Number(data ?? 0);
   }
 
   async vetoRequest(id: string) {
