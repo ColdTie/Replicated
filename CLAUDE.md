@@ -983,3 +983,25 @@ Next: the first live talks will show how the model's tells read; watch that the 
 - Verified: build, Deno check, the code tools run over a real bundle, `tools/playtest-changes.mjs` (new) and the
   buildings, together, talk, become, warren and ruin playtests. The deployed v16 and v17 match the repo byte for
   byte. `screenshots/changes-journal.png`.
+
+### Session 14b (2026-10-19): the minds within $0.50 a day (Steve: "That's too costly. Bring the price down to 0.50 a day")
+- **Every wake runs on Claude Haiku 5.5** at low effort (`src/data/mind.json` `model`, `effort`; Haiku has no
+  server-side refusal fallback, so the function sends `fallbacks` only for the larger models). Haiku 5.5 is $0.10 in /
+  $0.50 out per million tokens against Opus 5.5's $4 / $20 (pricing page checked 2026-10-19; `prices` in mind.json).
+- **A daily budget the server enforces** (`budget.dailyUsd` 0.50, Steve's day in Los Angeles time). Each wake's cost,
+  from the API's token counts and `prices`, goes on a per-galaxy ledger (migration 0013: `mind_spend`,
+  `add_mind_spend`, `mind_spend_today`; members read their own galaxy, the scheduled run uses the service role). The
+  function wakes nobody once the day's budget is spent (`{ skipped, reason: 'budget' }`), and the long wakes stop at
+  `awayShare` (half), so the rest is kept for when Steve plays. An unreadable ledger counts as spent. The game rests
+  the minds for half an hour when told the budget is out (`PlanetScene.mindsRest`); the journal shows "The minds
+  today: $0.12 of $0.50".
+- Live wakes every 6 minutes instead of 4 (`wakeMinutes`). The tool definitions carry a cache breakpoint, shared by
+  every copy.
+- Measured (function v18): a long wake on Haiku costs about $0.0015 to $0.0017 (Moss, Lookout), against $0.06 to
+  $0.08 on Opus. Twice-daily long wakes for 29 copies come to about $0.10 a day; a live wake costs about the same
+  as a long one, so the other $0.25 covers roughly 150 live wakes (two to three hours of play) before the minds rest.
+- The maker routine runs as a Claude Code session on Steve's plan, not on the mind function's API key, so it is
+  outside this budget.
+- Verified: build, Deno check, the ledger functions (sums, a stranger reads 0), `tools/playtest-changes.mjs` (now also
+  the journal's spend line) and the talk, together, become, warren and buildings playtests; v18 matches the repo byte
+  for byte.
