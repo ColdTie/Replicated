@@ -229,6 +229,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | mind | `wants` | `[{ text, category, done, at }]` 1 to 3 goals in its own words (`set_wants` / `finish_want`) |
 | state | `blank` | born and not yet itself (grey, still; the first wake is the becoming) |
 | state | `awake`, `mods`, `sparks` | intro played; ruin modules; Sparks held |
+| state | `inherit` | `{ from, name, wants }`: born with a Spark beside that copy; it carries its notes and remembers being it |
 | state | `weary`, `sleptAt` | tiredness carried over; last sleep |
 | state | `needs` | `{ company, purpose }` 0 empty .. 1 full (`src/data/needs.json`); rest is `1 - weary`. No food or water (Steve, 2026-10-08). |
 | state | `inventory` | `{ material: count }` gifts from the original the copy still holds |
@@ -468,3 +469,16 @@ whole `npm test` passed before and after.
 - `tools/playtest.mjs` now asserts the spore reflect (it only logged it before; Earth's spitter is shy, so that part
   lifts the flag for itself) and that Earth's creatures leave you alone; `playtest-warren.mjs` checks that crossing the
   hatch does nothing. `npm test` 13 of 13.
+
+**M3, more for the Spark: inheritance.** Steve's default (the plan's recommendation) until he says otherwise.
+- At the Replicator with a Spark while a copy (not blank) stands within `drift.json spark.range` (36 px) of the ring,
+  the birth spends the Spark (it flies from you into the machine; both of you are scanned): the newborn is that copy's
+  child (stats drift from it, `parent_id` and generation follow it), `traits.inherit = { from, name, wants }` keeps its
+  open wants, and its newest `spark.notes` (12) notes are copied to the newborn with their dates
+  (`GameStore.inheritNotes`; the notes table's member insert policy covers it, no migration). Without a copy by the
+  ring, or without a Spark, a birth is as before; AWAKEN in the journal still spends a Spark the old way.
+- The mind function's persona tells such a copy it remembers living those notes, a little differently, and is not the
+  older copy but who those memories became (`inherited()`). **Not deployed yet**: it waits with the S1 function change
+  for Steve's go-ahead in Supabase (the live function ignores `inherit` until then; the notes are copied either way).
+- Verified: `tools/playtest-become.mjs` step 4 (a Spark birth beside Ash: parent, inherit, wants, notes, Spark spent),
+  the mind tool check and `deno check`.

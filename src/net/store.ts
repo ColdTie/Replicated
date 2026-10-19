@@ -36,6 +36,8 @@ export interface ReplicantSave {
     /** what the original handed it (gifts), by material */
     inventory?: Record<string, number>;
     tell?: { text: string; at: number };
+    /** born with a Spark beside an older copy: it carries that copy's notes and remembers being it (drift.json spark) */
+    inherit?: { from: string; name: string; wants?: string[] };
   };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
@@ -310,6 +312,8 @@ export interface GameStore {
   vetoRequest(id: string): Promise<void>;
   /** What the minds have cost today in USD (migration 0013), or null where minds cost nothing (this device). */
   mindSpend(): Promise<number | null>;
+  /** A Spark birth: the newest `limit` notes of one copy become the other's, with their dates. Returns how many. */
+  inheritNotes(fromId: string, toId: string, limit: number): Promise<number>;
   /** Letters to this replicant that arrived after `since` (ISO), oldest first, at most `limit`. */
   lettersTo(id: string, since: string, limit: number): Promise<Letter[]>;
   /** How the minds are doing (migration 0014), or null where there are no real minds (this device) or it cannot be read. */
@@ -570,6 +574,14 @@ export class LocalStore implements GameStore {
 
   async mindSpend() { return null; }
 
+  async inheritNotes(fromId: string, toId: string, limit: number) {
+    const mine = this.db.notes.filter((n) => n.replicant_id === fromId).slice(0, limit);
+    this.db.notes.push(...mine.map((n) => ({ ...n, replicant_id: toId })));
+    this.db.notes.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    this.flush();
+    return mine.length;
+  }
+
   async lettersTo(id: string, since: string, limit: number) {
     const now = Date.now(), from = Date.parse(since);
     return this.db.mail.filter((m) => m.to_replicant === id && Date.parse(m.arrives_at) > from && Date.parse(m.arrives_at) <= now)
@@ -778,6 +790,15 @@ export class CloudStore implements GameStore {
   async mindSpend() {
     const { data, error } = await this.sb.rpc('mind_spend_today', { p_galaxy: this.galaxyId });
     return error ? null : Number(data ?? 0);
+  }
+
+  async inheritNotes(fromId: string, toId: string, limit: number) {
+    const { data, error } = await this.sb.from('notes').select('body,created_at').eq('replicant_id', fromId).order('created_at', { ascending: false }).limit(limit);
+    if (error) throw error;
+    if (!data?.length) return 0;
+    const { error: e } = await this.sb.from('notes').insert(data.map((n) => ({ galaxy_id: this.galaxyId, replicant_id: toId, body: n.body, created_at: n.created_at })));
+    if (e) throw e;
+    return data.length;
   }
 
   async lettersTo(id: string, since: string, limit: number) {
