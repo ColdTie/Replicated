@@ -1,5 +1,6 @@
-// The journal: what the copies on this planet remember, write to each other and ask for. An HTML panel over
-// the canvas (Tab / I, or tap the corner label). Until the replicant can hear them, every line is runes.
+// The journal: what the copies on this planet remember, write to each other and ask for, and the changes to the game
+// they proposed (with the maker's answer). An HTML panel over the canvas (Tab / I, or tap the corner label). Until
+// the replicant can hear them, every line is runes.
 import { PALETTE } from '../core/data';
 import type { Journal, ReplicantSave } from '../net/store';
 import { paletteCss as css } from './overlay';
@@ -33,6 +34,10 @@ function ensureStyle() {
   .jn .act button, .jn p button { font: inherit; font-size: 11px; letter-spacing: 1px; background: ${css(PALETTE[23])}; color: ${css(PALETTE[2])}; border: 1px solid ${css(PALETTE[22])}; padding: 3px 8px; cursor: pointer; }
   .jn .act button:hover, .jn p button:hover { background: ${css(PALETTE[22])}; }
   .jn .act button.spark { color: ${css(PALETTE[19])}; border-color: ${css(PALETTE[18])}; }
+  .jn details { margin: 0 0 4px 22px; color: ${css(PALETTE[21])}; font-size: 12px; }
+  .jn details summary { cursor: pointer; letter-spacing: 1px; }
+  .jn details div { white-space: pre-wrap; margin: 2px 0 0; color: ${css(PALETTE[20])}; }
+  .jn p.made { color: ${css(PALETTE[12])}; }
   `;
   document.head.appendChild(s);
 }
@@ -83,7 +88,7 @@ export interface JournalView {
   buildings?: string[];
   pending?: { id: string; name: string }[];
   /** the original's one action on a copy or a blueprint */
-  actions?: { approve(id: string): void; veto(id: string): void; talk(id: string, text: string): void; give(id: string): void; awaken(id: string): void };
+  actions?: { approve(id: string): void; veto(id: string): void; talk(id: string, text: string): void; give(id: string): void; awaken(id: string): void; vetoChange(id: string): void };
   /** Sparks the original holds: each one can awaken a copy as a player of its own */
   sparks?: number;
 }
@@ -112,7 +117,9 @@ export function openJournal(v: JournalView) {
     parts.push(`<h3 style="color:${color(c)}">${esc(c.name.toUpperCase())}</h3>`);
     const notes = v.journal.notes.filter((n) => n.replicant_id === c.id).slice(0, 8);
     const mail = v.journal.mail.filter((m) => m.from_replicant === c.id || m.to_replicant === c.id).slice(0, 8);
-    const asks = v.journal.requests.filter((r) => r.replicant_id === c.id).slice(0, 5);
+    const asks = v.journal.requests.filter((r) => r.replicant_id === c.id && r.kind !== 'change').slice(0, 5);
+    // proposals to change the game: the newest few, minus those it replaced with a newer idea
+    const changes = v.journal.requests.filter((r) => r.replicant_id === c.id && r.kind === 'change' && !(r.status === 'dropped' && /^Replaced by/.test(r.reply ?? ''))).slice(0, 3);
     const t = c.traits.temperament;
     if (c.traits.blank) parts.push(`<p class="mute">${v.canHear ? 'Not yet itself. It has not chosen.' : runes('not yet itself')}</p>`);
     else if (t) parts.push(`<p class="mute">${show(`${t.pace}, ${t.sociability}, ${t.work === 'balanced' ? 'works and wanders' : t.work}, ${t.bedtime} to bed, ${t.risk}`)}</p>`);
@@ -123,7 +130,7 @@ export function openJournal(v: JournalView) {
       parts.push(`<div class="k">WANTS</div>`);
       for (const w of wants) parts.push(`<p class="${w.done ? 'done' : ''}">${show(w.text)}<small>${v.canHear ? esc(w.category) : runes(w.category)}</small></p>`);
     }
-    if (!notes.length && !mail.length && !asks.length && !wants.length) parts.push(`<p class="mute">${v.canHear ? 'Nothing written yet.' : runes('nothing written yet')}</p>`);
+    if (!notes.length && !mail.length && !asks.length && !wants.length && !changes.length) parts.push(`<p class="mute">${v.canHear ? 'Nothing written yet.' : runes('nothing written yet')}</p>`);
     if (notes.length) {
       parts.push(`<div class="k">NOTES</div>`);
       for (const n of notes) parts.push(`<p>${show(n.body)}<small>${ago(n.created_at)}</small></p>`);
@@ -142,6 +149,19 @@ export function openJournal(v: JournalView) {
       for (const r of asks) {
         const label = r.kind === 'skin' ? 'A NEW BODY' : r.kind === 'name' ? 'A NAME' : r.kind.toUpperCase();
         parts.push(`<p class="${r.status === 'open' ? 'ask' : 'done'}">${v.canHear ? esc(label) : runes(label)}: ${show(r.detail)}<small>${ago(r.created_at)}</small></p>`);
+      }
+    }
+    if (changes.length) {
+      parts.push(`<div class="k">WOULD CHANGE THE GAME</div>`);
+      for (const r of changes) {
+        const [head, ...rest] = (r.body ?? '').split('\n\n');
+        const why = head.match(/^Why: (.*)$/m)?.[1] ?? '';
+        const state = r.status === 'open' ? 'the maker reads it within a day' : r.status === 'done' ? 'in the game' : r.status === 'vetoed' ? 'you said no' : 'not made';
+        const cls = r.status === 'open' ? 'ask' : r.status === 'done' ? 'made' : 'done';
+        const no = r.status === 'open' && r.id && v.actions ? ` <button type="button" data-nochange="${esc(r.id)}">SAY NO</button>` : '';
+        parts.push(`<p class="${cls}">${show(r.detail)}${why ? ` - ${show(why)}` : ''}<small>${v.canHear ? esc(state) : runes(state)}, ${ago(r.created_at)}</small>${no}</p>`);
+        if (r.reply && r.status !== 'open') parts.push(`<p class="mute">${v.canHear ? 'the maker: ' : ''}${show(r.reply)}</p>`);
+        if (v.canHear && rest.join('').trim()) parts.push(`<details><summary>what it asks for</summary><div>${esc(rest.join('\n\n').trim())}</div></details>`);
       }
     }
   }
@@ -171,6 +191,11 @@ export function openJournal(v: JournalView) {
     if (!a || !t.dataset) return;
     if (t.dataset.approve) a.approve(t.dataset.approve);
     else if (t.dataset.veto) a.veto(t.dataset.veto);
+    else if (t.dataset.nochange) {
+      // twice: the first press says what it means
+      if (t.dataset.sure) a.vetoChange(t.dataset.nochange);
+      else { t.dataset.sure = '1'; t.textContent = 'SURE? THE MAKER WILL NOT BUILD IT'; }
+    }
     else if (t.dataset.give) a.give(t.dataset.give);
     else if (t.dataset.awaken) {
       // twice: the first press says what it means
