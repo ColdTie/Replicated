@@ -1757,6 +1757,7 @@ export class PlanetScene extends Phaser.Scene {
       this.lastMindCallAt.set(npc, Date.now());
       const res = await st.mindTick(npc.data.id, this.mindContext(npc));
       this.lastWake.set(npc, t);
+      if (res?.reason === 'budget') { this.mindsRest(); return; }
       if (!res || res.skipped || !this.npcs.includes(npc)) return;
       if (res.error) { console.warn('mind:', res.error); return; }
       this.applyMind(npc, res, false);
@@ -1794,6 +1795,7 @@ export class PlanetScene extends Phaser.Scene {
         this.lastMindCallAt.set(npc, Date.now());
         const res = await st.mindTick(npc.data.id, { ...this.mindContext(npc), talk: { said } });
         if (res?.error) console.warn('mind:', res.error);
+        if (res?.reason === 'budget') { this.mindsRest(); return null; }
         if (res?.skipped) continue;
         if (!res || res.error || !this.npcs.includes(npc)) return null;
         // it has just spoken: its next ordinary wake waits
@@ -1809,6 +1811,11 @@ export class PlanetScene extends Phaser.Scene {
     } finally {
       this.mindBusy = false;
     }
+  }
+
+  /** The day's budget for the minds is spent: no copy asks again for half an hour (the function would only say no). */
+  private mindsRest() {
+    for (const n of this.npcs) this.nextWake.set(n, Math.max(this.nextWake.get(n) ?? 0, this.mindClock + 30 * 60_000));
   }
 
   /** What a wake brought: letters, a voice, its song (not for a talk: the tell is the answer), and its deeds. */
@@ -1961,7 +1968,7 @@ export class PlanetScene extends Phaser.Scene {
     if (journalOpen()) { closeJournal(); return; }
     const st = session.store;
     if (!st) return;
-    const j = await st.journal(this.npcs.map((n) => n.data.id));
+    const [j, spent] = await Promise.all([st.journal(this.npcs.map((n) => n.data.id)), st.mindSpend().catch(() => null)]);
     const names: Record<string, string> = {};
     for (const r of this.everyone) names[r.id] = r.name;
     if (session.replicant) names[session.replicant.id] = session.replicant.name;
@@ -1976,7 +1983,7 @@ export class PlanetScene extends Phaser.Scene {
       awaken: (id: string) => void this.awakenCopy(id),
       vetoChange: (id: string) => { void st.vetoRequest(id).catch((e) => console.warn('veto', e)).then(() => { closeJournal(); return this.toggleJournal(); }); },
     };
-    openJournal({ sparks: this.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j, feelings, actions,
+    openJournal({ spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j, feelings, actions,
       buildings: this.buildings.describe(nameOf), pending: this.buildings.list.filter((b) => !b.vetoed && !b.approved && !b.built).map((b) => ({ id: b.id, name: b.name })), warren: this.warren.data.rooms.length ? describeWarren(this.warren.data, null, nameOf) : [], supplies: this.npcs.length ? this.warren.describeSupplies() : undefined, shortages: this.warren.shortages() });
   }
 

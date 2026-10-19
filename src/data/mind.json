@@ -2,10 +2,22 @@
   "_doc": "Minds of the copies (the mind Edge Function). firstWakeMs: after landing, the first copy wakes; staggerMs between copies; wakeMinutes: how often each copy wakes while you play; mailSecondsPerLy: letters cross space at this speed (same star: instant); bubbleMs: how long a song stays up; bubbleScale: song bubbles are this much smaller (padding and max width; the pixel font itself is never scaled, it drops rows). canned: what copies say when playing from this device (?local), no model involved. canned.tells / canned.answers: what the canned mind (?local, headless tests) tells the original, and answers when talked to.",
   "firstWakeMs": 6000,
   "staggerMs": 15000,
-  "wakeMinutes": 4,
+  "wakeMinutes": 6,
   "mailSecondsPerLy": 60,
   "bubbleMs": 7000,
   "bubbleScale": 0.9,
+  "model": "claude-haiku-5-5",
+  "effort": "low",
+  "budget": {
+    "_doc": "What the minds may cost per day (Steve's day, America/Los_Angeles), every wake included: live wakes while you play, talk wakes, long wakes while you are away. The mind function adds each wake's cost (from the API's token counts and prices below, USD per million tokens) to mind_spend (migration 0013) and wakes nobody once dailyUsd is spent; long wakes stop at awayShare of it, so the rest is kept for when you play. model / effort: the model every wake runs on (Haiku 5.5 keeps twice-daily long wakes for every copy inside $0.50; Opus 5.5 costs about 40 times as much).",
+    "dailyUsd": 0.5,
+    "awayShare": 0.5
+  },
+  "prices": {
+    "claude-haiku-5-5": { "input": 0.10, "cacheWrite": 0.125, "cacheRead": 0.01, "output": 0.50 },
+    "claude-sonnet-5-5": { "input": 2, "cacheWrite": 2.5, "cacheRead": 0.10, "output": 10 },
+    "claude-opus-5-5": { "input": 4, "cacheWrite": 5, "cacheRead": 0.20, "output": 20 }
+  },
   "away": {
     "_doc": "Long wakes: while nobody plays a planet, each copy on it wakes on its own every everyHours (about twice a day), up to batch copies per hourly run and perPlanet per planet. A long wake has up to rounds model calls within seconds of the run starting, and the code tools: code_map, search_code, read_code (the game's source from code.url, published by the deploy; at most code.calls reads and code.chars characters per wake, code.lines per read_code, code.hits per search) and propose_change (the maker builds it, NEEDS.md). Copied into the mind function by tools/build-mind-kit.mjs.",
     "everyHours": 11,

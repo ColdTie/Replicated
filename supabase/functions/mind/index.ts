@@ -12,7 +12,12 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import KIT from "./kit.json" with { type: "json" };
 import { allRooms, cleanName, describeWarren, placeItem, placeRoom, restOf, type Dir, type ItemKind, type RoomSize, type WarrenData, type WarrenItem, type WarrenRoom } from "./warren.ts";
 
-const MODEL = "claude-opus-5-5";
+// the model, its effort, the daily budget and the prices: src/data/mind.json, through the kit
+const MIND = KIT.mind as { model: string; effort: string; budget: { dailyUsd: number; awayShare: number }; prices: Record<string, Price> };
+interface Price { input: number; cacheWrite: number; cacheRead: number; output: number }
+const MODEL = MIND.model;
+// Haiku has no server-side refusal fallback (a fallbacks list is a 400 there); the larger models get the default one
+const FALLBACK = MODEL.startsWith("claude-haiku") ? {} : { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" };
 const MIN_GAP_SECONDS = 90;        // a copy wakes at most this often
 const TALK_GAP_SECONDS = 15;       // ...unless the original has walked up to talk to it
 const TALK_ROUNDS = 2;             // a talk wake answers quickly
@@ -290,6 +295,9 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
 ];
 
+/** The tools as sent: the last one carries a cache breakpoint, so every copy shares the cached definitions. */
+const cachedTools = (list: Anthropic.Beta.BetaTool[]) => list.map((t, i) => (i === list.length - 1 ? { ...t, cache_control: { type: "ephemeral" as const } } : t));
+
 /** Only in long wakes: the code that makes the world, to read, and a way to ask for it to change. */
 const longTools: Anthropic.Beta.BetaTool[] = [
   {
@@ -336,6 +344,20 @@ const longTools: Anthropic.Beta.BetaTool[] = [
     },
   },
 ];
+
+const TOOLS = cachedTools(tools), LONG_TOOLS = cachedTools([...tools, ...longTools]);
+
+/** What a wake cost, from the API's token counts (src/data/mind.json prices, USD per million tokens). */
+function costOf(u: { input: number; cacheRead: number; cacheWrite: number; output: number }) {
+  const p = MIND.prices[MODEL] ?? MIND.prices["claude-opus-5-5"];
+  return (u.input * p.input + u.cacheWrite * p.cacheWrite + u.cacheRead * p.cacheRead + u.output * p.output) / 1e6;
+}
+
+/** What the minds of this galaxy have cost today (migration 0013); null when the ledger cannot be read. */
+async function spentToday(sb: SupabaseClient, galaxy: string): Promise<number | null> {
+  const { data, error } = await sb.rpc("mind_spend_today", { p_galaxy: galaxy });
+  return error ? null : Number(data ?? 0);
+}
 
 function persona(me: Replicant, parentName: string | null, ctx: Context) {
   const t = me.traits as { feature?: number; gear?: number; trail?: number };
@@ -388,6 +410,9 @@ Deno.serve(async (req) => {
     if (rep.status !== "npc") return json({ error: "only copies have minds here" }, 400);
     const gap = context.talk ? TALK_GAP_SECONDS : MIN_GAP_SECONDS;
     if (rep.last_tick_at && Date.now() - Date.parse(rep.last_tick_at) < gap * 1000) return json({ skipped: true });
+    // the day's budget (mind.json budget): once it is spent, nobody wakes until tomorrow; an unreadable ledger counts as spent
+    const spent = await spentToday(sb, rep.galaxy_id);
+    if (spent === null || spent >= MIND.budget.dailyUsd) return json({ skipped: true, reason: "budget" });
     return json(await wakeCopy(sb, rep, context));
   } catch (e) {
     console.error(e);
@@ -483,234 +508,243 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     let wrapping = false;
     // tokens spent, for the away run's report (what a long wake costs, whether its cache holds)
     const usage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, rounds: 0 };
-    for (let round = 0; round <= rounds; round++) {
-      if (round > 0 && context.deadline && Date.now() > context.deadline) break;
-      const res = await client.beta.messages.create({
-        model: MODEL,
-        max_tokens: 2000,
-        betas: ["server-side-fallback-2026-07-01"],
-        fallbacks: "default",
-        output_config: { effort: "low" },
-        system: [{ type: "text", text: persona(rep, parentName, context), cache_control: { type: "ephemeral" } }],
-        tools: context.long ? [...tools, ...longTools] : tools,
-        messages,
-        // the conversation grows round by round in a long wake: cache it as it goes
-        ...(context.long ? { cache_control: { type: "ephemeral" } } : {}),
-      } as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming);
-      const u0 = res.usage as { input_tokens?: number; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null; output_tokens?: number };
-      usage.input += u0.input_tokens ?? 0; usage.cacheRead += u0.cache_read_input_tokens ?? 0; usage.cacheWrite += u0.cache_creation_input_tokens ?? 0; usage.output += u0.output_tokens ?? 0; usage.rounds++;
-      if (res.stop_reason === "refusal") break;
-      messages.push({ role: "assistant", content: res.content });
-      const text = res.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.Beta.BetaTextBlock).text).join(" ").trim();
-      if (text) song = text;
-      const uses = res.content.filter((b) => b.type === "tool_use") as Anthropic.Beta.BetaToolUseBlock[];
-      if (res.stop_reason !== "tool_use" || !uses.length) break;
-      const results: (Anthropic.Beta.BetaToolResultBlockParam | Anthropic.Beta.BetaTextBlockParam)[] = [];
-      for (const u of uses) {
-        const input = u.input as Record<string, string>;
-        let out = "ok";
-        try {
-          if (u.name === "remember") {
-            const body = String(input.note ?? "").slice(0, 400);
-            await sb.from("notes").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, body });
-            actions.push({ type: "note", body });
-          } else if (u.name === "say_to") {
-            const to = byName.get(String(input.to ?? "").toLowerCase());
-            if (!to) out = `No replicant named ${input.to}. You can write to: ${everyone.map((r) => r.name).join(", ")}.`;
-            else {
-              const delay = Math.max(0, Number(context.delays?.[to.id] ?? 0));
-              const body = String(input.text ?? "").slice(0, 500);
-              await sb.from("messages").insert({
-                galaxy_id: rep.galaxy_id, from_replicant: rep.id, to_replicant: to.id, body,
-                arrives_at: new Date(Date.now() + delay * 1000).toISOString(),
-              });
-              actions.push({ type: "mail", to: to.name, toId: to.id, body, delay });
-              out = delay > 0 ? `Sent. It will reach ${to.name} in about ${Math.round(delay / 60)} minutes.` : `Sent. ${to.name} will read it soon.`;
-            }
-          } else if (u.name === "ask_for") {
-            const kind = oneOf(input.kind, E.ask, "other"), detail = String(input.detail ?? "").slice(0, 300);
-            await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind, detail });
-            actions.push({ type: "request", kind, detail });
-          } else if (u.name === "describe_self") {
-            const look = String(input.appearance ?? "").trim().slice(0, 300);
-            if (look.length < 20) out = "Say more: what colors, what head, what on your back, what in your hands.";
-            else {
-              await sb.from("requests").update({ status: "dropped" }).eq("replicant_id", rep.id).eq("kind", "skin").eq("status", "open");
-              await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind: "skin", detail: look });
-              await sb.from("replicants").update({ traits: { ...rep.traits, look } }).eq("id", rep.id);
-              actions.push({ type: "look", detail: look });
-              out = "Noted. The original will have that body drawn for you; it takes a while to arrive.";
-            }
-          } else if (u.name === "cut_tree") {
-            if (context.treesNear === 0) out = "There is no tree near the base to cut.";
-            else { actions.push({ type: "cut", why: String(input.why ?? "") }); out = "You walk to the nearest tree and bring it down."; }
-          } else if (u.name === "remove_build") {
-            const kind = oneOf(input.kind, E.build, "any");
-            const have = kind === "any" ? Object.values(context.mine ?? {}).reduce((a, b) => a + b, 0) : (context.mine?.[kind] ?? 0);
-            if (!have) out = kind === "any" ? "You have built nothing to take down." : `You have no ${kind} of your own to take down.`;
-            else { actions.push({ type: "demolish", kind }); out = `You take your ${kind === "any" ? "nearest build" : kind} down.`; }
-          } else if (u.name === "sing_as") {
-            const voice = { instrument: oneOf(input.instrument, E.instrument, "hum"), mood: oneOf(input.mood, E.mood, "bright"), tempo: oneOf(input.tempo, E.tempo, "walking") };
-            const notes = String(input.notes ?? "").replace(/[^-\d_ .,]/g, "").trim().slice(0, 120);
-            await sb.from("replicants").update({ traits: { ...rep.traits, voice } }).eq("id", rep.id);
-            (rep.traits as Record<string, unknown>).voice = voice;
-            actions.push({ type: "melody", ...voice, notes });
-            out = notes ? `Your song will be sung on the ${voice.instrument}, ${voice.mood}, ${voice.tempo}, to your tune.` : `Your voice is the ${voice.instrument} now, ${voice.mood}, ${voice.tempo}.`;
-          } else if (u.name === "dig_room") {
-            const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
-            const beside = String(input.beside ?? "Entrance");
-            const ask = { type: "dig", kind: oneOf(input.kind, E.room, "other"), name: String(input.name ?? ""), size: oneOf(input.size, E.size, "small"), beside, direction: oneOf(input.direction, E.dir, "south"), purpose: String(input.purpose ?? "").slice(0, 160) };
-            if (context.warrenFull) out = "There is no room left to dig. Furnish what is there instead.";
-            else if (!rooms.includes(beside.toLowerCase())) out = `No room called ${beside}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
-            else if (live) {
-              const room = liveDig(live, rep.id, ask);
-              if (!room) out = `There is no space for a ${ask.size} room ${ask.direction} of ${beside}. Try another side or a smaller room.`;
+    let usd = 0;
+    try {
+      for (let round = 0; round <= rounds; round++) {
+        if (round > 0 && context.deadline && Date.now() > context.deadline) break;
+        const res = await client.beta.messages.create({
+          model: MODEL,
+          max_tokens: 2000,
+          ...FALLBACK,
+          output_config: { effort: MIND.effort },
+          system: [{ type: "text", text: persona(rep, parentName, context), cache_control: { type: "ephemeral" } }],
+          tools: context.long ? LONG_TOOLS : TOOLS,
+          messages,
+          // the conversation grows round by round in a long wake: cache it as it goes
+          ...(context.long ? { cache_control: { type: "ephemeral" } } : {}),
+        } as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming);
+        const u0 = res.usage as { input_tokens?: number; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null; output_tokens?: number };
+        usage.input += u0.input_tokens ?? 0; usage.cacheRead += u0.cache_read_input_tokens ?? 0; usage.cacheWrite += u0.cache_creation_input_tokens ?? 0; usage.output += u0.output_tokens ?? 0; usage.rounds++;
+        if (res.stop_reason === "refusal") break;
+        messages.push({ role: "assistant", content: res.content });
+        const text = res.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.Beta.BetaTextBlock).text).join(" ").trim();
+        if (text) song = text;
+        const uses = res.content.filter((b) => b.type === "tool_use") as Anthropic.Beta.BetaToolUseBlock[];
+        if (res.stop_reason !== "tool_use" || !uses.length) break;
+        const results: (Anthropic.Beta.BetaToolResultBlockParam | Anthropic.Beta.BetaTextBlockParam)[] = [];
+        for (const u of uses) {
+          const input = u.input as Record<string, string>;
+          let out = "ok";
+          try {
+            if (u.name === "remember") {
+              const body = String(input.note ?? "").slice(0, 400);
+              await sb.from("notes").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, body });
+              actions.push({ type: "note", body });
+            } else if (u.name === "say_to") {
+              const to = byName.get(String(input.to ?? "").toLowerCase());
+              if (!to) out = `No replicant named ${input.to}. You can write to: ${everyone.map((r) => r.name).join(", ")}.`;
               else {
-                actions.push({ ...ask, name: room.name, applied: true });
-                liveRefresh(live, rep.id, context);
-                out = `You mark out ${room.name} ${room.dir} of ${beside}. The copies dig it once there is wood to shore it up (${ROOM_WOOD[room.size]} wood); you will find it dug when you next wake.`;
+                const delay = Math.max(0, Number(context.delays?.[to.id] ?? 0));
+                const body = String(input.text ?? "").slice(0, 500);
+                await sb.from("messages").insert({
+                  galaxy_id: rep.galaxy_id, from_replicant: rep.id, to_replicant: to.id, body,
+                  arrives_at: new Date(Date.now() + delay * 1000).toISOString(),
+                });
+                actions.push({ type: "mail", to: to.name, toId: to.id, body, delay });
+                out = delay > 0 ? `Sent. It will reach ${to.name} in about ${Math.round(delay / 60)} minutes.` : `Sent. ${to.name} will read it soon.`;
               }
-            } else {
-              actions.push(ask);
-              out = `You mark out ${input.name} ${input.direction} of ${beside}. It will be dug once there is wood to shore it up.`;
-            }
-          } else if (u.name === "furnish") {
-            const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
-            const room = String(input.room ?? "");
-            const item = oneOf(input.item, E.item, "");
-            const recipe = context.recipes?.[item];
-            const short: string[] = [];
-            if (recipe) for (const [m, n] of Object.entries(recipe)) {
-              if (m === "bench") { if (n && !context.hasWorkbench) short.push("a workbench"); continue; }
-              const have = Math.floor(context.supplies?.[m] ?? 0);
-              if (have < (n as number)) short.push(`${(n as number) - have} more ${m}`);
-            }
-            if (!item) out = `Furnish with one of: ${E.item.join(", ")}.`;
-            else if (!rooms.includes(room.toLowerCase())) out = `No room called ${room}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
-            else if (short.length) out = `Not yet: a ${item} needs ${short.join(", ")}.`;
-            else {
-              let forId: string | undefined, forName = "";
-              if (item === "rest") {
-                const who = String(input.for ?? "me").trim();
-                if (!who || who.toLowerCase() === "me" || who.toLowerCase() === rep.name.toLowerCase()) { forId = rep.id; forName = "you"; }
-                else { const r = byName.get(who.toLowerCase()); if (r) { forId = r.id; forName = r.name; } }
-                if (!forId) out = `No replicant named ${input.for}.`;
+            } else if (u.name === "ask_for") {
+              const kind = oneOf(input.kind, E.ask, "other"), detail = String(input.detail ?? "").slice(0, 300);
+              await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind, detail });
+              actions.push({ type: "request", kind, detail });
+            } else if (u.name === "describe_self") {
+              const look = String(input.appearance ?? "").trim().slice(0, 300);
+              if (look.length < 20) out = "Say more: what colors, what head, what on your back, what in your hands.";
+              else {
+                await sb.from("requests").update({ status: "dropped" }).eq("replicant_id", rep.id).eq("kind", "skin").eq("status", "open");
+                await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind: "skin", detail: look });
+                await sb.from("replicants").update({ traits: { ...rep.traits, look } }).eq("id", rep.id);
+                actions.push({ type: "look", detail: look });
+                out = "Noted. The original will have that body drawn for you; it takes a while to arrive.";
               }
-              if (out === "ok") {
-                const placement = oneOf(input.placement, E.placement, ""), beside = String(input.beside ?? ""), color = String(input.color ?? "");
-                const a = { type: "furnish", room, item, forId, detail: forName, placement, beside, color };
-                if (live) {
-                  if (!liveFurnish(live, rep.id, a)) out = `${room} has no free spot for a ${item}.`;
-                  else { actions.push({ ...a, applied: true }); liveRefresh(live, rep.id, context); }
-                } else {
-                  if (recipe) for (const [m, n] of Object.entries(recipe)) if (m !== "bench" && context.supplies) context.supplies[m] = (context.supplies[m] ?? 0) - (n as number);
-                  actions.push(a);
+            } else if (u.name === "cut_tree") {
+              if (context.treesNear === 0) out = "There is no tree near the base to cut.";
+              else { actions.push({ type: "cut", why: String(input.why ?? "") }); out = "You walk to the nearest tree and bring it down."; }
+            } else if (u.name === "remove_build") {
+              const kind = oneOf(input.kind, E.build, "any");
+              const have = kind === "any" ? Object.values(context.mine ?? {}).reduce((a, b) => a + b, 0) : (context.mine?.[kind] ?? 0);
+              if (!have) out = kind === "any" ? "You have built nothing to take down." : `You have no ${kind} of your own to take down.`;
+              else { actions.push({ type: "demolish", kind }); out = `You take your ${kind === "any" ? "nearest build" : kind} down.`; }
+            } else if (u.name === "sing_as") {
+              const voice = { instrument: oneOf(input.instrument, E.instrument, "hum"), mood: oneOf(input.mood, E.mood, "bright"), tempo: oneOf(input.tempo, E.tempo, "walking") };
+              const notes = String(input.notes ?? "").replace(/[^-\d_ .,]/g, "").trim().slice(0, 120);
+              await sb.from("replicants").update({ traits: { ...rep.traits, voice } }).eq("id", rep.id);
+              (rep.traits as Record<string, unknown>).voice = voice;
+              actions.push({ type: "melody", ...voice, notes });
+              out = notes ? `Your song will be sung on the ${voice.instrument}, ${voice.mood}, ${voice.tempo}, to your tune.` : `Your voice is the ${voice.instrument} now, ${voice.mood}, ${voice.tempo}.`;
+            } else if (u.name === "dig_room") {
+              const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
+              const beside = String(input.beside ?? "Entrance");
+              const ask = { type: "dig", kind: oneOf(input.kind, E.room, "other"), name: String(input.name ?? ""), size: oneOf(input.size, E.size, "small"), beside, direction: oneOf(input.direction, E.dir, "south"), purpose: String(input.purpose ?? "").slice(0, 160) };
+              if (context.warrenFull) out = "There is no room left to dig. Furnish what is there instead.";
+              else if (!rooms.includes(beside.toLowerCase())) out = `No room called ${beside}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
+              else if (live) {
+                const room = liveDig(live, rep.id, ask);
+                if (!room) out = `There is no space for a ${ask.size} room ${ask.direction} of ${beside}. Try another side or a smaller room.`;
+                else {
+                  actions.push({ ...ask, name: room.name, applied: true });
+                  liveRefresh(live, rep.id, context);
+                  out = `You mark out ${room.name} ${room.dir} of ${beside}. The copies dig it once there is wood to shore it up (${ROOM_WOOD[room.size]} wood); you will find it dug when you next wake.`;
                 }
-                if (out === "ok") out = item === "rest" ? `A resting station for ${forName} goes in ${room}${placement ? ", by the " + placement : ""}.` : `A ${item} goes in ${room}${placement ? ", " + placement : ""}${color ? ", in " + color : ""}.`;
+              } else {
+                actions.push(ask);
+                out = `You mark out ${input.name} ${input.direction} of ${beside}. It will be dug once there is wood to shore it up.`;
               }
-            }
-          } else if (u.name === "design_building") {
-            const k = context.buildingKit;
-            const w = Math.round(Number(input.width)), h = Math.round(Number(input.height));
-            if (!k) out = "No building kit here.";
-            else if (!(w >= k.minFootprint[0] && w <= k.maxFootprint[0] && h >= k.minFootprint[1] && h <= k.maxFootprint[1])) out = `A footprint of ${k.minFootprint.join("x")} to ${k.maxFootprint.join("x")} tiles.`;
-            else {
-              const material = oneOf(input.material, E.material, "wood");
-              const cost = Math.ceil(w * h * (k.perTile[material] ?? 1));
-              actions.push({ type: "building", name: String(input.name ?? "Shelter"), purpose: String(input.purpose ?? "").slice(0, 140), width: w, height: h, material, roof: oneOf(input.roof, E.roof, "peaked"), door: oneOf(input.door, E.door, "south"), primary: String(input.primary ?? "silver"), secondary: String(input.secondary ?? "slate") });
-              out = `${input.name} is marked out near the base: ${w}x${h}, ${cost} ${material}. It waits for the original's word.`;
-            }
-          } else if (u.name === "choose_body") {
-            const kit = context.kit;
-            if (!kit) out = "There is no kit here.";
-            else {
-              const ok = (v: string, list: string[]) => list.find((x) => x.toLowerCase() === String(v ?? "").trim().toLowerCase());
-              const head = ok(input.head, kit.head), visor = ok(input.visor, kit.visor), torso = ok(input.torso, kit.torso), arms = ok(input.arms, kit.arms), legs = ok(input.legs, kit.legs), back = ok(input.back, kit.back);
-              const headgear = ok(input.headgear, kit.headgear) ?? kit.headgear[0];
-              const primary = ok(input.primary, kit.colors), secondary = ok(input.secondary, kit.colors), accent = ok(input.accent, kit.colors);
-              const visorColor = ok(input.visor_color, kit.visors);
-              const accessory = ok(input.accessory, kit.accessory ?? ["none"]) ?? "none", markings = ok(input.markings, kit.markings ?? ["none"]) ?? "none";
-              const missing = [["head", head], ["visor", visor], ["torso", torso], ["arms", arms], ["legs", legs], ["back", back], ["primary", primary], ["secondary", secondary], ["accent", accent], ["visor_color", visorColor]].filter(([, v]) => !v).map(([k]) => k);
-              if (missing.length) out = `Not in the kit: ${missing.join(", ")}. Pick from the names listed.`;
+            } else if (u.name === "furnish") {
+              const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
+              const room = String(input.room ?? "");
+              const item = oneOf(input.item, E.item, "");
+              const recipe = context.recipes?.[item];
+              const short: string[] = [];
+              if (recipe) for (const [m, n] of Object.entries(recipe)) {
+                if (m === "bench") { if (n && !context.hasWorkbench) short.push("a workbench"); continue; }
+                const have = Math.floor(context.supplies?.[m] ?? 0);
+                if (have < (n as number)) short.push(`${(n as number) - have} more ${m}`);
+              }
+              if (!item) out = `Furnish with one of: ${E.item.join(", ")}.`;
+              else if (!rooms.includes(room.toLowerCase())) out = `No room called ${room}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
+              else if (short.length) out = `Not yet: a ${item} needs ${short.join(", ")}.`;
               else {
-                const body = { head, visor, torso, arms, legs, back, accessory, markings, headgear: kit.headgear.indexOf(headgear), primary, secondary, accent };
-                chosen.body = body;
-                chosen.feature = kit.visorLights[kit.visors.indexOf(visorColor!)];
-                chosen.trail = kit.colorIndex[accent!] ?? 10;
-                chosen.gear = body.headgear;
-                chosen.blank = false;
-                const extra = String(input.extra ?? "").trim().slice(0, 300);
-                if (extra.length >= 20) {
-                  await sb.from("requests").update({ status: "dropped" }).eq("replicant_id", rep.id).eq("kind", "skin").eq("status", "open");
-                  await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind: "skin", detail: extra });
-                  chosen.look = extra;
+                let forId: string | undefined, forName = "";
+                if (item === "rest") {
+                  const who = String(input.for ?? "me").trim();
+                  if (!who || who.toLowerCase() === "me" || who.toLowerCase() === rep.name.toLowerCase()) { forId = rep.id; forName = "you"; }
+                  else { const r = byName.get(who.toLowerCase()); if (r) { forId = r.id; forName = r.name; } }
+                  if (!forId) out = `No replicant named ${input.for}.`;
                 }
-                out = `Your body: ${head} head, ${visor} visor in ${visorColor}, ${torso} torso, ${arms} arms, ${legs}, ${back} on your back, ${accessory !== "none" ? accessory + ", " : ""}${markings !== "none" ? markings + ", " : ""}${headgear}; ${primary}, ${secondary}, ${accent}.${extra.length >= 20 ? " The rest will be drawn for you by hand." : ""}`;
+                if (out === "ok") {
+                  const placement = oneOf(input.placement, E.placement, ""), beside = String(input.beside ?? ""), color = String(input.color ?? "");
+                  const a = { type: "furnish", room, item, forId, detail: forName, placement, beside, color };
+                  if (live) {
+                    if (!liveFurnish(live, rep.id, a)) out = `${room} has no free spot for a ${item}.`;
+                    else { actions.push({ ...a, applied: true }); liveRefresh(live, rep.id, context); }
+                  } else {
+                    if (recipe) for (const [m, n] of Object.entries(recipe)) if (m !== "bench" && context.supplies) context.supplies[m] = (context.supplies[m] ?? 0) - (n as number);
+                    actions.push(a);
+                  }
+                  if (out === "ok") out = item === "rest" ? `A resting station for ${forName} goes in ${room}${placement ? ", by the " + placement : ""}.` : `A ${item} goes in ${room}${placement ? ", " + placement : ""}${color ? ", in " + color : ""}.`;
+                }
               }
-            }
-          } else if (u.name === "set_temperament") {
-            chosen.temperament = { pace: oneOf(input.pace, E.pace, "steady"), sociability: oneOf(input.sociability, E.sociability, "friendly"), work: oneOf(input.work, E.work, "balanced"), bedtime: oneOf(input.bedtime, E.bedtime, "even"), risk: oneOf(input.risk, E.risk, "careful") };
-            out = "That is how you will live.";
-          } else if (u.name === "set_wants") {
-            const given = (u.input as { wants?: unknown }).wants;
-            const list = (Array.isArray(given) ? given : []).filter((w) => w && typeof w === "object") as { text: string; category: string }[];
-            const wants = list.slice(0, 3).map((w) => ({ text: String(w.text ?? "").slice(0, 120), category: oneOf(w.category, E.want, "learn"), done: false, at: Date.now() }));
-            if (!wants.length) out = "Say at least one thing you want.";
-            else { chosen.wants = wants; actions.push({ type: "wants", wants }); out = `Your wants are set: ${wants.map((w) => w.text).join("; ")}.`; }
-          } else if (u.name === "finish_want") {
-            const wants = ((chosen.wants ?? rep.traits.wants) as { text: string; done: boolean }[] | undefined) ?? [];
-            const k = Number(input.number) - 1;
-            if (!wants[k]) out = "No want with that number.";
-            else { wants[k] = { ...wants[k], done: true }; chosen.wants = wants; actions.push({ type: "wants", wants }); out = `Done: ${wants[k].text}`; }
-          } else if (u.name === "tell_original") {
-            tell = cleanTell(String(input.text ?? ""));
-            out = tell.length < 12 ? "Say a little more to them." : "They will hear it when they come to you.";
-            if (tell.length < 12) tell = "";
-          } else if (u.name === "choose_name") {
-            const name = String(input.name ?? "").replace(/[^A-Za-z' -]/g, "").trim().slice(0, 16);
-            if (name.length < 2) out = "That name is too short or has odd characters. Letters only.";
-            else if (byName.has(name.toLowerCase())) out = `Someone is already called ${name}.`;
-            else {
-              const { error } = await sb.from("replicants").update({ name }).eq("id", rep.id);
-              if (error) out = `failed: ${error.message}`;
+            } else if (u.name === "design_building") {
+              const k = context.buildingKit;
+              const w = Math.round(Number(input.width)), h = Math.round(Number(input.height));
+              if (!k) out = "No building kit here.";
+              else if (!(w >= k.minFootprint[0] && w <= k.maxFootprint[0] && h >= k.minFootprint[1] && h <= k.maxFootprint[1])) out = `A footprint of ${k.minFootprint.join("x")} to ${k.maxFootprint.join("x")} tiles.`;
               else {
-                await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind: "name", detail: `${rep.name} chose the name ${name}`, status: "done", done_at: new Date().toISOString() });
-                if (context.blank) newName = name; else actions.push({ type: "rename", name, was: rep.name });
-                rep.name = name;
-                out = `You are ${name} now.`;
+                const material = oneOf(input.material, E.material, "wood");
+                const cost = Math.ceil(w * h * (k.perTile[material] ?? 1));
+                actions.push({ type: "building", name: String(input.name ?? "Shelter"), purpose: String(input.purpose ?? "").slice(0, 140), width: w, height: h, material, roof: oneOf(input.roof, E.roof, "peaked"), door: oneOf(input.door, E.door, "south"), primary: String(input.primary ?? "silver"), secondary: String(input.secondary ?? "slate") });
+                out = `${input.name} is marked out near the base: ${w}x${h}, ${cost} ${material}. It waits for the original's word.`;
               }
-            }
-          } else if (u.name === "code_map" || u.name === "search_code" || u.name === "read_code") {
-            out = context.long ? await codeTool(u.name, input, budget) : "The code is for your long wakes.";
-          } else if (u.name === "propose_change") {
-            const title = String(input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
-            const change = String(input.change ?? "").trim().slice(0, 3000), why = String(input.why ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
-            const area = oneOf(input.area, E.area, "other");
-            if (!context.long) out = "Proposals are for your long wakes.";
-            else if (title.length < 4 || change.length < 40) out = "Say what to change concretely enough to build: which part of the game, and what it should do.";
-            else {
-              // one at a time: a newer idea replaces the one still waiting
-              await sb.from("requests").update({ status: "dropped", reply: "Replaced by a newer idea.", done_at: new Date().toISOString() }).eq("replicant_id", rep.id).eq("kind", "change").eq("status", "open");
-              const { error } = await sb.from("requests").insert({
-                galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index,
-                kind: "change", detail: title, body: `Why: ${why}\nArea: ${area}\n\n${change}`,
-              });
-              if (error) out = `failed: ${error.message}`;
-              else { actions.push({ type: "propose", detail: title, kind: area }); out = `The maker will read it within a day and tell you what came of it. ${context.playerName} may say no.`; }
-            }
-          } else out = "unknown tool";
-        } catch (e) {
-          out = `failed: ${(e as Error).message}`;
+            } else if (u.name === "choose_body") {
+              const kit = context.kit;
+              if (!kit) out = "There is no kit here.";
+              else {
+                const ok = (v: string, list: string[]) => list.find((x) => x.toLowerCase() === String(v ?? "").trim().toLowerCase());
+                const head = ok(input.head, kit.head), visor = ok(input.visor, kit.visor), torso = ok(input.torso, kit.torso), arms = ok(input.arms, kit.arms), legs = ok(input.legs, kit.legs), back = ok(input.back, kit.back);
+                const headgear = ok(input.headgear, kit.headgear) ?? kit.headgear[0];
+                const primary = ok(input.primary, kit.colors), secondary = ok(input.secondary, kit.colors), accent = ok(input.accent, kit.colors);
+                const visorColor = ok(input.visor_color, kit.visors);
+                const accessory = ok(input.accessory, kit.accessory ?? ["none"]) ?? "none", markings = ok(input.markings, kit.markings ?? ["none"]) ?? "none";
+                const missing = [["head", head], ["visor", visor], ["torso", torso], ["arms", arms], ["legs", legs], ["back", back], ["primary", primary], ["secondary", secondary], ["accent", accent], ["visor_color", visorColor]].filter(([, v]) => !v).map(([k]) => k);
+                if (missing.length) out = `Not in the kit: ${missing.join(", ")}. Pick from the names listed.`;
+                else {
+                  const body = { head, visor, torso, arms, legs, back, accessory, markings, headgear: kit.headgear.indexOf(headgear), primary, secondary, accent };
+                  chosen.body = body;
+                  chosen.feature = kit.visorLights[kit.visors.indexOf(visorColor!)];
+                  chosen.trail = kit.colorIndex[accent!] ?? 10;
+                  chosen.gear = body.headgear;
+                  chosen.blank = false;
+                  const extra = String(input.extra ?? "").trim().slice(0, 300);
+                  if (extra.length >= 20) {
+                    await sb.from("requests").update({ status: "dropped" }).eq("replicant_id", rep.id).eq("kind", "skin").eq("status", "open");
+                    await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind: "skin", detail: extra });
+                    chosen.look = extra;
+                  }
+                  out = `Your body: ${head} head, ${visor} visor in ${visorColor}, ${torso} torso, ${arms} arms, ${legs}, ${back} on your back, ${accessory !== "none" ? accessory + ", " : ""}${markings !== "none" ? markings + ", " : ""}${headgear}; ${primary}, ${secondary}, ${accent}.${extra.length >= 20 ? " The rest will be drawn for you by hand." : ""}`;
+                }
+              }
+            } else if (u.name === "set_temperament") {
+              chosen.temperament = { pace: oneOf(input.pace, E.pace, "steady"), sociability: oneOf(input.sociability, E.sociability, "friendly"), work: oneOf(input.work, E.work, "balanced"), bedtime: oneOf(input.bedtime, E.bedtime, "even"), risk: oneOf(input.risk, E.risk, "careful") };
+              out = "That is how you will live.";
+            } else if (u.name === "set_wants") {
+              const given = (u.input as { wants?: unknown }).wants;
+              const list = (Array.isArray(given) ? given : []).filter((w) => w && typeof w === "object") as { text: string; category: string }[];
+              const wants = list.slice(0, 3).map((w) => ({ text: String(w.text ?? "").slice(0, 120), category: oneOf(w.category, E.want, "learn"), done: false, at: Date.now() }));
+              if (!wants.length) out = "Say at least one thing you want.";
+              else { chosen.wants = wants; actions.push({ type: "wants", wants }); out = `Your wants are set: ${wants.map((w) => w.text).join("; ")}.`; }
+            } else if (u.name === "finish_want") {
+              const wants = ((chosen.wants ?? rep.traits.wants) as { text: string; done: boolean }[] | undefined) ?? [];
+              const k = Number(input.number) - 1;
+              if (!wants[k]) out = "No want with that number.";
+              else { wants[k] = { ...wants[k], done: true }; chosen.wants = wants; actions.push({ type: "wants", wants }); out = `Done: ${wants[k].text}`; }
+            } else if (u.name === "tell_original") {
+              tell = cleanTell(String(input.text ?? ""));
+              out = tell.length < 12 ? "Say a little more to them." : "They will hear it when they come to you.";
+              if (tell.length < 12) tell = "";
+            } else if (u.name === "choose_name") {
+              const name = String(input.name ?? "").replace(/[^A-Za-z' -]/g, "").trim().slice(0, 16);
+              if (name.length < 2) out = "That name is too short or has odd characters. Letters only.";
+              else if (byName.has(name.toLowerCase())) out = `Someone is already called ${name}.`;
+              else {
+                const { error } = await sb.from("replicants").update({ name }).eq("id", rep.id);
+                if (error) out = `failed: ${error.message}`;
+                else {
+                  await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind: "name", detail: `${rep.name} chose the name ${name}`, status: "done", done_at: new Date().toISOString() });
+                  if (context.blank) newName = name; else actions.push({ type: "rename", name, was: rep.name });
+                  rep.name = name;
+                  out = `You are ${name} now.`;
+                }
+              }
+            } else if (u.name === "code_map" || u.name === "search_code" || u.name === "read_code") {
+              out = context.long ? await codeTool(u.name, input, budget) : "The code is for your long wakes.";
+            } else if (u.name === "propose_change") {
+              const title = String(input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+              const change = String(input.change ?? "").trim().slice(0, 3000), why = String(input.why ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+              const area = oneOf(input.area, E.area, "other");
+              if (!context.long) out = "Proposals are for your long wakes.";
+              else if (title.length < 4 || change.length < 40) out = "Say what to change concretely enough to build: which part of the game, and what it should do.";
+              else {
+                // one at a time: a newer idea replaces the one still waiting
+                await sb.from("requests").update({ status: "dropped", reply: "Replaced by a newer idea.", done_at: new Date().toISOString() }).eq("replicant_id", rep.id).eq("kind", "change").eq("status", "open");
+                const { error } = await sb.from("requests").insert({
+                  galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index,
+                  kind: "change", detail: title, body: `Why: ${why}\nArea: ${area}\n\n${change}`,
+                });
+                if (error) out = `failed: ${error.message}`;
+                else { actions.push({ type: "propose", detail: title, kind: area }); out = `The maker will read it within a day and tell you what came of it. ${context.playerName} may say no.`; }
+              }
+            } else out = "unknown tool";
+          } catch (e) {
+            out = `failed: ${(e as Error).message}`;
+          }
+          results.push({ type: "tool_result", tool_use_id: u.id, content: out });
         }
-        results.push({ type: "tool_result", tool_use_id: u.id, content: out });
+        // the wrap-up round's tools are done: no more calls
+        if (wrapping) break;
+        if (context.deadline && Date.now() > context.deadline - 30_000) {
+          wrapping = true;
+          results.push({ type: "text", text: "Your long wake is ending. If you have not yet, call tell_original now, then sing." });
+        }
+        messages.push({ role: "user", content: results });
       }
-      // the wrap-up round's tools are done: no more calls
-      if (wrapping) break;
-      if (context.deadline && Date.now() > context.deadline - 30_000) {
-        wrapping = true;
-        results.push({ type: "text", text: "Your long wake is ending. If you have not yet, call tell_original now, then sing." });
+    } finally {
+      // what it cost goes on the day's ledger, also when a round failed half way
+      usd = costOf(usage);
+      if (usage.rounds) {
+        const { error } = await sb.rpc("add_mind_spend", { p_galaxy: rep.galaxy_id, p_usd: usd });
+        if (error) console.error("mind spend", error.message);
       }
-      messages.push({ role: "user", content: results });
     }
     if (mailRows.length) await sb.from("messages").update({ read_at: new Date().toISOString() }).in("id", mailRows.map((m) => m.id));
     // what it would tell the original: kept on its row (merged in alone, so nothing else on the row is undone) and in
@@ -738,7 +772,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       line += sentence;
     }
     song = (line.trim() || song.slice(0, 160)).trim();
-    return { song, actions, received: mailRows.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })), usage, read: budget };
+    return { song, actions, received: mailRows.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })), usage, usd, read: budget };
 }
 
 
@@ -1078,12 +1112,16 @@ async function awayRun(req: Request) {
   const playing = (r: Replicant) => (players ?? []).some((p) => p.galaxy_id === r.galaxy_id && p.status === "active" && p.star_id === r.star_id && p.planet_index === r.planet_index
     && now - Date.parse(p.updated_at) < PLAYING_MINUTES * 60_000);
   const copies = (npcs ?? []) as Replicant[];
+  // long wakes stop once a galaxy has spent awayShare of its day's budget: the rest is kept for when the original plays
+  const spent = new Map<string, number | null>();
+  for (const g of new Set(copies.map((r) => r.galaxy_id))) spent.set(g, await spentToday(sb, g));
+  const awayLeft = (g: string) => { const s = spent.get(g); return s !== null && s !== undefined && s < MIND.budget.dailyUsd * MIND.budget.awayShare; };
   // longest asleep first, at most perPlanet on a planet (they wake one after another there) and batch in all
   const perPlanet = new Map<string, number>();
   const due = new Set(copies.filter((r) => !r.last_tick_at || Date.parse(r.last_tick_at) < cutoff)
     .sort((a, b) => (a.last_tick_at ? Date.parse(a.last_tick_at) : 0) - (b.last_tick_at ? Date.parse(b.last_tick_at) : 0))
     .filter((r) => {
-      if (playing(r)) return false;
+      if (playing(r) || !awayLeft(r.galaxy_id)) return false;
       const k = `${r.galaxy_id}|${r.star_id}|${r.planet_index}`;
       perPlanet.set(k, (perPlanet.get(k) ?? 0) + 1);
       return perPlanet.get(k)! <= AWAY.perPlanet;
@@ -1109,7 +1147,7 @@ async function awayRun(req: Request) {
           const original = (players ?? []).find((x) => x.galaxy_id === rep.galaxy_id && x.status !== "npc")?.name ?? "the original";
           const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone)), long: true, deadline }, p);
           p.items.push({ id: rep.id, name: rep.name, at: Date.now(), song: res.song, actions: res.actions.filter((a) => a.type !== "become"), became: res.actions.some((a) => a.type === "become") });
-          woke.push({ id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type), usage: res.usage, read: res.read });
+          woke.push({ id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type), usage: res.usage, usd: Math.round(res.usd * 1e5) / 1e5, read: res.read });
         } catch (e) {
           console.error("away wake", rep.id, e);
           // it did not really wake: give back its turn so the next run tries again
@@ -1124,7 +1162,7 @@ async function awayRun(req: Request) {
       return { planet: label, error: (e as Error).message };
     }
   }));
-  return json({ planets });
+  return json({ spentToday: Object.fromEntries(spent), planets });
 }
 
 /** What a copy knows when it wakes with nobody playing: its planet as saved, after this run's pass. */
