@@ -47,7 +47,9 @@ export class Skitter implements Enemy {
     const dx = p.x - this.x, dy = p.y - this.y;
     const dist = Math.hypot(dx, dy);
     const v = this.body.velocity;
-    const canSee = p.alive && !p.locked && dist < this.def.senseRange;
+    const canSee = p.alive && !p.locked && dist < this.def.senseRange && !this.scene.playerSafe && !this.scene.planet.shy;
+    // on a shy world it keeps its distance: scurries off when you come close
+    const fleeing = this.scene.planet.shy && p.alive && dist < this.def.senseRange * 0.6;
 
     switch (this.state) {
       case 'wander':
@@ -58,7 +60,8 @@ export class Skitter implements Enemy {
           if (Math.random() < 0.35) this.wanderDir.set(0, 0);
           this.stateUntil = time + 700 + Math.random() * 1400;
         }
-        v.set(this.wanderDir.x * this.def.speed, this.wanderDir.y * this.def.speed);
+        if (fleeing) v.set((-dx / (dist || 1)) * this.def.chaseSpeed, (-dy / (dist || 1)) * this.def.chaseSpeed);
+        else v.set(this.wanderDir.x * this.def.speed, this.wanderDir.y * this.def.speed);
         if (canSee) this.state = 'chase';
         break;
       case 'chase':
@@ -92,7 +95,7 @@ export class Skitter implements Enemy {
 
     const want = this.state === 'windup' ? 'windup' : 'walk';
     if (this.sprite.anims.currentAnim?.key !== anim(this.texKey, want)) this.sprite.play(anim(this.texKey, want));
-    this.sprite.anims.timeScale = this.state === 'chase' || this.state === 'lunge' ? 1.8 : v.length() < 4 ? 0.3 : 1;
+    this.sprite.anims.timeScale = this.state === 'chase' || this.state === 'lunge' || fleeing ? 1.8 : v.length() < 4 ? 0.3 : 1;
     if (Math.abs(v.x) > 3) this.sprite.setFlipX(v.x < 0);
     if (this.state === 'windup') this.sprite.setFlipX(dx < 0);
     this.eye.color = this.state === 'windup' ? PALETTE[11] : PALETTE[8];

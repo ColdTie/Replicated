@@ -68,7 +68,10 @@ try {
   // 5. down the hatch, with a copy at work below so we can watch it walk there (the pool room gets dug by hand)
   await ev(() => { const s = window.__scene; const pool = s.warren.data.rooms.find((r) => r.kind === 'pool'); if (pool) pool.dug = true; s.supplies.wood = 9; s.supplies.stone = 9; });
   await page.waitForFunction(() => [...window.__scene.warren.below.values()].some((b) => b.task === 'dig' || b.task === 'furnish'), null, { timeout: 30000 }).catch(() => log('note: nobody is working below right now'));
-  await ev(() => { const s = window.__scene; s.player.locked = false; s.hatchReadyAt = 0; s.player.setPosition(s.warren.hatch.x, s.warren.hatch.y); });
+  // walking across the hatch does not take you down: a moment on it, then off again
+  const crossed = await ev(async () => { const s = window.__scene; s.player.locked = false; s.hatchReadyAt = 0; s.player.setPosition(s.warren.hatch.x, s.warren.hatch.y); await new Promise((r) => setTimeout(r, 120)); s.player.setPosition(s.warren.hatch.x + 40, s.warren.hatch.y + 30); await new Promise((r) => setTimeout(r, 400)); return !!window.__warren?.scene.isActive(); });
+  if (crossed) fail('crossing the hatch took the player down');
+  await ev(() => { const s = window.__scene; s.player.setPosition(s.warren.hatch.x, s.warren.hatch.y); });
   await page.waitForFunction(() => !!window.__warren && window.__warren.scene.isActive(), null, { timeout: 8000 }).catch(() => fail('warren scene did not open'));
   await page.waitForTimeout(600);
   const under = await ev(() => { const w = window.__warren; return { me: { x: Math.round(w.me.x), y: Math.round(w.me.y) }, copies: w.copies.size, items: w.items.size, planetPaused: window.__scene.scene.isPaused(), ladder: w.ladder, water: [...w.cells].filter((c) => c === 3).length, walking: [...w.copies.values()].map((v) => ({ who: v.b.npc.data.name, task: v.b.task, path: v.w.path.length, settled: v.settled })) }; });

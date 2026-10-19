@@ -46,6 +46,8 @@ export interface PlanetDef {
   poles?: { size: number; colors: [number, number] };
   /** A beacon world: the plaza, the monolith and its keeper are placed on it (set by planetFor) */
   beacon?: boolean;
+  /** Its creatures never attack: they flee from you (planets.json; Earth) */
+  shy?: boolean;
 }
 
 export type SkitterDef = (typeof enemiesJson)['skitter'];
@@ -57,6 +59,8 @@ export const PALETTE: number[] = paletteJson.colors.map((h) => parseInt(h, 16));
 export const PLANETS = planetsJson.planets as unknown as PlanetDef[];
 export const PLAYER = playerJson;
 export const ENEMIES = enemiesJson as unknown as Record<string, EnemyDef>;
+/** Tiles around the town where no creature goes after you (enemies.json townSafe). */
+export const TOWN_SAFE_TILES = (enemiesJson as unknown as { townSafe: number }).townSafe;
 export const ITEMS = itemsJson;
 export const STRUCTURES = structuresJson;
 export const BACKEND = backendJson;

@@ -53,7 +53,8 @@ export class Hopper implements Enemy {
     if (this.state === 'dead') return;
     const p = this.scene.player;
     const dist = Math.hypot(p.x - this.x, p.y - this.y);
-    this.aggressive = p.alive && !p.locked && dist < this.def.senseRange;
+    const shy = this.scene.planet.shy;
+    this.aggressive = p.alive && !p.locked && dist < this.def.senseRange && !this.scene.playerSafe && !shy;
     this.body.velocity.scale(0.8);
 
     switch (this.state) {
@@ -61,6 +62,8 @@ export class Hopper implements Enemy {
       case 'rest':
         if (time < this.stateUntil) break;
         if (this.aggressive) this.windup(time, p.x, p.y);
+        // on a shy world it hops away from you instead
+        else if (shy && p.alive && dist < this.def.senseRange * 0.7) this.jump(time, this.x - (p.x - this.x), this.y - (p.y - this.y), false);
         else if (this.state === 'idle' || time > this.stateUntil + 400) {
           // lazy wander hop around home
           const a = Math.random() * Math.PI * 2;

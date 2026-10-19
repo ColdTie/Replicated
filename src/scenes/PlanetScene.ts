@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
-import { BACKEND, BEACON, BUILDINGS, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, SUPPLIES, VILLAGE, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
+import { BACKEND, BEACON, BUILDINGS, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, SUPPLIES, TOWN_SAFE_TILES, VILLAGE, WARREN, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
 import { DRIFT, replicate, stat } from '../core/drift';
 import { session } from '../core/session';
 import { Base } from '../entities/Base';
@@ -109,6 +109,8 @@ export class PlanetScene extends Phaser.Scene {
   stopped = false;
   private seed?: number;
   shot = false;
+  /** The player stands in the town (or close by): no creature goes after them (enemies.json townSafe). */
+  playerSafe = false;
   /** Screenshot mode: enemies hold still. */
   private frozen = false;
 
@@ -130,6 +132,9 @@ export class PlanetScene extends Phaser.Scene {
   private boardRing?: Phaser.GameObjects.Ellipse;
   /** after climbing out of the warren, the hatch waits a moment before it takes you again */
   private hatchReadyAt = 0;
+  /** how long the player has stood on the open hatch, and the ring that fills meanwhile */
+  private hatchDwell = 0;
+  private hatchRing?: Phaser.GameObjects.Graphics;
   trees: { index: number; x: number; y: number; sprite: Phaser.GameObjects.Sprite; zone: Phaser.GameObjects.Zone; alive: boolean }[] = [];
   // the scene's parts (src/scenes/planet/): made once, like the scene object they belong to
   readonly talker = new Talk(this);
@@ -183,6 +188,8 @@ export class PlanetScene extends Phaser.Scene {
     this.player = undefined as unknown as Player;
     this.pending = { embers: 0, nodes: {}, doors: {} };
     this.hands.reset();
+    this.hatchRing = undefined;
+    this.hatchDwell = 0;
     this.homecoming.reset();
     this.townState = { lots: {}, civic: {} };
     this.migrated = false;
@@ -729,6 +736,7 @@ export class PlanetScene extends Phaser.Scene {
     const input = this.talker.routeTalk(time, this.controls.read());
     if (!this.stopped) {
       this.player.update(time, dt, input);
+      this.playerSafe = this.inTown(this.player.x, this.player.y);
       if (!this.frozen) for (const e of this.enemies) e.update(time, dt);
       for (const s of this.shards) s.update(time, dt);
       this.shards = this.shards.filter((s) => !s.collected);
@@ -759,7 +767,7 @@ export class PlanetScene extends Phaser.Scene {
     this.hands.update(time);
     this.homecoming.update(time);
     this.warren.update(dt);
-    if (time > this.hatchReadyAt && this.player.alive && !this.player.locked && !this.talker.talk && !this.stopped && this.warren.playerOnHatch()) this.descend();
+    this.updateHatch(dt);
     this.minds.tickMinds(dt);
     this.watchFps(time);
     this.env.update(dt);
@@ -889,6 +897,7 @@ export class PlanetScene extends Phaser.Scene {
   /** The action button does something other than attack here (build). Returns true if it did. */
   tryInteract(): boolean {
     if (this.departure.playerOnBoardSpot()) return this.departure.tryBoard();
+    if (this.time.now > this.hatchReadyAt && this.warren.playerOnHatch()) { this.descend(); return true; }
     if (this.base.playerOnSpot()) return this.tryReplicate();
     if (!this.base.playerOnPad() || !this.base.canBuild(this.embers)) return false;
     const cost = STRUCTURES.replicator.cost;
@@ -907,6 +916,18 @@ export class PlanetScene extends Phaser.Scene {
   }
 
   // --- the warren ---
+
+  /** Standing on the open hatch for a moment (warren.json hatchDwellMs) takes you down; crossing it never does. */
+  private updateHatch(dt: number) {
+    const on = this.time.now > this.hatchReadyAt && this.player.alive && !this.player.locked && !this.talker.talk && !this.stopped && this.warren.playerOnHatch();
+    this.hatchDwell = on ? this.hatchDwell + dt : 0;
+    this.hatchRing ??= this.add.graphics().setDepth(DEPTH.fx);
+    this.hatchRing.clear();
+    if (!this.hatchDwell) return;
+    const h = this.warren.hatch, k = Math.min(1, this.hatchDwell / WARREN.hatchDwellMs);
+    this.hatchRing.lineStyle(1, PALETTE[10], 0.4 + 0.5 * k).beginPath().arc(h.x, h.y - 2, 10, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2).strokePath();
+    if (k >= 1) { this.hatchDwell = 0; this.hatchRing.clear(); this.descend(); }
+  }
 
   /** Down the hatch: the underground opens over this scene, which waits (and keeps nothing running) until you climb back. */
   private descend(instant = false) {
@@ -1341,6 +1362,16 @@ export class PlanetScene extends Phaser.Scene {
       cam.centerOn(this.home.x, this.home.y);
       cam.fadeIn(500, 24, 20, 37);
     });
+  }
+
+  /** Within townSafe tiles of the town's lots, streets or square. */
+  inTown(px: number, py: number) {
+    const m = this.map, r = TOWN_SAFE_TILES;
+    const tx = Math.floor(px / 16), ty = Math.floor(py / 16);
+    for (let y = ty - r; y <= ty + r; y++) for (let x = tx - r; x <= tx + r; x++) {
+      if (x >= 0 && y >= 0 && x < m.w && y < m.h && m.townMask[y * m.w + x] >= 2) return true;
+    }
+    return false;
   }
 
   isWalkable(px: number, py: number) {
