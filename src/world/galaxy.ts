@@ -1,4 +1,5 @@
 // The real neighborhood: star lookup, distances, travel time and fuel, and the planet each star gets.
+import BEACON from '../data/beacon.json';
 import BIOMES from '../data/biomes.json';
 import STARS from '../data/stars.json';
 import TRAVEL from '../data/travel.json';
@@ -13,6 +14,22 @@ export const BEACONS = STARS.beacons;
 export { TRAVEL };
 
 export const starById = (id: string) => STAR_LIST.find((s) => s.id === id);
+
+/**
+ * How long a letter takes between two stars, in seconds: light speed (mailSecondsPerLy), or at once along the beacon
+ * lattice (beacon.json lattice): every letter once all four beacons are lit, else when both ends lie within its radius
+ * of a lit beacon or of the Sun.
+ */
+export function mailSeconds(from: string, to: string, lit: string[], perLy: number) {
+  if (from === to) return 0;
+  const lattice = lit.filter((b) => BEACONS.includes(b));
+  if (lattice.length >= BEACONS.length) return 0;
+  if (lattice.length) {
+    const near = (star: string) => [...lattice, 'sol'].some((b) => distanceLy(star, b) <= BEACON.lattice.radius);
+    if (near(from) && near(to)) return 0;
+  }
+  return Math.round(distanceLy(from, to) * perLy);
+}
 
 export function distanceLy(a: string, b: string) {
   const s = starById(a), t = starById(b);

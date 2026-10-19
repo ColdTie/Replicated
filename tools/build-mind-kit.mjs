@@ -11,7 +11,7 @@ import fs from 'node:fs';
 
 const read = (f) => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const PARTS = read('parts.json'), PLAYER = read('player.json'), SUPPLIES = read('supplies.json'), BUILDINGS = read('buildings.json');
-const MIND = read('mind.json'), WARREN = read('warren.json'), STARS = read('stars.json');
+const MIND = read('mind.json'), WARREN = read('warren.json'), STARS = read('stars.json'), BEACON = read('beacon.json');
 const names = (o) => Object.keys(o ?? {}).filter((k) => !k.startsWith('_'));
 const colorIndex = Object.fromEntries(names(PARTS.colors).map((k) => [k, PARTS.colors[k]]));
 const colorName = (i) => names(PARTS.colors).find((k) => PARTS.colors[k] === i) ?? `color ${i}`;
@@ -39,6 +39,7 @@ const out = {
     swingsPerTile: BUILDINGS.swingsPerTile,
   },
   mailSecondsPerLy: MIND.mailSecondsPerLy,
+  beacons: STARS.beacons, latticeRadius: BEACON.lattice.radius,
   away: MIND.away,
   mind: { model: MIND.model, effort: MIND.effort, budget: MIND.budget, prices: MIND.prices },
   stars: Object.fromEntries(STARS.stars.map((s) => [s.id, [s.name, s.x, s.y, s.z]])),

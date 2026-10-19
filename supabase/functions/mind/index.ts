@@ -516,6 +516,11 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     }
     const built = changeRows.filter((c) => c.replicant_id !== rep.id && c.status === "done");
     if (built.length) lines.push(`Lately the maker built into the game: ${built.map((c) => `${nameOf(c.replicant_id)}'s "${c.detail}"`).join("; ")}.`);
+    // the beacon lattice around the Sun (beacon.json lattice)
+    const { data: litRows } = await sb.from("planet_states").select("star_id").eq("galaxy_id", rep.galaxy_id).eq("data->beacon->>lit", "true");
+    const points = new Set((litRows ?? []).map((r: { star_id: string }) => r.star_id).filter((id: string) => KIT.beacons.includes(id))).size;
+    if (points >= KIT.beacons.length) lines.push("The beacon lattice around the Sun is whole: every letter between the worlds arrives at once.");
+    else if (points) lines.push(`The beacon lattice around the Sun is lit at ${points} of ${KIT.beacons.length} points: letters between worlds near it arrive at once.`);
     lines.push(`You can write to: ${everyone.map((r) => r.name).join(", ") || "nobody"}.`);
 
     const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
@@ -1125,11 +1130,13 @@ async function awayRun(req: Request) {
   // the run must end inside the function's time: every long wake wraps up by then
   const deadline = now + AWAY.seconds * 1000;
   const cols = "id,galaxy_id,name,model,generation,parent_id,traits,stats,star_id,planet_index,status,profile_id,last_tick_at";
-  const [{ data: npcs, error }, { data: players }, { data: all }] = await Promise.all([
+  const [{ data: npcs, error }, { data: players }, { data: all }, { data: litRows }] = await Promise.all([
     sb.from("replicants").select(cols).eq("status", "npc"),
     sb.from("replicants").select("galaxy_id,name,star_id,planet_index,status,updated_at").in("status", ["active", "in_transit"]),
     sb.from("replicants").select("id,name,star_id"),
+    sb.from("planet_states").select("galaxy_id,star_id").eq("data->beacon->>lit", "true"),
   ]);
+  const litOf = (g: string) => ((litRows ?? []) as { galaxy_id: string; star_id: string }[]).filter((r) => r.galaxy_id === g).map((r) => r.star_id);
   if (error) return json({ error: error.message }, 500);
   const everyone = (all ?? []) as { id: string; name: string; star_id: string }[];
   const names = new Map(everyone.map((r) => [r.id, r.name]));
@@ -1169,7 +1176,7 @@ async function awayRun(req: Request) {
       for (const rep of here.filter((r) => due.has(r.id))) {
         try {
           const original = (players ?? []).find((x) => x.galaxy_id === rep.galaxy_id && x.status !== "npc")?.name ?? "the original";
-          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone)), long: true, deadline }, p);
+          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id))), long: true, deadline }, p);
           p.items.push({ id: rep.id, name: rep.name, at: Date.now(), song: res.song, actions: res.actions.filter((a) => a.type !== "become"), became: res.actions.some((a) => a.type === "become") });
           woke.push({ id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type), usage: res.usage, usd: Math.round(res.usd * 1e5) / 1e5, read: res.read });
           await logRun(sb, rep, "away");
@@ -1247,13 +1254,16 @@ function awayContext(rep: Replicant, original: string, p: AwayPlanet, delays: Re
 }
 
 /** Letter delays by star distance (light speed) to every replicant in the galaxy. */
-function mailDelays(from: string, all: { id: string; star_id: string }[]): Record<string, number> {
+function mailDelays(from: string, all: { id: string; star_id: string }[], lit: string[] = []): Record<string, number> {
   const stars = KIT.stars as unknown as Record<string, [string, number, number, number]>;
-  const a = stars[from];
+  const ly = (x: string, y: string) => { const a = stars[x], b = stars[y]; return a && b ? Math.hypot(a[1] - b[1], a[2] - b[2], a[3] - b[3]) : 0; };
+  // the beacon lattice (src/world/galaxy.ts mailSeconds): at once when whole, or between systems near a lit point of it
+  const lattice = lit.filter((b) => KIT.beacons.includes(b));
+  const near = (star: string) => [...lattice, "sol"].some((b) => ly(star, b) <= KIT.latticeRadius);
   const out: Record<string, number> = {};
   for (const r of all) {
-    const b = stars[r.star_id];
-    out[r.id] = r.star_id === from || !a || !b ? 0 : Math.round(Math.hypot(a[1] - b[1], a[2] - b[2], a[3] - b[3]) * KIT.mailSecondsPerLy);
+    const instant = r.star_id === from || lattice.length >= KIT.beacons.length || (lattice.length > 0 && near(from) && near(r.star_id));
+    out[r.id] = instant ? 0 : Math.round(ly(from, r.star_id) * KIT.mailSecondsPerLy);
   }
   return out;
 }

@@ -507,3 +507,23 @@ would cost much of what it saves; decide on it after reading `?perf` on Steve's 
   them need new paint and a mind function deploy). The `bring` wish (M2) waits for those.
 - Verified: `playtest-travel.mjs` (the hold takes Earth's seed, the seed lands on Alpha Centauri B II, an ember world,
   and lifts the mood).
+
+**M5, the beacon lattice** (`beacon.json lattice`, `galaxy.ts mailSeconds`).
+- The four beacons sit along symmetric directions around the Sun. On the star map each lit beacon is joined to the Sun
+  and to every other lit one (cyan; white and brighter once all four are lit). The map fetches the lit beacons itself
+  when it opens from a ship in flight.
+- Lighting one says "THE LATTICE: 2 OF 4 LIT" (or "THE LATTICE IS WHOLE: EVERY LETTER ARRIVES AT ONCE") and the copies
+  hear of it.
+- Letters: between two systems that both lie within 12 ly of a lit beacon or of the Sun (once any is lit) a letter
+  arrives at once; with all four lit every letter does. The game passes these delays to live wakes now; the mind
+  function uses the same rule in away wakes and tells every copy how far the lattice is lit (kit.json `beacons`,
+  `latticeRadius`). **The function part waits for the deploy** with S1 and M3.
+- Verified: `playtest-beacon.mjs` (lighting Fomalhaut joins the lattice), `screenshots/map-beacon-lit.png` (Sol,
+  Fomalhaut, Pollux joined), the mind tool check and `deno check`.
+
+**Waiting for Steve (session 15).**
+1. Supabase: approve migration `0014_mind_runs.sql` and the `mind` function deploy (the SQL and deploy calls timed out
+   waiting for a confirmation in this session). The function in the repo carries S1's heartbeat, M3's inheritance and
+   M5's lattice; until it is deployed the live function is v18.
+2. GitHub: Settings > Branches > main: require the "test" status check, so a red PR (the maker's too) cannot merge.
+3. Play on the laptop with `?perf` once and say the numbers: they decide whether the ground paint gets a cache.
