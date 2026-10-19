@@ -177,7 +177,9 @@ src/ui/dialogue.ts       the talk box at the bottom (portrait, name, pages, typi
                          drawn in the 'prose' font (tools/sprites/font-prose.json: mixed case with descenders)
 src/scenes/planet/       PlanetScene's parts, each a class holding the scene as `s` and made once with it: Hands (the
                          original's own work: felling, stone, scrap, the load above the head, handing it over,
-                         swinging at a building, a copy's need over its head; supplies.json hands), Talk (the
+                         swinging at a building, a copy's need over its head; supplies.json hands), Homecoming (what
+                         changed since data.seen as a wordless camera tour, letters as envelopes by the vessel;
+                         return.json), Talk (the
                          talk box), Minds (wakes, mind context, away replay, chorus, the journal and its actions,
                          copies' chores), Saving (planet delta, replicant row), Town (migration, lots, gifts),
                          Departure (board ring, star map, lift-off); shared.ts holds their helpers. The scene keeps
@@ -199,6 +201,8 @@ Saving: the shared Ember pool, node damage, structures (Replicator and the copie
 building work live in `planet_states` and are written as atomic deltas
 (`apply_planet_delta` RPC) every 4s and when the page is hidden; the server value wins so every profile shares one
 pool. The replicant row stores position, planet and `traits.awake` (Earth's wake-up intro plays once per replicant).
+`data.seen` is the village as the original last saw it (builds, buildings' progress, dug rooms, copies' names and
+bodies), written after the landing, every minute while you play and when you leave; the next landing tours what changed.
 A planet saved before the town (no `data.layout`, or below `town.json layout`) moves into it once on load: builds go to
 their builder's lot, buildings to civic lots, the hatch into the square, node damage and felled trees reset (the world
 was regenerated bigger); `data.town` keeps who lives on which lot. `data.gifts` holds builds the original granted
@@ -237,6 +241,8 @@ playtest, about 6 minutes; `npm test -- talk town` runs only those), `npm run sp
 `node tools/playtest-warren.mjs` (rooms planned, a copy digs, a copy makes its bed, down the hatch, walk, back up),
 `node tools/playtest-become.mjs` (a blank birth, the becoming with the canned mind, eating, the journal's wants),
 `node tools/playtest-buildings.mjs` (a proposal, approval in the journal, paid and raised by three copies, talk, give),
+`node tools/playtest-return.mjs` (beats from an older snapshot, the tour gives the player back, a key skips it, a letter
+waits by the vessel and opens the sender's letters),
 `node tools/playtest-carry.mjs` (fell trees and carry the wood, a copy shows what its building waits for, the load pays
 it, swings raise it, a load handed to a copy, stone from rock, a load stowed when leaving),
 `node tools/playtest-together.mjs` (a lonely copy seeks company, the Meeting Hall starts itself and gathers them, a
@@ -434,3 +440,16 @@ whole `npm test` passed before and after.
 - Every handover and felled tree goes into the minds' events ("STEVE carried 6 wood to Workroom").
 - Verified: `tools/playtest-carry.mjs` (new, port 4193: 4190 is a port fetch refuses) and the whole `npm test`, 12 of
   12. `screenshots/hands-carry.png`, `hands-need.png`.
+
+**M2, the return** (`src/scenes/planet/Homecoming.ts`, tunables `src/data/return.json`).
+- `planet_states.data.seen` keeps the village as you last saw it. Landing (or fading in) after at least an hour away, the
+  camera visits what changed before you get control: a copy that is new or has become itself, a building finished or
+  raised a quarter further, new village builds (near ones are one beat), rooms dug below (at the hatch). Each beat is a
+  pan, a warm swell of light and the maker hopping; up to six; any key or click skips to the end. The first visit
+  only remembers. No words anywhere.
+- Letters that came for you since then wait as glowing envelopes in a row in front of the vessel (new
+  `GameStore.lettersTo`). Walking into one opens its sender's talk box on LETTERS (new `jumpTo` in `Talk.openTalk`);
+  a letter from a copy on another world opens the journal.
+- Not done from the plan: the `bring` wish in `tell_original` (it belongs with M4's imports).
+- Verified: `tools/playtest-return.mjs` (new) and `npm test`, 13 of 13. `screenshots/return-letters.png`,
+  `return-letter-open.png`.

@@ -90,6 +90,21 @@ export interface PlanetData {
   gifts?: Gift[];
   /** Who lives where in the town: copy id -> lot index, building id -> lot index (indexes into the town's lots) */
   town?: { lots: Record<string, number>; civic: Record<string, number> };
+  /** What the original saw here last (src/scenes/planet/Homecoming.ts): on the next landing what changed is shown */
+  seen?: SeenState;
+}
+
+/** A snapshot of the village as the original last saw it. */
+export interface SeenState {
+  at: number;
+  /** village builds as "type|x|y" */
+  builds: string[];
+  /** building id -> share raised (1 = built) */
+  buildings: Record<string, number>;
+  /** dug warren room ids */
+  rooms: string[];
+  /** copy id -> "name|body" (body: it has chosen one) */
+  copies: Record<string, string>;
 }
 
 /** One blueprint format for the warren's rooms and the surface buildings: a named footprint someone designed. */
@@ -295,6 +310,8 @@ export interface GameStore {
   vetoRequest(id: string): Promise<void>;
   /** What the minds have cost today in USD (migration 0013), or null where minds cost nothing (this device). */
   mindSpend(): Promise<number | null>;
+  /** Letters to this replicant that arrived after `since` (ISO), oldest first, at most `limit`. */
+  lettersTo(id: string, since: string, limit: number): Promise<Letter[]>;
   /** How the minds are doing (migration 0014), or null where there are no real minds (this device) or it cannot be read. */
   mindHealth(): Promise<MindHealth | null>;
   /**
@@ -552,6 +569,12 @@ export class LocalStore implements GameStore {
   }
 
   async mindSpend() { return null; }
+
+  async lettersTo(id: string, since: string, limit: number) {
+    const now = Date.now(), from = Date.parse(since);
+    return this.db.mail.filter((m) => m.to_replicant === id && Date.parse(m.arrives_at) > from && Date.parse(m.arrives_at) <= now)
+      .sort((a, b) => Date.parse(a.arrives_at) - Date.parse(b.arrives_at)).slice(0, limit).map((m) => ({ ...m }));
+  }
   async mindHealth() { return null; }
 
   async vetoRequest(id: string) {
@@ -755,6 +778,13 @@ export class CloudStore implements GameStore {
   async mindSpend() {
     const { data, error } = await this.sb.rpc('mind_spend_today', { p_galaxy: this.galaxyId });
     return error ? null : Number(data ?? 0);
+  }
+
+  async lettersTo(id: string, since: string, limit: number) {
+    const { data, error } = await this.sb.from('messages').select('id,from_replicant,to_replicant,body,sent_at,arrives_at,read_at')
+      .eq('to_replicant', id).gt('arrives_at', since).lte('arrives_at', new Date().toISOString()).order('arrives_at').limit(limit);
+    if (error) throw error;
+    return (data ?? []) as Letter[];
   }
 
   async mindHealth() {
