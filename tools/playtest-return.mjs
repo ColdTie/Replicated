@@ -41,7 +41,7 @@ try {
     const target = { x: s.player.x + 200, y: s.player.y - 120 };
     let done = false, farthest = 0;
     h.tour([target], () => { done = true; s.player.locked = false; });
-    for (let i = 0; i < 80 && !done; i++) {
+    for (let i = 0; i < 250 && !done; i++) {
       await new Promise((r) => setTimeout(r, 100));
       farthest = Math.max(farthest, Math.hypot(cam.midPoint.x - s.player.x, cam.midPoint.y - s.player.y));
     }
