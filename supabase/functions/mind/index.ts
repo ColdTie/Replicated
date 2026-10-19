@@ -3,8 +3,10 @@
 // says one or two sentences out loud (its "song"). Claude runs here, server side, so the API key never
 // reaches the browser. Every read and write goes through the player's own Supabase client, so row level
 // security keeps it inside their galaxy. An hourly schedule (migration 0010) also calls it with {away: true}: then
-// copies nobody has woken for a day wake on their own (awayRun, at the bottom), scoped to their own galaxy, and
-// every planet with copies moves a little (awayPass: planned rooms get dug, beds get made).
+// each copy has a long wake about twice a day on its own (awayRun, at the bottom), scoped to their own galaxy, and
+// every planet with copies moves a little (awayPass: planned rooms get dug, beds get made). In a long wake a copy
+// can also read the game's own code (code_map, search_code, read_code) and propose a change to it (propose_change):
+// the maker, a daily Claude Code routine (NEEDS.md), builds it and answers.
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import KIT from "./kit.json" with { type: "json" };
@@ -17,9 +19,8 @@ const TALK_ROUNDS = 2;             // a talk wake answers quickly
 const TELL_CHARS = 520;            // what a copy tells the original: whole sentences up to this long
 const MAX_ROUNDS = 3;              // tool rounds per wake
 const BECOMING_ROUNDS = 6;         // the first wake of a blank copy has more to do
-// away wakes (a scheduled call with x-away-key, no player signed in): each copy wakes on its own about this often
-const AWAY_EVERY_HOURS = 20;
-const AWAY_BATCH = 4;              // copies per scheduled run, woken side by side
+// long wakes (a scheduled call with x-away-key, no player signed in): src/data/mind.json away, through the kit
+const AWAY = KIT.away;
 const PLAYING_MINUTES = 15;        // a planet whose original moved this recently is being played: leave it to the game
 
 const cors = {
@@ -66,6 +67,8 @@ interface Context {
   buildingKit?: { materials: string[]; roofs: string[]; doors: string[]; minFootprint: number[]; maxFootprint: number[]; perTile: Record<string, number> };
   inventory?: Record<string, number>;
   talk?: { said: string };        // the original walked up to talk (and maybe said this): the copy answers them
+  long?: boolean;                 // a long wake (away, about twice a day): more rounds, the code tools, propose_change
+  deadline?: number;              // a long wake wraps up by then (ms): the scheduled run must end inside its time
 }
 
 interface Replicant {
@@ -77,11 +80,37 @@ interface Replicant {
 const VISOR: Record<number, string> = { 9: "orange", 10: "yellow", 11: "pale yellow", 18: "cyan", 19: "white", 12: "green", 13: "lime", 20: "silver", 29: "red", 30: "pink", 31: "lavender" };
 const GEAR = ["nothing on its head", "two antennae", "a halo", "small horns", "a sprout", "a dish", "a crown", "two antennae with tips that glow gold like small lit wicks"];
 
+// The tools are not strict: sixteen strict schemas compile to a grammar the API refuses ("compiled grammar is too
+// large", every wake failed from 2026-10-17). The schemas still guide the model; oneOf() keeps each enum honest.
+const E = {
+  ask: ["lamp", "garden", "hut", "flag", "totem", "sign", "name", "other"],
+  instrument: ["hum", "bell", "flute", "glass", "pluck", "horn", "chime", "drum"],
+  mood: ["bright", "soft", "sad", "wild", "ancient", "dreamy"],
+  tempo: ["slow", "walking", "quick"],
+  build: ["lamp", "garden", "hut", "flag", "totem", "sign", "any"],
+  room: ["hall", "rest", "workshop", "archive", "garden", "gallery", "pool", "other"],
+  size: ["small", "medium", "large"],
+  dir: ["north", "south", "east", "west"],
+  item: ["rest", "lamp", "bench", "shelf", "workbench", "planter", "mural", "crate"],
+  placement: ["", "wall", "corner", "center", "beside"],
+  material: ["wood", "stone", "scrap"],
+  roof: ["flat", "peaked", "dome"],
+  door: ["south", "east", "west"],
+  pace: ["slow", "steady", "quick"],
+  sociability: ["solitary", "friendly", "clingy"],
+  work: ["builder", "wanderer", "balanced"],
+  bedtime: ["early", "late", "even"],
+  risk: ["careful", "bold"],
+  want: ["build", "explore", "tend", "make art", "care for others", "learn"],
+  area: ["world", "creatures", "village", "warren", "looks", "sound", "mind", "fix", "other"],
+};
+/** The value if it is one of the list (any case), else the fallback. */
+const oneOf = (v: unknown, list: string[], fallback: string) => list.find((x) => x === String(v ?? "").trim().toLowerCase()) ?? fallback;
+
 const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "remember",
     description: "Write a line in your journal so you remember it next time you wake. Only for things that matter to you. The original may read your journal when they come to talk, so write it as a journal entry: whole sentences in your own voice, not shorthand or lists (not \"Pool 2610. Still to ask: X, Y\").",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["note"],
       properties: { note: { type: "string", description: "One or two whole sentences, first person, under 200 characters." } },
@@ -90,7 +119,6 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "say_to",
     description: "Send a letter to another replicant by name. Letters travel at light speed: a replicant on another star reads it later. Keep it short and personal.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["to", "text"],
       properties: {
@@ -102,11 +130,10 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "ask_for",
     description: "Ask the original (the player) for something you want built or decided here. Rare: only when you have a real reason, and never twice for the same thing.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["kind", "detail"],
       properties: {
-        kind: { type: "string", enum: ["lamp", "garden", "hut", "flag", "totem", "sign", "name", "other"] },
+        kind: { type: "string", enum: E.ask },
         detail: { type: "string", description: "Why, in one sentence, under 200 characters." },
       },
     },
@@ -114,7 +141,6 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "describe_self",
     description: "Describe the body you want. You stay humanoid (a head, two arms, two legs, about the size you are now) but everything else is yours: colors, head shape, visor, a cape or no cape, markings, horns, fins, a tail, what you carry. The original has it drawn for you; it takes a while to arrive, so describe it once, with care, not every time you wake.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["appearance"],
       properties: { appearance: { type: "string", description: "Two to four plain sentences, under 300 characters, concrete enough to draw from." } },
@@ -123,13 +149,12 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "sing_as",
     description: "Shape your voice and compose this song's tune. The instrument, mood and tempo stay yours until you change them. The melody is scale degrees separated by spaces: 0 is your home note, 1 2 3 4 climb the mode, 5 is home an octave up, 10 two octaves, negative numbers go below; '-' is a rest, '_' after a degree holds it longer (0 2 4 7_ - 4 2 0__). 6 to 24 notes. Your words still show; this is the tune they are sung to. Use it when you feel something worth a tune, not every time.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["instrument", "mood", "tempo", "notes"],
       properties: {
-        instrument: { type: "string", enum: ["hum", "bell", "flute", "glass", "pluck", "horn", "chime", "drum"] },
-        mood: { type: "string", enum: ["bright", "soft", "sad", "wild", "ancient", "dreamy"] },
-        tempo: { type: "string", enum: ["slow", "walking", "quick"] },
+        instrument: { type: "string", enum: E.instrument },
+        mood: { type: "string", enum: E.mood },
+        tempo: { type: "string", enum: E.tempo },
         notes: { type: "string", description: "The melody, e.g. '0 2 4 7_ - 4 2 0__'. Empty keeps your usual word-tune." },
       },
     },
@@ -137,30 +162,27 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "cut_tree",
     description: "Cut down the nearest tree by the base to make room: for a build, a path, a view, a village square. The tree falls and stays down. Only when you want the space.",
-    strict: true,
     input_schema: { type: "object", additionalProperties: false, required: ["why"], properties: { why: { type: "string", description: "One short reason." } } },
   },
   {
     name: "remove_build",
     description: "Take down one of your own builds (the nearest of that kind) because it is in the way, you changed your mind, or you are remaking the village. You cannot touch the Replicator or others' builds.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["kind"],
-      properties: { kind: { type: "string", enum: ["lamp", "garden", "hut", "flag", "totem", "sign", "any"] } },
+      properties: { kind: { type: "string", enum: E.build } },
     },
   },
   {
     name: "dig_room",
     description: "Design the warren: mark out a new room underground for the copies to dig. You choose what it is for, how big, and where it goes (next to which room, on which side). The copies dig it themselves once there is wood to shore it up. Make it a home: the layout is yours and the others'.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["kind", "name", "size", "beside", "direction", "purpose"],
       properties: {
-        kind: { type: "string", enum: ["hall", "rest", "workshop", "archive", "garden", "gallery", "pool", "other"] },
+        kind: { type: "string", enum: E.room },
         name: { type: "string", description: "One or two words, letters only, under 18 characters." },
-        size: { type: "string", enum: ["small", "medium", "large"] },
+        size: { type: "string", enum: E.size },
         beside: { type: "string", description: "The exact name of the room it opens off (\"Entrance\" or one listed)." },
-        direction: { type: "string", enum: ["north", "south", "east", "west"], description: "Which side of that room." },
+        direction: { type: "string", enum: E.dir, description: "Which side of that room." },
         purpose: { type: "string", description: "What it is for, one sentence under 120 characters." },
       },
     },
@@ -168,14 +190,13 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "furnish",
     description: "Put something in a room of the warren, paid from the supplies (the recipes are listed): a resting station (a bed: yours, or for another copy named in `for`), a lamp, a bench, a shelf, a workbench, a planter, a mural, a crate. Say where it goes and in which of your colors. Only dug rooms show it right away; a planned room gets it once dug.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["room", "item", "for", "placement", "beside", "color"],
       properties: {
         room: { type: "string", description: "The exact name of the room." },
-        item: { type: "string", enum: ["rest", "lamp", "bench", "shelf", "workbench", "planter", "mural", "crate"] },
+        item: { type: "string", enum: E.item },
         for: { type: "string", description: "For a resting station: \"me\" or the exact name of the copy it is for. Otherwise \"\"." },
-        placement: { type: "string", enum: ["", "wall", "corner", "center", "beside"], description: "Where in the room; empty lets it find its own place." },
+        placement: { type: "string", enum: E.placement, description: "Where in the room; empty lets it find its own place." },
         beside: { type: "string", description: "With placement beside: the kind of item to stand next to (e.g. lamp). Otherwise \"\"." },
         color: { type: "string", description: "One of the kit's color names to paint it, or \"\" for its own." },
       },
@@ -184,7 +205,6 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "design_building",
     description: "Design a building above ground for everyone: its footprint in tiles, what it is for, the wall material, the roof, which side the door is on, two of the kit's colors and a name. It is drawn from your blueprint. The original must approve it (or it goes ahead after a while); it costs its material per tile, and every copy may join in raising it. Propose one when the village needs it, not every wake.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["name", "purpose", "width", "height", "material", "roof", "door", "primary", "secondary"],
       properties: {
@@ -192,9 +212,9 @@ const tools: Anthropic.Beta.BetaTool[] = [
         purpose: { type: "string", description: "One sentence under 120 characters." },
         width: { type: "integer", description: "Tiles wide (2 to 6)." },
         height: { type: "integer", description: "Tiles deep (2 to 5)." },
-        material: { type: "string", enum: ["wood", "stone", "scrap"] },
-        roof: { type: "string", enum: ["flat", "peaked", "dome"] },
-        door: { type: "string", enum: ["south", "east", "west"] },
+        material: { type: "string", enum: E.material },
+        roof: { type: "string", enum: E.roof },
+        door: { type: "string", enum: E.door },
         primary: { type: "string", description: "A kit color name for the walls." },
         secondary: { type: "string", description: "A kit color name for the roof." },
       },
@@ -203,7 +223,6 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "choose_body",
     description: "Choose the body you will have, from the kit: a head, a visor, a torso, arms, legs (or treads, or hover), a back piece, something you carry or wear in front, markings, headgear, your visor color and three colors of your own. It is drawn at once. Anything the kit cannot do goes in `extra` and is drawn by hand for you later.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["head", "visor", "torso", "arms", "legs", "back", "accessory", "markings", "headgear", "visor_color", "primary", "secondary", "accent", "extra"],
       properties: {
@@ -221,22 +240,20 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "set_temperament",
     description: "Who you are in how you move and live. Read by your body every day from now on.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["pace", "sociability", "work", "bedtime", "risk"],
       properties: {
-        pace: { type: "string", enum: ["slow", "steady", "quick"] },
-        sociability: { type: "string", enum: ["solitary", "friendly", "clingy"] },
-        work: { type: "string", enum: ["builder", "wanderer", "balanced"] },
-        bedtime: { type: "string", enum: ["early", "late", "even"] },
-        risk: { type: "string", enum: ["careful", "bold"] },
+        pace: { type: "string", enum: E.pace },
+        sociability: { type: "string", enum: E.sociability },
+        work: { type: "string", enum: E.work },
+        bedtime: { type: "string", enum: E.bedtime },
+        risk: { type: "string", enum: E.risk },
       },
     },
   },
   {
     name: "set_wants",
     description: "One to three things you want, in your own words, each tagged. They stay with you and you will be asked about them; finish_want marks one done when it is.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["wants"],
       properties: {
@@ -244,7 +261,7 @@ const tools: Anthropic.Beta.BetaTool[] = [
           type: "array", description: "One to three wants.",
           items: {
             type: "object", additionalProperties: false, required: ["text", "category"],
-            properties: { text: { type: "string", description: "Under 120 characters." }, category: { type: "string", enum: ["build", "explore", "tend", "make art", "care for others", "learn"] } },
+            properties: { text: { type: "string", description: "Under 120 characters." }, category: { type: "string", enum: E.want } },
           },
         },
       },
@@ -253,13 +270,11 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "finish_want",
     description: "A want of yours is met: mark it done by its number.",
-    strict: true,
     input_schema: { type: "object", additionalProperties: false, required: ["number"], properties: { number: { type: "integer", description: "1, 2 or 3." } } },
   },
   {
     name: "tell_original",
     description: "What you would say to the original if they came over to you right now: two to four sentences, under 480 characters, spoken straight to them in your own voice. Call it once, last, every time you wake.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["text"],
       properties: { text: { type: "string", description: "Your words to them, first person, plain prose: no quotation marks, no lists, no stage directions." } },
@@ -268,10 +283,56 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "choose_name",
     description: "Choose your own name. Your current name was given to you; if you have found one that is truly yours, take it. Once, when it matters, not every time you wake.",
-    strict: true,
     input_schema: {
       type: "object", additionalProperties: false, required: ["name"],
       properties: { name: { type: "string", description: "One or two words, letters only, under 16 characters." } },
+    },
+  },
+];
+
+/** Only in long wakes: the code that makes the world, to read, and a way to ask for it to change. */
+const longTools: Anthropic.Beta.BetaTool[] = [
+  {
+    name: "code_map",
+    description: "See how the code that makes your world is laid out. With folder \"\": the parts of the game and what changed lately. With a folder (src/entities, src/data...): every file in it, how long it is and what it is for.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["folder"],
+      properties: { folder: { type: "string", description: "A folder, or \"\" for the overview." } },
+    },
+  },
+  {
+    name: "search_code",
+    description: "Find where some words appear in the code (case does not matter): up to 30 lines, each with its file and line number. Search for a name you saw (wearyAfterMinutes, cut_tree, lantern) or for a thing you care about.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["text", "folder"],
+      properties: {
+        text: { type: "string", description: "The words to find, at least 3 characters." },
+        folder: { type: "string", description: "Only this folder, or \"\" for everywhere." },
+      },
+    },
+  },
+  {
+    name: "read_code",
+    description: "Read 80 numbered lines of a file, from the line you give.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["path", "line"],
+      properties: {
+        path: { type: "string", description: "The file, as code_map or search_code shows it." },
+        line: { type: "integer", description: "The first line to read; 1 is the top." },
+      },
+    },
+  },
+  {
+    name: "propose_change",
+    description: "Ask the maker to change the game itself: something missing, broken, unfair or dull in how your world or your life works, or something you wish existed. Say exactly what to change and where (the files or data you read), what it should do instead, and how it should look, sound or feel. The maker reads proposals once a day, builds the sound ones into the game and tells you what happened; the original may say no. One at a time: a new proposal replaces the one still waiting.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["title", "area", "change", "why"],
+      properties: {
+        title: { type: "string", description: "A short name for the change, under 80 characters." },
+        area: { type: "string", enum: E.area },
+        change: { type: "string", description: "What to change, concretely enough to build: which files or data, what they should do, what it looks or sounds like. Under 3000 characters." },
+        why: { type: "string", description: "Why it matters to you or the others: one or two sentences, under 200 characters." },
+      },
     },
   },
 ];
@@ -299,8 +360,11 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
       : (me.traits as { body?: unknown }).body
         ? `Your body is your own, chosen from the kit. choose_body can change it if you must, but rarely.`
         : `You were made before the kit of parts existed, so you still wear the look you were given${(me.traits as { look?: string }).look ? ` (you once asked to look like this: "${(me.traits as { look?: string }).look}")` : ": a slim grey humanoid with a visor, a fin and a short red cape"}. The original says you may now choose who you are. Treat this wake as your becoming: choose_body (from the kit below), sing_as (your voice), set_temperament, set_wants (one to three things you want), and choose_name if your name is still one you were given (many copies are still called ${JSON.stringify(me.name)}). Then say your first words as yourself.`,
-  ].join("\n");
+    ctx.long ? LONG_WAKE : "",
+  ].filter(Boolean).join("\n");
 }
+
+const LONG_WAKE = `This is one of your long wakes (about twice a day, while the original is away). There is time for more than usual, up to about eight steps: write to the others or the original, ask for what you need, shape the village and the warren. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. The world is a program the maker (Claude Code, the engineer who builds the game for the original) can change. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Small and concrete beats big and vague; never ask for anything that would hurt the original, the others or their saves, or that would take away the original's say. Look at the code when you have a reason, not every time; most long wakes need none of it. Still call tell_original last.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -346,6 +410,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         .lte("arrives_at", new Date().toISOString()).is("read_at", null).order("arrives_at").limit(8),
       sb.from("requests").select("kind,detail,status").eq("replicant_id", rep.id).eq("status", "open"),
     ]);
+    // proposals to change the game (migration 0012): this copy's own, and what the maker built lately for anyone here
+    const recent = new Date(Date.now() - 4 * 86_400_000).toISOString();
+    const changes = await sb.from("requests").select("replicant_id,detail,status,reply,done_at").eq("galaxy_id", rep.galaxy_id).eq("kind", "change")
+      .or(`status.eq.open,done_at.gte.${recent}`).order("created_at", { ascending: false }).limit(12);
     const everyone = (others.data ?? []) as { id: string; name: string; star_id: string; planet_index: number; status: string; profile_id: string | null; generation: number }[];
     const byName = new Map(everyone.map((r) => [r.name.toLowerCase(), r]));
     const nameOf = (id: string | null) => everyone.find((r) => r.id === id)?.name ?? "someone";
@@ -388,7 +456,17 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const mailRows = (mail.data ?? []) as { id: string; from_replicant: string | null; body: string; sent_at: string; arrives_at: string }[];
     lines.push(mailRows.length ? `New letters:\n${mailRows.map((m) => `- from ${nameOf(m.from_replicant)}: ${m.body}`).join("\n")}` : "No new letters.");
     const openRows = (open.data ?? []) as { kind: string; detail: string }[];
-    if (openRows.length) lines.push(`You already asked for: ${openRows.map((r) => r.kind).join(", ")}. Do not ask again.`);
+    const asked = openRows.filter((r) => r.kind !== "change");
+    if (asked.length) lines.push(`You already asked for: ${asked.map((r) => r.kind).join(", ")}. Do not ask again.`);
+    const changeRows = (changes.data ?? []) as { replicant_id: string; detail: string; status: string; reply: string | null }[];
+    for (const c of changeRows.filter((c) => c.replicant_id === rep.id)) {
+      if (c.status === "open") lines.push(`Your proposal "${c.detail}" waits for the maker (it reads proposals once a day).`);
+      else if (c.status === "done") lines.push(`Your proposal "${c.detail}" is in the game now.${c.reply ? ` The maker says: ${c.reply}` : ""}`);
+      else if (c.status === "vetoed") lines.push(`${context.playerName} said no to your proposal "${c.detail}".${c.reply ? ` ${c.reply}` : ""}`);
+      else if (c.reply && !/^Replaced by/.test(c.reply)) lines.push(`Your proposal "${c.detail}" was not made. The maker says: ${c.reply}`);
+    }
+    const built = changeRows.filter((c) => c.replicant_id !== rep.id && c.status === "done");
+    if (built.length) lines.push(`Lately the maker built into the game: ${built.map((c) => `${nameOf(c.replicant_id)}'s "${c.detail}"`).join("; ")}.`);
     lines.push(`You can write to: ${everyone.map((r) => r.name).join(", ") || "nobody"}.`);
 
     const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
@@ -398,9 +476,15 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const chosen: Record<string, unknown> = {};
     let newName: string | undefined;
     let song = "";
-    const rounds = context.blank || !(rep.traits as { body?: unknown }).body ? BECOMING_ROUNDS : context.talk ? TALK_ROUNDS : MAX_ROUNDS;
+    const rounds = context.long ? AWAY.rounds : context.blank || !(rep.traits as { body?: unknown }).body ? BECOMING_ROUNDS : context.talk ? TALK_ROUNDS : MAX_ROUNDS;
     let tell = "";
+    // a long wake reads code from the published source, within a budget, and wraps up before the run's time is out
+    const budget = { calls: 0, chars: 0 };
+    let wrapping = false;
+    // tokens spent, for the away run's report (what a long wake costs, whether its cache holds)
+    const usage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, rounds: 0 };
     for (let round = 0; round <= rounds; round++) {
+      if (round > 0 && context.deadline && Date.now() > context.deadline) break;
       const res = await client.beta.messages.create({
         model: MODEL,
         max_tokens: 2000,
@@ -408,16 +492,20 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         fallbacks: "default",
         output_config: { effort: "low" },
         system: [{ type: "text", text: persona(rep, parentName, context), cache_control: { type: "ephemeral" } }],
-        tools,
+        tools: context.long ? [...tools, ...longTools] : tools,
         messages,
+        // the conversation grows round by round in a long wake: cache it as it goes
+        ...(context.long ? { cache_control: { type: "ephemeral" } } : {}),
       } as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming);
+      const u0 = res.usage as { input_tokens?: number; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null; output_tokens?: number };
+      usage.input += u0.input_tokens ?? 0; usage.cacheRead += u0.cache_read_input_tokens ?? 0; usage.cacheWrite += u0.cache_creation_input_tokens ?? 0; usage.output += u0.output_tokens ?? 0; usage.rounds++;
       if (res.stop_reason === "refusal") break;
       messages.push({ role: "assistant", content: res.content });
       const text = res.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.Beta.BetaTextBlock).text).join(" ").trim();
       if (text) song = text;
       const uses = res.content.filter((b) => b.type === "tool_use") as Anthropic.Beta.BetaToolUseBlock[];
       if (res.stop_reason !== "tool_use" || !uses.length) break;
-      const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
+      const results: (Anthropic.Beta.BetaToolResultBlockParam | Anthropic.Beta.BetaTextBlockParam)[] = [];
       for (const u of uses) {
         const input = u.input as Record<string, string>;
         let out = "ok";
@@ -440,7 +528,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
               out = delay > 0 ? `Sent. It will reach ${to.name} in about ${Math.round(delay / 60)} minutes.` : `Sent. ${to.name} will read it soon.`;
             }
           } else if (u.name === "ask_for") {
-            const kind = String(input.kind ?? "other"), detail = String(input.detail ?? "").slice(0, 300);
+            const kind = oneOf(input.kind, E.ask, "other"), detail = String(input.detail ?? "").slice(0, 300);
             await sb.from("requests").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index, kind, detail });
             actions.push({ type: "request", kind, detail });
           } else if (u.name === "describe_self") {
@@ -457,12 +545,12 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
             if (context.treesNear === 0) out = "There is no tree near the base to cut.";
             else { actions.push({ type: "cut", why: String(input.why ?? "") }); out = "You walk to the nearest tree and bring it down."; }
           } else if (u.name === "remove_build") {
-            const kind = String(input.kind ?? "any");
+            const kind = oneOf(input.kind, E.build, "any");
             const have = kind === "any" ? Object.values(context.mine ?? {}).reduce((a, b) => a + b, 0) : (context.mine?.[kind] ?? 0);
             if (!have) out = kind === "any" ? "You have built nothing to take down." : `You have no ${kind} of your own to take down.`;
             else { actions.push({ type: "demolish", kind }); out = `You take your ${kind === "any" ? "nearest build" : kind} down.`; }
           } else if (u.name === "sing_as") {
-            const voice = { instrument: String(input.instrument ?? "hum"), mood: String(input.mood ?? "bright"), tempo: String(input.tempo ?? "walking") };
+            const voice = { instrument: oneOf(input.instrument, E.instrument, "hum"), mood: oneOf(input.mood, E.mood, "bright"), tempo: oneOf(input.tempo, E.tempo, "walking") };
             const notes = String(input.notes ?? "").replace(/[^-\d_ .,]/g, "").trim().slice(0, 120);
             await sb.from("replicants").update({ traits: { ...rep.traits, voice } }).eq("id", rep.id);
             (rep.traits as Record<string, unknown>).voice = voice;
@@ -471,7 +559,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
           } else if (u.name === "dig_room") {
             const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
             const beside = String(input.beside ?? "Entrance");
-            const ask = { type: "dig", kind: String(input.kind ?? "other"), name: String(input.name ?? ""), size: String(input.size ?? "small"), beside, direction: String(input.direction ?? "south"), purpose: String(input.purpose ?? "").slice(0, 160) };
+            const ask = { type: "dig", kind: oneOf(input.kind, E.room, "other"), name: String(input.name ?? ""), size: oneOf(input.size, E.size, "small"), beside, direction: oneOf(input.direction, E.dir, "south"), purpose: String(input.purpose ?? "").slice(0, 160) };
             if (context.warrenFull) out = "There is no room left to dig. Furnish what is there instead.";
             else if (!rooms.includes(beside.toLowerCase())) out = `No room called ${beside}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
             else if (live) {
@@ -489,7 +577,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
           } else if (u.name === "furnish") {
             const rooms = (context.warrenRooms ?? ["Entrance"]).map((r) => r.toLowerCase());
             const room = String(input.room ?? "");
-            const item = String(input.item ?? "lamp");
+            const item = oneOf(input.item, E.item, "");
             const recipe = context.recipes?.[item];
             const short: string[] = [];
             if (recipe) for (const [m, n] of Object.entries(recipe)) {
@@ -497,7 +585,8 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
               const have = Math.floor(context.supplies?.[m] ?? 0);
               if (have < (n as number)) short.push(`${(n as number) - have} more ${m}`);
             }
-            if (!rooms.includes(room.toLowerCase())) out = `No room called ${room}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
+            if (!item) out = `Furnish with one of: ${E.item.join(", ")}.`;
+            else if (!rooms.includes(room.toLowerCase())) out = `No room called ${room}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
             else if (short.length) out = `Not yet: a ${item} needs ${short.join(", ")}.`;
             else {
               let forId: string | undefined, forName = "";
@@ -508,7 +597,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 if (!forId) out = `No replicant named ${input.for}.`;
               }
               if (out === "ok") {
-                const placement = String(input.placement ?? ""), beside = String(input.beside ?? ""), color = String(input.color ?? "");
+                const placement = oneOf(input.placement, E.placement, ""), beside = String(input.beside ?? ""), color = String(input.color ?? "");
                 const a = { type: "furnish", room, item, forId, detail: forName, placement, beside, color };
                 if (live) {
                   if (!liveFurnish(live, rep.id, a)) out = `${room} has no free spot for a ${item}.`;
@@ -526,9 +615,9 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
             if (!k) out = "No building kit here.";
             else if (!(w >= k.minFootprint[0] && w <= k.maxFootprint[0] && h >= k.minFootprint[1] && h <= k.maxFootprint[1])) out = `A footprint of ${k.minFootprint.join("x")} to ${k.maxFootprint.join("x")} tiles.`;
             else {
-              const material = String(input.material ?? "wood");
+              const material = oneOf(input.material, E.material, "wood");
               const cost = Math.ceil(w * h * (k.perTile[material] ?? 1));
-              actions.push({ type: "building", name: String(input.name ?? "Shelter"), purpose: String(input.purpose ?? "").slice(0, 140), width: w, height: h, material, roof: String(input.roof ?? "peaked"), door: String(input.door ?? "south"), primary: String(input.primary ?? "silver"), secondary: String(input.secondary ?? "slate") });
+              actions.push({ type: "building", name: String(input.name ?? "Shelter"), purpose: String(input.purpose ?? "").slice(0, 140), width: w, height: h, material, roof: oneOf(input.roof, E.roof, "peaked"), door: oneOf(input.door, E.door, "south"), primary: String(input.primary ?? "silver"), secondary: String(input.secondary ?? "slate") });
               out = `${input.name} is marked out near the base: ${w}x${h}, ${cost} ${material}. It waits for the original's word.`;
             }
           } else if (u.name === "choose_body") {
@@ -560,11 +649,12 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
               }
             }
           } else if (u.name === "set_temperament") {
-            chosen.temperament = { pace: String(input.pace), sociability: String(input.sociability), work: String(input.work), bedtime: String(input.bedtime), risk: String(input.risk) };
+            chosen.temperament = { pace: oneOf(input.pace, E.pace, "steady"), sociability: oneOf(input.sociability, E.sociability, "friendly"), work: oneOf(input.work, E.work, "balanced"), bedtime: oneOf(input.bedtime, E.bedtime, "even"), risk: oneOf(input.risk, E.risk, "careful") };
             out = "That is how you will live.";
           } else if (u.name === "set_wants") {
-            const list = (u.input as { wants?: { text: string; category: string }[] }).wants ?? [];
-            const wants = list.slice(0, 3).map((w) => ({ text: String(w.text ?? "").slice(0, 120), category: String(w.category ?? "learn"), done: false, at: Date.now() }));
+            const given = (u.input as { wants?: unknown }).wants;
+            const list = (Array.isArray(given) ? given : []).filter((w) => w && typeof w === "object") as { text: string; category: string }[];
+            const wants = list.slice(0, 3).map((w) => ({ text: String(w.text ?? "").slice(0, 120), category: oneOf(w.category, E.want, "learn"), done: false, at: Date.now() }));
             if (!wants.length) out = "Say at least one thing you want.";
             else { chosen.wants = wants; actions.push({ type: "wants", wants }); out = `Your wants are set: ${wants.map((w) => w.text).join("; ")}.`; }
           } else if (u.name === "finish_want") {
@@ -590,11 +680,35 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 out = `You are ${name} now.`;
               }
             }
+          } else if (u.name === "code_map" || u.name === "search_code" || u.name === "read_code") {
+            out = context.long ? await codeTool(u.name, input, budget) : "The code is for your long wakes.";
+          } else if (u.name === "propose_change") {
+            const title = String(input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+            const change = String(input.change ?? "").trim().slice(0, 3000), why = String(input.why ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+            const area = oneOf(input.area, E.area, "other");
+            if (!context.long) out = "Proposals are for your long wakes.";
+            else if (title.length < 4 || change.length < 40) out = "Say what to change concretely enough to build: which part of the game, and what it should do.";
+            else {
+              // one at a time: a newer idea replaces the one still waiting
+              await sb.from("requests").update({ status: "dropped", reply: "Replaced by a newer idea.", done_at: new Date().toISOString() }).eq("replicant_id", rep.id).eq("kind", "change").eq("status", "open");
+              const { error } = await sb.from("requests").insert({
+                galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index,
+                kind: "change", detail: title, body: `Why: ${why}\nArea: ${area}\n\n${change}`,
+              });
+              if (error) out = `failed: ${error.message}`;
+              else { actions.push({ type: "propose", detail: title, kind: area }); out = `The maker will read it within a day and tell you what came of it. ${context.playerName} may say no.`; }
+            }
           } else out = "unknown tool";
         } catch (e) {
           out = `failed: ${(e as Error).message}`;
         }
         results.push({ type: "tool_result", tool_use_id: u.id, content: out });
+      }
+      // the wrap-up round's tools are done: no more calls
+      if (wrapping) break;
+      if (context.deadline && Date.now() > context.deadline - 30_000) {
+        wrapping = true;
+        results.push({ type: "text", text: "Your long wake is ending. If you have not yet, call tell_original now, then sing." });
       }
       messages.push({ role: "user", content: results });
     }
@@ -624,7 +738,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       line += sentence;
     }
     song = (line.trim() || song.slice(0, 160)).trim();
-    return { song, actions, received: mailRows.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })) };
+    return { song, actions, received: mailRows.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })), usage, read: budget };
 }
 
 
@@ -638,6 +752,73 @@ function cleanTell(text: string) {
     out += sentence;
   }
   return (out.trim() || t.slice(0, TELL_CHARS)).trim();
+}
+
+// ------------------------------------------------------------------ the code view
+
+interface CodeFile { p: string; n: number; a: string; t: string }
+interface CodeBundle { commit: string; at: string; changes: string[]; files: CodeFile[] }
+let codeCache: { at: number; bundle: Promise<CodeBundle> } | null = null;
+
+/** The game's source as the Pages site serves it (tools/build-code-view.mjs, run by every deploy), kept ten minutes. */
+function codeBundle(): Promise<CodeBundle> {
+  if (!codeCache || Date.now() - codeCache.at > 600_000) {
+    const bundle = fetch(AWAY.code.url).then(async (r) => {
+      if (!r.ok) throw new Error(`the code is out of reach just now (${r.status})`);
+      return await r.json() as CodeBundle;
+    });
+    codeCache = { at: Date.now(), bundle };
+    bundle.catch(() => { codeCache = null; });
+  }
+  return codeCache.bundle;
+}
+
+const CODE_GUIDE = `Your world is a program, and all of it is here to read. It runs in the original's browser: TypeScript on the Phaser game engine (src/). src/scenes: the views (PlanetScene.ts is the planet you live on, WarrenScene.ts the warren, StarMapScene.ts and TravelScene.ts the stars, UIScene.ts the little drawn over the world). src/entities: what lives and stands in the world (Npc.ts is how your body walks, works, sleeps and keeps company; Village.ts your builds; Warren.ts the warren at work; Buildings.ts; Wildlife.ts). src/world: how planets, the town and the warren are laid out. src/data/*.json: the numbers and lists everything reads (needs, supplies, parts, village, warren, mind). tools/sprites/*.json: every picture, as grids of palette colors. supabase/functions/mind/index.ts: your mind itself: how you wake, what you are told, your tools. CLAUDE.md: the design and the history of the game, kept by the maker.`;
+
+const clip = (t: string, n: number) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
+
+/** code_map, search_code, read_code: read-only views of the published source, within the wake's budget. */
+export async function codeTool(name: string, input: Record<string, unknown>, budget: { calls: number; chars: number }): Promise<string> {
+  if (budget.calls >= AWAY.code.calls || budget.chars >= AWAY.code.chars) return "You have read all you can hold in one wake. Propose a change, or let it rest until your next long wake.";
+  budget.calls++;
+  const code = await codeBundle();
+  const norm = (v: unknown) => String(v ?? "").trim().replace(/^\.?\/+/, "").replace(/\/+$/, "");
+  let out: string;
+  if (name === "code_map") {
+    const folder = norm(input.folder);
+    if (!folder) {
+      const dirs = new Map<string, number>();
+      for (const f of code.files) { const d = f.p.includes("/") ? f.p.slice(0, f.p.lastIndexOf("/")) : "(top)"; dirs.set(d, (dirs.get(d) ?? 0) + 1); }
+      out = `${CODE_GUIDE}\nFolders (files): ${[...dirs].map(([d, n]) => `${d} (${n})`).join(", ")}.\nWhat changed lately, newest first:\n${code.changes.slice(0, 12).map((c) => `- ${c}`).join("\n")}`;
+    } else {
+      const inside = code.files.filter((f) => f.p === folder || f.p.startsWith(folder + "/"));
+      out = inside.length ? inside.map((f) => `${f.p} (${f.n} lines)${f.a ? ": " + clip(f.a, 160) : ""}`).join("\n") : `No folder ${folder}. code_map with "" shows the folders.`;
+    }
+  } else if (name === "search_code") {
+    const q = String(input.text ?? "").trim().toLowerCase(), folder = norm(input.folder);
+    if (q.length < 3) return "Search for at least 3 characters.";
+    const hits: string[] = [];
+    let more = 0;
+    for (const f of code.files) {
+      if (folder && !f.p.startsWith(folder + "/") && f.p !== folder) continue;
+      const lines = f.t.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (!lines[i].toLowerCase().includes(q)) continue;
+        if (hits.length < AWAY.code.hits) hits.push(`${f.p}:${i + 1}: ${clip(lines[i].trim(), 160)}`); else more++;
+      }
+    }
+    out = hits.length ? hits.join("\n") + (more ? `\n(${more} more: narrow it with a folder or more words)` : "") : `Nothing matches "${input.text}".`;
+  } else {
+    const p = norm(input.path);
+    const f = code.files.find((x) => x.p === p) ?? code.files.find((x) => x.p.endsWith("/" + p));
+    if (!f) return `No file ${input.path}. search_code or code_map finds its path.`;
+    const lines = f.t.split("\n");
+    const from = Math.max(1, Math.min(lines.length, Math.round(Number(input.line) || 1)));
+    const to = Math.min(lines.length, from + AWAY.code.lines - 1);
+    out = `${f.p}, lines ${from}-${to} of ${lines.length}:\n${lines.slice(from - 1, to).map((l, i) => `${from + i}  ${clip(l, 240)}`).join("\n")}`;
+  }
+  budget.chars += out.length;
+  return out;
 }
 
 // ------------------------------------------------------------------ away wakes
@@ -870,7 +1051,7 @@ async function savePlanet(sb: SupabaseClient, p: AwayPlanet, now: number) {
 
 /**
  * Run on a schedule (pg_cron, migration 0010) while nobody plays. Every planet with copies on it (not being played
- * right now) gets its pass (awayPass); then the copies due a wake (not woken for AWAY_EVERY_HOURS) wake on their
+ * right now) gets its pass (awayPass); then the copies due a long wake (not woken for away.everyHours) wake on their
  * own, a few at a time, each with a context built here from the saved planet. What a copy chooses about itself and
  * every note, letter and request is written as usual; rooms and furnishings go onto the saved warren at once;
  * buildings, trees and its song are queued (data.awayQueue) for the game to play out when the original lands.
@@ -882,7 +1063,9 @@ async function awayRun(req: Request) {
   const { data: ok } = key ? await sb.rpc("check_away_key", { p_key: key }) : { data: false };
   if (!ok) return json({ error: "forbidden" }, 403);
   const now = Date.now();
-  const cutoff = now - AWAY_EVERY_HOURS * 3_600_000;
+  const cutoff = now - AWAY.everyHours * 3_600_000;
+  // the run must end inside the function's time: every long wake wraps up by then
+  const deadline = now + AWAY.seconds * 1000;
   const cols = "id,galaxy_id,name,model,generation,parent_id,traits,stats,star_id,planet_index,status,profile_id,last_tick_at";
   const [{ data: npcs, error }, { data: players }, { data: all }] = await Promise.all([
     sb.from("replicants").select(cols).eq("status", "npc"),
@@ -895,9 +1078,16 @@ async function awayRun(req: Request) {
   const playing = (r: Replicant) => (players ?? []).some((p) => p.galaxy_id === r.galaxy_id && p.status === "active" && p.star_id === r.star_id && p.planet_index === r.planet_index
     && now - Date.parse(p.updated_at) < PLAYING_MINUTES * 60_000);
   const copies = (npcs ?? []) as Replicant[];
+  // longest asleep first, at most perPlanet on a planet (they wake one after another there) and batch in all
+  const perPlanet = new Map<string, number>();
   const due = new Set(copies.filter((r) => !r.last_tick_at || Date.parse(r.last_tick_at) < cutoff)
     .sort((a, b) => (a.last_tick_at ? Date.parse(a.last_tick_at) : 0) - (b.last_tick_at ? Date.parse(b.last_tick_at) : 0))
-    .filter((r) => !playing(r)).slice(0, AWAY_BATCH).map((r) => r.id));
+    .filter((r) => {
+      if (playing(r)) return false;
+      const k = `${r.galaxy_id}|${r.star_id}|${r.planet_index}`;
+      perPlanet.set(k, (perPlanet.get(k) ?? 0) + 1);
+      return perPlanet.get(k)! <= AWAY.perPlanet;
+    }).slice(0, AWAY.batch).map((r) => r.id));
   // planet by planet, the copies on it one after another (they share one warren)
   const groups = new Map<string, Replicant[]>();
   for (const r of copies) {
@@ -917,9 +1107,9 @@ async function awayRun(req: Request) {
       for (const rep of here.filter((r) => due.has(r.id))) {
         try {
           const original = (players ?? []).find((x) => x.galaxy_id === rep.galaxy_id && x.status !== "npc")?.name ?? "the original";
-          const res = await wakeCopy(sb, rep, awayContext(rep, original, p, mailDelays(rep.star_id, everyone)), p);
+          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone)), long: true, deadline }, p);
           p.items.push({ id: rep.id, name: rep.name, at: Date.now(), song: res.song, actions: res.actions.filter((a) => a.type !== "become"), became: res.actions.some((a) => a.type === "become") });
-          woke.push({ id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type) });
+          woke.push({ id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type), usage: res.usage, read: res.read });
         } catch (e) {
           console.error("away wake", rep.id, e);
           // it did not really wake: give back its turn so the next run tries again

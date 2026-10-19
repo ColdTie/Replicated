@@ -228,7 +228,7 @@ export interface Body { head: string; visor: string; torso: string; arms: string
 export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: 'solitary' | 'friendly' | 'clingy'; work: 'builder' | 'wanderer' | 'balanced'; bedtime: 'early' | 'late' | 'even'; risk: 'careful' | 'bold' }
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose';
   body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string; was?: string;
   /** dig: size, beside (room name), direction, purpose; furnish: room, item, forId (resting station owner) */
   size?: string; beside?: string; direction?: string; purpose?: string; room?: string; item?: string; forId?: string;
@@ -248,7 +248,9 @@ export interface MindAction {
 export interface MindResult { skipped?: boolean; song?: string; actions?: MindAction[]; received?: { from: string; body: string }[]; error?: string }
 export interface Note { replicant_id: string; body: string; created_at: string }
 export interface Letter { id: string; from_replicant: string | null; to_replicant: string | null; body: string; sent_at: string; arrives_at: string; read_at?: string | null }
-export interface Request { replicant_id: string; kind: string; detail: string; status: string; created_at: string }
+/** A copy's ask. kind 'change' is a proposal to change the game (migration 0012): detail its title, body "Why: ...",
+ * "Area: ..." and the change itself; the maker answers in reply; 'vetoed' is the original's no. */
+export interface Request { id?: string; replicant_id: string; kind: string; detail: string; status: string; created_at: string; body?: string; reply?: string | null; done_at?: string | null }
 export interface Journal { notes: Note[]; mail: Letter[]; requests: Request[] }
 
 export interface GameStore {
@@ -285,6 +287,8 @@ export interface GameStore {
   sendMessage(from: ReplicantSave, toId: string, body: string): Promise<void>;
   /** Takes (returns and clears) what the copies here did in their away wakes (migration 0010). */
   takeMindQueue(star: string, planetIndex: number): Promise<AwayItem[]>;
+  /** The original says no to a copy's proposal to change the game, before the maker builds it. */
+  vetoRequest(id: string): Promise<void>;
   /**
    * The handoff: a Spark awakens a copy as a player of its own. A new profile is made in its name and visor
    * color and the copy becomes that profile's replicant (one row update); the giver spends the Spark.
@@ -539,6 +543,11 @@ export class LocalStore implements GameStore {
     return structuredClone(cur);
   }
 
+  async vetoRequest(id: string) {
+    const r = this.db.requests.find((x) => x.id === id && x.status === 'open');
+    if (r) { r.status = 'vetoed'; r.done_at = new Date().toISOString(); this.flush(); }
+  }
+
   async takeMindQueue(star: string, planetIndex: number) {
     const cur = this.db.planets[`${star}:${planetIndex}`];
     const q = cur?.data.awayQueue ?? [];
@@ -732,6 +741,11 @@ export class CloudStore implements GameStore {
     return (row as PlanetSave[] | null)?.[0] ?? null;
   }
 
+  async vetoRequest(id: string) {
+    const { error } = await this.sb.from('requests').update({ status: 'vetoed', done_at: new Date().toISOString() }).eq('id', id).eq('status', 'open');
+    if (error) throw error;
+  }
+
   async takeMindQueue(star: string, planetIndex: number) {
     const { data, error } = await this.sb.rpc('take_mind_queue', { p_galaxy: this.galaxyId, p_star: star, p_index: planetIndex });
     if (error) throw error;
@@ -765,7 +779,7 @@ export class CloudStore implements GameStore {
     const [n, m, r] = await Promise.all([
       this.sb.from('notes').select('replicant_id,body,created_at').in('replicant_id', ids).order('created_at', { ascending: false }).limit(60),
       this.sb.from('messages').select('id,from_replicant,to_replicant,body,sent_at,arrives_at,read_at').or(`from_replicant.in.${list},to_replicant.in.${list}`).order('sent_at', { ascending: false }).limit(60),
-      this.sb.from('requests').select('replicant_id,kind,detail,status,created_at').in('replicant_id', ids).order('created_at', { ascending: false }).limit(30),
+      this.sb.from('requests').select('id,replicant_id,kind,detail,status,created_at,body,reply,done_at').in('replicant_id', ids).order('created_at', { ascending: false }).limit(40),
     ]);
     return { notes: (n.data ?? []) as Note[], mail: (m.data ?? []) as Letter[], requests: (r.data ?? []) as Request[] };
   }

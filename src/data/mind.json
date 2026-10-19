@@ -6,6 +6,15 @@
   "mailSecondsPerLy": 60,
   "bubbleMs": 7000,
   "bubbleScale": 0.9,
+  "away": {
+    "_doc": "Long wakes: while nobody plays a planet, each copy on it wakes on its own every everyHours (about twice a day), up to batch copies per hourly run and perPlanet per planet. A long wake has up to rounds model calls within seconds of the run starting, and the code tools: code_map, search_code, read_code (the game's source from code.url, published by the deploy; at most code.calls reads and code.chars characters per wake, code.lines per read_code, code.hits per search) and propose_change (the maker builds it, NEEDS.md). Copied into the mind function by tools/build-mind-kit.mjs.",
+    "everyHours": 11,
+    "batch": 6,
+    "perPlanet": 1,
+    "rounds": 8,
+    "seconds": 100,
+    "code": { "url": "https://coldtie.github.io/Replicated/code/source.json", "calls": 12, "chars": 48000, "lines": 80, "hits": 30 }
+  },
   "chorusLines": [
     "We are here. We are many. We are one.",
     "The light is ours, the dark is wide. We hold.",

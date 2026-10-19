@@ -1614,7 +1614,7 @@ export class PlanetScene extends Phaser.Scene {
   private replayAway(items: AwayItem[]) {
     if (!items?.length || this.stopped) return;
     const hear = this.canHear();
-    let k = 0;
+    let k = 0, proposals = 0;
     for (const it of [...items].sort((a, b) => a.at - b.at)) {
       const npc = this.npcs.find((n) => n.data.id === it.id);
       if (!npc) continue;
@@ -1639,6 +1639,11 @@ export class PlanetScene extends Phaser.Scene {
         else if (a.type === 'note') log(`${name} wrote itself a note`);
         else if (a.type === 'mail') log(`${name} wrote to ${a.to}`);
         else if (a.type === 'request') log(`${name} asked the original for ${a.kind}`);
+        else if (a.type === 'propose') {
+          log(`${name} read the code of the world and proposed a change to it: ${a.detail ?? 'something'}`);
+          // after the "while you were away" notice, one at a time
+          if (hear) this.time.delayedCall(4000 * ++proposals, () => this.game.events.emit('notice', `${name.toUpperCase()} PROPOSES A CHANGE TO THE GAME`));
+        }
         else if (a.type === 'melody') log(`${name} found its voice on the ${a.instrument}`);
         else if (a.type === 'tell' && a.body) npc.data.traits.tell = { text: a.body, at: a.at ?? it.at };
       }
@@ -1852,6 +1857,8 @@ export class PlanetScene extends Phaser.Scene {
         this.game.events.emit('notice', `${npc.data.name.toUpperCase()} DESCRIBES A NEW BODY`);
       } else if (a.type === 'request' && hear) {
         this.game.events.emit('notice', `${npc.data.name.toUpperCase()} ASKS FOR ${String(a.kind ?? '').toUpperCase()}`);
+      } else if (a.type === 'propose' && hear) {
+        this.game.events.emit('notice', `${npc.data.name.toUpperCase()} PROPOSES A CHANGE TO THE GAME`);
       } else if (a.type === 'tell' && a.body) {
         // what it would tell you when you come over (the talk box shows it)
         npc.data.traits.tell = { text: a.body, at: a.at ?? Date.now() };
@@ -1967,6 +1974,7 @@ export class PlanetScene extends Phaser.Scene {
       talk: (id: string, text: string) => void this.talkTo(id, text),
       give: (id: string) => this.giveTo(id),
       awaken: (id: string) => void this.awakenCopy(id),
+      vetoChange: (id: string) => { void st.vetoRequest(id).catch((e) => console.warn('veto', e)).then(() => { closeJournal(); return this.toggleJournal(); }); },
     };
     openJournal({ sparks: this.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.placeLabel, canHear: this.canHear(), copies: this.npcs.map((n) => n.data), names, journal: j, feelings, actions,
       buildings: this.buildings.describe(nameOf), pending: this.buildings.list.filter((b) => !b.vetoed && !b.approved && !b.built).map((b) => ({ id: b.id, name: b.name })), warren: this.warren.data.rooms.length ? describeWarren(this.warren.data, null, nameOf) : [], supplies: this.npcs.length ? this.warren.describeSupplies() : undefined, shortages: this.warren.shortages() });

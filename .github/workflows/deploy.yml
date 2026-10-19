@@ -21,12 +21,16 @@ jobs:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 40   # the code view lists main's latest changes
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
+      # the game's source for the copies to read (the mind's code tools): dist/code/source.json
+      - run: node tools/build-code-view.mjs dist
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
