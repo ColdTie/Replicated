@@ -315,7 +315,7 @@ export class PlanetScene extends Phaser.Scene {
         if (bi >= 0) treeBlockers.add(bi);
         if (felled.has(i)) return;
         const s = this.add.sprite(pr.x, pr.y, tex('tree', p.id), pr.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + pr.y);
-        if (pr.frame === 0) this.time.delayedCall(Math.random() * 1500, () => s.play(anim(tex('tree', p.id), 'sway')));
+        if (pr.frame === 0) this.time.delayedCall(Math.random() * 1500, () => { if (s.active) s.play(anim(tex('tree', p.id), 'sway')); });
         this.trees.push({ index: i, x: pr.x, y: pr.y, sprite: s, zone: this.addSolid(pr.x, pr.y - 2, 8, 5), alive: true });
         return;
       }
