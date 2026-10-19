@@ -4,7 +4,8 @@
 // file only when it builds the context alone. It also writes supabase/functions/mind/warren.ts: the warren's
 // layout engine (src/world/warren.ts) with its imports replaced by the kit, so the away wakes place rooms and
 // furnishings on the saved warren exactly as the game would. Run after changing parts.json, supplies.json,
-// warren.json, buildings.json, mind.json, stars.json or src/world/warren.ts, then redeploy the function.
+// warren.json, buildings.json, mind.json (away: the long wakes and the code view), stars.json or src/world/warren.ts,
+// then redeploy the function.
 // Usage: node tools/build-mind-kit.mjs
 import fs from 'node:fs';
 
@@ -38,6 +39,7 @@ const out = {
     swingsPerTile: BUILDINGS.swingsPerTile,
   },
   mailSecondsPerLy: MIND.mailSecondsPerLy,
+  away: MIND.away,
   stars: Object.fromEntries(STARS.stars.map((s) => [s.id, [s.name, s.x, s.y, s.z]])),
 };
 const dest = new URL('../supabase/functions/mind/kit.json', import.meta.url);
