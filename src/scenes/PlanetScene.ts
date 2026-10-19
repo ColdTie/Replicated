@@ -974,7 +974,10 @@ export class PlanetScene extends Phaser.Scene {
       sound.denied();
       return true; // standing on the spot: never swing at the Replicator
     }
-    const parent = session.replicant!;
+    const me = session.replicant!;
+    // with a Spark and a copy standing by the ring, the newborn comes from that copy and carries its memories
+    const elder = (me.traits.sparks ?? 0) > 0 && !this.visit ? this.sparkElder() : undefined;
+    const parent = elder?.data ?? me;
     this.replicating = true;
     this.embers -= DRIFT.cost;
     this.pending.embers -= DRIFT.cost;
@@ -986,10 +989,26 @@ export class PlanetScene extends Phaser.Scene {
     pl.setPosition(this.base.spotX, this.base.spotY);
     sound.scan();
     this.base.scan(pl.sprite, pl.featureColor, 1600);
+    if (elder) {
+      me.traits.sparks = (me.traits.sparks ?? 1) - 1;
+      this.game.events.emit('sparks', me.traits.sparks);
+      void this.saver.saveReplicant();
+      elder.thank();
+      this.base.scan(elder.sprite, elder.trailColor, 1600);
+      // the Spark leaves the original and goes into the machine
+      const spark = this.add.image(pl.x, pl.y - 16, BEACON.spark.sprite).setDepth(6300).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({ targets: spark, x: this.base.x, y: this.base.y - 12, duration: 700, ease: 'Quad.easeIn', onComplete: () => { spark.destroy(); this.fx.sparks(this.base.x, this.base.y - 12, PALETTE[19], 14); sound.spark(); } });
+    }
     // the copy appears beside the Replicator, on whichever side is open
     const side = this.isWalkable(this.base.x + 24, this.base.y + 8) ? 24 : -24;
     const bx = this.base.x + side, by = this.base.y + 8;
     const row = replicate(parent, this.planet.star, this.planet.planetIndex, bx, by);
+    if (elder) {
+      const wants = (elder.data.traits.wants ?? []).filter((w) => !w.done).map((w) => w.text);
+      row.traits.inherit = { from: elder.data.id, name: elder.data.name, ...(wants.length ? { wants } : {}) };
+      this.mindLog.push({ t: this.mindClock, text: `${me.name} spent a Spark: a new copy was made from ${elder.data.name} and remembers being it` });
+      if (this.canHear()) this.game.events.emit('notice', `A NEW COPY CARRIES ${elder.data.name.toUpperCase()}'S MEMORIES`);
+    }
     this.time.delayedCall(1700, () => {
       const npc = new Npc(this, { ...row, id: 'pending' }, bx, by);
       // its home: the next free lot, recorded under its id once the row is saved
@@ -1013,6 +1032,7 @@ export class PlanetScene extends Phaser.Scene {
         st.createReplicant(row).then((saved) => {
           const lotIndex = this.townState.lots[lotKey];
           Object.assign(npc.data, saved);
+          if (elder) st.inheritNotes(elder.data.id, saved.id, DRIFT.spark.notes).catch((e) => console.warn('inherit notes failed', e));
           if (lotIndex !== undefined) { delete this.townState.lots[lotKey]; this.townState.lots[saved.id] = lotIndex; this.towner.markTown(); }
         })
           .catch((e) => { console.warn('copy save failed', e); delete this.townState.lots[lotKey]; });
@@ -1020,6 +1040,13 @@ export class PlanetScene extends Phaser.Scene {
       }
     });
     return true;
+  }
+
+  /** A copy (not blank, up here) standing close to the Replicator's ring: a Spark birth would come from it. */
+  private sparkElder() {
+    const sx = this.base.spotX, sy = this.base.spotY;
+    return this.npcs.filter((n) => !n.blank && !n.below && n.state !== 'born' && !n.data.id.startsWith('pending') && Math.hypot(n.x - sx, n.y - sy) < DRIFT.spark.range)
+      .sort((a, b) => Math.hypot(a.x - sx, a.y - sy) - Math.hypot(b.x - sx, b.y - sy))[0];
   }
 
   /** The copy's name floats above it for a moment so the family knows who is who (a blank copy has none yet). */
