@@ -275,7 +275,8 @@ R = reply (a letter it answers at once). M or the speaker icon (top right) mutes
 URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
 screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond|ruin` for other spots, `&kid` for kid mode),
 `?planet=solace`, `?seed=123`, `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
-`?low` (force low-detail mode; also switches on by itself under 40 fps), `?fast` (travel minutes become seconds),
+`?low` (force low-detail mode; also switches on by itself under 40 fps), `?perf` (the planet's load phases in seconds,
+bottom left, for 12 s: save, world, ground, rock, rest; also `window.__loadMs`), `?fast` (travel minutes become seconds),
 `?shot=1&view=warren&copies=3` (a dug, lived-in warren, you at the foot of the ladder), `?shot=1&star=tau-ceti&pi=2` (preview planet 2 of another star, as a hologram visit), `?shot=1&at=fomalhaut&pi=1`
 (start the replicant on another world for real; `&view=beacon` stands you before the sleeping keeper, `&view=beacon-lit`
 shows the lit monolith).
@@ -482,3 +483,9 @@ whole `npm test` passed before and after.
   for Steve's go-ahead in Supabase (the live function ignores `inherit` until then; the notes are copied either way).
 - Verified: `tools/playtest-become.mjs` step 4 (a Spark birth beside Ash: parent, inherit, wants, notes, Spark spent),
   the mind tool check and `deno check`.
+
+**S3, load.** Phaser is its own chunk (`vite.config.ts manualChunks`): 1.2 MB that never changes, so a deploy (the maker
+ships daily) re-downloads only the game, 418 KB (142 KB gzipped) instead of 1.6 MB. `?perf` shows where a planet's
+load goes. Headless (software GL): Earth 1.59 s, of which ground paint 1.02 s, rock 0.19, world 0.12, the rest 0.25.
+The paint cache from the plan is not built: the ground image is 2336 x 1792 (16.7 MB raw), so storing and decoding it
+would cost much of what it saves; decide on it after reading `?perf` on Steve's laptop.

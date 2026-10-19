@@ -54,6 +54,7 @@ export class UIScene extends Phaser.Scene {
     this.game.events.on('titlecard', this.titleCard, this);
     this.game.events.on('location', this.showLocation, this);
     this.game.events.on('notice', this.notice, this);
+    this.game.events.on('perf', this.perf, this);
     this.game.events.on('talkable', this.onTalkable, this);
     (this.scene.get('planet') as unknown as { announceLocation?: () => void }).announceLocation?.(); // the planet announced before this layer existed
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -62,6 +63,7 @@ export class UIScene extends Phaser.Scene {
       this.game.events.off('titlecard', this.titleCard, this);
       this.game.events.off('location', this.showLocation, this);
       this.game.events.off('notice', this.notice, this);
+      this.game.events.off('perf', this.perf, this);
       this.game.events.off('talkable', this.onTalkable, this);
     });
     this.talkBox = new TalkBox(this);
@@ -236,6 +238,12 @@ export class UIScene extends Phaser.Scene {
     });
     if (who.length > 7) items.push(this.add.bitmapText(7, 11 + 7 * 9, 'pixel', `+${who.length - 7}`).setTint(PALETTE[21]));
     this.location = this.add.container(7, y0, items).setAlpha(0.6).setDepth(10);
+  }
+
+  /** ?perf: where the planet's load went, bottom left, for a while. */
+  private perf(text: string) {
+    const t = this.add.bitmapText(7, this.scale.height - 12, 'pixel', text).setTint(PALETTE[21]).setDepth(20);
+    this.tweens.add({ targets: t, alpha: 0, delay: 12_000, duration: 800, onComplete: () => t.destroy() });
   }
 
   /** A short one-line notice ("STEVE GETS +20% DASH") that rises in and fades, lower middle of the screen. */
