@@ -44,8 +44,12 @@ try {
   log('dash moved', Math.round(await ev(()=>window.__scene.player.x) - x0), 'dashUntil set', await ev(()=>window.__scene.player.dashUntil>0));
   for (let i=0;i<3;i++){ await page.keyboard.press('Space'); await page.waitForTimeout(150); }
   log('combo', await ev(()=>window.__scene.player.combo));
-  // spitter reflect
-  const sp = await ev(()=>{const s=window.__scene; const e=s.enemies.find(e=>e.constructor.name.includes('Spitter')||e.def?.kind==='spitter'); if(!e) return null; s.player.setPosition(e.x+60,e.y); s.frozen=false; return {x:e.x,y:e.y,hp:e.hp}; });
+  // Earth is shy (planets.json): its spitter keeps its spores and its creatures never lunge at you
+  const shy = await ev(async()=>{const s=window.__scene; const e=s.enemies.find(e=>e.def?.kind==='spitter'); if(!e) return null; s.player.setPosition(e.x+50,e.y); s.frozen=false; const hp=s.player.hp; await new Promise(r=>setTimeout(r,2500)); const out={shy:!!s.planet.shy, spores:s.spores.length, hurt:s.player.hp<hp}; s.frozen=true; return out;});
+  log('shy earth', JSON.stringify(shy));
+  if (shy && (!shy.shy || shy.spores || shy.hurt)) errors.push('a creature attacked on peaceful Earth');
+  // spitter reflect (a hostile world's spitter: Earth's shyness lifted for this part)
+  const sp = await ev(()=>{const s=window.__scene; s.planet.shy=false; const e=s.enemies.find(e=>e.constructor.name.includes('Spitter')||e.def?.kind==='spitter'); if(!e) return null; s.player.setPosition(e.x+60,e.y); s.frozen=false; return {x:e.x,y:e.y,hp:e.hp}; });
   log('spitter', JSON.stringify(sp));
   if (sp) {
     await ev(()=>{ window.__scene.enemies.forEach(e=>{ if(e.def?.kind!=='spitter'){ e.body.enable=false; e.state='dead'; e.sprite.setVisible(false);} }); });
@@ -56,7 +60,9 @@ try {
     }
     await page.waitForTimeout(1200);
     log('reflected', reflected, 'spitter hp', await ev(()=>window.__scene.enemies.find(e=>e.def?.kind==='spitter').hp), 'player hp', await ev(()=>window.__scene.player.hp));
+    if (!reflected) errors.push('no spore was batted back');
   }
+  await ev(()=>{ window.__scene.planet.shy = true; });
   // replicate: build the Replicator, stand on the glowing spot, press action
   await ev(()=>{const s=window.__scene; s.base.placeReplicator(false); s.embers=45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked=false;});
   await page.keyboard.press('Space');

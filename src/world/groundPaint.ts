@@ -134,7 +134,9 @@ function townMarks(map: PlanetMap, W: number, H: number, edgeNoise: (x: number, 
     stamp(wear, ax0 - E - 4, ay0 - E - 4, ax1 + E + 4, ay1 + E + 4, (x, y) => {
       const lived = smooth(worn + 72, worn, along(x, y));
       // past the last home the street narrows to a track
-      const sd = rectSd(x, y, ax0, ay0, ax1, ay1, 6) + (1 - lived) * 9 + (edgeNoise(x, y) - 0.5) * E * 1.4;
+      // its width wanders a little along its length, as feet wear it, not a ruler
+      const a = along(x, y), wob = Math.sin(a * 0.045 + st.rect.x * 1.7) * 2.5 + Math.sin(a * 0.12 + st.rect.y) * 1.2;
+      const sd = rectSd(x, y, ax0, ay0, ax1, ay1, 6) + (1 - lived) * 9 + (edgeNoise(x, y) - 0.5) * E * 1.4 + wob;
       return smooth(E * 0.6, -E * 0.5, sd) * (tp.trackWear + (tp.streetWear - tp.trackWear) * lived);
     });
   }
@@ -177,6 +179,9 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number, occup
     const mx = x - marks.x0, my = y - marks.y0;
     return mx < 0 || my < 0 || mx >= marks.rw || my >= marks.rh ? 0 : arr[my * marks.rw + mx];
   };
+  // the square in pixels: toward its edge stones are missing and moss creeps into the joints (TOWN.paint edgeFade px)
+  const sq = map.town.square, sqx0 = sq.x * T, sqy0 = sq.y * T, sqx1 = (sq.x + sq.w) * T, sqy1 = (sq.y + sq.h) * T;
+  const fade = (TOWN.paint as { edgeFade?: number }).edgeFade ?? 30;
   // fitted flagstones: jittered voronoi cells; flag() leaves the joint distance and the stone's id and bevel here
   const FLAG = 11;
   let fEdge = 0, fId = 0, fLit = 0;
@@ -281,7 +286,14 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number, occup
       // Cover mask: where grass, snow or drift lies; worn bare around the base, on the streets and the footpaths
       const bx = x - base.x, by = y - base.y;
       const worn = smoothstep(84, 34, Math.sqrt(bx * bx + by * by) + (f - 0.5) * 40);
-      const trod = markAt(marks.wear, x, y), paved = markAt(marks.pave, x, y);
+      const trod = markAt(marks.wear, x, y);
+      let paved = markAt(marks.pave, x, y), outer = 0;
+      if (paved > 0 && tp.square === 'flags') {
+        // near the edge some flags are gone and the grass has them: the outline is whole stones, not a line
+        flag(x, y);
+        outer = Math.max(0, 1 - -rectSd(x, y, sqx0, sqy0, sqx1, sqy1, 10) / fade);
+        if ((fId * 7919) % 1 < outer * 0.7) paved = 0;
+      }
       let m = smoothstep(thr - 0.05, thr + 0.05, lush(x, y) + (f - 0.5) * 0.16 + (wn - 0.5) * 0.05);
       m *= 1 - worn * (st.kind === 'grass' ? 0.8 : 0.5);
       m *= 1 - Math.max(trod * (0.85 + (wn - 0.5) * 0.3), paved);
@@ -340,7 +352,7 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number, occup
           if (fEdge < 1.7) t -= 0.18 * (1 - fEdge / 1.7);
           ramp(stone, t, cc);
           if (fEdge < 1.1) { cc[0] *= 0.55; cc[1] *= 0.55; cc[2] *= 0.6; }
-          if (grassy && fEdge < 1.5 && lush(x, y) + (wn - 0.5) * 0.3 > 0.5) { ramp(cover, 0.25 + wn * 0.3, cs); cc[0] += (cs[0] - cc[0]) * 0.7; cc[1] += (cs[1] - cc[1]) * 0.7; cc[2] += (cs[2] - cc[2]) * 0.7; }
+          if (grassy && fEdge < 1.5 + outer * 1.5 && lush(x, y) + (wn - 0.5) * 0.3 + outer * 0.3 > 0.5) { ramp(cover, 0.25 + wn * 0.3, cs); cc[0] += (cs[0] - cc[0]) * 0.7; cc[1] += (cs[1] - cc[1]) * 0.7; cc[2] += (cs[2] - cc[2]) * 0.7; }
         } else {
           ramp(soil, 0.62 + (f - 0.5) * 0.25 + (wn - 0.5) * 0.08 + shade * 0.5, cc);
         }

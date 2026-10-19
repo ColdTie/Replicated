@@ -44,7 +44,7 @@ export class Spitter implements Enemy {
     this.body.setVelocity(0, 0);
     const p = this.scene.player;
     const dist = Math.hypot(p.x - this.x, p.y - this.y);
-    const canSee = p.alive && !p.locked && dist < this.def.fireRange;
+    const canSee = p.alive && !p.locked && dist < this.def.fireRange && !this.scene.playerSafe && !this.scene.planet.shy;
     if (this.state === 'idle' && canSee && time > this.stateUntil) {
       this.state = 'windup';
       this.stateUntil = time + this.def.windupMs;

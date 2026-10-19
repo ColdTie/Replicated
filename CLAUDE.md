@@ -265,7 +265,8 @@ Controls: move WASD/arrows/left stick/left-side touch drag. Attack Space/J/Enter
 side (three quick attacks = heavy combo finisher; presses during the cooldown are buffered). With nothing alive in
 reach, a swing works on the village: a tree (6 swings fell it), rock (4 break off stone), an opened ruin's machine
 (scrap), a building being raised (a blow). Walk into a building waiting for what you carry, a copy, or the hatch to
-hand the load over. Dash Shift/K/X, gamepad
+hand the load over. Stand on the open hatch for a moment (a warm ring fills) or press attack on it to go down; walking
+or dashing across it never does. Dash Shift/K/X, gamepad
 B/L1/R2, swipe on the right side. Talk to the copy beside you (a speech mark shows over it): E, right click, gamepad Y,
 or the touch talk button; in the box E / Space / Enter / click = next, Left = back, Esc / Tab / gamepad B = close,
 R = reply (a letter it answers at once). M or the speaker icon (top right) mutes.
@@ -453,3 +454,17 @@ whole `npm test` passed before and after.
 - Not done from the plan: the `bring` wish in `tell_original` (it belongs with M4's imports).
 - Verified: `tools/playtest-return.mjs` (new) and `npm test`, 13 of 13. `screenshots/return-letters.png`,
   `return-letter-open.png`.
+
+**M6, a peaceful Earth; S4, the town's seams; S5, one way down.**
+- Earth is `shy` (planets.json): its skitters scurry off when you come close, its hoppers hop away, its spitters never
+  spit; hitting one still gives Ember. On every world no creature goes after you within `enemies.json townSafe` (2)
+  tiles of the town's lots, streets or square (`PlanetScene.playerSafe`, `inTown`).
+- The square frays into the grass stone by stone: within `town.json paint.edgeFade` (30 px) of its edge some flags are
+  missing and moss fills the joints, so its outline is whole stones, not a line. Streets wander a little in width along
+  their length. `screenshots/s4-town-day.png` against `review` shots of the hard rectangle.
+- The hatch no longer takes you down when you walk or dash across it (or deliver a load to it): stand on it for
+  `warren.json hatchDwellMs` (350) while a warm ring fills, or press attack on it. The corner name list was already
+  capped at seven plus "+N" (the plan had it wrong).
+- `tools/playtest.mjs` now asserts the spore reflect (it only logged it before; Earth's spitter is shy, so that part
+  lifts the flag for itself) and that Earth's creatures leave you alone; `playtest-warren.mjs` checks that crossing the
+  hatch does nothing. `npm test` 13 of 13.

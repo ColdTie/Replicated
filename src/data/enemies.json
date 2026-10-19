@@ -1,4 +1,6 @@
 {
+  "_doc": "Creature stats per kind. townSafe: tiles of the town (lots, streets, the square: townMask 2 and up, plus this many tiles around) where no creature goes after you; they lose interest at its edge.",
+  "townSafe": 2,
   "skitter": {
     "sprite": "skitter",
     "hp": 3,
