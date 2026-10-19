@@ -103,7 +103,8 @@ export class Npc {
     const base = (1 - this.weary + n.company + n.purpose) / 3;
     const w = this.scene.warren;
     const finer = Math.min(SUPPLIES.upgrade.moodMax, w.upgradeLevels * SUPPLIES.upgrade.moodPerLevel);
-    return Math.min(1, base + Math.min(NEEDS.muralMoodMax, w.muralCount * NEEDS.muralMood) + finer);
+    // things from other worlds in the store (supplies.json signature)
+    return Math.min(1, base + Math.min(NEEDS.muralMoodMax, w.muralCount * NEEDS.muralMood) + finer + this.scene.trade.importMood);
   }
   get moodWord(): 'content' | 'low' | 'bleak' { const m = this.mood; return m > 0.6 ? 'content' : m > 0.35 ? 'low' : 'bleak'; }
   /** Which needs are low, in words ("lonely (company 20%)"). */

@@ -1,8 +1,8 @@
 {
- "_doc": "Material icons (src/data/supplies.json): 0 stone, 1 soil, 2 wood, 3 water, 4 food, 5 scrap, 6 ember. 8x8, carried over heads and flown to the hatch.",
+ "_doc": "Material icons (src/data/supplies.json): 0 stone, 1 soil, 2 wood, 3 water, 4 food, 5 scrap, 6 ember; each world's signature material (supplies.json signature): 7 ice glass, 8 salt, 9 obsidian, 10 spore silk, 11 seed, 12 regolith. 8x8, carried over heads and flown to the hatch.",
  "size": [8, 8],
  "tinted": false,
- "legend": { ".": null, "k": 25, "K": 24, "L": 20, "l": 21, "S": 22, "b": 4, "B": 5, "t": 31, "c": 18, "C": 17, "g": 12, "G": 13, "O": 9, "Y": 10, "y": 11, "W": 19 },
+ "legend": { ".": null, "k": 25, "K": 24, "L": 20, "l": 21, "S": 22, "b": 4, "B": 5, "t": 31, "c": 18, "C": 17, "g": 12, "G": 13, "O": 9, "Y": 10, "y": 11, "W": 19, "p": 30, "P": 29 },
  "animations": {},
  "frames": [
   ["........", "..kkkk..", ".kLLllk.", ".kLlllk.", ".kllSSk.", ".klSSSk.", "..kkkk..", "........"],
@@ -11,6 +11,12 @@
   ["...k....", "..kck...", "..kcck..", ".kcCcck.", ".kcCWck.", ".kccCck.", "..kkkk..", "........"],
   ["...G....", "..GgG...", ".kggggk.", "kgggggGk", "kgGggggk", ".kggggk.", "..kkkk..", "........"],
   ["........", ".kk.kkk.", "kOYk.kOk", "kOOkkOOk", ".kOOOOk.", "..kYOk..", "...kk...", "........"],
-  ["...k....", "..kYk...", ".kYyYk..", ".kYWYk..", ".kYyYk..", "..kYk...", "...k....", "........"]
+  ["...k....", "..kYk...", ".kYyYk..", ".kYWYk..", ".kYyYk..", "..kYk...", "...k....", "........"],
+  ["...k....", "..kWk...", "..kWck..", ".kcWcCk.", ".kccWCk.", "..kcCk..", "...kk...", "........"],
+  ["........", "...kk...", "..kWLk..", ".kWLWLk.", "kWLWLWLk", "kllllllk", ".kkkkkk.", "........"],
+  ["...k....", "..kOk...", "..kKKk..", ".kKkKOk.", ".kkKkOk.", "..kKOk..", "...kk...", "........"],
+  ["........", ".kkkkkk.", ".ktttttk", "..kpPpk.", "..kPpPk.", ".ktttttk", ".kkkkkk.", "........"],
+  ["...k....", "..kGk...", "..kgGk..", ".kgGgGk.", ".kGgGbk.", "..kGbk..", "...kk...", "........"],
+  ["...kk...", "..kllk..", "..kSSk..", ".klSlSk.", ".kSSlSk.", ".klSSSk.", "..kkkk..", "........"]
  ]
 }

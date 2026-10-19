@@ -23,6 +23,13 @@ export function distanceLy(a: string, b: string) {
 /** Trip length in milliseconds. fixedSeconds > 0 makes every trip that long; otherwise real time (?fast: minutes become seconds). */
 export function travelMs(ly: number) {
   if (TRAVEL.fixedSeconds > 0) return TRAVEL.fixedSeconds * 1000;
+  const c = TRAVEL.cruise;
+  if (c.enabled) {
+    // ?fast: a cruise of a few seconds, for tests
+    const k = new URLSearchParams(location.search).has('fast') ? 1000 / 12 : 1000;
+    if (ly < 0.01) return Math.round(c.inSystemSeconds * k);
+    return Math.round((c.minSeconds + (c.maxSeconds - c.minSeconds) * Math.sqrt(Math.min(1, ly / c.maxLy))) * k);
+  }
   // a hop between planets of the same star is a short trip, not a free one
   const minutes = ly < 0.01 ? TRAVEL.inSystemMinutes : TRAVEL.minutesAtRef * Math.pow(ly / TRAVEL.refLy, TRAVEL.exponent);
   const fast = new URLSearchParams(location.search).has('fast');

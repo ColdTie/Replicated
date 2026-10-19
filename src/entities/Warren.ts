@@ -521,7 +521,9 @@ export class Warren {
 
   /** The supplies in words, for the minds and the journal. */
   describeSupplies() {
-    const s = MATERIALS.map((m) => `${m} ${Math.floor(this.supplies[m] ?? 0)}`).join(', ');
+    // a world's own materials, and imports, only once there are some
+    const sig = new Set(Object.values(SUPPLIES.signature.byWorld));
+    const s = MATERIALS.filter((m) => !sig.has(m) || (this.supplies[m] ?? 0) >= 1).map((m) => `${m} ${Math.floor(this.supplies[m] ?? 0)}`).join(', ');
     return `${s}, ember ${this.scene.embers} (the base holds ${this.cap} of each; shelves add ${SUPPLIES.shelfCap})`;
   }
 }

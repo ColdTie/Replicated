@@ -36,6 +36,7 @@ import { planetFor, starById } from '../world/galaxy';
 import { Departure } from './planet/Departure';
 import { Hands } from './planet/Hands';
 import { Homecoming } from './planet/Homecoming';
+import { Trade } from './planet/Trade';
 import { Minds } from './planet/Minds';
 import { Saving } from './planet/Saving';
 import { Talk } from './planet/Talk';
@@ -146,6 +147,7 @@ export class PlanetScene extends Phaser.Scene {
   readonly departure = new Departure(this);
   readonly hands = new Hands(this);
   readonly homecoming = new Homecoming(this);
+  readonly trade = new Trade(this);
 
   constructor() { super('planet'); }
 
@@ -193,6 +195,7 @@ export class PlanetScene extends Phaser.Scene {
     this.hatchRing = undefined;
     this.hatchDwell = 0;
     this.homecoming.reset();
+    this.trade.reset();
     this.townState = { lots: {}, civic: {} };
     this.migrated = false;
     this.npcsLoaded = true;
@@ -380,7 +383,7 @@ export class PlanetScene extends Phaser.Scene {
     this.warren = new Warren(this, save?.data.warren);
     this.buildings = new Buildings(this, save?.data.buildings);
     this.time.delayedCall(2500, () => this.towner.grantGifts(save?.data.gifts));
-    if (!this.shot && !this.visit) { this.warren.applyOffline(this.awayHours); this.buildings.applyOffline(this.awayHours); }
+    if (!this.shot && !this.visit) { this.warren.applyOffline(this.awayHours); this.buildings.applyOffline(this.awayHours); this.trade.accrueAway(this.awayHours); }
     for (const e of m.enemies) {
       const def = ENEMIES[e.type];
       const ex = e.x * 16 + 8, ey = e.y * 16 + 8;
@@ -680,6 +683,7 @@ export class PlanetScene extends Phaser.Scene {
         squash(this, pl.sprite, 1.35, 0.7, 120);
         this.fx.dust(ex, ey + 2, 6);
         this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
+        this.trade.unload();
         this.homecoming.run(() => { pl.locked = false; this.saver.markAwake(); });
       },
     });
@@ -779,6 +783,7 @@ export class PlanetScene extends Phaser.Scene {
     this.updateVesselCue(time, dt);
     this.hands.update(time);
     this.homecoming.update(time);
+    this.trade.update(dt);
     this.warren.update(dt);
     this.updateHatch(dt);
     this.minds.tickMinds(dt);
