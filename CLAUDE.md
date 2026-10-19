@@ -175,7 +175,9 @@ src/ui/talk.ts           what a copy says when you talk to it: pages SAYS (trait
                          WANTS (and a feeling), LETTERS (to you first), wrapped for the box (pure; src/data/talk.json)
 src/ui/dialogue.ts       the talk box at the bottom (portrait, name, pages, typing in the copy's voice, reply line);
                          drawn in the 'prose' font (tools/sprites/font-prose.json: mixed case with descenders)
-src/scenes/planet/       PlanetScene's parts, each a class holding the scene as `s` and made once with it: Talk (the
+src/scenes/planet/       PlanetScene's parts, each a class holding the scene as `s` and made once with it: Hands (the
+                         original's own work: felling, stone, scrap, the load above the head, handing it over,
+                         swinging at a building, a copy's need over its head; supplies.json hands), Talk (the
                          talk box), Minds (wakes, mind context, away replay, chorus, the journal and its actions,
                          copies' chores), Saving (planet delta, replicant row), Town (migration, lots, gifts),
                          Departure (board ring, star map, lift-off); shared.ts holds their helpers. The scene keeps
@@ -235,6 +237,8 @@ playtest, about 6 minutes; `npm test -- talk town` runs only those), `npm run sp
 `node tools/playtest-warren.mjs` (rooms planned, a copy digs, a copy makes its bed, down the hatch, walk, back up),
 `node tools/playtest-become.mjs` (a blank birth, the becoming with the canned mind, eating, the journal's wants),
 `node tools/playtest-buildings.mjs` (a proposal, approval in the journal, paid and raised by three copies, talk, give),
+`node tools/playtest-carry.mjs` (fell trees and carry the wood, a copy shows what its building waits for, the load pays
+it, swings raise it, a load handed to a copy, stone from rock, a load stowed when leaving),
 `node tools/playtest-together.mjs` (a lonely copy seeks company, the Meeting Hall starts itself and gathers them, a
 room is improved, an away wake plays out, a Spark awakens a copy as a player),
 `node tools/playtest-town.mjs [seed.json] [--port n] [--shots]` (an old save moves into the town once, nothing lost; the
@@ -252,7 +256,10 @@ Saving a copy: needs, weariness, sleep and gifts go through `GameStore.patchTrai
 migration 0009), which merges only those keys, so a game left open never undoes a body, voice or name chosen since.
 
 Controls: move WASD/arrows/left stick/left-side touch drag. Attack Space/J/Enter/Z, left click, gamepad A/X/R1, tap right
-side (three quick attacks = heavy combo finisher; presses during the cooldown are buffered). Dash Shift/K/X, gamepad
+side (three quick attacks = heavy combo finisher; presses during the cooldown are buffered). With nothing alive in
+reach, a swing works on the village: a tree (6 swings fell it), rock (4 break off stone), an opened ruin's machine
+(scrap), a building being raised (a blow). Walk into a building waiting for what you carry, a copy, or the hatch to
+hand the load over. Dash Shift/K/X, gamepad
 B/L1/R2, swipe on the right side. Talk to the copy beside you (a speech mark shows over it): E, right click, gamepad Y,
 or the touch talk button; in the box E / Space / Enter / click = next, Left = back, Esc / Tab / gamepad B = close,
 R = reply (a letter it answers at once). M or the speaker icon (top right) mutes.
@@ -411,3 +418,19 @@ moved into `src/scenes/planet/` by a script that moved each member with its comm
 logic touched). Controllers are made once with the scene object, as their fields were, so nothing resets differently.
 Two captures of the same build differ in 13% of pixels (particles, wind), so a pixel diff proves nothing here; the
 whole `npm test` passed before and after.
+
+**M1, hands in the village** (`src/scenes/planet/Hands.ts`, tunables `supplies.json hands`).
+- With nothing alive in reach, your swing works on the village: six swings fell a tree (3 wood, gone for good like the
+  copies' felled trees), four break stone off rock (2 stone; each rock tile once per 10 minutes), three scavenge an
+  opened ruin (2 scrap, on the copies' cooldown). Chips heal after 4 s without a hit, so a fight beside a tree never
+  fells it by accident.
+- The load rides above your head as a little stack of icons (up to 6 wood or stone, 4 scrap); more, or another
+  material, flies to the store as the copies' does. Walk into a building waiting for that material (approved, not
+  yet paid; it is paid at once when the store then covers it), into a copy (company +0.2, purpose +0.25, it turns and
+  hops, its mind hears of it soon), or the hatch, and it is handed over. Launching or closing the page stows it.
+- Your swing at a building being raised counts 1.5 of a copy's blows; you join its builders ("being raised, 33%
+  (STEVE)"), and copies at work there hop now and then to keep time.
+- A copy whose own building waits for a material shows that material over its head when you come within 80 px.
+- Every handover and felled tree goes into the minds' events ("STEVE carried 6 wood to Workroom").
+- Verified: `tools/playtest-carry.mjs` (new, port 4193: 4190 is a port fetch refuses) and the whole `npm test`, 12 of
+  12. `screenshots/hands-carry.png`, `hands-need.png`.

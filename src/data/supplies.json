@@ -79,6 +79,19 @@
       "wood": 1
     }
   },
+  "hands": {
+    "_doc": "What the original does with their own hands (src/scenes/planet/Hands.ts). Hitting a tree treeHits times fells it for treeWood; hitting rock rockHits times breaks off rockYield stone (each rock tile once per rockCooldownMinutes); hitting an opened ruin's machine gives scrapPerRuin scrap (same cooldown as the copies' scavenging). The load rides above the head, up to carry of a material; more, or another material, flies to the store. Walking into a building waiting for that material, the hatch, or a copy hands it over (deliverRange px). A copy given a load: company + gift.company, purpose + gift.purpose. A swing at a building being raised counts swingWorth of a copy's blow. needRange: a copy whose building waits on a material shows it over its head when you come this close. hitsForgetMs: chips on a tree or rock heal after this long without a hit.",
+    "carry": { "wood": 6, "stone": 6, "scrap": 4 },
+    "treeHits": 6,
+    "rockHits": 4,
+    "rockYield": 2,
+    "rockCooldownMinutes": 10,
+    "hitsForgetMs": 4000,
+    "deliverRange": 14,
+    "swingWorth": 1.5,
+    "gift": { "company": 0.2, "purpose": 0.25 },
+    "needRange": 80
+  },
   "placements": [
     "wall",
     "corner",

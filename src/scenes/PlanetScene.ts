@@ -34,6 +34,7 @@ import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from
 import { TOWN_TUNING, birthOrder, nextFreeLot, occupiedLots, type TownState } from '../world/town';
 import { planetFor, starById } from '../world/galaxy';
 import { Departure } from './planet/Departure';
+import { Hands } from './planet/Hands';
 import { Minds } from './planet/Minds';
 import { Saving } from './planet/Saving';
 import { Talk } from './planet/Talk';
@@ -135,6 +136,7 @@ export class PlanetScene extends Phaser.Scene {
   readonly saver = new Saving(this);
   readonly towner = new Town(this);
   readonly departure = new Departure(this);
+  readonly hands = new Hands(this);
 
   constructor() { super('planet'); }
 
@@ -178,6 +180,7 @@ export class PlanetScene extends Phaser.Scene {
     // the scene object is reused between planets: drop the old player so update() waits for the new world
     this.player = undefined as unknown as Player;
     this.pending = { embers: 0, nodes: {}, doors: {} };
+    this.hands.reset();
     this.townState = { lots: {}, civic: {} };
     this.migrated = false;
     this.npcsLoaded = true;
@@ -751,6 +754,7 @@ export class PlanetScene extends Phaser.Scene {
     if (!this.shot && !this.visit) this.village.update(time, dt, this.npcs.reduce((a, n) => a + stat(n.data, 'gather'), 0));
     else this.village.update(time, 0, 0);
     this.updateVesselCue(time, dt);
+    this.hands.update(time);
     this.warren.update(dt);
     if (time > this.hatchReadyAt && this.player.alive && !this.player.locked && !this.talker.talk && !this.stopped && this.warren.playerOnHatch()) this.descend();
     this.minds.tickMinds(dt);
@@ -1112,6 +1116,8 @@ export class PlanetScene extends Phaser.Scene {
       hit = true;
     }
     for (const r of this.ruins) if (r.hitMachine(hx, hy, radius)) hit = true;
+    // nothing alive in reach: the swing works on the village (a tree, rock, a ruin, a building being raised)
+    if (!hit && this.hands.swing(hx, hy, radius)) hit = true;
     for (const sp of this.spores) {
       if (sp.dead || sp.reflected || Math.hypot(sp.x - hx, sp.y - hy) > radius + 8) continue;
       sp.reflect(aim, this.player.featureColor);
