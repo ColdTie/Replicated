@@ -18,7 +18,7 @@ export class Saving {
   setupSaving() {
     const flushAll = () => { void this.flushPlanet(); void this.saveReplicant(); };
     // closing the page: a carried load goes into the store first
-    const onLeave = () => { this.s.hands.stow(); flushAll(); };
+    const onLeave = () => { this.s.hands.stow(); this.s.homecoming.remember(); flushAll(); };
     const onHide = () => { if (document.visibilityState === 'hidden') flushAll(); };
     document.addEventListener('visibilitychange', onHide);
     window.addEventListener('pagehide', onLeave);
@@ -53,7 +53,7 @@ export class Saving {
     // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
     if (this.s.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
     if (p.npcTick !== undefined) this.npcTickAt = Date.now();
-    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && !p.town && !p.layout && !p.gifts && p.npcTick === undefined) return;
+    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && !p.town && !p.layout && !p.gifts && !p.seen && p.npcTick === undefined) return;
     this.s.pending = { embers: 0, nodes: {}, doors: {} };
     this.saving = true;
     try {
@@ -71,6 +71,7 @@ export class Saving {
       if (p.town) data.town = p.town;
       if (p.gifts) data.gifts = p.gifts;
       if (p.layout) data.layout = p.layout;
+      if (p.seen) data.seen = p.seen;
       const row = await st.applyPlanetDelta(this.s.planet.star, this.s.planet.planetIndex, p.embers, data);
       if (row) {
         this.s.embers = row.embers + this.s.pending.embers;
@@ -92,6 +93,7 @@ export class Saving {
       this.s.pending.buildings ??= p.buildings;
       this.s.pending.label ??= p.label; this.s.pending.biome ??= p.biome;
       this.s.pending.town ??= p.town; this.s.pending.layout ??= p.layout;
+      this.s.pending.seen ??= p.seen;
     } finally {
       this.saving = false;
     }

@@ -72,7 +72,8 @@ export class Talk {
   /** A press waiting in the player's attack buffer must not fire once the talk ends. */
   dropAttackBuffer() { (this.s.player as unknown as { attackBufferedUntil: number }).attackBufferedUntil = 0; }
 
-  openTalk(npc: Npc) {
+  /** Opens the talk box for this copy; `jumpTo` a page key ("letters:0") once its notes and letters are in. */
+  openTalk(npc: Npc, jumpTo?: string) {
     const box = this.talkBox, ui = this.s.scene.get('ui') as UIScene;
     if (!box) return;
     this.talkable?.setTalkHint(false);
@@ -93,7 +94,7 @@ export class Talk {
     box.show({ name: () => npc.data.name, color: () => this.visorOf(npc), look, seed: npc.voiceSeed, voice: () => npc.data.traits.voice }, this.talkPages());
     this.s.game.events.on('tell', this.onTell, this);
     // its notes and letters: SAYS shows at once while they load
-    session.store?.journal([npc.data.id]).then((j) => { if (this.talk === t) { t.journal = j; this.refreshTalk(); } }).catch((e) => console.warn('talk journal', e));
+    session.store?.journal([npc.data.id]).then((j) => { if (this.talk === t) { t.journal = j; this.refreshTalk(jumpTo); } }).catch((e) => console.warn('talk journal', e));
     // what it last wanted to tell you is old (or there is nothing): ask its mind for a fresh word
     const rt = this.requestTalkFn(), tell = npc.data.traits.tell;
     if (rt && !npc.blank && (!tell || Date.now() - tell.at > TALK.staleMinutes * 60_000)) {

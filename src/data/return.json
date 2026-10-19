@@ -1,0 +1,10 @@
+{
+  "_doc": "Coming back to a planet (src/scenes/planet/Homecoming.ts). After the landing or the fade-in, when you were away at least minAwayMinutes since you last saw it (planet_states.data.seen), the camera visits what changed, up to maxBeats: a copy that is new or has become itself, a building raised further (by at least buildingStep) or finished, new village builds, rooms dug below (shown at the hatch). Each beat: a panMs camera pan, a warm pulse, the maker hops, holdMs. Any key or click skips the rest. Letters to the original that arrived since then wait as glowing envelopes in front of the vessel (at most maxLetters); walking into one opens the sender's talk box on its letters (or the journal, for a copy on another world). seenEveryMs: how often what you see is written while you play.",
+  "minAwayMinutes": 60,
+  "maxBeats": 6,
+  "panMs": 650,
+  "holdMs": 900,
+  "buildingStep": 0.25,
+  "maxLetters": 5,
+  "seenEveryMs": 60000
+}

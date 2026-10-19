@@ -73,6 +73,7 @@ export class Departure {
     const fuel = fuelFor(ly);
     this.s.launching = true;
     this.s.hands.stow();
+    this.s.homecoming.remember();
     this.s.embers -= fuel;
     this.s.pending.embers -= fuel;
     this.s.game.events.emit('embers', this.s.embers);

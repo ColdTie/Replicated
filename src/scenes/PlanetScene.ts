@@ -27,7 +27,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
 import { Controls } from '../input/Controls';
-import type { AwayItem, Building, DoorState, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
+import type { AwayItem, SeenState, Building, DoorState, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
@@ -35,6 +35,7 @@ import { TOWN_TUNING, birthOrder, nextFreeLot, occupiedLots, type TownState } fr
 import { planetFor, starById } from '../world/galaxy';
 import { Departure } from './planet/Departure';
 import { Hands } from './planet/Hands';
+import { Homecoming } from './planet/Homecoming';
 import { Minds } from './planet/Minds';
 import { Saving } from './planet/Saving';
 import { Talk } from './planet/Talk';
@@ -112,7 +113,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[] } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState } = { embers: 0, nodes: {}, doors: {} };
   /** who lives on which lot of the town (planet_states.data.town) */
   townState: TownState = { lots: {}, civic: {} };
   /** this load moved an old save into the town: saved positions of the player and the copies are ignored once */
@@ -137,6 +138,7 @@ export class PlanetScene extends Phaser.Scene {
   readonly towner = new Town(this);
   readonly departure = new Departure(this);
   readonly hands = new Hands(this);
+  readonly homecoming = new Homecoming(this);
 
   constructor() { super('planet'); }
 
@@ -181,6 +183,7 @@ export class PlanetScene extends Phaser.Scene {
     this.player = undefined as unknown as Player;
     this.pending = { embers: 0, nodes: {}, doors: {} };
     this.hands.reset();
+    this.homecoming.reset();
     this.townState = { lots: {}, civic: {} };
     this.migrated = false;
     this.npcsLoaded = true;
@@ -576,6 +579,7 @@ export class PlanetScene extends Phaser.Scene {
           this.fx.dust(ex, ey + 2, 6);
           pl.locked = false;
           this.saver.markAwake();
+          this.homecoming.remember();
           this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
         },
       });
@@ -592,9 +596,8 @@ export class PlanetScene extends Phaser.Scene {
     this.time.delayedCall(450, () => {
       squash(this, pl.sprite, 0.7, 1.3, 140);
       this.fx.sparks(pl.x, pl.y - 8, PALETTE[10], 8);
-      pl.locked = false;
-      this.saver.markAwake();
       this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
+      this.homecoming.run(() => { pl.locked = false; this.saver.markAwake(); });
     });
   }
 
@@ -656,9 +659,8 @@ export class PlanetScene extends Phaser.Scene {
         pl.setPosition(ex, ey);
         squash(this, pl.sprite, 1.35, 0.7, 120);
         this.fx.dust(ex, ey + 2, 6);
-        pl.locked = false;
-        this.saver.markAwake();
         this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
+        this.homecoming.run(() => { pl.locked = false; this.saver.markAwake(); });
       },
     });
   }
@@ -755,6 +757,7 @@ export class PlanetScene extends Phaser.Scene {
     else this.village.update(time, 0, 0);
     this.updateVesselCue(time, dt);
     this.hands.update(time);
+    this.homecoming.update(time);
     this.warren.update(dt);
     if (time > this.hatchReadyAt && this.player.alive && !this.player.locked && !this.talker.talk && !this.stopped && this.warren.playerOnHatch()) this.descend();
     this.minds.tickMinds(dt);
