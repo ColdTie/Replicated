@@ -37,7 +37,7 @@ try {
     const n0 = s.hands.load?.n ?? 0;
     while (t.alive && swings < 12) { s.resolveAttack(t.x - 4, t.y - 4, 14, aim); swings++; await new Promise((r) => setTimeout(r, 150)); }
     // the wood flies over once the tree is down (a scene timer: slow at headless frame rates)
-    for (let i = 0; i < 40 && (s.hands.load?.n ?? 0) < n0 + 3; i++) await new Promise((r) => setTimeout(r, 100));
+    for (let i = 0; i < 150 && (s.hands.load?.n ?? 0) < n0 + 3; i++) await new Promise((r) => setTimeout(r, 100));
     return { swings, alive: t.alive, felled: (s.pending.felled ?? []).includes(t.index), load: s.hands.load && { ...s.hands.load } };
   });
   const one = await fell();
