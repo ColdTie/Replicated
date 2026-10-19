@@ -17,12 +17,14 @@ export class Saving {
 
   setupSaving() {
     const flushAll = () => { void this.flushPlanet(); void this.saveReplicant(); };
+    // closing the page: a carried load goes into the store first
+    const onLeave = () => { this.s.hands.stow(); flushAll(); };
     const onHide = () => { if (document.visibilityState === 'hidden') flushAll(); };
     document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pagehide', flushAll);
+    window.addEventListener('pagehide', onLeave);
     this.s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       document.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('pagehide', flushAll);
+      window.removeEventListener('pagehide', onLeave);
     });
   }
 

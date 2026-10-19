@@ -243,6 +243,14 @@ export class Npc {
     });
   }
 
+  /** The original handed it something, or works beside it: it turns to them and hops. */
+  thank() {
+    if (this.state === 'born' || this.state === 'below' || this.state === 'blank') return;
+    this.sprite.setFlipX(this.scene.player.x < this.x);
+    this.hop();
+    sound.pet();
+  }
+
   private hop() {
     this.scene.tweens.add({ targets: this, z: 6, duration: 140, yoyo: true, ease: 'Quad.easeOut' });
     squash(this.scene, this.sprite, 0.8, 1.2, 120);

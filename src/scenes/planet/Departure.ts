@@ -72,6 +72,7 @@ export class Departure {
     const ly = distanceLy(this.s.planet.star, to);
     const fuel = fuelFor(ly);
     this.s.launching = true;
+    this.s.hands.stow();
     this.s.embers -= fuel;
     this.s.pending.embers -= fuel;
     this.s.game.events.emit('embers', this.s.embers);

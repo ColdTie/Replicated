@@ -5,7 +5,7 @@
 // planet_states.data.buildings; blueprints share the warren's shape so a building can get an interior later.
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
-import { BUILDINGS, PALETTE } from '../core/data';
+import { BUILDINGS, PALETTE, SUPPLIES } from '../core/data';
 import { session } from '../core/session';
 import type { Light } from '../fx/Lighting';
 import type { Building, MindAction } from '../net/store';
@@ -215,12 +215,52 @@ export class Buildings {
     });
   }
 
-  private complete(b: Building, npc: Npc) {
+  /** Approved buildings not yet paid for whose cost includes this material: where a carried load is wanted. */
+  waitingFor(material: string) {
+    return this.list.filter((b) => !b.vetoed && !b.built && b.approved && !b.paid && material in b.cost);
+  }
+
+  /** The material a copy's own building is waiting for, if any (shown over its head when the original comes near). */
+  needOf(id: string): string | null {
+    const b = this.list.find((x) => x.by === id && !x.vetoed && !x.built && x.approved && !x.paid);
+    if (!b) return null;
+    return Object.keys(b.cost).find((m) => Math.floor(this.scene.supplies[m] ?? 0) < b.cost[m]) ?? null;
+  }
+
+  /** The original brought material: pay the building now if the store covers it. */
+  fund(b: Building) {
+    if (b.paid || this.scene.warren.shortage(b.cost)) return;
+    this.scene.warren.pay(b.cost);
+    b.paid = true;
+    this.save();
+    this.scene.mindLog.push({ t: this.scene.mindClock, text: `${b.name} has all it needs now and can be raised` });
+  }
+
+  /** The original swings at a building being raised: a blow worth hands.swingWorth of a copy's. True when it struck one. */
+  playerSwing(hx: number, hy: number, radius: number) {
+    const b = this.list.find((x) => !x.vetoed && !x.built && x.approved && x.paid
+      && Math.abs(hx - x.x) < x.w * 8 + radius && hy > x.y - x.h * 8 - radius - 10 && hy < x.y + radius);
+    if (!b) return false;
+    const me = session.replicant;
+    if (me && !b.helpers.includes(me.id)) b.helpers.push(me.id);
+    b.progress = Math.min(this.swingsFor(b), b.progress + SUPPLIES.hands.swingWorth);
+    const p = this.placed.get(b.id);
+    if (p) this.refresh(p, false);
+    this.scene.fx.sparks(hx, hy - 4, PALETTE[10], 4);
+    sound.hit();
+    // the copies at work there keep time with you
+    for (const n of this.workers.get(b.id) ?? []) if (Math.random() < 0.3) n.thank();
+    if (b.progress >= this.swingsFor(b)) this.complete(b);
+    else if (Math.random() < 0.2) this.save();
+    return true;
+  }
+
+  private complete(b: Building, npc?: Npc) {
     b.built = true;
     const p = this.placed.get(b.id);
     if (p) this.refresh(p, true);
     this.save();
-    const helpers = b.helpers.map((id) => this.scene.npcs.find((n) => n.data.id === id)?.data.name ?? 'someone');
+    const helpers = b.helpers.map((id) => this.scene.npcs.find((n) => n.data.id === id)?.data.name ?? (id === session.replicant?.id ? session.replicant.name : 'someone'));
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${b.name} is built (${helpers.join(', ')})` });
     if (this.scene.canHear()) this.scene.game.events.emit('notice', `${b.name.toUpperCase()} IS BUILT`);
     for (const n of this.scene.npcs) if (b.helpers.includes(n.data.id)) n.onWorked(n === npc);

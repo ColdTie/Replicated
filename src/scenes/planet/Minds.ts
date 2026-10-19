@@ -365,15 +365,7 @@ export class Minds {
       },
       done: () => {
         if (!tree.alive) return;
-        tree.alive = false;
-        tree.zone.destroy();
-        const dir = npc.x < tree.x ? 1 : -1;
-        this.s.tweens.add({ targets: tree.sprite, angle: 84 * dir, duration: 700, ease: 'Quad.easeIn', onComplete: () => {
-          this.s.fx.dust(tree.x + dir * 12, tree.y, 10);
-          if (Math.hypot(this.s.player.x - tree.x, this.s.player.y - tree.y) < 220) sound.stomp();
-          this.s.tweens.add({ targets: tree.sprite, alpha: 0, duration: 1200, delay: 600, onComplete: () => tree.sprite.destroy() });
-        } });
-        this.s.pending.felled = [...new Set([...(session.planet?.data.felled ?? []), ...(this.s.pending.felled ?? []), tree.index])];
+        this.s.hands.fell(tree, npc.x);
         this.s.time.delayedCall(1500, () => this.s.flyMaterial('wood', { x: tree.x, y: tree.y }, this.s.warren.hatch, SUPPLIES.treeWood));
         this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} cut down a tree near the base (${SUPPLIES.treeWood} wood)` });
         if (this.s.canHear()) this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} CUT DOWN A TREE`);
