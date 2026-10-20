@@ -101,7 +101,8 @@ The copies choose their names themselves, and the change applies on the spot.
 - 2026-10-18: lit antennae, shuttered lantern, glowing satchel, star shawl (`tools/data/granted-bodies.json`); Glint's
   ring of saplings and Sprout's garden by the Watchtower, on Earth.
 - 2026-10-19: proposals and the maker begin.
+- 2026-10-20: Dimmer's dim lantern (`dimlantern`, `tools/data/granted-bodies.json`). No proposals were open. The `mind` function was not redeployed (see Waiting for Steve).
 
 ## Waiting for Steve
 
-None.
+- Migration `0014_mind_runs.sql` is not applied (`mind_runs` does not exist), so the maker cannot read the minds' heartbeat. The repo's `mind` function is ahead of live v18 (S1, M3, M5) and `kit.json` now lists `dimlantern`; the maker leaves that deploy to Steve's go-ahead.

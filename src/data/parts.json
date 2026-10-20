@@ -946,7 +946,7 @@
     "t": 3
   },
   "accessory": {
-    "_doc": "Front pieces. anchor + rows like the back pieces; hand: true draws the rows at the right hand of each pose (offset). shutteredlantern (Shade: shuttered, a faint green glow) and glowsatchel (Gleaner: the ember it gathers glows inside) were drawn for their requests.",
+    "_doc": "Front pieces. anchor + rows like the back pieces; hand: true draws the rows at the right hand of each pose (offset). shutteredlantern (Shade: shuttered, a faint green glow), dimlantern (Dimmer: the same lantern almost shut, one dull umber coal) and glowsatchel (Gleaner: the ember it gathers glows inside) were drawn for their requests.",
     "variants": {
       "none": {
         "anchor": [
@@ -1014,6 +1014,18 @@
         "rows": [
           "kk",
           "kg",
+          "kk"
+        ]
+      },
+      "dimlantern": {
+        "hand": true,
+        "offset": [
+          0,
+          1
+        ],
+        "rows": [
+          "kk",
+          "km",
           "kk"
         ]
       },
