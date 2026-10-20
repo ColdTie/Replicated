@@ -541,3 +541,6 @@ would cost much of what it saves; decide on it after reading `?perf` on Steve's 
 - Verified: build, `tools/playtest-talk.mjs` (new: a click on a copy 70 px away and on its speech mark talks and does
   not swing; a click beside it or on a copy 150 px away swings; a mouse click on the touch talk button talks; an
   awakened copy reads the words) and the whole `npm test`.
+
+### Maker 2026-10-20
+- No change proposals open. One body request granted: Dimmer's "shuttered lantern glow only a little" is the new `dimlantern` part (one dull umber coal), written to its `traits.body`. `mind_runs` does not exist yet (migration 0014 waits for Steve), and the `mind` function was left at live v18; `kit.json` is regenerated for the next deploy. Verified: build, talk and town playtests, `screenshots/body-dimmer.png`.
