@@ -1,6 +1,8 @@
 {
-  "_doc": "Talking to a copy (E, right click, gamepad Y, the touch talk button). range: px from the player to the nearest copy you can talk to. The box: margin px from the screen edges, height px, lines of prose per page, linePx between lines; text types out at charsPerSecond, holding pauseMs after punctuation. staleMinutes: a traits.tell older than this asks the copy for a fresh one when the box opens (if the mind is there). thoughts: how many notes the THOUGHTS pages show; letters: how many letters to you, and one latest received and one latest sent. blip: the copy's voice per typed letter (minGapMs between blips, seconds long, vol).",
+  "_doc": "Talking to a copy (E, right click, gamepad Y, the touch talk button, or a left or right click on the copy itself). range: px from the player to the nearest copy you can talk to; clickRange: how far away a copy you click on can be; clickReopenMs: a click on a copy this soon after its box closed does nothing. The box: margin px from the screen edges, height px, lines of prose per page, linePx between lines; text types out at charsPerSecond, holding pauseMs after punctuation. staleMinutes: a traits.tell older than this asks the copy for a fresh one when the box opens (if the mind is there). thoughts: how many notes the THOUGHTS pages show; letters: how many letters to you, and one latest received and one latest sent. blip: the copy's voice per typed letter (minGapMs between blips, seconds long, vol).",
   "range": 34,
+  "clickRange": 96,
+  "clickReopenMs": 600,
   "box": { "margin": 8, "height": 90, "lines": 4, "linePx": 13 },
   "charsPerSecond": 40,
   "pauseMs": { ".": 200, "!": 200, "?": 200, ",": 90, ";": 110, ":": 110 },

@@ -1,8 +1,9 @@
 // Scripted headless playtest of talking to the copies, on a snapshot of Steve's Earth (its six copies, their real
 // notes and letters): walk up to a copy and its talk hint shows; E opens the talk box (SAYS, THOUGHTS, WANTS,
 // LETTERS), E / Space turn the pages, Left goes back, Esc closes and the copy goes back to what it was doing;
-// right click opens it too and no longer dashes (Shift still does); a blank copy has one wordless page; runes
-// until you can hear; R sends a reply as a letter and the copy's answer comes as a new page.
+// right click opens it too and no longer dashes (Shift still does); a left click on a copy a few steps away talks to
+// it; a blank copy has one wordless page; runes until you can hear (an awakened copy always can); R sends a reply as a
+// letter and the copy's answer comes as a new page.
 // Usage: npm run build && node tools/playtest-talk.mjs [seed.json] [journal.json]
 // (without arguments it seeds a small made-up Earth of its own)
 import { spawn } from 'node:child_process';
@@ -214,6 +215,60 @@ try {
   await page.waitForTimeout(400);
   log('dash', JSON.stringify({ moved: Math.round((await ev(() => window.__scene.player.x)) - d0.x), rightClickMoved: rc.moved, fps: await ev(() => Math.round(window.__game.loop.actualFps)) }));
 
+  // 6b. a left click on a copy a few steps away talks to it and does not swing; a click beside it, or on a copy too
+  // far away, swings as before
+  const onScreen = (id, dy) => ev(({ id, dy }) => {
+    const s = window.__scene, n = s.npcs.find((q) => q.data.id === id), v = s.cameras.main.worldView, r = s.game.canvas.getBoundingClientRect();
+    return { x: r.left + (n.x - v.x) * r.width / v.width, y: r.top + (n.y + dy - v.y) * r.height / v.height };
+  }, { id, dy });
+  // (the player stands on the vessel's boarding spot here: a plain click would board, so boarding is off for this step)
+  await ev(() => { const s = window.__scene; window.__interact = s.tryInteract; s.tryInteract = () => false; });
+  const clickAt = async (from, dy) => {
+    await ev((sp) => { window.__scene.player.setPosition(sp.x - sp.from, sp.y); window.__count.attack = 0; }, { ...spot, from });
+    await page.waitForTimeout(400);
+    const c = await onScreen(glintId, dy);
+    await page.mouse.click(c.x, c.y);
+    await page.waitForTimeout(400);
+    const r = { open: (await box()).open, who: await ev(() => window.__scene.talker.talk?.npc.data.name ?? null), swung: await ev(() => window.__count.attack) };
+    if (r.open) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); }
+    return r;
+  };
+  const near = await clickAt(70, -10), mark = await clickAt(70, -27), beside = await clickAt(70, -60), far = await clickAt(150, -10);
+  log('click', JSON.stringify({ near, mark, beside, far }));
+  if (!near.open || near.who !== 'Glint') fail('a left click on Glint 70 px away did not talk to it');
+  if (near.swung) fail('the click on a copy also swung');
+  if (!mark.open || mark.who !== 'Glint') fail('a click on the speech mark over Glint did not talk to it');
+  if (beside.open || !beside.swung) fail('a click beside the copy did not swing');
+  if (far.open || !far.swung) fail('a click on a copy out of reach opened the box');
+  // clicking through the last page with the cursor still on the copy: one click too many does not open it again
+  await ev((sp) => { window.__scene.player.setPosition(sp.x - 70, sp.y); }, spot);
+  await page.waitForTimeout(400);
+  const g = await onScreen(glintId, -10);
+  await page.mouse.click(g.x, g.y);
+  await page.waitForTimeout(300);
+  await ev(() => { window.__count.attack = 0; window.__scene.talker.closeTalk(); });
+  await page.waitForTimeout(150);
+  await page.mouse.click(g.x, g.y);
+  await page.waitForTimeout(300);
+  const extra = { open: (await box()).open, swung: await ev(() => window.__count.attack) };
+  log('click after close', JSON.stringify(extra));
+  if (extra.open || extra.swung) fail('a click on the copy just after its box closed opened it again or swung');
+  if (extra.open) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); }
+  // a touchscreen laptop shows the touch controls: a mouse click on the talk button talks
+  await ev((sp) => { const s = window.__scene; s.player.setPosition(sp.x - 24, sp.y); window.__count.attack = 0; s.game.scene.getScene('ui').touchUi.setVisible(true); }, spot);
+  await page.waitForFunction(() => window.__game.scene.getScene('ui').talkBtn.visible, null, { timeout: 3000 }).catch(() => fail('the touch talk button did not show'));
+  await page.waitForTimeout(300);
+  const tb = await ev(() => { const u = window.__game.scene.getScene('ui'), r = u.game.canvas.getBoundingClientRect(); return { x: r.left + u.talkBtn.x * r.width / u.scale.width, y: r.top + u.talkBtn.y * r.height / u.scale.height }; });
+  await page.mouse.click(tb.x, tb.y);
+  await page.waitForTimeout(400);
+  const btn = { open: (await box()).open, swung: await ev(() => window.__count.attack) };
+  log('talk button by mouse', JSON.stringify(btn));
+  if (!btn.open || btn.swung) fail('a mouse click on the touch talk button did not talk');
+  if (btn.open) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); }
+  await ev(() => window.__game.scene.getScene('ui').touchUi.setVisible(false));
+  // the swings above were meant: the tally at the end counts only presses that slipped through a talk
+  await ev(() => { window.__scene.tryInteract = window.__interact; window.__count.attack = 0; });
+
   // 7. a blank copy: one wordless page
   await ev(({ id, sp }) => {
     const s = window.__scene, n = s.npcs.find((q) => q.data.id === id);
@@ -251,6 +306,18 @@ try {
   await page.screenshot({ path: 'screenshots/talk-runes.png' });
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
+
+  // 8b. a copy a Spark awakened (traits.handedBy) was one of them: it reads their words without the module
+  await ev(() => { window.__session.replicant.traits.handedBy = 'p-giver'; });
+  await page.keyboard.press('KeyE');
+  await page.waitForTimeout(500);
+  await typed();
+  const heard = await ev(() => { const t = window.__game.scene.getScene('ui').talkBox; return { tones: t.page.lines.flat().map((s) => s.tone), text: t.page.lines.map((l) => l.map((s) => s.text).join('')).join(' ') }; });
+  log('awakened hears', heard.text.slice(0, 90));
+  if (heard.tones.includes('rune') || heard.text.includes('cannot read them yet')) fail('an awakened copy still saw runes');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  await ev(() => { delete window.__session.replicant.traits.handedBy; });
 
   // 9. R: a reply goes as a letter (no quick wake), the mind's talk wake answers as a new SAYS page
   await ev(() => {

@@ -35,14 +35,35 @@ export class Talk {
     return this.s.requestTalk;
   }
 
+  /** Nothing stops a talk right now (you are up, free, not leaving or replicating, the journal is shut). */
+  canTalk() {
+    const p = this.s.player;
+    return p.alive && !p.locked && !p.isHidden && !this.s.stopped && !this.s.launching && !this.s.replicating && !journalOpen() && !!this.talkBox;
+  }
+
   /** The copy you can talk to: the nearest one up here within reach (not being born, not below). */
   talkTarget(): Npc | null {
+    if (!this.canTalk()) return null;
     const p = this.s.player;
-    if (!p.alive || p.locked || p.isHidden || this.s.stopped || this.s.launching || this.s.replicating || journalOpen() || !this.talkBox) return null;
     let best: Npc | null = null, bd = TALK.range;
     for (const n of this.s.npcs) {
       if (n.below || n.state === 'born') continue;
       const d = Math.hypot(n.x - p.x, n.y - p.y);
+      if (d < bd) { bd = d; best = n; }
+    }
+    return best;
+  }
+
+  /** The copy under a mouse click (its body or the speech mark over it), if it stands within TALK.clickRange of you. */
+  copyAt(sx: number, sy: number): Npc | null {
+    if (!this.canTalk()) return null;
+    const w = this.s.cameras.main.getWorldPoint(sx, sy), p = this.s.player;
+    let best: Npc | null = null, bd = Infinity;
+    for (const n of this.s.npcs) {
+      if (n.below || n.state === 'born' || !n.sprite.visible) continue;
+      if (Math.abs(w.x - n.x) > 10 || w.y < n.y - 32 || w.y > n.y + 4) continue;
+      if (Math.hypot(n.x - p.x, n.y - p.y) > TALK.clickRange) continue;
+      const d = Math.hypot(w.x - n.x, w.y - (n.y - 10));
       if (d < bd) { bd = d; best = n; }
     }
     return best;
@@ -61,6 +82,11 @@ export class Talk {
       this.talkable = target;
       this.s.game.events.emit('talkable', target ? this.visorOf(target) : null);
     }
+    // a click on a copy talks to that one; E / right click anywhere talks to the nearest in reach. One more click on it
+    // just after clicking through the last page neither opens the box again nor swings.
+    const clicked = raw.click && (raw.attack || raw.interact) ? this.copyAt(raw.click.x, raw.click.y) : null;
+    if (clicked && time - this.talkClosedAt < TALK.clickReopenMs) return { ...raw, attack: false, dash: false, interact: false };
+    if (clicked) { this.openTalk(clicked); return NO_INPUT; }
     if (raw.interact && target) { this.openTalk(target); return NO_INPUT; }
     // the press that closed the box must not also swing, dash or board the vessel
     if (time - this.talkClosedAt < 150) return { ...raw, attack: false, dash: false, interact: false };

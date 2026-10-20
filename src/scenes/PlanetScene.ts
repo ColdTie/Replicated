@@ -1131,9 +1131,13 @@ export class PlanetScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ the copies' minds
 
-  /** The replicant can understand the copies: it holds the listening module (or ?hear=1 for screenshots). */
+  /**
+   * The replicant can understand the copies: it holds the listening module, or it was a copy itself until a Spark
+   * awakened it (traits.handedBy) and has always spoken their tongue (or ?hear=1 for screenshots).
+   */
   canHear() {
-    return !!session.replicant?.traits.mods?.includes('listen') || new URLSearchParams(location.search).has('hear');
+    const t = session.replicant?.traits;
+    return !!t?.mods?.includes('listen') || !!t?.handedBy || new URLSearchParams(location.search).has('hear');
   }
 
   /** "EARTH - SOL" or "TITAN - SATURN" */

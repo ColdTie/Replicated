@@ -2,7 +2,7 @@
 import Phaser from 'phaser';
 
 /** Shared touch state. UIScene writes it, PlanetScene reads it through Controls (the only reader that clears it). */
-export const touch = { x: 0, y: 0, actionQueued: false, active: false, dashQueued: false, dashX: 0, dashY: 0, interactQueued: false, replyQueued: false };
+export const touch = { x: 0, y: 0, actionQueued: false, active: false, dashQueued: false, dashX: 0, dashY: 0, interactQueued: false, replyQueued: false, click: null as { x: number; y: number } | null };
 
 export interface InputFrame {
   x: number;       // -1..1
@@ -19,6 +19,8 @@ export interface InputFrame {
   reply: boolean;
   /** Optional dash direction (touch swipe); otherwise the player uses its move or facing direction */
   dashDir?: { x: number; y: number };
+  /** where on the screen this frame's mouse click (left or right) landed: a click on a copy talks to it */
+  click?: { x: number; y: number };
 }
 
 const KEYS = {
@@ -70,7 +72,7 @@ export class Controls {
   /** Drops every press still waiting (a talk box just closed: the key that closed it must not also swing). */
   clear() {
     for (const k of Object.keys(this.queued) as (keyof typeof this.queued)[]) this.queued[k] = false;
-    touch.actionQueued = false; touch.dashQueued = false; touch.interactQueued = false; touch.replyQueued = false;
+    touch.actionQueued = false; touch.dashQueued = false; touch.interactQueued = false; touch.replyQueued = false; touch.click = null;
   }
 
   read(): InputFrame {
@@ -112,6 +114,7 @@ export class Controls {
     if (touch.actionQueued) { f.attack = true; touch.actionQueued = false; }
     if (touch.interactQueued) { f.interact = true; touch.interactQueued = false; }
     if (touch.replyQueued) { f.reply = true; touch.replyQueued = false; }
+    if (touch.click) { f.click = touch.click; touch.click = null; }
     if (touch.dashQueued) {
       f.dash = true;
       touch.dashQueued = false;

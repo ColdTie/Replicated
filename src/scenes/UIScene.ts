@@ -118,10 +118,18 @@ export class UIScene extends Phaser.Scene {
         else touch.actionQueued = true;
         return;
       }
-      // Mouse: left click attacks / interacts, right click talks to the copy beside you
+      // Mouse: left click attacks / interacts, right click talks to the copy beside you; either one on a copy talks to it
       if (!p.wasTouch) {
+        // a touchscreen laptop shows the touch talk button: a click on it talks too
+        if (onTalkBtn(p)) {
+          touch.interactQueued = true;
+          this.tweens.add({ targets: this.talkBtn, scale: { from: 0.8, to: 1 }, duration: 140, ease: 'Back.easeOut' });
+          return;
+        }
         if (p.button === 0) touch.actionQueued = true;
         else if (p.button === 2) touch.interactQueued = true;
+        else return;
+        touch.click = { x: p.x, y: p.y };
         return;
       }
       touch.active = true;
