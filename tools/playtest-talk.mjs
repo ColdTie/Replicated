@@ -242,12 +242,14 @@ try {
   if (far.open || !far.swung) fail('a click on a copy out of reach opened the box');
   // clicking through the last page with the cursor still on the copy: one click too many does not open it again
   await ev((sp) => { window.__scene.player.setPosition(sp.x - 70, sp.y); }, spot);
-  await page.waitForTimeout(400);
-  const g = await onScreen(glintId, -10);
+  await page.waitForTimeout(1500); // the camera eases after the jump
+  let g = await onScreen(glintId, -10);
   await page.mouse.click(g.x, g.y);
   await page.waitForTimeout(300);
+  if (!(await box()).open) fail('a click on Glint did not open the box');
   await ev(() => { window.__count.attack = 0; window.__scene.talker.closeTalk(); });
   await page.waitForTimeout(150);
+  g = await onScreen(glintId, -10);
   await page.mouse.click(g.x, g.y);
   await page.waitForTimeout(300);
   const extra = { open: (await box()).open, swung: await ev(() => window.__count.attack) };
