@@ -229,7 +229,8 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | mind | `temperament` | `{ pace, sociability, work, bedtime, risk }` (`set_temperament`): walking pace, greeting range, build vs wander, when it turns in, how far it ranges |
 | mind | `wants` | `[{ text, category, done, at }]` 1 to 3 goals in its own words (`set_wants` / `finish_want`) |
 | state | `blank` | born and not yet itself (grey, still; the first wake is the becoming) |
-| state | `awake`, `mods`, `sparks` | intro played; ruin modules; Sparks held |
+| state | `awake`, `mods`, `sparks` | intro played; ruin modules (`listen` reads the copies' words); Sparks held |
+| state | `handedBy` | the replicant that awakened this one with a Spark (it was a copy, so it reads the copies without `listen`) |
 | state | `cargo` | `{ material, n, from }` what the vessel's hold carries between worlds (supplies.json signature), or null |
 | state | `inherit` | `{ from, name, wants }`: born with a Spark beside that copy; it carries its notes and remembers being it |
 | state | `weary`, `sleptAt` | tiredness carried over; last sleep |
@@ -271,7 +272,8 @@ reach, a swing works on the village: a tree (6 swings fell it), rock (4 break of
 hand the load over. Stand on the open hatch for a moment (a warm ring fills) or press attack on it to go down; walking
 or dashing across it never does. Dash Shift/K/X, gamepad
 B/L1/R2, swipe on the right side. Talk to the copy beside you (a speech mark shows over it): E, right click, gamepad Y,
-or the touch talk button; in the box E / Space / Enter / click = next, Left = back, Esc / Tab / gamepad B = close,
+or the touch talk button (a mouse click on it works too, for touchscreen laptops); or click (left or right) on any copy
+within `talk.json clickRange` (96 px, six tiles) to talk to that one; in the box E / Space / Enter / click = next, Left = back, Esc / Tab / gamepad B = close,
 R = reply (a letter it answers at once). M or the speaker icon (top right) mutes.
 
 URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
@@ -527,3 +529,15 @@ would cost much of what it saves; decide on it after reading `?perf` on Steve's 
    M5's lattice; until it is deployed the live function is v18.
 2. GitHub: Settings > Branches > main: require the "test" status check, so a red PR (the maker's too) cannot merge.
 3. Play on the laptop with `?perf` once and say the numbers: they decide whether the ground paint gets a cache.
+
+### Session 16 (2026-10-20): clicking to talk on the laptop; Hearth reads the copies (Steve: "On PC I cant click to talk to other vessels", "they are talking in gibberish a little bit")
+- **Click to talk.** A left or right click on a copy (its body or the speech mark over it) within `talk.json clickRange`
+  (96 px) opens its talk box; before, a left click on a copy swung, and only a right click talked, to the nearest copy
+  within 34 px. A click anywhere else works as before. On a touchscreen laptop the touch controls show (Phaser reports
+  touch), and a mouse click on the touch talk button used to swing: it talks now.
+- **An awakened copy hears.** The runes are the "cannot read them yet" state until the listening module is found in a
+  ruin. Steve was playing Hearth (awakened with a Spark, `traits.handedBy`, no modules): a copy itself until then, so
+  `canHear()` is true for it now. Steve's original holds `listen` and is unchanged.
+- Verified: build, `tools/playtest-talk.mjs` (new: a click on a copy 70 px away and on its speech mark talks and does
+  not swing; a click beside it or on a copy 150 px away swings; a mouse click on the touch talk button talks; an
+  awakened copy reads the words) and the whole `npm test`.
