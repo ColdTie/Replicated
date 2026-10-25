@@ -104,7 +104,8 @@ try {
   // 5. a Spark awakens a copy: a profile in its name, its row active, the copy gone from the planet
   const woke = await ev(async () => {
     const s = window.__scene, st = window.__session.store, me = window.__session.replicant;
-    const n = s.npcs[2];
+    // a copy up here and itself (one down in the warren, or blank, is rightly refused)
+    const n = s.npcs.find((x, i) => i > 0 && !x.below && !x.blank) ?? s.npcs[2];
     const saved = await st.createReplicant({ ...n.data }); n.data.id = saved.id;
     me.traits.sparks = 1;
     s.shot = false;
@@ -112,7 +113,7 @@ try {
     s.shot = true;
     const profiles = await st.listProfiles();
     const row = st.db.replicants.find((r) => r.id === saved.id);
-    return { npcs: s.npcs.length, sparks: me.traits.sparks, profile: profiles.find((p) => p.id === row.profile_id)?.name, name: n.data.name, status: row.status };
+    return { npcs: s.npcs.length, sparks: me.traits.sparks, profile: profiles.find((p) => p.id === row.profile_id)?.name, name: n.data.name, status: row.status, below: !!n.below };
   });
   log('awaken', JSON.stringify(woke));
   if (woke.npcs !== 2 || woke.sparks !== 0 || woke.status !== 'active' || woke.profile !== woke.name) fail('the handoff did not happen');

@@ -37,15 +37,15 @@ export function distanceLy(a: string, b: string) {
   return Math.hypot(s.x - t.x, s.y - t.y, s.z - t.z);
 }
 
-/** Trip length in milliseconds. fixedSeconds > 0 makes every trip that long; otherwise real time (?fast: minutes become seconds). */
+/** Trip length in milliseconds: the cruise (travel.json, secondsPerLy for every light year), fixedSeconds when above
+ * 0, or real time (?fast: minutes become seconds). */
 export function travelMs(ly: number) {
   if (TRAVEL.fixedSeconds > 0) return TRAVEL.fixedSeconds * 1000;
   const c = TRAVEL.cruise;
   if (c.enabled) {
-    // ?fast: a cruise of a few seconds, for tests
+    // ?fast: a cruise a twelfth as long, for tests
     const k = new URLSearchParams(location.search).has('fast') ? 1000 / 12 : 1000;
-    if (ly < 0.01) return Math.round(c.inSystemSeconds * k);
-    return Math.round((c.minSeconds + (c.maxSeconds - c.minSeconds) * Math.sqrt(Math.min(1, ly / c.maxLy))) * k);
+    return Math.round((ly < 0.01 ? c.inSystemSeconds : ly * c.secondsPerLy) * k);
   }
   // a hop between planets of the same star is a short trip, not a free one
   const minutes = ly < 0.01 ? TRAVEL.inSystemMinutes : TRAVEL.minutesAtRef * Math.pow(ly / TRAVEL.refLy, TRAVEL.exponent);
@@ -55,10 +55,12 @@ export function travelMs(ly: number) {
 
 export const fuelFor = (ly: number) => Math.round(TRAVEL.fuelBase + TRAVEL.fuelPerLy * ly);
 
-/** "45 MIN", "9 H 40 MIN", "6 DAYS 2 H" */
+/** "40 SEC", "1 MIN 5 SEC", "45 MIN", "9 H 40 MIN", "6 DAYS 2 H" */
 export function formatDuration(ms: number) {
-  const m = Math.max(0, Math.round(ms / 60_000));
-  if (m < 1) return `${Math.max(0, Math.round(ms / 1000))} SEC`;
+  const sec = Math.max(0, Math.round(ms / 1000));
+  if (sec < 60) return `${sec} SEC`;
+  if (sec < 600) return sec % 60 ? `${Math.floor(sec / 60)} MIN ${sec % 60} SEC` : `${sec / 60} MIN`;
+  const m = Math.round(ms / 60_000);
   if (m < 60) return `${m} MIN`;
   const h = Math.floor(m / 60), mm = m % 60;
   if (h < 48) return mm ? `${h} H ${mm} MIN` : `${h} H`;

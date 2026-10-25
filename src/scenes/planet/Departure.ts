@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { sound } from '../../audio/Sound';
 import { PALETTE } from '../../core/data';
+import { inManny, mannyWorlds, shipFlying, worldKey } from '../../core/mannies';
 import { session } from '../../core/session';
 import { TRAVEL, distanceLy, fuelFor, travelMs } from '../../world/galaxy';
 import type { StarMapData } from '../StarMapScene';
@@ -19,9 +20,21 @@ export class Departure {
     return Math.abs(p.x - this.s.boardSpot.x) < 13 && Math.abs(p.y - this.s.boardSpot.y) < 9;
   }
 
-  /** Someone has to stay behind: you can launch once this planet has a copy (travel.json needCopy). */
+  /** Someone has to stay behind: you can launch once this planet has a copy (travel.json needCopy), from the vessel
+   * (not from its empty berth while you drive a manny and it waits elsewhere). */
   canLaunch() {
-    return !this.s.visit && (!TRAVEL.needCopy || this.s.npcs.length > 0);
+    return !this.s.visit && !this.s.vesselAway && (!TRAVEL.needCopy || this.s.npcs.length > 0);
+  }
+
+  /** Mannies on other worlds you could link into from here. */
+  private linkable() {
+    const s = this.s;
+    return mannyWorlds(session.replicant).filter((w) => w.star !== s.planet.star || w.planet !== s.planet.planetIndex);
+  }
+
+  /** The board ring glows: something to do there (launch, link, go back to the vessel or the ship). */
+  boardReady() {
+    return this.canLaunch() || !!this.s.visit || this.s.vesselAway || (!this.s.shot && this.linkable().length > 0);
   }
 
   tryBoard(): boolean {
@@ -30,7 +43,7 @@ export class Departure {
       void this.returnToShip();
       return true;
     }
-    if (!this.canLaunch()) {
+    if (!this.canLaunch() && !this.s.vesselAway && !this.linkable().length) {
       sound.denied();
       this.s.tweens.add({ targets: this.s.vessel, x: this.s.vessel.x + 1, duration: 40, yoyo: true, repeat: 3 });
       // hint without words: a ghost of a copy blinks by the Replicator (or the build pad)
@@ -42,13 +55,21 @@ export class Departure {
     this.s.player.locked = true;
     this.s.player.body.setVelocity(0, 0);
     sound.coreHum();
+    const r = session.replicant;
     const data: StarMapData = {
-      mode: 'launch',
+      mode: this.s.vesselAway ? 'link' : 'launch',
       from: this.s.planet.star,
       fromPlanet: this.s.planet.planetIndex,
       embers: this.s.embers,
       lit: this.s.litBeacons,
+      blocked: !this.canLaunch(),
+      mannies: mannyWorlds(r).map((w) => w.key),
+      inManny: inManny(r),
+      vessel: this.s.vesselAway ? r?.traits.ship ?? null : null,
+      journey: this.s.vesselAway && shipFlying(r?.traits.ship) ? r!.traits.ship!.journey : undefined,
       onLaunch: (to, planet) => this.launch(to, planet),
+      onLink: (to, planet) => this.s.linker.linkTo(to, planet),
+      onVessel: () => this.s.linker.toVessel(),
       onClose: () => { this.s.player.locked = false; this.s.scene.resume(); },
     };
     this.s.scene.pause();
@@ -72,6 +93,13 @@ export class Departure {
     const ly = distanceLy(this.s.planet.star, to);
     const fuel = fuelFor(ly);
     this.s.launching = true;
+    // driving this world's manny: it steps back into its dock and you board in your own body
+    const r = session.replicant;
+    if (r && inManny(r)) {
+      const key = worldKey(this.s.planet.star, this.s.planet.planetIndex);
+      if (r.traits.mannies?.[key]) r.traits.mannies = { ...r.traits.mannies, [key]: { at: r.traits.mannies[key].at } };
+      r.traits.ship = null;
+    }
     this.s.hands.stow();
     this.s.trade.loadHold();
     this.s.homecoming.remember();
