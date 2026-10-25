@@ -186,7 +186,7 @@ export class Minds {
       else if (dp < 170) out.push(`${me.name} is near`);
     }
     for (const n of this.s.npcs) if (n !== npc && !n.below && d(n) < 48) out.push(`${n.data.name} is beside you`);
-    const node = this.s.nodes.filter((n) => n.alive).sort((a, b) => d(a) - d(b))[0];
+    const node = this.s.nodes.filter((n) => n.alive && n.kind === 'ember').sort((a, b) => d(a) - d(b))[0];
     if (node && d(node) < 120) out.push(d(node) < 30 ? 'a crystal within reach' : 'a crystal a few steps away');
     if (d(this.s.warren.hatch) < 70 && this.s.warren.data.rooms.length) out.push(this.s.warren.opened ? 'the hatch down to the warren' : 'the dig mark where the warren will begin');
     if (this.s.base.built && d(this.s.replicatorSpot) < 70) out.push('the Replicator');

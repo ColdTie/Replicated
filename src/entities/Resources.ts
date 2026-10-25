@@ -7,63 +7,96 @@ import { flashWhite } from './Player';
 
 const EMBER = ITEMS.ember;
 
-/** Glowing crystal cluster. Hit it to chip off shards; the last hit shatters it. */
+/** What a node gives: an Ember crystal, iron ore or a hydrogen vent (items.json). */
+export type NodeKind = 'ember' | 'iron' | 'hydrogen';
+/** How hard each kind is to break, what it drops, and how it shines. */
+export const NODE: Record<NodeKind, { hits: number; perHit: number; onBreak: number; glow: number; spark: [number, number]; sprite: string; tinted: boolean }> = {
+  ember: { hits: EMBER.nodeHits, perHit: EMBER.nodeDropsPerHit, onBreak: EMBER.nodeDropsOnBreak, glow: PALETTE[9], spark: [PALETTE[10], PALETTE[11]], sprite: EMBER.nodeSprite, tinted: true },
+  iron: { hits: ITEMS.iron.nodeHits, perHit: ITEMS.iron.nodeDropsPerHit, onBreak: ITEMS.iron.nodeDropsOnBreak, glow: PALETTE[ITEMS.iron.glow], spark: [PALETTE[ITEMS.iron.spark[0]], PALETTE[ITEMS.iron.spark[1]]], sprite: ITEMS.iron.nodeSprite, tinted: false },
+  hydrogen: { hits: ITEMS.hydrogen.nodeHits, perHit: ITEMS.hydrogen.nodeDropsPerHit, onBreak: ITEMS.hydrogen.nodeDropsOnBreak, glow: PALETTE[ITEMS.hydrogen.glow], spark: [PALETTE[ITEMS.hydrogen.spark[0]], PALETTE[ITEMS.hydrogen.spark[1]]], sprite: ITEMS.hydrogen.nodeSprite, tinted: false },
+};
+
+/** A resource node. Hit it to chip off pickups; the last hit breaks it. An Ember crystal glows warm; iron ore is dark
+ *  rusted metal that glints now and then; a hydrogen vent holds a pink bubble of gas and lets smaller ones rise. */
 export class CrystalNode {
   readonly zone: Phaser.GameObjects.Zone;
   readonly sprite: Phaser.GameObjects.Sprite;
   private glow: Phaser.GameObjects.Image;
   private light: Light;
+  private bubbles?: Phaser.GameObjects.Particles.ParticleEmitter;
+  private def: (typeof NODE)[NodeKind];
   hits = 0;
 
-  constructor(private scene: PlanetScene, readonly x: number, readonly y: number, readonly index: number, startHits = 0) {
+  constructor(private scene: PlanetScene, readonly x: number, readonly y: number, readonly index: number, startHits = 0, readonly kind: NodeKind = 'ember') {
+    const d = this.def = NODE[kind];
     this.zone = scene.add.zone(x, y - 2, 12, 7);
     scene.physics.add.existing(this.zone, true);
-    this.sprite = scene.add.sprite(x, y + 2, tex(EMBER.nodeSprite, scene.planet.id), 0).setOrigin(0.5, 1).setDepth(100 + y);
-    this.glow = scene.add.image(x, y - 7, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.22).setScale(0.7).setDepth(6100);
-    this.light = scene.lighting.add({ x, y: y - 6, radius: 46, color: PALETTE[9], intensity: 0.85, flicker: 0.25 });
-    scene.tweens.add({ targets: this.glow, alpha: 0.12, duration: 1400 + Math.random() * 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.hits = Math.min(startHits, EMBER.nodeHits);
+    this.sprite = scene.add.sprite(x, y + 2, d.tinted ? tex(d.sprite, scene.planet.id) : d.sprite, 0).setOrigin(0.5, 1).setDepth(100 + y);
+    const metal = kind === 'iron';
+    this.glow = scene.add.image(x, y - 7, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(d.glow).setAlpha(metal ? 0.1 : 0.22).setScale(metal ? 0.5 : 0.7).setDepth(6100);
+    this.light = scene.lighting.add({ x, y: y - 6, radius: metal ? 30 : 46, color: d.glow, intensity: metal ? 0.5 : 0.85, flicker: metal ? 0.05 : 0.25 });
+    scene.tweens.add({ targets: this.glow, alpha: metal ? 0.04 : 0.12, duration: 1400 + Math.random() * 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    if (kind === 'hydrogen') {
+      // small bubbles of gas leave the vent and rise, fading
+      this.bubbles = scene.add.particles(x, y - 5, 'px', {
+        frequency: 420 + Math.random() * 200, lifespan: { min: 900, max: 1500 }, speedY: { min: -16, max: -8 }, speedX: { min: -4, max: 4 },
+        scale: { start: 0.9, end: 0.3 }, alpha: { start: 0.85, end: 0 }, tint: [PALETTE[29], PALETTE[28], PALETTE[19]], blendMode: Phaser.BlendModes.ADD,
+      }).setDepth(6090);
+    }
+    if (metal) {
+      // a cold glint runs over the metal every few seconds
+      scene.time.addEvent({ delay: 1800 + Math.random() * 2400, loop: true, callback: () => {
+        const p = scene.player;
+        if (!this.alive || !p || Math.hypot(p.x - x, p.y - y) > 260) return;
+        const g = scene.add.image(x - 3 + Math.round(Math.random() * 6), y - 6 - Math.round(Math.random() * 4), 'px1').setDepth(6150).setBlendMode(Phaser.BlendModes.ADD).setScale(1);
+        scene.tweens.add({ targets: g, scaleX: 5, alpha: { from: 1, to: 0 }, duration: 260, ease: 'Quad.easeOut', onComplete: () => g.destroy() });
+      } });
+    }
+    this.hits = Math.min(startHits, d.hits);
     if (this.hits) this.applyStage(false);
   }
 
   /** Visuals for the current damage stage (used on hit and when restoring a save). */
   private applyStage(animate: boolean) {
-    this.sprite.setFrame(Math.min(3, this.hits));
-    const left = 1 - this.hits / EMBER.nodeHits;
-    this.light.radius = 20 + 26 * left;
-    this.light.intensity = 0.4 + 0.45 * left;
+    this.sprite.setFrame(Math.min(3, Math.round(this.hits / this.def.hits * 3)));
+    const left = 1 - this.hits / this.def.hits;
+    const metal = this.kind === 'iron';
+    this.light.radius = (metal ? 14 : 20) + (metal ? 16 : 26) * left;
+    this.light.intensity = (metal ? 0.25 : 0.4) + (metal ? 0.25 : 0.45) * left;
+    if (this.alive) this.bubbles?.setFrequency(420 + 700 * (1 - left));
     if (this.alive) return;
     (this.zone.body as Phaser.Physics.Arcade.StaticBody).enable = false;
     this.scene.tweens.killTweensOf(this.glow);
+    this.bubbles?.stop();
     if (!animate) {
       this.glow.setAlpha(0);
       this.light.intensity = 0.15;
       this.light.radius = 16;
       return;
     }
-    this.scene.fx.sparks(this.x, this.y - 8, PALETTE[11], 16);
+    this.scene.fx.sparks(this.x, this.y - 8, this.def.spark[1], 16);
     this.scene.tweens.add({ targets: this.glow, alpha: 0, duration: 500 });
     this.scene.tweens.add({ targets: this.light, intensity: 0.15, radius: 16, duration: 800 });
   }
 
-  get alive() { return this.hits < EMBER.nodeHits; }
+  get alive() { return this.hits < this.def.hits; }
 
   hit(dir: Phaser.Math.Vector2) {
     if (!this.alive) return;
     this.hits++;
     flashWhite(this.scene, this.sprite, 70);
     this.scene.tweens.add({ targets: this.sprite, x: this.x + dir.x * 2, duration: 40, yoyo: true, repeat: 1 });
-    this.scene.fx.sparks(this.x, this.y - 8, PALETTE[10], 8);
-    const drops = this.alive ? EMBER.nodeDropsPerHit : EMBER.nodeDropsOnBreak;
-    for (let i = 0; i < drops; i++) this.scene.spawnShard(this.x, this.y - 4, dir);
+    this.scene.fx.sparks(this.x, this.y - 8, this.def.spark[0], 8);
+    const drops = this.alive ? this.def.perHit : this.def.onBreak;
+    for (let i = 0; i < drops; i++) this.scene.spawnShard(this.x, this.y - 4, dir, this.kind);
     this.applyStage(true);
     this.scene.onNodeHit(this);
   }
 }
 
-/** Ember shard pickup: pops out, bobs, then flies to the player once close. In flight it shimmers in a shifting
- *  rainbow and passes through anything in the way; just before it reaches you it glitches like a bad teleport
- *  (jitter, flicker, a red/cyan split and static pixels). */
+/** A pickup: pops out, bobs, then flies to the player once close. An Ember shard shimmers in a shifting rainbow in
+ *  flight and passes through anything in the way; just before it reaches you it glitches like a bad teleport (jitter,
+ *  flicker, a red/cyan split and static pixels). Iron falls heavy and gleams; hydrogen floats up and drifts. */
 export class Shard {
   readonly sprite: Phaser.GameObjects.Sprite;
   private glow: Phaser.GameObjects.Image;
@@ -82,19 +115,25 @@ export class Shard {
   x: number;
   y: number;
 
-  constructor(private scene: PlanetScene, x: number, y: number, dir?: Phaser.Math.Vector2) {
+  /** how strongly it falls back to the ground (hydrogen hardly does) */
+  private gravity = 320;
+
+  constructor(private scene: PlanetScene, x: number, y: number, dir?: Phaser.Math.Vector2, readonly kind: NodeKind = 'ember') {
     this.x = x; this.y = y;
     const a = (dir ? Math.atan2(dir.y, dir.x) : Math.random() * Math.PI * 2) + (Math.random() - 0.5) * 2.2;
-    const sp = 40 + Math.random() * 45;
+    const sp = (kind === 'iron' ? 30 : 40) + Math.random() * 45;
     this.vx = Math.cos(a) * sp;
     this.vy = Math.sin(a) * sp;
     this.vz = 70 + Math.random() * 40;
-    this.sprite = scene.add.sprite(x, y, 'shard').setOrigin(0.5, 0.5);
-    this.sprite.play({ key: anim('shard', 'twinkle'), startFrame: Math.floor(Math.random() * 6) });
-    this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.3).setScale(0.35).setDepth(6100);
+    if (kind === 'hydrogen') { this.gravity = 60; this.vz = 30 + Math.random() * 20; }
+    const key = kind === 'ember' ? 'shard' : ITEMS[kind].sprite;
+    const color = NODE[kind].glow;
+    this.sprite = scene.add.sprite(x, y, key).setOrigin(0.5, 0.5);
+    this.sprite.play({ key: anim(key, 'twinkle'), startFrame: Math.floor(Math.random() * 3) });
+    this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(color).setAlpha(kind === 'iron' ? 0.15 : 0.3).setScale(0.35).setDepth(6100);
     // chromatic-split ghosts, only shown during the glitch right before pickup
-    this.ghosts = [0xff3060, 0x30f0ff].map((c) => scene.add.image(x, y, 'shard').setTintFill(c).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(6140));
-    this.light = scene.lighting.add({ x, y, radius: 16, color: PALETTE[9], intensity: 0.7 });
+    this.ghosts = kind === 'ember' ? [0xff3060, 0x30f0ff].map((c) => scene.add.image(x, y, 'shard').setTintFill(c).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(6140)) : [];
+    this.light = scene.lighting.add({ x, y, radius: 16, color, intensity: kind === 'iron' ? 0.4 : 0.7 });
     this.readyAt = scene.time.now + EMBER.pickupDelayMs;
   }
 
@@ -118,7 +157,7 @@ export class Shard {
     } else {
       // bounce on the ground and slide to a stop
       if (this.z > 0 || this.vz > 0) {
-        this.vz -= 320 * s;
+        this.vz -= this.gravity * s;
         this.z = Math.max(0, this.z + this.vz * s);
         if (this.z === 0) { this.vz = Math.abs(this.vz) > 30 ? -this.vz * 0.4 : 0; }
       }
@@ -129,16 +168,18 @@ export class Shard {
       if (this.scene.isWalkable(this.x, ny)) this.y = ny; else this.vy *= -0.5;
     }
 
-    const bob = !this.homing && this.z === 0 && this.vz === 0 ? Math.sin(time / 260 + this.x) * 1.5 + 2 : 0;
-    let rx = Math.round(this.x), ry = Math.round(this.y - this.z - bob);
+    // hydrogen hovers higher and sways; iron lies still
+    const resting = !this.homing && this.z === 0 && this.vz === 0;
+    const bob = !resting ? 0 : this.kind === 'hydrogen' ? Math.sin(time / 380 + this.x) * 2.5 + 6 : this.kind === 'iron' ? 0 : Math.sin(time / 260 + this.x) * 1.5 + 2;
+    let rx = Math.round(this.x + (resting && this.kind === 'hydrogen' ? Math.sin(time / 610 + this.y) * 1.5 : 0)), ry = Math.round(this.y - this.z - bob);
     this.sprite.setDepth(100 + this.y + (this.homing ? 30 : 0));
 
-    if (this.homing) this.glitchLook(time, d, rx, ry);
+    if (this.homing && this.kind === 'ember') this.glitchLook(time, d, rx, ry);
     else {
       this.sprite.clearTint().setAlpha(1).setScale(1);
       for (const g of this.ghosts) g.setAlpha(0);
     }
-    if (this.homing && d < 26) {
+    if (this.homing && d < 26 && this.kind === 'ember') {
       // teleport jitter right before pickup
       const t = 1 - d / 26;
       rx += Math.round((Math.random() * 2 - 1) * (1 + 2 * t));
@@ -197,8 +238,8 @@ export class Shard {
 
   private collect() {
     this.collected = true;
-    this.teleportFlash();
-    this.scene.collectShard(this.x, this.y);
+    if (this.kind === 'ember') this.teleportFlash();
+    this.scene.collectShard(this.x, this.y, this.kind);
     this.destroy();
   }
 

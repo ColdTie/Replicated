@@ -2,7 +2,7 @@
 // town at the landing site (src/world/town.ts) kept open: no rock, water, ruins, creatures or crystals on it.
 import type { PlanetDef } from '../core/data';
 import { fbm, mulberry32, randInt, type Rng } from '../core/rng';
-import { BEACON } from '../core/data';
+import { BEACON, ITEMS, MANNY } from '../core/data';
 import { TOWN_TUNING, layoutTown, townMask, type Town } from './town';
 
 export const enum Cell { Void = 0, Floor = 1, Rock = 2, Ruin = 3, Water = 4 }
@@ -31,6 +31,8 @@ export interface PlanetMap {
   walls: number[][];
   spawn: Point;               // tile coords of the landing site
   nodes: Point[];             // tile coords
+  /** Iron ore and hydrogen vents (items.json), tile coords; their node indexes follow the crystals' */
+  ores: (Point & { kind: 'iron' | 'hydrogen' })[];
   enemies: { type: string; x: number; y: number }[];
   decor: { frame: number; x: number; y: number }[]; // pixel coords (feet)
   glows: { x: number; y: number; kind: 'door' | 'mushroom' | 'machine' }[];
@@ -41,7 +43,7 @@ export interface PlanetMap {
   /** Ruins: sealed door (feet), broken machine holding a core (feet), spot inside where the reward appears */
   ruins: { door: Point; machine: Point; inside: Point }[];
   /** Fixed base layout around the landing site, pixel coords */
-  base: { vessel: Point; cradle: Point; pad: Point; center: Point };
+  base: { vessel: Point; cradle: Point; pad: Point; center: Point; dock: Point };
   /** Beacon worlds: the monolith (feet, pixels), where its keeper sleeps, and the stone plaza (tiles) */
   beacon?: { x: number; y: number; guardian: Point; plaza: { x: number; y: number; w: number; h: number } };
   /** The town around the base: square, streets, lots, lamp spots, the hatch (src/world/town.ts) */
@@ -385,12 +387,63 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
     }
   }
 
+  // 12. Iron ore in the rock and hydrogen vents by the water and in the open (items.json iron / hydrogen), a few of
+  // each just off the town's lots so the first manny is never far. Own rng and placed last, so nothing else on a
+  // world moves and saved crystal damage keeps its indexes (ore nodes are numbered after the crystals).
+  const ores: PlanetMap['ores'] = [];
+  {
+    const r5 = mulberry32(seed ^ 0x0fe2);
+    const blocked = new Set<number>();
+    for (const p of [...taken, ...nodes]) blocked.add(idx(p.x, p.y));
+    for (const b of blockers) blocked.add(idx(Math.floor(b.x / 16), Math.floor(b.y / 16)));
+    for (const d of decor) if (d.frame === DECOR.mushroom || d.frame === DECOR.pod || d.frame === DECOR.pillar) blocked.add(idx(Math.floor(d.x / 16), Math.floor((d.y - 1) / 16)));
+    if (beacon) {
+      const pl = beacon.plaza;
+      for (let y = pl.y; y < pl.y + pl.h; y++) for (let x = pl.x; x < pl.x + pl.w; x++) blocked.add(idx(x, y));
+    }
+    const near = (x: number, y: number, d: number, c: Cell) => {
+      for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) if (at(x + dx, y + dy) === c) return true;
+      return false;
+    };
+    const free = (x: number, y: number) => x >= 2 && y >= 2 && x < w - 2 && y < h - 2 && isOpen(x, y) && !ruinFloor[idx(x, y)]
+      && !blocked.has(idx(x, y)) && townFar(x, y, keep.crystals) && farFrom(x, y, ores, 3) && farFrom(x, y, nodes, 2);
+    // iron in the rock; hydrogen by the water, or out in the open where a world has none
+    const likes = {
+      iron: (x: number, y: number) => near(x, y, 2, Cell.Rock),
+      hydrogen: (x: number, y: number) => near(x, y, 3, Cell.Water) || !near(x, y, 3, Cell.Rock),
+    };
+    const b = town.bounds, g = town.margin;
+    const quarters = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+    for (const kind of ['iron', 'hydrogen'] as const) {
+      const item = ITEMS[kind];
+      // starters: one per quarter between the streets, hugging the lots (iron and hydrogen start in opposite quarters)
+      for (let i = 0, attempt = 0; i < item.starters && attempt < 400 * item.starters; attempt++) {
+        const [qx, qy] = quarters[(i + (kind === 'iron' ? 0 : 3)) % 4];
+        const x = Math.round(cx + qx * (3 + r5() * (b.w / 2 + g + 2))), y = Math.round(cy + qy * (3 + r5() * (b.h / 2 + g + 2)));
+        if (!free(x, y) || (townFar(x, y, keep.crystals + 3) && attempt % 400 < 300)) continue;
+        ores.push({ x, y, kind }); i++;
+      }
+      // the rest across the island, most of them where this kind likes to be
+      const total = Math.round(item.perWorld * def.resourceNodes / 30);
+      for (let attempt = 0, placed = 0; attempt < total * 120 && placed < total; attempt++) {
+        const x = randInt(r5, 2, w - 3), y = randInt(r5, 2, h - 3);
+        if (!free(x, y) || Math.hypot(x - cx, y - cy) < 8) continue;
+        if (attempt < total * 80 && !likes[kind](x, y)) continue;
+        ores.push({ x, y, kind }); placed++;
+      }
+    }
+    // grass and pebbles under a node give way to it
+    const oreAt = new Set(ores.map((o) => idx(o.x, o.y)));
+    for (let i = decor.length - 1; i >= 0; i--) if (oreAt.has(idx(Math.floor(decor[i].x / 16), Math.floor((decor[i].y - 1) / 16)))) decor.splice(i, 1);
+  }
+
   const c = { x: cx * 16 + 8, y: cy * 16 + 8 };
   const base = {
     center: c,
     vessel: { x: c.x - 40, y: c.y - 6 },
     cradle: { x: c.x, y: c.y + 22 },
     pad: { x: c.x + 46, y: c.y + 12 },
+    dock: { x: c.x + MANNY.dock[0], y: c.y + MANNY.dock[1] },
   };
-  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, enemies, decor, glows, props, blockers, ruins, base, beacon, town, townMask: tmask };
+  return { w, h, cells, ground, walls, spawn: { x: cx, y: cy }, nodes, ores, enemies, decor, glows, props, blockers, ruins, base, beacon, town, townMask: tmask };
 }

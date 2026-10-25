@@ -14,6 +14,7 @@ import warrenJson from '../data/warren.json';
 import suppliesJson from '../data/supplies.json';
 import needsJson from '../data/needs.json';
 import buildingsJson from '../data/buildings.json';
+import mannyJson from '../data/manny.json';
 
 export interface PlanetDef {
   id: string;
@@ -72,6 +73,7 @@ export const NEEDS = needsJson;
 export const BUILDINGS = buildingsJson;
 export const BEACON = beaconJson;
 export const MIND = mindJson;
+export const MANNY = mannyJson;
 export type GuardianDef = (typeof beaconJson)['guardian'];
 
 export const hex = (s: string) => parseInt(s, 16);

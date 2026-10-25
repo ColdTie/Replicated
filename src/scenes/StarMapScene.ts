@@ -9,15 +9,26 @@ import { Globe } from '../fx/Globe';
 import type { Journey, ReplicantSummary } from '../net/store';
 import { BEACONS, STAR_LIST, defaultPlanetIndex, distanceLy, formatDuration, fuelFor, planetFor, starById, travelMs, type Star } from '../world/galaxy';
 import { systemFor, type SystemPlanet } from '../world/system';
+import { shipFlying } from '../core/mannies';
 
 export interface StarMapData {
-  mode: 'launch' | 'view';
+  /** launch: at the vessel; view: from the ship in flight; link: at the empty berth while the vessel is elsewhere */
+  mode: 'launch' | 'view' | 'link';
   from: string;          // star the ship is at (or flying from)
   fromPlanet?: number;   // planet the ship is at
   embers?: number;       // fuel available (launch mode)
   journey?: Journey;     // the flight in progress (view mode)
   lit?: string[];        // beacon stars the family has lit
+  /** launching is not possible from here yet (someone has to stay behind: travel.json needCopy) */
+  blocked?: boolean;
+  /** worlds with your manny ('star:planet', manny.json), and whether you drive one right now */
+  mannies?: string[];
+  inManny?: boolean;
+  /** where your vessel waits while you drive a manny (link mode) */
+  vessel?: { star: string; planet: number; journey?: Journey } | null;
   onLaunch?: (to: string, planet: number) => void;
+  onLink?: (to: string, planet: number) => void;
+  onVessel?: () => void;
   onClose?: () => void;
 }
 
@@ -44,6 +55,8 @@ export class StarMapScene extends Phaser.Scene {
   private infoText!: Phaser.GameObjects.BitmapText;
   private title!: Phaser.GameObjects.BitmapText;
   private launchBtn!: Phaser.GameObjects.Container;
+  private linkBtn!: Phaser.GameObjects.Container;
+  private vesselBtn!: Phaser.GameObjects.Container;
   private backBtn!: Phaser.GameObjects.Container;
   private dragging = false;
   private lastInputAt = 0;
@@ -59,6 +72,8 @@ export class StarMapScene extends Phaser.Scene {
   private sysItems: SysItem[] = [];
   private selPlanet: SystemPlanet | null = null;
   private nextGlobeAt = 0;
+  /** your visor color: the mannies and the LINK button wear it */
+  private visor = PALETTE[10];
 
   constructor() { super('starmap'); }
 
@@ -73,6 +88,22 @@ export class StarMapScene extends Phaser.Scene {
     const s = starById(d.from) ?? STAR_LIST[0];
     this.center = { x: s.x, y: s.y, z: s.z };
     this.zoom = 1;
+    this.visor = PALETTE[session.replicant?.traits.feature ?? session.profile?.feature_color ?? 10] ?? PALETTE[10];
+  }
+
+  /** A little body in your visor color beside a world where a manny of yours waits; a small ship where your vessel does. */
+  private drawMarks(g: Phaser.GameObjects.Graphics, x: number, y: number, r: number, manny: boolean, vessel: boolean) {
+    if (manny) {
+      const mx = Math.round(x + r + 3), my = Math.round(y - r - 7);
+      g.fillStyle(PALETTE[25], 0.85).fillRect(mx - 1, my - 1, 5, 7);
+      g.fillStyle(PALETTE[20], 1).fillRect(mx, my, 3, 5);
+      g.fillStyle(this.visor, 1).fillRect(mx, my + 1, 3, 1);
+    }
+    if (vessel) {
+      const vx = Math.round(x - r - 6), vy = Math.round(y - r - 4);
+      g.fillStyle(PALETTE[9], 1).fillTriangle(vx, vy - 3, vx + 3, vy + 2, vx - 3, vy + 2);
+      g.fillStyle(PALETTE[11], 0.6 + 0.4 * Math.sin(this.t * 5)).fillRect(vx - 1, vy + 2, 2, 2);
+    }
   }
 
   create() {
@@ -106,9 +137,27 @@ export class StarMapScene extends Phaser.Scene {
     const ring = this.add.circle(0, 0, 24, PALETTE[24], 0.7).setStrokeStyle(2, PALETTE[9]);
     const core = this.add.circle(0, 0, 16, PALETTE[9], 0.5);
     const icon = this.add.image(0, 2, 'vessel', 0).setScale(0.75);
-    this.launchBtn = this.add.container(w - 40, h - 40, [ring, core, icon]).setSize(56, 56).setVisible(false).setDepth(5000);
+    const label = (text: string, color: number) => this.add.bitmapText(0, 27, 'pixel', text).setOrigin(0.5, 0).setTint(color);
+    this.launchBtn = this.add.container(w - 40, h - 44, [ring, core, icon, label('LAUNCH', PALETTE[9])]).setSize(56, 56).setVisible(false).setDepth(5000);
     this.launchBtn.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.launch());
     this.tweens.add({ targets: core, alpha: 0.2, duration: 700, yoyo: true, repeat: -1 });
+
+    // Link (a manny waits on the picked world): a ring in your visor color around a little body
+    const visor = this.visor;
+    const lcore = this.add.circle(0, 0, 13, PALETTE[28], 0.45);
+    const figure = this.add.graphics();
+    figure.fillStyle(PALETTE[20]).fillRect(-3, -8, 6, 5).fillRect(-4, -2, 8, 7).fillRect(-3, 5, 2, 4).fillRect(1, 5, 2, 4);
+    figure.fillStyle(visor).fillRect(-2, -7, 4, 2);
+    this.linkBtn = this.add.container(w - 100, h - 44, [this.add.circle(0, 0, 20, PALETTE[24], 0.7).setStrokeStyle(2, visor), lcore, figure, label('LINK', visor)])
+      .setSize(46, 46).setVisible(false).setDepth(5000);
+    this.linkBtn.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.link());
+    this.tweens.add({ targets: lcore, alpha: 0.15, duration: 800, yoyo: true, repeat: -1 });
+
+    // Back to your own body aboard the vessel (link mode: you drive a manny and the vessel waits elsewhere)
+    this.vesselBtn = this.add.container(w - 40, h - 44, [this.add.circle(0, 0, 24, PALETTE[24], 0.7).setStrokeStyle(2, visor), this.add.circle(0, 0, 16, PALETTE[9], 0.35),
+      this.add.image(0, 2, 'vessel', 0).setScale(0.75), label(this.d.vessel && shipFlying(this.d.vessel) ? 'TO SHIP' : 'TO VESSEL', visor)])
+      .setSize(56, 56).setVisible(this.d.mode === 'link' && !!this.d.vessel).setDepth(5000);
+    this.vesselBtn.setInteractive({ useHandCursor: true }).on('pointerdown', () => { const cb = this.d.onVessel; this.scene.stop(); cb?.(); });
 
     // Input: drag to rotate, tap to select, pinch / wheel to zoom
     let downAt = { x: 0, y: 0, t: 0 };
@@ -157,8 +206,39 @@ export class StarMapScene extends Phaser.Scene {
     if (this.d.journey) this.discovered.add(this.d.journey.from_star);
 
     // Title
-    this.title = this.add.bitmapText(w / 2, 10, 'pixel', this.d.mode === 'launch' ? 'WHERE TO?' : 'STAR MAP').setOrigin(0.5, 0).setTint(PALETTE[21]).setDepth(5000);
+    this.title = this.add.bitmapText(w / 2, 10, 'pixel', this.titleText()).setOrigin(0.5, 0).setTint(PALETTE[21]).setDepth(5000);
     sound.coreHum();
+  }
+
+  private titleText() {
+    return this.d.mode === 'launch' ? 'WHERE TO?' : this.d.mode === 'link' ? 'YOUR MANNIES' : 'STAR MAP';
+  }
+
+  /** The planet of this star where a manny of yours waits (the given one if it has one), or null. */
+  private mannyAt(star: string, planet?: number) {
+    const keys = this.d.mannies ?? [];
+    if (planet !== undefined) return keys.includes(`${star}:${planet}`) ? planet : null;
+    const k = keys.find((x) => x.slice(0, x.lastIndexOf(':')) === star);
+    return k ? Number(k.slice(k.lastIndexOf(':') + 1)) : null;
+  }
+
+  /** Where a link from the current selection would go: a world with your manny that is not this one. */
+  private linkTarget(): { star: string; planet: number } | null {
+    if (!this.d.onLink) return null;
+    const star = this.view === 'system' ? this.sysStar : this.selected;
+    if (!star) return null;
+    const planet = this.view === 'system' ? (this.selPlanet ? this.mannyAt(star.id, this.selPlanet.index) : null) : this.mannyAt(star.id);
+    if (planet === null) return null;
+    if (this.d.mode !== 'view' && this.isHere(star.id, planet)) return null;
+    return { star: star.id, planet };
+  }
+
+  link() {
+    const t = this.linkTarget();
+    if (!t) return;
+    const cb = this.d.onLink;
+    this.scene.stop();
+    cb?.(t.star, t.planet);
   }
 
   private pinching() {
@@ -186,7 +266,8 @@ export class StarMapScene extends Phaser.Scene {
 
   private tap(x: number, y: number) {
     const { width: w, height: h } = this.scale;
-    if ((x > w - 70 && y > h - 70 && this.launchBtn.visible) || (x > w - 30 && y < 30) || (x < 30 && y < 30 && this.backBtn.visible)) return; // buttons
+    if ((x > w - 70 && y > h - 76 && (this.launchBtn.visible || this.vesselBtn.visible)) || (x > w - 126 && x < w - 74 && y > h - 72 && this.linkBtn.visible)
+      || (x > w - 30 && y < 30) || (x < 30 && y < 30 && this.backBtn.visible)) return; // buttons
     if (this.info.visible && x < this.info.x + (this.info.list[0] as Phaser.GameObjects.Rectangle).width && y > this.info.y) return;
     if (this.view === 'system') { this.tapPlanet(x, y); return; }
     let best: Projected | null = null, bd = 18;
@@ -231,7 +312,10 @@ export class StarMapScene extends Phaser.Scene {
         if (s.id !== this.d.from) lines.push(`${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
         const known = planets.some((p) => p.real);
         lines.push(`${planets.length} ${planets.length === 1 ? 'WORLD' : 'WORLDS'}${known ? ' KNOWN TO ASTRONOMERS' : ''}  - TAP FOR PLANETS`);
-        if (this.d.mode === 'launch' && s.id !== this.d.from) lines.push(`FUEL ${fuel} OF ${this.d.embers ?? 0}`);
+        if (this.d.mode === 'launch' && s.id !== this.d.from) lines.push(this.d.blocked ? 'A COPY MUST STAY BEHIND FIRST' : `FUEL ${fuel} OF ${this.d.embers ?? 0}`);
+        const mp = this.mannyAt(s.id);
+        if (mp !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, mp) ? 'YOU DRIVE YOUR MANNY HERE' : `YOUR MANNY WAITS ON ${planetFor(s.id, mp)?.name ?? 'A WORLD'} - LINK`);
+        if (this.d.vessel?.star === s.id) lines.push(shipFlying(this.d.vessel) ? 'YOUR VESSEL IS ON ITS WAY HERE' : 'YOUR VESSEL WAITS HERE');
       } else {
         lines.push(s.id !== this.d.from ? formatDuration(travelMs(ly)) : 'HOME STAR');
       }
@@ -243,8 +327,10 @@ export class StarMapScene extends Phaser.Scene {
         lines.push(p.real ? 'CONFIRMED BY ASTRONOMERS' : 'UNCHARTED');
         if (!this.isHere(s.id, p.index)) {
           lines.push(ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
-          if (this.d.mode === 'launch') lines.push(`FUEL ${fuel} OF ${this.d.embers ?? 0}`);
+          if (this.d.mode === 'launch') lines.push(this.d.blocked ? 'A COPY MUST STAY BEHIND FIRST' : `FUEL ${fuel} OF ${this.d.embers ?? 0}`);
         }
+        if (this.mannyAt(s.id, p.index) !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, p.index) ? 'YOU DRIVE YOUR MANNY HERE' : 'YOUR MANNY WAITS HERE - LINK');
+        if (this.d.vessel?.star === s.id && this.d.vessel.planet === p.index) lines.push(shipFlying(this.d.vessel) ? 'YOUR VESSEL IS ON ITS WAY HERE' : 'YOUR VESSEL WAITS HERE');
       } else if (!this.isHere(s.id, p.index)) lines.push(formatDuration(travelMs(ly)));
     } else {
       lines.push(s.name);
@@ -253,7 +339,9 @@ export class StarMapScene extends Phaser.Scene {
     this.infoText.setText(lines.join('\n'));
     const canGo = !!dest && this.d.mode === 'launch' && !this.isHere(dest.star.id, dest.planet);
     this.launchBtn.setVisible(canGo);
-    this.launchBtn.setAlpha(canGo && this.canAfford(dest!.star) ? 1 : 0.35);
+    this.launchBtn.setAlpha(canGo && !this.d.blocked && this.canAfford(dest!.star) ? 1 : 0.35);
+    this.linkBtn.setVisible(!!this.linkTarget());
+    this.linkBtn.setX(this.d.mode === 'view' ? this.scale.width - 40 : this.scale.width - 100);
     (this.info.list[0] as Phaser.GameObjects.Rectangle).setSize(Math.max(160, this.infoText.width + 14), lines.length * 10 + 8);
     this.info.setY(this.scale.height - (lines.length * 10 + 8) - 6);
   }
@@ -262,7 +350,7 @@ export class StarMapScene extends Phaser.Scene {
     const dest = this.destination();
     if (!dest || this.d.mode !== 'launch') return;
     if (this.isHere(dest.star.id, dest.planet)) { this.openSystem(dest.star); return; }
-    if (!this.canAfford(dest.star)) {
+    if (this.d.blocked || !this.canAfford(dest.star)) {
       sound.denied();
       this.tweens.add({ targets: this.launchBtn, x: this.launchBtn.x + 3, duration: 40, yoyo: true, repeat: 3 });
       return;
@@ -316,7 +404,7 @@ export class StarMapScene extends Phaser.Scene {
     this.sysStar = null;
     this.selPlanet = null;
     this.backBtn.setVisible(false);
-    this.title.setText(this.d.mode === 'launch' ? 'WHERE TO?' : 'STAR MAP');
+    this.title.setText(this.titleText());
     sound.collect();
     this.updateInfo();
   }
@@ -378,6 +466,8 @@ export class StarMapScene extends Phaser.Scene {
         }
       }
       if (this.isHere(star.id, it.sp.index)) g.lineStyle(1, PALETTE[18], 0.9).strokeCircle(it.x, it.y, r + 7 + Math.sin(this.t * 4));
+      this.drawMarks(g, it.x, it.y, r, this.mannyAt(star.id, it.sp.index) !== null,
+        !!this.d.vessel && !shipFlying(this.d.vessel) && this.d.vessel.star === star.id && this.d.vessel.planet === it.sp.index);
       if (this.selPlanet === it.sp) g.lineStyle(1, PALETTE[19], 1).strokeRect(it.x - r - 5, it.y - r - 5, (r + 5) * 2, (r + 5) * 2);
       it.label.setPosition(Math.round(it.x), Math.round(it.y + r + 4)).setVisible(this.selPlanet === it.sp || it.sp.real || this.sysItems.length <= 4 || front > 0.3);
     }
@@ -486,6 +576,7 @@ export class StarMapScene extends Phaser.Scene {
         }
       }
       if (s.id === this.d.from) g.lineStyle(1, PALETTE[18], 0.9).strokeCircle(p.sx, p.sy, r + 7 + Math.sin(this.t * 4));
+      this.drawMarks(g, p.sx, p.sy, r, this.mannyAt(s.id) !== null, !!this.d.vessel && !shipFlying(this.d.vessel) && this.d.vessel.star === s.id);
       if (this.selected?.id === s.id) g.lineStyle(1, PALETTE[19], 1).strokeRect(p.sx - r - 5, p.sy - r - 5, (r + 5) * 2, (r + 5) * 2);
     }
 

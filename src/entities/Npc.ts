@@ -438,7 +438,7 @@ export class Npc {
         const dx = sides.find((d) => this.scene.isWalkable(n.x + d, n.y + 4) && this.scene.surfaceAt(n.x + d, n.y + 4) !== 'void');
         return dx === undefined ? null : { x: n.x + dx, y: n.y + 4 };
       };
-      const node = this.scene.nodes.filter((n) => n.alive && Math.hypot(n.x - home.x, n.y - home.y) < range && standAt(n))
+      const node = this.scene.nodes.filter((n) => n.alive && n.kind === 'ember' && Math.hypot(n.x - home.x, n.y - home.y) < range && standAt(n))
         .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))[0];
       if (node) {
         this.mineAt = { x: node.x, y: node.y };

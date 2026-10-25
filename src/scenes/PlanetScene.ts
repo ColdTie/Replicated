@@ -13,10 +13,12 @@ import { Npc } from '../entities/Npc';
 import { Village } from '../entities/Village';
 import { Warren } from '../entities/Warren';
 import { Buildings } from '../entities/Buildings';
+import { MannyDock } from '../entities/Manny';
+import { inManny, vesselAway, vesselHere } from '../core/mannies';
 import { demoWarren } from '../world/warren';
 import { planetAt } from '../world/system';
 import { Player, squash } from '../entities/Player';
-import { CrystalNode, Shard, Spark } from '../entities/Resources';
+import { CrystalNode, NODE, Shard, Spark, type NodeKind } from '../entities/Resources';
 import { Ruin } from '../entities/Ruin';
 import { Skitter } from '../entities/Skitter';
 import { Spitter, Spore } from '../entities/Spitter';
@@ -34,6 +36,7 @@ import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from
 import { TOWN_TUNING, birthOrder, nextFreeLot, occupiedLots, type TownState } from '../world/town';
 import { BEACONS, planetFor, starById } from '../world/galaxy';
 import { Departure } from './planet/Departure';
+import { Link } from './planet/Link';
 import { Hands } from './planet/Hands';
 import { Homecoming } from './planet/Homecoming';
 import { Trade } from './planet/Trade';
@@ -53,6 +56,8 @@ interface InitData {
   visit?: { star: string; planetIndex: number };
   /** Just arrived from a journey: the vessel lands */
   arrival?: boolean;
+  /** Just linked in (manny.json): woken in this world's manny, or back in your own body aboard the vessel here */
+  link?: 'manny' | 'vessel';
 }
 
 const SAVE_EVERY_MS = 4000;
@@ -128,6 +133,10 @@ export class PlanetScene extends Phaser.Scene {
   /** Hologram visit while the replicant's ship is flying elsewhere: no position saves, no launching */
   visit: { star: string; planetIndex: number } | null = null;
   arrival = false;
+  link: InitData['link'] = undefined;
+  /** You drive a manny here and the vessel is on another world (or flying): its berth stands empty */
+  vesselAway = false;
+  dock!: MannyDock;
   launching = false;
   boardSpot = { x: 0, y: 0 };
   private boardRing?: Phaser.GameObjects.Ellipse;
@@ -148,6 +157,7 @@ export class PlanetScene extends Phaser.Scene {
   readonly hands = new Hands(this);
   readonly homecoming = new Homecoming(this);
   readonly trade = new Trade(this);
+  readonly linker = new Link(this);
 
   constructor() { super('planet'); }
 
@@ -178,6 +188,8 @@ export class PlanetScene extends Phaser.Scene {
     const r = session.replicant;
     this.visit = data.visit ?? null;
     this.arrival = !!data.arrival;
+    this.link = data.link;
+    this.vesselAway = false;
     this.planet = PLANETS.find((p) => p.id === data.planetId)
       ?? (this.visit ? planetFor(this.visit.star, this.visit.planetIndex) : undefined)
       ?? (r ? planetFor(r.star_id, r.planet_index) : undefined)
@@ -349,7 +361,7 @@ export class PlanetScene extends Phaser.Scene {
     const vesselShadow = this.add.image(b.vessel.x, b.vessel.y + 2, 'shadow').setTint(PALETTE[25]).setAlpha(0.5).setScale(2.6, 2).setDepth(DEPTH.shadow);
     this.vessel = this.add.sprite(b.vessel.x, b.vessel.y + 4, 'vessel').setOrigin(0.5, 1).setDepth(DEPTH.actors + b.vessel.y);
     this.vessel.play(anim('vessel', 'idle'));
-    this.addSolid(b.vessel.x, b.vessel.y - 4, 24, 10);
+    const vesselSolid = this.addSolid(b.vessel.x, b.vessel.y - 4, 24, 10);
     // stand here (just below the vessel) and press action to open the star map
     this.boardSpot = { x: b.vessel.x, y: b.vessel.y + 14 };
     this.boardRing = this.add.ellipse(this.boardSpot.x, this.boardSpot.y, 20, 8).setDepth(55).setStrokeStyle(1, PALETTE[9], 0.4);
@@ -358,6 +370,20 @@ export class PlanetScene extends Phaser.Scene {
     // a warm pool on the ground under the ship so the base reads as a hearth from a distance
     this.add.image(b.vessel.x, b.vessel.y + 8, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[9]).setAlpha(0.1).setScale(2.2, 0.9).setDepth(DEPTH.glow);
     this.makeVesselCue();
+    // driving a manny while the vessel is on another world (or flying): an empty berth where it lands
+    const me = session.replicant;
+    this.vesselAway = !!me && inManny(me) && !this.visit && !vesselHere(me, p.star, p.planetIndex);
+    if (this.vesselAway) {
+      for (const o of [this.vessel, vesselShadow, vesselGlow]) o.setVisible(false);
+      vesselLight.intensity = 0.25;
+      this.solids.remove(vesselSolid, true, true);
+      const berth = this.add.graphics().setDepth(DEPTH.ground + 5);
+      berth.lineStyle(1, PALETTE[22], 0.7).strokeEllipse(b.vessel.x, b.vessel.y - 2, 40, 14);
+      berth.lineStyle(1, PALETTE[9], 0.5).strokeEllipse(b.vessel.x, b.vessel.y - 2, 26, 8);
+      for (const [dx, dy] of [[-24, 0], [24, 0], [0, -9], [0, 7]]) berth.fillStyle(PALETTE[9], 0.6).fillRect(b.vessel.x + dx - 1, b.vessel.y - 2 + dy, 2, 1);
+    }
+    // a flight that went on without you and has landed since: the star is reached
+    if (me && inManny(me) && !this.shot) void vesselAway(me, session.store);
     if (p.intro === 'wake') {
       this.cradle = this.add.image(b.cradle.x, b.cradle.y + 6, tex('cradle', p.id), 1).setOrigin(0.5, 1).setDepth(DEPTH.actors + b.cradle.y - 4);
       this.lighting.add({ x: b.cradle.x, y: b.cradle.y, radius: 30, color: PALETTE[18], intensity: 0.5, flicker: 0.2 });
@@ -369,15 +395,16 @@ export class PlanetScene extends Phaser.Scene {
     this.announceLocation();
 
     // Resources (restoring chipped/broken crystals; they regrow after a while) and creatures
+    // iron ore and hydrogen vents follow the crystals (their indexes go on after them)
     const regrowMs = BACKEND.nodeRegrowMinutes * 60_000;
-    m.nodes.forEach((n, i) => {
+    [...m.nodes.map((n) => ({ ...n, kind: 'ember' as NodeKind })), ...m.ores].forEach((n, i) => {
       let hits = save?.data.nodes?.[i]?.hits ?? 0;
       const at = save?.data.nodes?.[i]?.at ?? 0;
-      if (hits >= ITEMS.ember.nodeHits && Date.now() - at > regrowMs) {
+      if (hits >= NODE[n.kind].hits && Date.now() - at > regrowMs) {
         hits = 0;
         this.pending.nodes[i] = { hits: 0, at: Date.now() };
       }
-      this.nodes.push(new CrystalNode(this, n.x * 16 + 8, n.y * 16 + 10, i, hits));
+      this.nodes.push(new CrystalNode(this, n.x * 16 + 8, n.y * 16 + 10, i, hits, n.kind));
     });
     // the way down to the warren the copies dig (hatch spot kept per planet); it moved on while nobody was here
     this.warren = new Warren(this, save?.data.warren);
@@ -409,9 +436,12 @@ export class PlanetScene extends Phaser.Scene {
     const awake = !!r?.traits.awake;
     const saved = r && r.star_id === p.star && r.planet_index === p.planetIndex && r.pos_x != null && r.pos_y != null
       && this.isWalkable(r.pos_x, r.pos_y) && !this.migrated ? { x: r.pos_x, y: r.pos_y! } : null;
-    // just moved into the town: the replicant stands by the vessel (its old spot belongs to the old layout)
-    const start = saved ?? (this.migrated ? { x: b.vessel.x + 20, y: b.vessel.y + 18 } : this.home);
+    // just moved into the town: the replicant stands by the vessel (its old spot belongs to the old layout); linked
+    // into a manny that waited in its dock: on the dock's pad
+    const start = saved ?? (this.link === 'manny' ? { x: b.dock.x, y: b.dock.y + 2 } : this.link === 'vessel' ? this.boardSpot
+      : this.migrated ? { x: b.vessel.x + 20, y: b.vessel.y + 18 } : this.home);
     this.player = new Player(this, start.x, start.y);
+    this.dock = new MannyDock(this, b.dock.x, b.dock.y);
     this.reflection = this.add.image(0, 0, this.player.sprite.texture.key).setOrigin(0.5, 0).setFlipY(true)
       .setAlpha(0.3).setTint(0x9ab8ff).setDepth(DEPTH.ground + 3).setVisible(false);
     this.glints = this.add.particles(0, 0, 'px1', {
@@ -449,6 +479,8 @@ export class PlanetScene extends Phaser.Scene {
       this.stageForScreenshot();
     } else if (this.arrival) {
       this.playLanding(vesselShadow, vesselLight, vesselGlow);
+    } else if (this.link) {
+      this.linker.playLinkIn(this.link);
     } else if (this.visit) {
       this.playReturn();
     } else if (p.intro === 'wake' && !awake) {
@@ -666,7 +698,7 @@ export class PlanetScene extends Phaser.Scene {
     });
   }
 
-  private hopOut() {
+  hopOut() {
     const pl = this.player;
     const sx = this.vessel.x, sy = this.vessel.y - 6, ex = this.vessel.x, ey = this.vessel.y + 14;
     pl.setPosition(sx, sy);
@@ -692,7 +724,7 @@ export class PlanetScene extends Phaser.Scene {
   /** Deterministic pose for screenshots: player next to a crystal, a creature nearby, shards around. */
   private stageForScreenshot() {
     const c = this.map.base.center;
-    const node = this.nodes.slice().sort((a, b) =>
+    const node = this.nodes.filter((n) => n.kind === 'ember').sort((a, b) =>
       Phaser.Math.Distance.Between(a.x, a.y, c.x, c.y) - Phaser.Math.Distance.Between(b.x, b.y, c.x, c.y))[0];
     let px = node.x - 30, py = node.y + 6;
     for (const [ox, oy] of [[-30, 6], [30, 6], [0, 26], [-26, 20], [26, 20], [0, -20]]) {
@@ -771,8 +803,9 @@ export class PlanetScene extends Phaser.Scene {
     this.updateCamera();
     this.base.update(time, this.embers);
     this.base.updateSpot(time, this.canReplicate());
+    this.dock.update(time);
     if (this.boardRing) {
-      const ready = this.departure.canLaunch() || !!this.visit;
+      const ready = this.departure.boardReady();
       const on = this.departure.playerOnBoardSpot();
       this.boardRing.setStrokeStyle(1, ready ? PALETTE[9] : PALETTE[22], ready ? 0.5 + 0.4 * Math.sin(time / 300) : 0.3)
         .setFillStyle(PALETTE[9], ready && on ? 0.3 : 0);
@@ -800,6 +833,7 @@ export class PlanetScene extends Phaser.Scene {
   /** Supplies changed: write them with the next flush. */
   markSupplies() {
     this.pending.supplies = { ...this.supplies };
+    this.game.events.emit('supplies', this.supplies);
   }
 
   /** Embers in or out of the shared pool (recipes, gifts). */
@@ -915,6 +949,7 @@ export class PlanetScene extends Phaser.Scene {
   /** The action button does something other than attack here (build). Returns true if it did. */
   tryInteract(): boolean {
     if (this.departure.playerOnBoardSpot()) return this.departure.tryBoard();
+    if (this.dock.playerOnPad()) return this.dock.tryBuild();
     if (this.time.now > this.hatchReadyAt && this.warren.playerOnHatch()) { this.descend(); return true; }
     if (this.base.playerOnSpot()) return this.tryReplicate();
     if (!this.base.playerOnPad() || !this.base.canBuild(this.embers)) return false;
@@ -1393,12 +1428,19 @@ export class PlanetScene extends Phaser.Scene {
     this.pending.nodes[n.index] = { hits: n.hits, at: Date.now() };
   }
 
-  spawnShard(x: number, y: number, dir?: Phaser.Math.Vector2) {
-    this.shards.push(new Shard(this, x, y, dir));
+  spawnShard(x: number, y: number, dir?: Phaser.Math.Vector2, kind: NodeKind = 'ember') {
+    this.shards.push(new Shard(this, x, y, dir, kind));
   }
 
-  collectShard(x: number, y: number) {
+  collectShard(x: number, y: number, kind: NodeKind = 'ember') {
     sound.collect();
+    if (kind !== 'ember') {
+      // iron and hydrogen go into this world's store (the materials of a manny)
+      this.warren.add(kind, 1);
+      this.fx.sparks(x, y - 4, NODE[kind].spark[0], 5);
+      this.fx.floatIcon(this.player.x, this.player.y - 22, ITEMS[kind].sprite);
+      return;
+    }
     this.embers++;
     this.pending.embers++;
     this.fx.sparks(x, y - 4, PALETTE[10], 5);

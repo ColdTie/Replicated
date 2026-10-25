@@ -10,5 +10,27 @@
     "magnetPull": 1925,
     "pickupDelayMs": 340
   },
-  "_doc": "ember.magnetPull: how hard a shard is pulled toward you once it starts flying to you (1400 = original speed; 1925 = Steve's +25% on 2026-10-06). magnetRange: how close you must be for a shard to start flying. pickupDelayMs: how long a shard bounces before it may fly."
+  "iron": {
+    "sprite": "iron",
+    "nodeSprite": "ironore",
+    "glow": 20,
+    "spark": [11, 9],
+    "nodeHits": 4,
+    "nodeDropsPerHit": 1,
+    "nodeDropsOnBreak": 3,
+    "perWorld": 12,
+    "starters": 4
+  },
+  "hydrogen": {
+    "sprite": "hydrogen",
+    "nodeSprite": "hvent",
+    "glow": 28,
+    "spark": [29, 19],
+    "nodeHits": 3,
+    "nodeDropsPerHit": 1,
+    "nodeDropsOnBreak": 3,
+    "perWorld": 10,
+    "starters": 4
+  },
+  "_doc": "ember.magnetPull: how hard a shard is pulled toward you once it starts flying to you (1400 = original speed; 1925 = Steve's +25% on 2026-10-06). magnetRange: how close you must be for a shard to start flying. pickupDelayMs: how long a shard bounces before it may fly. iron / hydrogen (Steve, 2026-10-25: the materials of mannies, src/data/manny.json): iron ore sits in the rock, hydrogen vents by water and in the open; nodeSprite is the node, sprite the pickup (both untinted: their colors are their own on every world), glow and spark are palette indexes (the node's light, the sparks a hit throws). Hit a node nodeHits times: nodeDropsPerHit pickups each hit, nodeDropsOnBreak on the last; pickups fly to you like Embers and go into the world's store (planet_states.data.supplies). perWorld nodes of each on a world with resourceNodes 30 (Earth; scaled with resourceNodes, so beacon worlds hold three times as many), starters of them just off the town's lots. They regrow like crystals (backend.json nodeRegrowMinutes)."
 }

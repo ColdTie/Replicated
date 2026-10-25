@@ -41,6 +41,12 @@ export interface ReplicantSave {
     inherit?: { from: string; name: string; wants?: string[] };
     /** what the vessel's hold carries between worlds (supplies.json signature): set at launch, unloaded on landing */
     cargo?: { material: string; n: number; from: string } | null;
+    /** the original's mannies (manny.json), one per world ('star:planet'): when it was built, and where it stands
+     * while you are elsewhere (no x / y: in its dock) */
+    mannies?: Record<string, { at: number; x?: number; y?: number }>;
+    /** while you drive a manny: where your own body waits aboard the vessel, a world or a flight that goes on
+     * without you (star / planet: where the vessel is, or will land) */
+    ship?: { star: string; planet: number; journey?: Journey } | null;
   };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
@@ -301,6 +307,8 @@ export interface GameStore {
   activeJourney(r: ReplicantSave): Promise<Journey | null>;
   /** Arrival: the replicant is now at the new star, and the family has discovered it. */
   completeJourney(r: ReplicantSave, j: Journey): Promise<void>;
+  /** A star reached (a vessel landed there, with or without anyone aboard). */
+  discover(star: string, by: string): Promise<void>;
   /** All journeys still flying (any family member), for the star map. */
   openJourneys(): Promise<Journey[]>;
   listReplicants(): Promise<ReplicantSummary[]>;
@@ -513,7 +521,11 @@ export class LocalStore implements GameStore {
     r.planet_index = j.to_planet;
     r.pos_x = null; r.pos_y = null;
     await this.saveReplicant(r);
-    if (!this.db.discovered.includes(j.to_star)) this.db.discovered.push(j.to_star);
+    await this.discover(j.to_star);
+  }
+
+  async discover(star: string) {
+    if (!this.db.discovered.includes(star)) this.db.discovered.push(star);
     this.flush();
   }
 
@@ -728,8 +740,12 @@ export class CloudStore implements GameStore {
     r.planet_index = j.to_planet;
     r.pos_x = null; r.pos_y = null;
     await this.saveReplicant(r);
+    await this.discover(j.to_star, r.id);
+  }
+
+  async discover(star: string, by: string) {
     const { error } = await this.sb.from('discovered_stars')
-      .upsert({ galaxy_id: this.galaxyId, star_id: j.to_star, discovered_by: r.id }, { onConflict: 'galaxy_id,star_id', ignoreDuplicates: true });
+      .upsert({ galaxy_id: this.galaxyId, star_id: star, discovered_by: by }, { onConflict: 'galaxy_id,star_id', ignoreDuplicates: true });
     if (error) throw error;
   }
 

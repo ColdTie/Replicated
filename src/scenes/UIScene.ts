@@ -1,4 +1,4 @@
-// Screen-space layer: ember counter, landing title card, the talk box, and touch controls.
+// Screen-space layer: the Ember, iron and hydrogen counters, landing title card, the talk box, and touch controls.
 import Phaser from 'phaser';
 import { PALETTE } from '../core/data';
 import { isKid, session } from '../core/session';
@@ -13,6 +13,8 @@ export class UIScene extends Phaser.Scene {
   private counterText!: Phaser.GameObjects.BitmapText;
   private counterFade?: Phaser.Time.TimerEvent;
   private sparkCounter!: Phaser.GameObjects.Container;
+  /** iron and hydrogen counters (n: the count shown) */
+  private stock: Record<string, { c: Phaser.GameObjects.Container; text: Phaser.GameObjects.BitmapText; n: number }> = {};
   private sparkText!: Phaser.GameObjects.BitmapText;
   private location?: Phaser.GameObjects.Container;
   private stickBase!: Phaser.GameObjects.Arc;
@@ -42,10 +44,19 @@ export class UIScene extends Phaser.Scene {
     // Kid mode: no numbers on screen; collected embers still float up and fill the shared base
     this.counter.setVisible(!isKid());
 
-    // Sparks (rare): a white star next to the Embers, only once the family has one
+    // Iron and hydrogen in this world's store (the materials of a manny), beside the Embers
+    for (const [i, kind] of (['iron', 'hydrogen'] as const).entries()) {
+      const text = this.add.bitmapText(15, 5, 'pixel', '0').setTint(PALETTE[kind === 'iron' ? 20 : 29]);
+      const c = this.add.container(44 + i * 38, 4, [this.add.image(0, 0, kind).setOrigin(0, 0), text]).setAlpha(0.35).setVisible(!isKid());
+      this.stock[kind] = { c, text, n: -1 };
+    }
+    this.onSupplies((this.scene.get('planet') as unknown as { supplies?: Record<string, number> }).supplies ?? {}, true);
+    this.game.events.on('supplies', this.onSupplies, this);
+
+    // Sparks (rare): a white star next to the rest, only once the family has one
     const sparkIcon = this.add.image(0, 0, 'spark', 0).setOrigin(0, 0).setScale(0.75);
     this.sparkText = this.add.bitmapText(14, 5, 'pixel', '0').setTint(PALETTE[18]);
-    this.sparkCounter = this.add.container(44, 3, [sparkIcon, this.sparkText]).setAlpha(0.6).setVisible(false);
+    this.sparkCounter = this.add.container(120, 3, [sparkIcon, this.sparkText]).setAlpha(0.6).setVisible(false);
     this.onSparks(session.replicant?.traits.sparks ?? 0, true);
     this.game.events.on('sparks', this.onSparks, this);
 
@@ -60,6 +71,7 @@ export class UIScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('embers', this.onEmbers, this);
       this.game.events.off('sparks', this.onSparks, this);
+      this.game.events.off('supplies', this.onSupplies, this);
       this.game.events.off('titlecard', this.titleCard, this);
       this.game.events.off('location', this.showLocation, this);
       this.game.events.off('notice', this.notice, this);
@@ -224,6 +236,22 @@ export class UIScene extends Phaser.Scene {
     this.tweens.add({ targets: this.counter, scale: { from: 1.25, to: 1 }, duration: 160, ease: 'Back.easeOut' });
     this.counterFade?.remove();
     this.counterFade = this.time.delayedCall(2500, () => this.tweens.add({ targets: this.counter, alpha: 0.35, duration: 600 }));
+  }
+
+  /** The world's store changed: the iron and hydrogen counters light up when theirs did. */
+  private onSupplies(supplies: Record<string, number>, quiet = false) {
+    for (const [kind, st] of Object.entries(this.stock)) {
+      const n = Math.floor(supplies[kind] ?? 0);
+      if (n === st.n) continue;
+      const first = st.n < 0;
+      st.n = n;
+      st.text.setText(String(n));
+      if (quiet || first) continue;
+      st.c.setAlpha(1);
+      this.tweens.killTweensOf(st.c);
+      this.tweens.add({ targets: st.c, scale: { from: 1.25, to: 1 }, duration: 160, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: st.c, alpha: 0.35, delay: 2500, duration: 600 });
+    }
   }
 
   private onSparks(n: number, quiet = false) {

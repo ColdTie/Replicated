@@ -1,6 +1,7 @@
 // In flight between stars. Departure shows the planet from orbit, then the warp; the cruise shows the ship,
-// streaking stars and the time left (real time). Settled planets can be visited while you wait. On arrival the
-// destination planet grows on screen and the ship lands.
+// streaking stars and the time left (real time). Settled planets can be visited while you wait, and a world with your
+// manny linked into (the ship flies on and lands by itself). On arrival the destination planet grows on screen and the
+// ship lands.
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { PALETTE, type PlanetDef } from '../core/data';
@@ -9,6 +10,7 @@ import { Globe } from '../fx/Globe';
 import type { Journey } from '../net/store';
 import { formatDuration, planetFor, starById } from '../world/galaxy';
 import { planetAt } from '../world/system';
+import { mannyWorlds, worldKey } from '../core/mannies';
 import type { StarMapData } from './StarMapScene';
 
 export interface TravelData { journey: Journey; depart?: boolean }
@@ -33,6 +35,8 @@ export class TravelScene extends Phaser.Scene {
   private eta!: Phaser.GameObjects.BitmapText;
   private ui!: Phaser.GameObjects.Container;
   private arriving = false;
+  /** linking out into a manny: the ship flies on without you */
+  private leaving = false;
   private t = 0;
   private nextGlobeAt = 0;
 
@@ -43,6 +47,7 @@ export class TravelScene extends Phaser.Scene {
     this.depart = !!d.depart;
     this.warp = this.depart ? 0 : 1;
     this.arriving = false;
+    this.leaving = false;
     this.streaks = [];
     this.globe = undefined; this.dest = undefined;
     this.globeImg = undefined; this.destImg = undefined;
@@ -107,24 +112,34 @@ export class TravelScene extends Phaser.Scene {
   }
 
   private async addVisits() {
-    const st = session.store;
+    const st = session.store, me = session.replicant;
     if (!st) return;
-    let reps;
-    try { reps = await st.listReplicants(); } catch { return; }
-    // planets with someone living there (copies or family) can be visited as a hologram while you fly
-    const where = new Map<string, [string, number]>();
-    for (const r of reps) if (r.status !== 'in_transit') where.set(`${r.star_id}:${r.planet_index}`, [r.star_id, r.planet_index]);
-    [...where.values()].slice(0, 4).forEach(([sid, pi], i) => {
+    // worlds with your manny first: you can link into it and play there for real while the ship flies on
+    const where = new Map<string, [string, number, boolean]>();
+    for (const w of mannyWorlds(me)) where.set(w.key, [w.star, w.planet, true]);
+    let reps: Awaited<ReturnType<typeof st.listReplicants>> = [];
+    try { reps = await st.listReplicants(); } catch { /* the mannies still show */ }
+    // then planets with someone living there (copies or family): visited as a hologram
+    for (const r of reps) if (r.status !== 'in_transit' && !where.has(`${r.star_id}:${r.planet_index}`)) where.set(`${r.star_id}:${r.planet_index}`, [r.star_id, r.planet_index, false]);
+    const visor = PALETTE[me?.traits.feature ?? 10] ?? PALETTE[10];
+    [...where.values()].slice(0, 5).forEach(([sid, pi, manny], i) => {
       const p = planetFor(sid, pi);
       if (!p || !this.scene.isActive()) return;
       const x = 22 + i * 34, y = 22;
       const key = `globe.visit.${sid}.${pi}`;
-      new Globe(this, key, 22, p, { earth: p.id === 'earth' });
+      if (!this.textures.exists(key)) new Globe(this, key, 22, p, { earth: p.id === 'earth' });
       const icon = this.add.image(0, 0, key);
-      const ring = this.add.circle(0, 0, 13, 0x000000, 0).setStrokeStyle(1, PALETTE[9], 0.8);
-      const name = this.add.bitmapText(0, 15, 'pixel', p.name.split(' ')[0]).setOrigin(0.5, 0).setTint(PALETTE[21]);
-      const c = this.add.container(x, y, [icon, ring, name]).setSize(28, 28).setInteractive({ useHandCursor: true });
-      c.on('pointerdown', () => this.visit(sid, p));
+      const ring = this.add.circle(0, 0, 13, 0x000000, 0).setStrokeStyle(manny ? 2 : 1, manny ? visor : PALETTE[9], manny ? 1 : 0.8);
+      const name = this.add.bitmapText(0, 15, 'pixel', p.name.split(' ')[0]).setOrigin(0.5, 0).setTint(manny ? visor : PALETTE[21]);
+      const parts: Phaser.GameObjects.GameObject[] = [icon, ring, name];
+      if (manny) {
+        // a little body on the globe's shoulder: your manny waits there
+        const fig = this.add.graphics();
+        fig.fillStyle(PALETTE[25], 0.9).fillRect(7, -14, 5, 8).fillStyle(PALETTE[20]).fillRect(8, -13, 3, 6).fillStyle(visor).fillRect(8, -12, 3, 1);
+        parts.push(fig);
+      }
+      const c = this.add.container(x, y, parts).setSize(28, 28).setInteractive({ useHandCursor: true });
+      c.on('pointerdown', () => (manny ? this.linkTo(sid, pi) : this.visit(sid, p)));
       this.ui.add(c);
     });
   }
@@ -137,10 +152,29 @@ export class TravelScene extends Phaser.Scene {
     });
   }
 
+  /** Out of the ship and into your manny on that world (manny.json): the ship flies on and lands by itself, and
+   * waits there for you (traits.ship). */
+  private async linkTo(star: string, planet: number) {
+    const r = session.replicant, st = session.store;
+    const target = r?.traits.mannies?.[worldKey(star, planet)];
+    if (!r || !target || this.leaving || this.arriving) return;
+    this.leaving = true;
+    sound.spark();
+    r.traits.ship = { star: this.j.to_star, planet: this.j.to_planet, journey: this.j };
+    r.status = 'active'; r.star_id = star; r.planet_index = planet;
+    r.pos_x = target.x ?? null; r.pos_y = target.y ?? null;
+    try { await st?.saveReplicant(r); } catch (e) { console.warn('link save failed', e); }
+    this.cameras.main.flash(200, 246, 117, 122);
+    this.cameras.main.fadeOut(500, 24, 20, 37);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => this.scene.start('planet', { link: 'manny' }));
+  }
+
   private openMap() {
     this.scene.pause();
     const data: StarMapData = {
       mode: 'view', from: this.j.from_star, fromPlanet: this.j.from_planet, journey: this.j,
+      mannies: mannyWorlds(session.replicant).map((w) => w.key),
+      onLink: (star, planet) => { this.scene.resume(); void this.linkTo(star, planet); },
       onClose: () => this.scene.resume(),
     };
     this.scene.launch('starmap', data);
@@ -232,6 +266,6 @@ export class TravelScene extends Phaser.Scene {
     const glow = 2 + f * 6;
     g.fillStyle(PALETTE[11], 0.15 * this.ui.alpha).fillCircle(w - 30, h * 0.45, glow * 3);
     g.fillStyle(PALETTE[11], 0.9 * this.ui.alpha).fillCircle(w - 30, h * 0.45, glow * 0.6);
-    if (left <= 0 && this.warp >= 0.99 && this.ui.alpha >= 0.99) this.arrive();
+    if (left <= 0 && this.warp >= 0.99 && this.ui.alpha >= 0.99 && !this.leaving) this.arrive();
   }
 }

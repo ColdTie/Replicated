@@ -1,0 +1,7 @@
+{
+  "_doc": "Mannies (Steve, 2026-10-25): android bodies the player builds, one per world, that look like the player and can be driven from anywhere (src/entities/Manny.ts, src/scenes/planet/Link.ts). cost is taken from this world's store (iron and hydrogen, items.json). The dock stands in the town square at dock px from the base center. Built, the manny is kept on the player's row (replicants.traits.mannies, by 'star:planet'); while you are elsewhere it stands where you left it, or in its dock. nearPx: how close you must come for the dock to show what it still needs. buildMs: the assembly. A link (the star map's LINK, or a world's icon in flight) puts you in that world's manny at once; your own body waits aboard the vessel where you left it (traits.ship), and the vessel's berth stands empty on worlds it is not on.",
+  "cost": { "iron": 15, "hydrogen": 10 },
+  "dock": [-84, 44],
+  "nearPx": 70,
+  "buildMs": 2600
+}
