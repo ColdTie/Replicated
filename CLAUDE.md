@@ -581,11 +581,13 @@ would cost much of what it saves; decide on it after reading `?perf` on Steve's 
   ship flying on alone; once it lands that star counts as reached, and TO VESSEL finds it there (TO SHIP while it still
   flies). A manny you leave stands where you left it; launching from a world puts its manny back in the dock. You can
   only launch from where the vessel is.
-- **The reset** (Steve: erase every character and its records). A copy of every row to be erased is in the
-  database's `backup_20261025` schema (RLS on, no grants to the API roles); drop it once it is not wanted. The erase
-  itself (all replicants, his original too, so a new one wakes in the cradle on Earth; Hearth's profile, an awakened
-  copy; every planet, journey, discovered star, note, letter and request; kept: the galaxy, its login, Steve's profile
-  and the minds' spend ledger) waits for Steve's confirmation in the Supabase connector.
+- **The reset** (Steve: erase every character and its records). Done 2026-10-25 by Steve running the backup-and-erase
+  SQL in the Supabase SQL Editor (the connector's approval prompt timed out three times): every replicant, his original
+  too (a new one wakes in the cradle on Earth), Hearth's profile (an awakened copy), and every planet, journey,
+  discovered star, note, letter and request are gone; the galaxy, its login, Steve's profile and the minds' spend
+  ledger stay. Verified: all those tables at 0 rows, one profile. A copy of everything erased (31 replicants, 11
+  planets, 472 notes, 725 letters) is in the `backup_20261025` schema (RLS on, no grants to the API roles); drop it
+  once it is not wanted.
 - Verified: build, `tools/playtest-manny.mjs` (new) and the whole `npm test`. `screenshots/manny-*.png`,
   `ores-n.png` (iron and hydrogen at night).
 
