@@ -479,11 +479,13 @@ export class Npc {
     const speed = PLAYER.speed * 0.55 * stat(this.data, 'speed') * this.pace * (1 - 0.3 * this.weary);
     const step = Math.min(d, speed * dt / 1000);
     const nx = this.x + (dx / d) * step, ny = this.y + (dy / d) * step;
+    // slide along what is in the way, unless the slide barely moves (a wall almost square across the way): then
+    // find a way round, so nobody inches along rock for ever
     if (this.scene.isWalkable(nx, ny) && this.scene.surfaceAt(nx, ny) !== 'void') {
       this.x = nx; this.y = ny;
       if (Math.abs(dx) > 1) this.sprite.setFlipX(dx < 0);
-    } else if (this.scene.isWalkable(nx, this.y) && Math.abs(nx - this.x) > 0.05) this.x = nx;
-    else if (this.scene.isWalkable(this.x, ny) && Math.abs(ny - this.y) > 0.05) this.y = ny;
+    } else if (this.scene.isWalkable(nx, this.y) && Math.abs(nx - this.x) > step * 0.25) this.x = nx;
+    else if (this.scene.isWalkable(this.x, ny) && Math.abs(ny - this.y) > step * 0.25) this.y = ny;
     else {
       const way = this.reroutes < 3 ? surfaceRoute(this.scene.map, this, t) : null;
       if (way) { this.route = way; this.reroutes++; return false; }
