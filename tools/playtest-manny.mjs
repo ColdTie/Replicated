@@ -90,6 +90,8 @@ try {
   if (!linkShown) fail('the LINK button did not show for a world with a manny');
   await ev(() => { const m = window.__game.scene.getScene('starmap'); m.selected = m.projected.find((p) => p.star.id === 'keid').star; m.updateInfo(); m.launch(); });
   await page.waitForFunction(() => window.__game.scene.isActive('travel'), null, { timeout: 30000 });
+  // trips are a fraction of a second now (travel.json): hold this one in the air while the test acts in flight
+  await ev(() => { window.__game.scene.getScene('travel').j.arrives_at = new Date(Date.now() + 600_000).toISOString(); });
   await page.waitForTimeout(6000);
   await shot('manny-flight-icons');
   await ev(() => window.__game.scene.getScene('travel').linkTo('alpha-cen', 1));

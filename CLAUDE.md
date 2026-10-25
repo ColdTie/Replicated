@@ -85,7 +85,7 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 These shape the data model now, even where the feature comes later.
 
 - **Travel runs on real-world time.** (Switched off 2026-10-06 at Steve's request: every trip took 5 seconds via
-  `fixedSeconds` in `src/data/travel.json`. Since 2026-10-25 a trip takes 15 seconds per light year, `travel.json
+  `fixedSeconds` in `src/data/travel.json`. Since 2026-10-25 a trip takes 0.1 seconds per light year, `travel.json
   cruise.secondsPerLy`; `cruise.enabled` false and `fixedSeconds` 0 restore real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
 - **One shared galaxy per login.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
 - **Earth is the start.** Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
@@ -588,4 +588,10 @@ would cost much of what it saves; decide on it after reading `?perf` on Steve's 
   and the minds' spend ledger) waits for Steve's confirmation in the Supabase connector.
 - Verified: build, `tools/playtest-manny.mjs` (new) and the whole `npm test`. `screenshots/manny-*.png`,
   `ores-n.png` (iron and hydrogen at night).
+
+### Session 17b (2026-10-25): travel at 0.1 s a light year (Steve: "Make the travel like 0.1 seconds per light years")
+- `travel.json cruise.secondsPerLy` 0.1 (and `inSystemSeconds` 0.1): Alpha Centauri under half a second, the farthest
+  beacon about 4 s. The departure and arrival scenes (about 4 s out, 3.5 s in) are now most of a trip; a ship already
+  in flight lands on the new schedule. Durations under 10 s read in tenths ("0.4 SEC").
+- `playtest-manny` and `playtest-travel` hold their flight in the air (a far `arrives_at`) while they act in it.
 
