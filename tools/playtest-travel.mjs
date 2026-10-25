@@ -47,6 +47,8 @@ try {
   log('hold', JSON.stringify(loaded));
   if (loaded.cargo?.material !== 'seed' || loaded.cargo?.n !== 10 || loaded.left !== 2) fail('the hold did not take the seed');
   await page.waitForFunction(() => window.__game.scene.isActive('travel'), null, { timeout: 30000 });
+  // trips are a fraction of a second now (travel.json): hold this one in the air for the warp screenshot
+  await ev(() => { window.__game.scene.getScene('travel').j.arrives_at = new Date(Date.now() + 600_000).toISOString(); });
   log('scenes', await active());
   await page.waitForTimeout(2500);
   await shot('m4-orbit');

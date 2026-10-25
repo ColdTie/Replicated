@@ -55,9 +55,10 @@ export function travelMs(ly: number) {
 
 export const fuelFor = (ly: number) => Math.round(TRAVEL.fuelBase + TRAVEL.fuelPerLy * ly);
 
-/** "40 SEC", "1 MIN 5 SEC", "45 MIN", "9 H 40 MIN", "6 DAYS 2 H" */
+/** "0.4 SEC", "40 SEC", "1 MIN 5 SEC", "45 MIN", "9 H 40 MIN", "6 DAYS 2 H" */
 export function formatDuration(ms: number) {
-  const sec = Math.max(0, Math.round(ms / 1000));
+  if (ms < 9950) return `${(Math.max(0, ms) / 1000).toFixed(1)} SEC`;
+  const sec = Math.round(ms / 1000);
   if (sec < 60) return `${sec} SEC`;
   if (sec < 600) return sec % 60 ? `${Math.floor(sec / 60)} MIN ${sec % 60} SEC` : `${sec / 60} MIN`;
   const m = Math.round(ms / 60_000);
