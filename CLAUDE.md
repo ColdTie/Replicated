@@ -85,8 +85,8 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 These shape the data model now, even where the feature comes later.
 
 - **Travel runs on real-world time.** (Switched off 2026-10-06 at Steve's request: every trip took 5 seconds via
-  `fixedSeconds` in `src/data/travel.json`. Since 2026-10-19 a trip is a 1 to 3 minute cruise, `travel.json cruise`;
-  `cruise.enabled` false and `fixedSeconds` 0 restore real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
+  `fixedSeconds` in `src/data/travel.json`. Since 2026-10-25 a trip takes 15 seconds per light year, `travel.json
+  cruise.secondsPerLy`; `cruise.enabled` false and `fixedSeconds` 0 restore real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
 - **One shared galaxy per login.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
 - **Earth is the start.** Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
 - **Messages travel at light speed until FTL comms exist.** A message between replicants in different systems arrives after a delay based on distance (scaled like travel). Building or finding the FTL comms device makes messages from that system instant.
@@ -118,7 +118,9 @@ src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by too
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
 src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalStore (localStorage)
 src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, enemies, decor, glows,
-                         trees/towers + blockers, fixed base layout (vessel, cradle, build pad), the town kept open
+                         trees/towers + blockers, fixed base layout (vessel, cradle, build pad, manny dock), the town
+                         kept open; iron ore (by rock) and hydrogen vents (by water, or in the open) placed last with
+                         their own rng (`ores`; their node indexes follow the crystals')
 src/world/town.ts        the town (tunables src/data/town.json): a paved square at the base (vessel, Replicator, cradle,
                          the hatch in its corner), streets out from it, home lots along them (named build slots, two
                          lamp posts) and civic lots for buildings; lot assignment (data.town), slotFor(), the one-time
@@ -129,7 +131,8 @@ src/world/groundPaint.ts painted floor: one full-color image per planet (relief-
                          The tilemap now only draws water and walls.
 src/fx/                  Lighting (multiply darkness RT + additive lights), Atmosphere (sky, stars, fog,
                          dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
-src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember), Base (pad + Replicator)
+src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember, iron, hydrogen by kind),
+                         Base (pad + Replicator), Manny (the manny dock: build one, the manny on standby)
 src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
 src/audio/Sound.ts       procedural WebAudio: every sound effect and the generative ambient music (no audio files)
 src/entities/            ... Spitter + Spore (reflectable), Ruin (machine core -> sealed door -> module), Wildlife
@@ -162,7 +165,12 @@ src/data/buildings.json  surface buildings: footprint limits, cost per tile and 
 src/world/buildingPaint.ts draws a building from its blueprint (planks / blocks / plates, flat / peaked / dome roof, door, window)
 src/entities/Buildings.ts proposals, the original's approve / veto, paying, shared raising, offline progress; the
                          communal Meeting Hall / Workshop / Lookout the village starts on its own when the store is full
-src/data/supplies.json   materials (stone, soil, wood, scrap, Ember), yields, storage, recipes
+src/data/supplies.json   materials (stone, soil, wood, scrap, Ember, iron, hydrogen), yields, storage, recipes
+src/data/items.json      Ember, iron and hydrogen: node hits, drops, colors, how many per world
+src/data/manny.json      mannies: cost (iron + hydrogen), where the dock stands, how near its readout shows
+src/core/mannies.ts      which worlds have your manny, whether you drive one, where the vessel is (traits.ship)
+src/scenes/planet/Link.ts linking: into a manny on another world, back to your own body aboard the vessel, the beam
+                         and the waking; the vessel's empty berth while it is elsewhere (PlanetScene.vesselAway)
 src/data/parts.json      the parts kit: heads, visors, torsos, arms, legs (or treads / hover), back pieces, named colors, poses
 src/core/bodyRender.ts   composes a 16x20 x 14 frame body from the kit + a spec (pure; tools/body-preview.mjs runs it in Node)
 src/core/body.ts         bodyFor(): the texture for a replicant (composed and cached, or its hand-made model), visor anchors
@@ -237,6 +245,8 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | state | `needs` | `{ company, purpose }` 0 empty .. 1 full (`src/data/needs.json`); rest is `1 - weary`. No food or water (Steve, 2026-10-08). |
 | state | `inventory` | `{ material: count }` gifts from the original the copy still holds |
 | voice | `tell` | `{ text, at }` what it would tell the original if they came over now (`tell_original`, every wake); the talk box's first page |
+| state | `mannies` | the original's mannies, `{ 'star:planet': { at, x?, y? } }`: built (manny.json), and where each stands while you are elsewhere (no x / y: in its dock) |
+| state | `ship` | while the original drives a manny: where its own body waits aboard the vessel, `{ star, planet, journey? }` (a journey: still flying, or landed without anyone aboard) |
 
 Commands: `npm run dev` (local server), `npm run build`, `npm test` (after a build: the mind tool check and every
 playtest, about 6 minutes; `npm test -- talk town` runs only those), `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`,
@@ -256,7 +266,8 @@ world is open; copies reach what they need; with a snapshot of the live data it 
 `node tools/playtest-talk.mjs` (the talk hint, E / right click open the box, pages, back, close, the reply line, runes,
 a blank copy, dash still on Shift, the real talk wake with the canned mind),
 `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
-on landing), `node tools/build-code-view.mjs [outDir]` (the source bundle the copies read; the deploy runs it),
+on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, a manny built at the dock, linked
+into from a ship in flight, from manny to manny, back to the ship once it landed alone, from your own body), `node tools/build-code-view.mjs [outDir]` (the source bundle the copies read; the deploy runs it),
 `node --experimental-strip-types tools/body-preview.mjs [--random 6]` (composed bodies side by side -> `screenshots/bodies.png`),
 `node tools/fps.mjs "<query>"` (headless frame rate; software GL, only for comparing builds),
 `node tools/sim-live.mjs <seed.json> <out.json> --minutes 10` (gives planets simulated play time from a snapshot of
@@ -270,7 +281,10 @@ side (three quick attacks = heavy combo finisher; presses during the cooldown ar
 reach, a swing works on the village: a tree (6 swings fell it), rock (4 break off stone), an opened ruin's machine
 (scrap), a building being raised (a blow). Walk into a building waiting for what you carry, a copy, or the hatch to
 hand the load over. Stand on the open hatch for a moment (a warm ring fills) or press attack on it to go down; walking
-or dashing across it never does. Dash Shift/K/X, gamepad
+or dashing across it never does. Attack on the manny dock's pad (lit, with a ghost of you, once the store holds enough
+iron and hydrogen) builds a manny. At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
+LINK; at the empty berth (the vessel is elsewhere) it has LINK and TO VESSEL / TO SHIP; in flight a world with your
+manny in the top-left row links you there. Dash Shift/K/X, gamepad
 B/L1/R2, swipe on the right side. Talk to the copy beside you (a speech mark shows over it): E, right click, gamepad Y,
 or the touch talk button (a mouse click on it works too, for touchscreen laptops); or click (left or right) on any copy
 within `talk.json clickRange` (96 px, six tiles) to talk to that one; in the box E / Space / Enter / click = next, Left = back, Esc / Tab / gamepad B = close,
@@ -544,3 +558,34 @@ would cost much of what it saves; decide on it after reading `?perf` on Steve's 
 
 ### Maker 2026-10-20
 - No change proposals open. One body request granted: Dimmer's "shuttered lantern glow only a little" is the new `dimlantern` part (one dull umber coal), written to its `traits.body`. `mind_runs` does not exist yet (migration 0014 waits for Steve), and the `mind` function was left at live v18; `kit.json` is regenerated for the next deploy. Verified: build, talk and town playtests, `screenshots/body-dimmer.png`.
+
+### Session 17 (2026-10-25): 15 s a light year; iron, hydrogen and mannies; a fresh galaxy (Steve: "Make the travelling 15 seconds for each light year", "there will always be a body for the player to use that can be controlled from anywhere", "erase all the characters", "Make iron and hydrogen main things we can gather", "the player must create a 'manny' that looks like the player")
+- **Travel.** A trip takes 15 seconds a light year (`travel.json cruise.secondsPerLy`): Alpha Centauri about 65 s, a
+  beacon at 25 to 43 ly 6 to 11 minutes; a hop inside a system 15 s. A ship on an older schedule lands when the same
+  trip would now. Times under ten minutes read in minutes and seconds ("1 MIN 6 SEC").
+- **Iron and hydrogen** (`items.json`, `supplies.json` materials). Iron ore (dark iron, bright steel facets, rust in the
+  seams; a cold glint runs over it) sits by rock; hydrogen vents (a stone mouth breathing a pink bubble, the color
+  hydrogen glows; smaller bubbles rise) sit by water or in the open. 12 and 10 per Earth-sized world (three times as
+  many on beacon worlds) and four of each just off the town's lots. Hit them like crystals: the pickups (a steel
+  nugget that glints, a pink bubble that floats) fly to you and go into the world's store. Copies keep mining Ember
+  only. Counters for both sit beside the Ember counter.
+- **Mannies** (`manny.json`, `src/entities/Manny.ts`, `src/scenes/planet/Link.ts`, `src/core/mannies.ts`). Every town
+  square has a manny dock (an iron pad with a ring of hydrogen light, two pylons, a scanner). With 15 iron and 10
+  hydrogen in the store its pylons light and a ghost of you stands in it; near it, a readout says what is missing.
+  Attack on the pad: the iron and hydrogen fly in, the scanner reads you, and a manny in your likeness rises on the pad
+  and goes to standby (your body, dimmed, a pink pilot light). One per world, kept on your row (`traits.mannies`).
+- **Linking.** At the vessel the star map shows LINK for any world with your manny: your own body hops into the vessel
+  (which waits there, `traits.ship`) and a beam wakes you in that manny. From a manny, the vessel's berth on that world
+  stands empty; the board ring there opens the map with LINK and TO VESSEL (back into your own body, wherever the vessel
+  waits). In flight, worlds with your manny lead the top-left row (ringed in your visor color): linking leaves the
+  ship flying on alone; once it lands that star counts as reached, and TO VESSEL finds it there (TO SHIP while it still
+  flies). A manny you leave stands where you left it; launching from a world puts its manny back in the dock. You can
+  only launch from where the vessel is.
+- **The reset** (Steve: erase every character and its records). A copy of every row to be erased is in the
+  database's `backup_20261025` schema (RLS on, no grants to the API roles); drop it once it is not wanted. The erase
+  itself (all replicants, his original too, so a new one wakes in the cradle on Earth; Hearth's profile, an awakened
+  copy; every planet, journey, discovered star, note, letter and request; kept: the galaxy, its login, Steve's profile
+  and the minds' spend ledger) waits for Steve's confirmation in the Supabase connector.
+- Verified: build, `tools/playtest-manny.mjs` (new) and the whole `npm test`. `screenshots/manny-*.png`,
+  `ores-n.png` (iron and hydrogen at night).
+
