@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { BACKEND, MIND, PLAYER } from '../core/data';
 import { PARTS } from '../core/body';
 import TRAVEL from '../data/travel.json';
+import { distanceLy, travelMs } from '../world/galaxy';
 
 export interface Profile {
   id: string;
@@ -153,12 +154,11 @@ export interface PlanetSave {
   data: PlanetData;
 }
 
-/** With fixed-length trips or the short cruise on (travel.json), a ship still flying on an older, longer schedule
- * arrives by the longest trip there is now. */
+/** With fixed-length trips or the cruise on (travel.json), a ship still flying on an older, longer schedule arrives
+ * when the same trip would now. */
 function capJourney<J extends Journey>(j: J): J {
-  const longest = TRAVEL.fixedSeconds > 0 ? TRAVEL.fixedSeconds : TRAVEL.cruise.enabled ? TRAVEL.cruise.maxSeconds : 0;
-  if (!longest) return j;
-  const cap = Date.parse(j.departs_at) + longest * 1000;
+  if (TRAVEL.fixedSeconds <= 0 && !TRAVEL.cruise.enabled) return j;
+  const cap = Date.parse(j.departs_at) + travelMs(distanceLy(j.from_star, j.to_star));
   return Date.parse(j.arrives_at) > cap ? { ...j, arrives_at: new Date(cap).toISOString() } : j;
 }
 

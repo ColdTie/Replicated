@@ -2,12 +2,10 @@
   "_doc": "Real-time travel. Trip minutes = minutesAtRef * (lightYears / refLy) ^ exponent: Alpha Centauri about 45 minutes, 12 ly about 10 hours, a beacon (25-43 ly) about 3 to 10 days. fuel (Embers from the planet you leave) = fuelBase + fuelPerLy * lightYears. needCopy: someone has to stay behind, so you can only launch from a planet that has at least one copy. ?fast in the URL turns minutes into seconds for testing. inSystemMinutes: real-time length of a hop between two planets of the same star. fixedSeconds: when above 0, every trip takes exactly that many seconds (Steve asked for 5 s trips on 2026-10-06); set it to 0 to bring back real-time travel. cruise (below) is used when fixedSeconds is 0.",
   "fixedSeconds": 0,
   "cruise": {
-    "_doc": "A trip is a short cruise (Steve, 2026-10-19: 1 to 3 minutes): minSeconds for the nearest stars up to maxSeconds at maxLy and beyond, growing with the square root of the distance; a hop inside a system takes inSystemSeconds. Used while enabled; set enabled false (and fixedSeconds 0) for real-time travel, or fixedSeconds above 0 for a fixed trip.",
+    "_doc": "A trip takes secondsPerLy for every light year (Steve, 2026-10-25: 15 seconds a light year; Alpha Centauri about 65 s, 12 ly 3 minutes, a beacon at 25 to 43 ly 6 to 11 minutes); a hop between planets of the same star takes inSystemSeconds. Used while enabled; set enabled false (and fixedSeconds 0) for real-time travel, or fixedSeconds above 0 for a fixed trip.",
     "enabled": true,
-    "minSeconds": 60,
-    "maxSeconds": 180,
-    "maxLy": 45,
-    "inSystemSeconds": 20
+    "secondsPerLy": 15,
+    "inSystemSeconds": 15
   },
   "minutesAtRef": 45,
   "refLy": 4.37,
