@@ -102,6 +102,9 @@ try {
       let ok = true;
       for (let dx = -80; dx <= 14 && ok; dx += 4) for (const dy of [-6, 0, 6]) if (s.blockedAt(x + dx, y + dy)) { ok = false; break; }
       if (!ok) continue;
+      // not by the husk vault's doorway (standing in it takes you down) or the hatch
+      if (Math.abs(y - s.dock.y) < 40 && x - 90 < s.dock.x + 20 && x + 20 > s.dock.x - 20) continue;
+      if (Math.abs(y - s.warren.hatch.y) < 30 && x - 90 < s.warren.hatch.x + 20 && x + 20 > s.warren.hatch.x - 20) continue;
       const n = s.npcs.find((q) => q.data.id === id);
       n.x = x; n.y = y; n.sync();
       // the others well away

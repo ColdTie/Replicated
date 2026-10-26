@@ -444,8 +444,8 @@ export class PlanetScene extends Phaser.Scene {
     const saved = r && r.star_id === p.star && r.planet_index === p.planetIndex && r.pos_x != null && r.pos_y != null
       && this.isWalkable(r.pos_x, r.pos_y) && !this.migrated ? { x: r.pos_x, y: r.pos_y! } : null;
     // just moved into the town: the replicant stands by the vessel (its old spot belongs to the old layout); linked
-    // into a manny that waited in its dock: on the dock's pad
-    const start = saved ?? (this.link === 'manny' ? { x: b.dock.x, y: b.dock.y + 2 } : this.link === 'vessel' ? this.boardSpot
+    // into a husk that waited in the vault: just out of its door
+    const start = saved ?? (this.link === 'manny' ? { x: b.dock.x, y: b.dock.y + 10 } : this.link === 'vessel' ? this.boardSpot
       : this.migrated ? { x: b.vessel.x + 20, y: b.vessel.y + 18 } : this.home);
     this.player = new Player(this, start.x, start.y);
     this.dock = new MannyDock(this, b.dock.x, b.dock.y);
@@ -794,7 +794,7 @@ export class PlanetScene extends Phaser.Scene {
     this.updateCamera();
     this.base.update(time, this.embers);
     this.base.updateSpot(time, this.canReplicate());
-    this.dock.update(time);
+    this.dock.update(time, dt);
     if (this.boardRing) {
       const ready = this.departure.boardReady();
       const on = this.departure.playerOnBoardSpot();

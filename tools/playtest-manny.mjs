@@ -1,5 +1,5 @@
 // Headless playtest of iron, hydrogen and mannies (manny.json): break an iron ore and a hydrogen vent and the pickups
-// fill the store; build a manny at the dock; link into a manny on another world from a ship in flight (the berth there
+// fill the store; build a husk in the vault (down its steps, from its menu); link into a manny on another world from a ship in flight (the berth there
 // stands empty), from that manny into the Earth one, back to the ship once it has landed without you, and from your
 // own body into a manny (the body waits aboard the vessel). Usage: npm run build && node tools/playtest-manny.mjs
 import { spawn } from 'node:child_process';
@@ -57,23 +57,38 @@ try {
   }
   await shot('manny-ores');
 
-  // 2. the dock: not enough yet refuses, then with enough a manny is built in the player's likeness
-  const dock = await ev(() => { const s = window.__scene; s.supplies.iron = 3; s.supplies.hydrogen = 1; s.markSupplies(); s.player.setPosition(s.dock.x, s.dock.y); s.player.locked = false; return { x: s.dock.x, y: s.dock.y }; });
-  await page.keyboard.press('Space');
+  // 2. the husk vault: stand in its doorway and you go down; its menu cannot build a husk without enough, then can,
+  // and the husk waits in its pod in your likeness
+  const dock = await ev(() => { const s = window.__scene; s.supplies.iron = 3; s.supplies.hydrogen = 1; s.markSupplies(); s.player.setPosition(s.dock.x, s.dock.y + 4); s.player.locked = false; return { x: s.dock.x, y: s.dock.y }; });
+  const vaultOpen = () => page.waitForFunction(() => window.__game.scene.isActive('vault') && window.__vault?.rows?.length, null, { timeout: 8000 }).then(() => true).catch(() => false);
+  if (!(await vaultOpen())) fail('standing in the vault doorway did not take you down');
   await page.waitForTimeout(600);
-  if (await ev(() => !!window.__session.replicant.traits.mannies)) fail('a manny was built without enough iron and hydrogen');
-  await ev(() => { const s = window.__scene; s.supplies.iron = 20; s.supplies.hydrogen = 12; s.markSupplies(); });
+  const menu = await ev(() => window.__vault.rows.map((r) => ({ kind: r.kind, label: r.label, enabled: r.enabled })));
+  log('vault menu', JSON.stringify(menu));
+  const build = menu.find((r) => r.kind === 'build');
+  if (!build || build.enabled) fail('the vault offers to build a husk without enough iron and hydrogen');
+  await page.keyboard.press('Enter');
   await page.waitForTimeout(400);
-  await shot('manny-dock-ready');
+  if (await ev(() => !!window.__session.replicant.traits.mannies)) fail('a husk was built without enough iron and hydrogen');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !window.__game.scene.isActive('vault') && !window.__scene.player.locked, null, { timeout: 5000 }).catch(() => fail('Esc did not take you back up'));
+  await ev(() => { const s = window.__scene; s.supplies.iron = 20; s.supplies.hydrogen = 12; s.markSupplies(); s.dock.readyAt = 0; s.player.setPosition(s.dock.x, s.dock.y + 4); });
   await page.keyboard.press('Space');
+  if (!(await vaultOpen())) fail('action in the doorway did not open the vault');
+  await page.waitForTimeout(600);
+  await shot('vault-build-ready');
+  await ev(() => { const v = window.__vault; v.index = v.rows.findIndex((r) => r.kind === 'build'); v.pick(); });
   await page.waitForTimeout(1800);
-  await shot('manny-building');
-  await page.waitForTimeout(2200);
-  const built = await ev(() => ({ mannies: window.__session.replicant.traits.mannies, iron: window.__scene.supplies.iron, hydrogen: window.__scene.supplies.hydrogen, idle: !!window.__scene.dock.idle }));
-  log('built', JSON.stringify(built), 'dock at', JSON.stringify(dock));
+  await shot('vault-building');
+  await page.waitForFunction(() => window.__vault?.rows?.some((r) => r.kind === 'husk'), null, { timeout: 8000 }).catch(() => fail('the new husk is not on the vault menu'));
+  await page.waitForTimeout(600);
+  const built = await ev(() => ({ mannies: window.__session.replicant.traits.mannies, iron: window.__scene.supplies.iron, hydrogen: window.__scene.supplies.hydrogen, rows: window.__vault.rows.map((r) => `${r.kind}:${r.sub}`) }));
+  log('built', JSON.stringify(built), 'vault at', JSON.stringify(dock));
   if (!built.mannies?.['sol:3']) fail('no manny was recorded for Earth');
-  if (built.iron !== 5 || built.hydrogen !== 2) fail('the manny did not cost 15 iron and 10 hydrogen');
-  if (!built.idle) fail('the new manny is not standing in its dock');
+  if (built.iron !== 5 || built.hydrogen !== 2) fail('the husk did not cost 15 iron and 10 hydrogen');
+  await shot('vault-husk');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !window.__game.scene.isActive('vault'), null, { timeout: 5000 });
   await ev(() => { const s = window.__scene; s.player.setPosition(s.dock.x + 30, s.dock.y + 14); });
   await page.waitForTimeout(500);
   await shot('manny-built');
@@ -115,10 +130,11 @@ try {
   await ev(() => { const m = window.__game.scene.getScene('starmap'); m.selected = m.projected.find((p) => p.star.id === 'sol').star; m.updateInfo(); m.link(); });
   if (!(await waitOn('sol'))) fail('linking from Alpha Centauri did not wake you in the Earth manny');
   const earth = await ev(() => { const s = window.__scene, r = window.__session.replicant; return { ship: r.traits.ship?.star, alpha: r.traits.mannies['alpha-cen:1'], away: s.vesselAway, idle: !!s.dock.idle, onPad: Math.hypot(s.player.x - s.dock.x, s.player.y - s.dock.y) < 12 }; });
+  // waking in a husk that waited in the vault: you step out of its door
   log('earth manny', JSON.stringify(earth), 'left at', JSON.stringify(leftAt));
   if (earth.ship !== 'keid') fail('the ship was forgotten on the way');
   if (earth.alpha?.x !== leftAt.x) fail('the Alpha Centauri manny does not remember where it was left');
-  if (!earth.away || earth.idle || !earth.onPad) fail('you did not wake in the Earth manny on its dock');
+  if (!earth.away || earth.idle || !earth.onPad) fail('you did not wake in the Earth husk at the vault door');
 
   // 5. the ship lands at Keid while you are away; TO VESSEL finds it there and the star counts as reached
   await ev(() => { const j = window.__session.replicant.traits.ship.journey; j.arrives_at = new Date(Date.now() - 1000).toISOString(); });
@@ -145,6 +161,20 @@ try {
   const last = await ev(() => window.__session.replicant.traits.ship);
   log('own body waits', JSON.stringify(last));
   if (last?.star !== 'keid' || last.journey) fail('your own body is not waiting aboard the vessel at Keid');
+
+  // 7. the vault's menu lists every husk (here first, then by distance); picking the Alpha Centauri one links you there
+  await page.waitForFunction(() => !window.__scene.player.locked, null, { timeout: 10000 }).catch(() => undefined);
+  await ev(() => { const s = window.__scene; s.dock.readyAt = 0; s.player.setPosition(s.dock.x, s.dock.y + 4); s.player.locked = false; s.dock.open(); });
+  await page.waitForFunction(() => window.__game.scene.isActive('vault') && window.__vault?.rows?.length, null, { timeout: 8000 }).catch(() => fail('the vault did not open from a husk'));
+  await page.waitForTimeout(700);
+  const rows = await ev(() => window.__vault.rows.map((r) => ({ kind: r.kind, label: r.label, sub: r.sub, enabled: r.enabled, star: r.star })));
+  log('vault rows', JSON.stringify(rows));
+  if (rows[0]?.star !== 'sol' || rows[0].enabled) fail('the husk you are in is not first and marked');
+  if (!rows.some((r) => r.star === 'alpha-cen')) fail('the vault does not list the husk on another world');
+  if (!rows.some((r) => r.kind === 'body')) fail('the vault does not offer the way back to your body');
+  await shot('vault-menu');
+  await ev(() => { const v = window.__vault; v.index = v.rows.findIndex((r) => r.star === 'alpha-cen'); v.pick(); });
+  if (!(await waitOn('alpha-cen'))) fail('picking a husk in the vault did not link you to it');
 } finally { await b.close(); try { process.kill(-server.pid); } catch {} }
 console.log('errors', errors);
 process.exit(errors.length ? 1 : 0);

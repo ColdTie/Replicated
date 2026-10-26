@@ -422,6 +422,28 @@ class SoundEngine {
     notes.forEach((s, i) => this.tone(midi((kind === 'wake' ? 69 : 57) + s), kind === 'wake' ? 0.5 : 0.9, { type: kind === 'wake' ? 'triangle' : 'sine', vol: 0.07, delay: i * (kind === 'wake' ? 0.08 : 0.16), rev: 0.7 }));
   }
 
+  /** The husk vault: its door (a heavy iron slide, a hiss of air), the hum of the pods below while you are in it, and
+   * the menu (a soft tick per row, a bright double tone to pick). */
+  vaultDoor() {
+    if (!this.ready('vaultDoor', 400)) return;
+    this.noise(0.5, { type: 'lowpass', freq: 500, to: 160, vol: 0.18, attack: 0.02 });
+    this.tone(70, 0.4, { type: 'square', to: 55, vol: 0.05 });
+    this.noise(0.35, { freq: 3000, q: 1.5, vol: 0.05, delay: 0.3 });
+  }
+  vaultHum(on: boolean) {
+    if (!on) { this.hum?.stop(); this.hum = undefined; return; }
+    if (this.hum || !this.ctx || !this.sfxBus) return;
+    const o = this.ctx.createOscillator(), o2 = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = 'sine'; o.frequency.value = 55; o2.type = 'sine'; o2.frequency.value = 82.5;
+    g.gain.value = 0; g.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + 1.2);
+    o.connect(g); o2.connect(g); g.connect(this.sfxBus);
+    o.start(); o2.start();
+    this.hum = { stop: () => { const t = this.ctx!.currentTime; g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(g.gain.value, t); g.gain.linearRampToValueAtTime(0, t + 0.6); o.stop(t + 0.7); o2.stop(t + 0.7); } };
+  }
+  private hum?: { stop(): void };
+  menuMove(i: number) { if (this.ready('menuMove', 40)) this.tone(midi(84 + (i % 3) * 2), 0.06, { type: 'triangle', vol: 0.04 }); }
+  menuPick() { if (this.ready('menuPick', 120)) [0, 7].forEach((s, i) => this.tone(midi(84 + s), 0.12, { type: 'triangle', vol: 0.06, delay: i * 0.06, rev: 0.3 })); }
+
   /** Not enough Embers: a low double buzz. */
   denied() {
     if (!this.ready('denied', 400)) return;

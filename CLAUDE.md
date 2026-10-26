@@ -152,7 +152,8 @@ src/world/groundPaint.ts painted floor: one full-color image per planet (relief-
 src/fx/                  Lighting (multiply darkness RT + additive lights), Atmosphere (sky, stars, fog,
                          dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
 src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember, iron, hydrogen by kind),
-                         Base (pad + Replicator), Manny (the manny dock: build one, the manny on standby)
+                         Base (pad + Replicator), Manny (the husk vault's bunker in the square: down its steps, a husk
+                         left standing on standby)
 src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
 src/audio/Sound.ts       procedural WebAudio: every sound effect and the generative ambient music (no audio files)
 src/entities/            ... Spitter + Spore (reflectable), Wildlife
@@ -187,13 +188,15 @@ src/entities/Buildings.ts proposals, the original's approve / veto, paying, shar
                          communal Meeting Hall / Workshop / Lookout the village starts on its own when the store is full
 src/data/supplies.json   materials (stone, soil, wood, scrap, Ember, iron, hydrogen), yields, storage, recipes
 src/data/items.json      Ember, iron and hydrogen: node hits, drops, colors, how many per world
-src/data/manny.json      mannies: cost (iron + hydrogen), where the dock stands, how near its readout shows
+src/data/manny.json      husks (mannies in code): cost (iron + hydrogen), where the vault stands, the doorway dwell
 src/core/mannies.ts      which worlds have your manny, whether you drive one, where the vessel is (traits.ship)
 src/scenes/planet/Link.ts linking: into a manny on another world, back to your own body aboard the vessel, the beam
                          and the waking; the vessel's empty berth while it is elsewhere (PlanetScene.vesselAway)
 src/data/parts.json      the parts kit: heads, visors, torsos, arms, legs (or treads / hover), back pieces, named colors, poses
 src/core/bodyRender.ts   composes a 16x20 x 14 frame body from the kit + a spec (pure; tools/body-preview.mjs runs it in Node)
 src/core/body.ts         bodyFor(): the texture for a replicant (composed and cached, or its hand-made model), visor anchors
+src/scenes/VaultScene    the husk vault below the bunker: a pod per husk you own, the menu (link into any husk, build
+                         this world's, back to your body, up)
 src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star, tap again for its system: planets as live globes
                          on temperature-tinted orbits, tap one to pick it), launch or look-only
 src/scenes/TravelScene   departure orbit (globe, giant behind a moon), warp, real-time cruise + ETA, visits, arrival
@@ -292,8 +295,9 @@ a blank copy, dash still on Shift, the real talk wake with the canned mind),
 `node tools/playtest-homeworld.mjs` (a new player on LHS 1140 b: the scan, Thales' word, the visor, the founded
 structures, Thales by his work, the Printworks printed to the end, Thales never handed over),
 `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
-on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, a manny built at the dock, linked
-into from a ship in flight, from manny to manny, back to the ship once it landed alone, from your own body), `node tools/build-code-view.mjs [outDir]` (the source bundle the copies read; the deploy runs it),
+on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, the vault opens from its doorway, a husk built
+from its menu, linked
+into from a ship in flight, from manny to manny, back to the ship once it landed alone, from your own body, from the vault's menu), `node tools/build-code-view.mjs [outDir]` (the source bundle the copies read; the deploy runs it),
 `node --experimental-strip-types tools/body-preview.mjs [--random 6]` (composed bodies side by side -> `screenshots/bodies.png`),
 `node tools/fps.mjs "<query>"` (headless frame rate; software GL, only for comparing builds),
 `node tools/sim-live.mjs <seed.json> <out.json> --minutes 10` (gives planets simulated play time from a snapshot of
@@ -308,8 +312,8 @@ reach, a swing works on the village: a tree (6 swings fell it), rock (4 break of
 raised (a blow). Walk into a building waiting for what you carry, a copy, or the hatch to
 hand the load over. Stand on the open hatch for a moment (a warm ring fills) or press attack on it to go down; walking
 or dashing across it never does. At the Replicator (attack on its ring with enough Ember) two lights open over it: WAKE (left) and HOLD (right);
-Left / Right (or the stick) choose, attack / E or a click on one picks. Attack on the manny dock's pad (lit, with a ghost of you, once the store holds enough
-iron and hydrogen) builds a manny. At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
+Left / Right (or the stick) choose, attack / E or a click on one picks. Standing in the husk vault's doorway a moment (a ring
+fills) or attack there goes down to the vault; Up / Down choose a row, attack / E / Enter pick, Esc goes up. At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
 LINK; at the empty berth (the vessel is elsewhere) it has LINK and TO VESSEL / TO SHIP; in flight a world with your
 manny in the top-left row links you there. Dash Shift/K/X, gamepad
 B/L1/R2, swipe on the right side. Talk to the copy beside you (a speech mark shows over it): E, right click, gamepad Y,
@@ -689,3 +693,16 @@ fly to (its intro is now a landing).
 - Verified: build, `npm test` 15 of 15 (`playtest-homeworld` now covers the first profile, naming, HOLD, the handover
   and the new player's first wake; `playtest-together` the handover without a Spark). Screenshots
   `opening-name.png`, `choice-wake-hold.png`, `held-vessel.png`, `home-profiles.png`.
+
+**Step 3, the husk vault.** The manny dock is gone from the square; a husk vault stands there (`huskvault` sprite: a
+low iron bunker half sunk in the ground, its door lit pink while a husk waits below or one can be built). Stand in its
+doorway a moment (a ring fills, as at the hatch) or press attack there and you go down (`src/scenes/VaultScene.ts`, over
+the paused planet like the warren): pods along the back wall, one per husk you own (this world's dimmed in its pod,
+the others as cold holograms of the same body), and a menu: every husk (this world's first, then by distance; the one
+you are in is marked), BUILD A HUSK with this world's iron and hydrogen (`manny.json cost`; iron and hydrogen fly into
+the empty pod, the scanner reads you, the husk rises), TO YOUR BODY while you drive a husk, UP THE STEPS. Picking a
+husk links you into it (`Link.linkTo`, unchanged). Arriving in a husk that waited in the vault, you step out of its
+door. A husk you leave somewhere still stands there on standby. Player facing words are husks and the ship ("YOUR
+HUSKS", "TO SHIP"); the code keeps manny and vessel. New sounds: the vault door, the pods' hum, the menu.
+- Verified: build, `npm test` 15 of 15 (`playtest-manny` goes through the vault; `playtest-talk` keeps its test spot
+  out of the doorway). Screenshots `vault-build-ready.png`, `vault-building.png`, `vault-husk.png`, `vault-menu.png`.
