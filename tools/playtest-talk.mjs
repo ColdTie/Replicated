@@ -290,6 +290,8 @@ try {
   if (await ev((id) => window.__scene.npcs.find((q) => q.data.id === id).state !== 'blank', kilnId)) fail('talking changed the blank copy');
   await page.screenshot({ path: 'screenshots/talk-blank.png' });
   await page.keyboard.press('Escape');
+  // a slow frame can take Esc and the next E together: wait until the box has really shut
+  await page.waitForFunction(() => !window.__game.scene.getScene('ui').talkBox.isOpen, null, { timeout: 5000 }).catch(() => fail('Esc did not close the blank copy\'s box'));
   await page.waitForTimeout(300);
   await ev((id) => { const n = window.__scene.npcs.find((q) => q.data.id === id); n.x += 300; n.sync(); }, kilnId);
 
