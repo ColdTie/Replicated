@@ -99,7 +99,7 @@ export interface JournalView {
 }
 
 /** What the journal (and the talk box) says while the copies' words are still runes. */
-export const HEAR_HINT = 'They sing, but you cannot read them yet. Something in the ruins listens.';
+export const HEAR_HINT = 'They sing, but you cannot read them yet.';
 
 let open: HTMLElement | null = null;
 export const journalOpen = () => !!open;

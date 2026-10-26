@@ -11,8 +11,8 @@ const MATERIALS = SUPPLIES.materials as Record<string, { icon: number; color: nu
 type Tree = PlanetScene['trees'][number];
 
 /**
- * The original's own hands in the village: felling a tree, breaking stone off rock, scavenging an opened ruin; the
- * load rides above the head and is handed over by walking into a building that waits for it, the hatch or a copy;
+ * The original's own hands in the village: felling a tree, breaking stone off rock; the load rides above the head
+ * and is handed over by walking into a building that waits for it, the hatch or a copy;
  * swings at a building being raised count with the copies' blows. Tunables: src/data/supplies.json hands.
  * Part of PlanetScene (src/scenes/PlanetScene.ts); `s` is the scene.
  */
@@ -22,7 +22,7 @@ export class Hands {
   /** what rides above the head */
   load: { material: string; n: number } | null = null;
   private stack: Phaser.GameObjects.Image[] = [];
-  /** chips on a tree, a rock tile or a ruin machine, healed after hitsForgetMs */
+  /** chips on a tree or a rock tile, healed after hitsForgetMs */
   private chips = new Map<string, { hits: number; at: number }>();
   /** rock tiles stone was taken from, and when */
   private rockTaken = new Map<number, number>();
@@ -45,11 +45,6 @@ export class Hands {
     for (const t of s.trees) {
       if (!t.alive || Math.hypot(t.x - hx, t.y - 6 - hy) > radius + 6) continue;
       this.chipTree(t);
-      return true;
-    }
-    for (const r of s.ruins) {
-      if (!r.open || Math.hypot(r.machinePos.x - hx, r.machinePos.y - 6 - hy) > radius + 6) continue;
-      this.chipRuin(r.index, r.machinePos);
       return true;
     }
     return this.chipRock(hx, hy);
@@ -88,17 +83,6 @@ export class Hands {
       s.tweens.add({ targets: t.sprite, alpha: 0, duration: 1200, delay: 600, onComplete: () => t.sprite.destroy() });
     } });
     s.pending.felled = [...new Set([...(session.planet?.data.felled ?? []), ...(s.pending.felled ?? []), t.index])];
-  }
-
-  private chipRuin(index: number, m: { x: number; y: number }) {
-    const s = this.s, w = s.warren;
-    s.fx.sparks(m.x + (Math.random() - 0.5) * 8, m.y - 8, PALETTE[9], 3);
-    sound.hit();
-    if (!this.chip(`u${index}`, 3)) return;
-    if (Date.now() - (w.data.scavenged?.[index] ?? 0) < SUPPLIES.ruinCooldownMinutes * 60_000) { sound.denied(); return; }
-    w.data.scavenged = { ...(w.data.scavenged ?? {}), [index]: Date.now() };
-    w.save();
-    this.take('scrap', SUPPLIES.scrapPerRuin, { x: m.x, y: m.y - 8 });
   }
 
   /** Rock under the swing (or just above it: walls are hit from below). */

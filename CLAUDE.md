@@ -117,7 +117,7 @@ src/data/*.json          palette, planets, player, enemies, items, structures, b
 src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by tools/build-stars.mjs; edit the catalog there)
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
 src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalStore (localStorage)
-src/world/planetGen.ts   seeded island: floor/rock/ruins/void, tiles, nodes, enemies, decor, glows,
+src/world/planetGen.ts   seeded island: floor/rock/water/void (no ruins since 2026-10-26), tiles, nodes, enemies, decor, glows,
                          trees/towers + blockers, fixed base layout (vessel, cradle, build pad, manny dock), the town
                          kept open; iron ore (by rock) and hydrogen vents (by water, or in the open) placed last with
                          their own rng (`ores`; their node indexes follow the crystals')
@@ -135,7 +135,7 @@ src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode
                          Base (pad + Replicator), Manny (the manny dock: build one, the manny on standby)
 src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
 src/audio/Sound.ts       procedural WebAudio: every sound effect and the generative ambient music (no audio files)
-src/entities/            ... Spitter + Spore (reflectable), Ruin (machine core -> sealed door -> module), Wildlife
+src/entities/            ... Spitter + Spore (reflectable), Wildlife
                          (Grazer you pet, bird Flock that scatters, Butterflies by day), Npc (drifted copies), Gear
 src/core/drift.ts        replication drift (visor, headgear, trail, stats) from src/data/drift.json
 src/world/galaxy.ts      star lookup, distances, travel time and fuel (src/data/travel.json), planetFor(star, index):
@@ -237,7 +237,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | mind | `temperament` | `{ pace, sociability, work, bedtime, risk }` (`set_temperament`): walking pace, greeting range, build vs wander, when it turns in, how far it ranges |
 | mind | `wants` | `[{ text, category, done, at }]` 1 to 3 goals in its own words (`set_wants` / `finish_want`) |
 | state | `blank` | born and not yet itself (grey, still; the first wake is the becoming) |
-| state | `awake`, `mods`, `sparks` | intro played; ruin modules (`listen` reads the copies' words); Sparks held |
+| state | `awake`, `mods`, `sparks` | intro played; ruin modules from before 2026-10-26 (light, dash, swing still count); Sparks held |
 | state | `handedBy` | the replicant that awakened this one with a Spark (it was a copy, so it reads the copies without `listen`) |
 | state | `cargo` | `{ material, n, from }` what the vessel's hold carries between worlds (supplies.json signature), or null |
 | state | `inherit` | `{ from, name, wants }`: born with a Spark beside that copy; it carries its notes and remembers being it |
@@ -250,7 +250,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 
 Commands: `npm run dev` (local server), `npm run build`, `npm test` (after a build: the mind tool check and every
 playtest, about 6 minutes; `npm test -- talk town` runs only those), `npm run sprites -- --preview` (writes `screenshots/sprite-sheet.png`), `node tools/screenshot.mjs --name <n> [--query "shot=1"] [--wait ms]`,
-`node tools/playtest.mjs` (scripted headless playtest of the ruin puzzle, dash, combo, spore reflect, petting),
+`node tools/playtest.mjs` (scripted headless playtest: no ruins on the world, dash, combo, spore reflect, petting),
 `node tools/playtest-beacon.mjs` (beacon world: keeper wakes, charges, slams, falls; beacon lights; Spark saved),
 `node tools/playtest-warren.mjs` (rooms planned, a copy digs, a copy makes its bed, down the hatch, walk, back up),
 `node tools/playtest-become.mjs` (a blank birth, the becoming with the canned mind, eating, the journal's wants),
@@ -263,7 +263,7 @@ it, swings raise it, a load handed to a copy, stone from rock, a load stowed whe
 room is improved, an away wake plays out, a Spark awakens a copy as a player),
 `node tools/playtest-town.mjs [seed.json] [--port n] [--shots]` (an old save moves into the town once, nothing lost; the
 world is open; copies reach what they need; with a snapshot of the live data it checks the real planet),
-`node tools/playtest-talk.mjs` (the talk hint, E / right click open the box, pages, back, close, the reply line, runes,
+`node tools/playtest-talk.mjs` (the talk hint, E / right click open the box, pages, back, close, the reply line, words read without a module,
 a blank copy, dash still on Shift, the real talk wake with the canned mind),
 `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, a manny built at the dock, linked
@@ -278,8 +278,8 @@ migration 0009), which merges only those keys, so a game left open never undoes 
 
 Controls: move WASD/arrows/left stick/left-side touch drag. Attack Space/J/Enter/Z, left click, gamepad A/X/R1, tap right
 side (three quick attacks = heavy combo finisher; presses during the cooldown are buffered). With nothing alive in
-reach, a swing works on the village: a tree (6 swings fell it), rock (4 break off stone), an opened ruin's machine
-(scrap), a building being raised (a blow). Walk into a building waiting for what you carry, a copy, or the hatch to
+reach, a swing works on the village: a tree (6 swings fell it), rock (4 break off stone), a building being
+raised (a blow). Walk into a building waiting for what you carry, a copy, or the hatch to
 hand the load over. Stand on the open hatch for a moment (a warm ring fills) or press attack on it to go down; walking
 or dashing across it never does. Attack on the manny dock's pad (lit, with a ghost of you, once the store holds enough
 iron and hydrogen) builds a manny. At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
@@ -291,7 +291,7 @@ within `talk.json clickRange` (96 px, six tiles) to talk to that one; in the box
 R = reply (a letter it answers at once). M or the speaker icon (top right) mutes.
 
 URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
-screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond|ruin` for other spots, `&kid` for kid mode),
+screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond` for other spots, `&kid` for kid mode),
 `?planet=solace`, `?seed=123`, `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
 `?low` (force low-detail mode; also switches on by itself under 40 fps), `?perf` (the planet's load phases in seconds,
 bottom left, for 12 s: save, world, ground, rock, rest; also `window.__loadMs`), `?fast` (travel minutes become seconds; a cruise takes a twelfth as long),
@@ -596,4 +596,18 @@ would cost much of what it saves; decide on it after reading `?perf` on Steve's 
   beacon about 4 s. The departure and arrival scenes (about 4 s out, 3.5 s in) are now most of a trip; a ship already
   in flight lands on the new schedule. Durations under 10 s read in tenths ("0.4 SEC").
 - `playtest-manny` and `playtest-travel` hold their flight in the air (a far `arrives_at`) while they act in it.
+
+### Session 18 (2026-10-26): no ruins; a faster replicant (Steve: "Take away all the ruins. Make the base speed of the playable character 15% faster.")
+- **The ruins are gone** from every world (`src/entities/Ruin.ts` deleted, with its scene hooks). Where one stood is now
+  open ground. `planetGen` still works out each old ruin's footprint with the same random draws (`cleared` its floor,
+  `oldWall` its walls) and placement treats them as before, so every world keeps the trees, crystals, ores, creatures
+  and ponds its saves were made on: Earth and Solace generate identical apart from the ruin walls and their pillars.
+  `biomes.json` / `planets.json` `ruins` is now only that count.
+- **Everyone understands the copies.** The listening module came only from ruins, so `canHear()` is always true; modules
+  already on a row still count.
+- **Scrap** (lamps, the workbench) came only from ruins: copies now pick it off iron ore (`supplies.json scrapPerOre`,
+  each ore once per `scrapCooldownMinutes`). The original's swing no longer scavenges. The mind function's line
+  "opened ruins give scrap" now says iron ore; it takes effect with the next `mind` deploy.
+- **Speed** `player.json speed` 99 -> 114 (+15%).
+- Verified: build, the layout comparison against main, `npm test`, `screenshots/no-ruins.png` (where an Earth ruin stood).
 

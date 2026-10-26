@@ -2,7 +2,7 @@
 // notes and letters): walk up to a copy and its talk hint shows; E opens the talk box (SAYS, THOUGHTS, WANTS,
 // LETTERS), E / Space turn the pages, Left goes back, Esc closes and the copy goes back to what it was doing;
 // right click opens it too and no longer dashes (Shift still does); a left click on a copy a few steps away talks to
-// it; a blank copy has one wordless page; runes until you can hear (an awakened copy always can); R sends a reply as a
+// it; a blank copy has one wordless page; words readable without any module; R sends a reply as a
 // letter and the copy's answer comes as a new page.
 // Usage: npm run build && node tools/playtest-talk.mjs [seed.json] [journal.json]
 // (without arguments it seeds a small made-up Earth of its own)
@@ -290,7 +290,7 @@ try {
   await page.waitForTimeout(300);
   await ev((id) => { const n = window.__scene.npcs.find((q) => q.data.id === id); n.x += 300; n.sync(); }, kilnId);
 
-  // 8. runes until you can hear: Prism's words are runes, the plain hint line above them
+  // 8. no module needed to understand them (the ruins that held it are gone): Prism's words read plainly
   await ev(({ id, sp }) => {
     const s = window.__scene, n = s.npcs.find((q) => q.data.id === id);
     window.__session.replicant.traits.mods = [];
@@ -301,25 +301,11 @@ try {
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(500);
   await typed();
-  const runes = await ev(() => { const t = window.__game.scene.getScene('ui').talkBox; return { tones: t.page.lines.flat().map((s) => s.tone), text: t.page.lines.map((l) => l.map((s) => s.text).join('')).join(' ') }; });
-  log('runes', runes.text.slice(0, 90));
-  if (!runes.tones.includes('rune') || !runes.text.includes('cannot read them yet')) fail('no runes (and hint) while not hearing');
-  if (/Quiet hour/.test(runes.text)) fail('words readable while not hearing');
-  await page.screenshot({ path: 'screenshots/talk-runes.png' });
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
-
-  // 8b. a copy a Spark awakened (traits.handedBy) was one of them: it reads their words without the module
-  await ev(() => { window.__session.replicant.traits.handedBy = 'p-giver'; });
-  await page.keyboard.press('KeyE');
-  await page.waitForTimeout(500);
-  await typed();
   const heard = await ev(() => { const t = window.__game.scene.getScene('ui').talkBox; return { tones: t.page.lines.flat().map((s) => s.tone), text: t.page.lines.map((l) => l.map((s) => s.text).join('')).join(' ') }; });
-  log('awakened hears', heard.text.slice(0, 90));
-  if (heard.tones.includes('rune') || heard.text.includes('cannot read them yet')) fail('an awakened copy still saw runes');
+  log('hears without modules', heard.text.slice(0, 90));
+  if (heard.tones.includes('rune') || heard.text.includes('cannot read them yet')) fail('runes without the listening module');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
-  await ev(() => { delete window.__session.replicant.traits.handedBy; });
 
   // 9. R: a reply goes as a letter (no quick wake), the mind's talk wake answers as a new SAYS page
   await ev(() => {

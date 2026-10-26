@@ -1,5 +1,5 @@
 {
-  "_doc": "The material economy that ties the surface to the bunker. Supplies are per planet (planet_states.data.supplies), shared by every copy; Ember is the planet's Ember pool. Sources: stone and soil from digging (digYield per tile, the entrance has its own), wood from felled trees (treeWood each, carried to the hatch), scrap from scavenging opened ruins (scrapPerRuin, once per ruinCooldownMinutes); iron and hydrogen from their nodes (items.json; the materials of mannies, manny.json). Storage: baseCap of each material, plus shelfCap per shelf in the warren. roomWood: timber to shore up a room before it is dug. recipes: what each furnishing takes (ember draws on the Ember pool); bench = needs a workbench in the warren. icons: frames in tools/sprites/supplies.json. upgrade: when stone is at least whenFull of capacity, a copy goes down and improves a dug room one level (cost each time, swings blows; up to max): fitted flagstones, carved walls with a band of the planet's crystal, stone pillars. Each level lifts every copy's mood by moodPerLevel (up to moodMax in all).",
+  "_doc": "The material economy that ties the surface to the bunker. Supplies are per planet (planet_states.data.supplies), shared by every copy; Ember is the planet's Ember pool. Sources: stone and soil from digging (digYield per tile, the entrance has its own), wood from felled trees (treeWood each, carried to the hatch), scrap picked off iron ore by the copies (scrapPerOre, each ore once per scrapCooldownMinutes); iron and hydrogen from their nodes (items.json; the materials of mannies, manny.json). Storage: baseCap of each material, plus shelfCap per shelf in the warren. roomWood: timber to shore up a room before it is dug. recipes: what each furnishing takes (ember draws on the Ember pool); bench = needs a workbench in the warren. icons: frames in tools/sprites/supplies.json. upgrade: when stone is at least whenFull of capacity, a copy goes down and improves a dug room one level (cost each time, swings blows; up to max): fitted flagstones, carved walls with a band of the planet's crystal, stone pillars. Each level lifts every copy's mood by moodPerLevel (up to moodMax in all).",
   "materials": {
     "stone": {
       "icon": 0,
@@ -49,8 +49,8 @@
     "large": 4
   },
   "treeWood": 3,
-  "scrapPerRuin": 2,
-  "ruinCooldownMinutes": 30,
+  "scrapPerOre": 2,
+  "scrapCooldownMinutes": 30,
   "recipes": {
     "rest": {
       "stone": 2,
@@ -97,7 +97,7 @@
     "importMoodMax": 0.12
   },
   "hands": {
-    "_doc": "What the original does with their own hands (src/scenes/planet/Hands.ts). Hitting a tree treeHits times fells it for treeWood; hitting rock rockHits times breaks off rockYield stone (each rock tile once per rockCooldownMinutes); hitting an opened ruin's machine gives scrapPerRuin scrap (same cooldown as the copies' scavenging). The load rides above the head, up to carry of a material; more, or another material, flies to the store. Walking into a building waiting for that material, the hatch, or a copy hands it over (deliverRange px). A copy given a load: company + gift.company, purpose + gift.purpose. A swing at a building being raised counts swingWorth of a copy's blow. needRange: a copy whose building waits on a material shows it over its head when you come this close. hitsForgetMs: chips on a tree or rock heal after this long without a hit.",
+    "_doc": "What the original does with their own hands (src/scenes/planet/Hands.ts). Hitting a tree treeHits times fells it for treeWood; hitting rock rockHits times breaks off rockYield stone (each rock tile once per rockCooldownMinutes). The load rides above the head, up to carry of a material; more, or another material, flies to the store. Walking into a building waiting for that material, the hatch, or a copy hands it over (deliverRange px). A copy given a load: company + gift.company, purpose + gift.purpose. A swing at a building being raised counts swingWorth of a copy's blow. needRange: a copy whose building waits on a material shows it over its head when you come this close. hitsForgetMs: chips on a tree or rock heal after this long without a hit.",
     "carry": { "wood": 6, "stone": 6, "scrap": 4 },
     "treeHits": 6,
     "rockHits": 4,
