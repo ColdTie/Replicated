@@ -1,8 +1,10 @@
 // A Metanoia 3D printer standing beside a building it prints (tools/sprites/printer.json, printhead.json). The head
 // runs along the gantry and lays a glowing layer with every blow on the building; while the building waits to be
 // finished the printer calls for hands with light and motion: a slow pulse on its bed and a thread of light to the
-// rows still missing. Once the building is done it powers down to a soft standby glow.
+// rows still missing. Once the building is done it powers down to a soft standby glow (a village printer then folds
+// away; the Metanoia's stand by their work).
 import Phaser from 'phaser';
+import { sound } from '../audio/Sound';
 import { PALETTE } from '../core/data';
 import type { Light } from '../fx/Lighting';
 import type { Building } from '../net/store';
@@ -19,6 +21,7 @@ export class Printer {
   private headTo = 0;
   private flashUntil = 0;
   private t = Math.random() * 10;
+  private solid: Phaser.GameObjects.Zone;
   done = false;
 
   constructor(private scene: PlanetScene, readonly b: Building) {
@@ -31,7 +34,7 @@ export class Printer {
     this.light = scene.lighting.add({ x: this.x, y: this.y - 8, radius: 46, color: PALETTE[10], intensity: 0.5, flicker: 0.1 });
     this.glow = scene.add.image(this.x, this.y - 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[10]).setAlpha(0.18).setScale(0.55).setDepth(6100);
     this.thread = scene.add.graphics().setDepth(6100).setBlendMode(Phaser.BlendModes.ADD);
-    scene.addSolid(this.x, this.y - 4, 22, 8);
+    this.solid = scene.addSolid(this.x, this.y - 4, 22, 8);
     if (b.built) this.standby();
   }
 
@@ -43,6 +46,8 @@ export class Printer {
     this.frame.setFrame(1);
     this.head.setFrame(1);
     this.scene.fx.sparks(this.x + this.headX, this.y - 9, PALETTE[11], 3);
+    const p = this.scene.player;
+    if (p) sound.printLayer(this.x - p.x, Math.hypot(this.x - p.x, this.y - p.y));
   }
 
   /** The building is finished: a bright swell, then standby. */
@@ -52,6 +57,18 @@ export class Printer {
     this.scene.tweens.add({ targets: this.light, intensity: 1.2, radius: 90, duration: 500, yoyo: true, onComplete: () => this.standby() });
     this.done = true;
     this.thread.clear();
+    sound.printDone();
+  }
+
+  /** A village printer folds its gantry down and is gone once its building stands. */
+  fold() {
+    const s = this.scene;
+    s.tweens.add({ targets: [this.frame, this.head], scaleY: 0, alpha: 0, duration: 500, ease: 'Quad.easeIn', onComplete: () => { this.frame.destroy(); this.head.destroy(); } });
+    s.tweens.add({ targets: this.glow, alpha: 0, duration: 500, onComplete: () => this.glow.destroy() });
+    s.tweens.add({ targets: this.light, intensity: 0, duration: 500, onComplete: () => s.lighting.remove(this.light) });
+    this.thread.destroy();
+    this.solid.destroy();
+    s.fx.dust(this.x, this.y, 6);
   }
 
   private standby() {

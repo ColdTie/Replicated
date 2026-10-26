@@ -3,7 +3,6 @@ import { sound } from '../../audio/Sound';
 import { PALETTE, PLAYER } from '../../core/data';
 import { isHome } from '../../core/home';
 import { session } from '../../core/session';
-import { Printer } from '../../entities/Printer';
 import { squash } from '../../entities/Player';
 import type { Npc } from '../../entities/Npc';
 import type { Building, PlanetSave, ReplicantSave } from '../../net/store';
@@ -21,11 +20,9 @@ const T = HOMEWORLD.thales;
 export class Homeworld {
   constructor(readonly s: PlanetScene) {}
 
-  printers: Printer[] = [];
-
   get here() { return isHome(this.s.planet.star, this.s.planet.planetIndex); }
 
-  reset() { this.printers = []; }
+  reset() { /* nothing kept between worlds */ }
 
   /** Thales lives on the homeworld: his row is made the first time anyone loads it (a stand-in for screenshots). */
   async ensureThales(rows: ReplicantSave[]): Promise<ReplicantSave[]> {
@@ -77,21 +74,14 @@ export class Homeworld {
     return out;
   }
 
-  /** The printer beside each founded structure (and the goal's call for hands while it is unfinished). */
+  /** Thales by his work, and the town's answer when his Printworks is finished (the printers are the buildings'). */
   placePrinters() {
     if (!this.here) return;
-    for (const f of HOMEWORLD.founded) {
-      if (f.built) continue;
-      const b = this.s.buildings.list.find((x) => x.id === f.id);
-      if (b) this.printers.push(new Printer(this.s, b));
-    }
     const th = this.thales, post = this.post();
     if (th && post) { th.home = post; if (th.data.pos_x == null) th.setPosition(post.x, post.y); }
-    const blow = (b: Building) => this.printers.find((p) => p.b.id === b.id)?.pulse();
     const done = (b: Building) => this.onBuilt(b);
-    this.s.events.on('building-blow', blow);
     this.s.events.on('building-done', done);
-    this.s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.s.events.off('building-blow', blow); this.s.events.off('building-done', done); });
+    this.s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.s.events.off('building-done', done));
   }
 
   get thales(): Npc | undefined { return this.s.npcs.find((n) => n.data.traits.thales); }
@@ -104,8 +94,6 @@ export class Homeworld {
   }
 
   private onBuilt(b: Building) {
-    const p = this.printers.find((x) => x.b.id === b.id);
-    p?.finish();
     if (b.id !== HOMEWORLD.goal) return;
     // Thales' work, finished: the town lights up for a moment and he greets you
     const th = this.thales;
@@ -113,10 +101,6 @@ export class Homeworld {
     sound.build();
     if (th) { th.home = this.post(); th.thank(); }
     this.s.mindLog.push({ t: this.s.mindClock, text: `${session.replicant?.name ?? 'The new Vessel'} finished Thales' ${b.name}` });
-  }
-
-  update(time: number, dt: number) {
-    for (const p of this.printers) p.update(time, dt);
   }
 
   /**

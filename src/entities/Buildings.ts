@@ -1,4 +1,5 @@
-// Surface buildings the copies design (design_building) and raise together. A proposal is placed on a free civic lot
+// Surface buildings the copies design (design_building) and print together (since 2026-10-26 every building is
+// printed: a 3D printer stands beside it while it is made, src/entities/Printer.ts, and lays a layer with each blow). A proposal is placed on a free civic lot
 // of the town (src/world/town.ts; else a home lot nobody lives on) and waits for the original's word (journal: approve / veto; after autoApproveMinutes it goes
 // ahead anyway). The first copy to join pays its material; every copy that joins adds hammer blows to one shared
 // progress, and the building rises row by row (src/world/buildingPaint.ts draws it from its blueprint). Saved in
@@ -13,13 +14,16 @@ import type { PlanetScene } from '../scenes/PlanetScene';
 import { paintBuilding, roofHeight } from '../world/buildingPaint';
 import { buildingSpot, lotForBuilding } from '../world/town';
 import type { Npc } from './Npc';
+import { Printer } from './Printer';
 
-interface Placed { b: Building; sprite: Phaser.GameObjects.Image; light?: Light; glow?: Phaser.GameObjects.Image; solid?: Phaser.GameObjects.Zone; height: number }
+interface Placed { b: Building; sprite: Phaser.GameObjects.Image; light?: Light; glow?: Phaser.GameObjects.Image; solid?: Phaser.GameObjects.Zone; height: number; printedRows?: number }
 
 export class Buildings {
   list: Building[];
   private placed = new Map<string, Placed>();
   private workers = new Map<string, Set<Npc>>();
+  /** the printer beside each building being made (approved, not yet built) */
+  readonly printers = new Map<string, Printer>();
   private nextCommunal = 0;
 
   constructor(private scene: PlanetScene, data: Building[] | undefined) {
@@ -47,6 +51,18 @@ export class Buildings {
     const p: Placed = { b, sprite, height: h };
     this.placed.set(b.id, p);
     this.refresh(p, animate);
+    this.printerFor(b);
+  }
+
+  /** A printer beside an approved building that is not built yet (Thales' founded work keeps its own after). */
+  private printerFor(b: Building) {
+    if (b.vetoed || this.printers.has(b.id) || (b.built && b.by !== 'thales') || (!b.approved && !b.built)) return;
+    if (b.built && !this.scene.homeworld.here) return;
+    this.printers.set(b.id, new Printer(this.scene, b));
+  }
+
+  update(time: number, dt: number) {
+    for (const p of this.printers.values()) p.update(time, dt);
   }
 
   private refresh(p: Placed, animate: boolean) {
@@ -60,6 +76,9 @@ export class Buildings {
       sprite.setAlpha(1).clearTint();
       const rows = Math.max(2, Math.round(p.height * frac));
       sprite.setCrop(0, p.height - rows, sprite.width, rows);
+      if (!animate && p.printedRows !== undefined && rows > p.printedRows) this.layer(p, rows);
+      p.printedRows = rows;
+      this.printers.get(b.id)?.pulse();
       this.scene.events.emit('building-blow', b);
     } else {
       sprite.setAlpha(1).clearTint().setCrop();
@@ -73,6 +92,13 @@ export class Buildings {
       }
       if (animate) { this.scene.fx.dust(b.x - b.w * 6, b.y + 2, 6); this.scene.fx.dust(b.x + b.w * 6, b.y + 2, 6); sound.build(); }
     }
+  }
+
+  /** A fresh layer: a bright line where the print reached, cooling from white through the printer's warm light. */
+  private layer(p: Placed, rows: number) {
+    const s = this.scene, y = p.b.y + 2 - rows, w = p.b.w * 16;
+    const line = s.add.rectangle(p.b.x, y, w, 1, 0xffffff).setBlendMode(Phaser.BlendModes.ADD).setDepth(6100).setAlpha(0.9);
+    s.tweens.add({ targets: line, alpha: 0, duration: 700, onUpdate: (tw) => line.setFillStyle(tw.progress < 0.3 ? 0xffffff : PALETTE[11]), onComplete: () => line.destroy() });
   }
 
   /** A free lot for a building: a civic lot of the town, else a home lot nobody lives on (-1: the town is full). */
@@ -118,6 +144,7 @@ export class Buildings {
     b.approved = true;
     const p = this.placed.get(id);
     if (p) this.refresh(p, false);
+    this.printerFor(b);
     this.save();
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${session.replicant?.name ?? 'the original'} approved ${b.name}` });
   }
@@ -131,6 +158,7 @@ export class Buildings {
     this.scene.markTown();
     const p = this.placed.get(id);
     if (p) { p.sprite.destroy(); p.light && this.scene.lighting.remove(p.light); p.glow?.destroy(); p.solid?.destroy(); this.placed.delete(id); }
+    this.printers.get(id)?.fold(); this.printers.delete(id);
     this.save();
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${session.replicant?.name ?? 'the original'} vetoed ${b.name}` });
   }
@@ -201,8 +229,9 @@ export class Buildings {
     const set = this.workers.get(b.id) ?? new Set<Npc>();
     set.add(npc); this.workers.set(b.id, set);
     if (!b.helpers.includes(npc.data.id)) b.helpers.push(npc.data.id);
+    const pr = this.printers.get(b.id);
     return npc.startChore({
-      x: b.x + side * (b.w * 8 + 6), y: b.y + 6, swings: Math.max(1, Math.min(14, total - b.progress)),
+      x: pr ? pr.x + (npc.x < pr.x ? -12 : 12) : b.x + side * (b.w * 8 + 6), y: pr ? pr.y + 4 : b.y + 6, swings: Math.max(1, Math.min(14, total - b.progress)),
       swing: () => {
         if (b.built) return;
         b.progress++;
@@ -219,6 +248,12 @@ export class Buildings {
   /** Approved buildings not yet paid for whose cost includes this material: where a carried load is wanted. */
   waitingFor(material: string) {
     return this.list.filter((b) => !b.vetoed && !b.built && b.approved && !b.paid && material in b.cost);
+  }
+
+  /** The approved building waiting for this material whose walls or printer you stand at, if any. */
+  feedAt(x: number, y: number, r: number, material: string): Building | undefined {
+    return this.waitingFor(material).find((b) => (Math.abs(x - b.x) < b.w * 8 + r && y > b.y - b.h * 8 - r && y < b.y + r)
+      || (this.printers.has(b.id) && Math.hypot(x - this.printers.get(b.id)!.x, y - this.printers.get(b.id)!.y) < r + 10));
   }
 
   /** The material a copy's own building is waiting for, if any (shown over its head when the original comes near). */
@@ -260,6 +295,12 @@ export class Buildings {
     b.built = true;
     const p = this.placed.get(b.id);
     if (p) this.refresh(p, true);
+    // its printer powers down; a village printer folds away (the Metanoia's stay by their work)
+    const pr = this.printers.get(b.id);
+    if (pr) {
+      pr.finish();
+      if (b.by !== 'thales') this.scene.time.delayedCall(2600, () => { pr.fold(); this.printers.delete(b.id); });
+    }
     this.scene.events.emit('building-done', b);
     this.save();
     const helpers = b.helpers.map((id) => this.scene.npcs.find((n) => n.data.id === id)?.data.name ?? (id === session.replicant?.id ? session.replicant.name : 'someone'));

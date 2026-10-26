@@ -444,6 +444,23 @@ class SoundEngine {
   menuMove(i: number) { if (this.ready('menuMove', 40)) this.tone(midi(84 + (i % 3) * 2), 0.06, { type: 'triangle', vol: 0.04 }); }
   menuPick() { if (this.ready('menuPick', 120)) [0, 7].forEach((s, i) => this.tone(midi(84 + s), 0.12, { type: 'triangle', vol: 0.06, delay: i * 0.06, rev: 0.3 })); }
 
+  /** A printer lays a layer: the head's servo whirs across, a click as it sets down, a soft hiss of the bead. Quieter
+   * and panned with distance (dx, d in px from the player); never twice the same. */
+  printLayer(dx = 0, d = 0) {
+    if (d > 260 || !this.ready('printLayer', 90)) return;
+    const near = Math.max(0.15, 1 - d / 260), pan = Math.max(-0.8, Math.min(0.8, dx / 200)), r = 1 + (Math.random() - 0.5) * 0.12;
+    this.tone(320 * r, 0.18, { type: 'square', to: 520 * r, vol: 0.025 * near, pan });
+    this.noise(0.05, { freq: 3500 * r, q: 4, vol: 0.06 * near, delay: 0.17 });
+    this.noise(0.22, { type: 'highpass', freq: 5000, vol: 0.025 * near, delay: 0.2, attack: 0.04 });
+  }
+  /** The last layer: a rising chord of the head running home, the gantry settling, the warm hum fading. */
+  printDone() {
+    if (!this.ready('printDone', 800)) return;
+    [0, 4, 7, 12].forEach((s, i) => this.tone(midi(64 + s), 0.6, { type: 'triangle', vol: 0.06, delay: i * 0.07, rev: 0.6 }));
+    this.noise(0.4, { type: 'lowpass', freq: 400, to: 120, vol: 0.12, delay: 0.32 });
+    this.tone(110, 1.4, { type: 'sine', vol: 0.05, delay: 0.3, attack: 0.05, rev: 0.4 });
+  }
+
   /** Not enough Embers: a low double buzz. */
   denied() {
     if (!this.ready('denied', 400)) return;
