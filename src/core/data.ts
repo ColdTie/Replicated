@@ -30,6 +30,7 @@ export interface PlanetDef {
   size: [number, number];
   islandRadius: number;
   rockThreshold: number;
+  /** ruins the world once had: none are built now, their old placement still draws its numbers (planetGen) */
   ruins: number;
   resourceNodes: number;
   enemies: Record<string, number>;

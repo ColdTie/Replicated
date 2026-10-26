@@ -18,7 +18,7 @@ import type { Npc } from './Npc';
 
 export type BelowTask = 'dig' | 'rest' | 'furnish' | 'improve' | 'linger' | 'idle';
 /** What a copy does about the warren next: below (dig, furnish, rest) or on the surface (entrance, wood, scrap). */
-export type WarrenTask = { task: BelowTask | 'entrance' | 'wood' | 'scavenge'; room?: WarrenRoom; ruinIndex?: number };
+export type WarrenTask = { task: BelowTask | 'entrance' | 'wood' | 'scavenge'; room?: WarrenRoom; oreIndex?: number };
 export interface Below {
   npc: Npc; task: BelowTask; room?: WarrenRoom; item?: WarrenItem;
   /** it has walked to where it works or sleeps (always true when nobody is watching) */
@@ -271,7 +271,7 @@ export class Warren {
 
   /**
    * What this copy should do about the warren now: dig the way down, shore up and dig a planned room (cutting a
-   * tree for the timber first), make its bed, scavenge a ruin for scrap, go to bed, or nothing.
+   * tree for the timber first), make its bed, pick scrap off iron ore, go to bed, or nothing.
    */
   pickTask(npc: Npc, night: number): WarrenTask | null {
     const e = this.data.entrance!;
@@ -306,10 +306,10 @@ export class Warren {
     // a full store of stone: make a room finer
     const better = Math.random() < 0.5 ? this.roomToImprove() : null;
     if (better) { this.digging.set(better.id, npc); return { task: 'improve', room: better }; }
-    // scrap for lamps and workbenches: scavenge an opened ruin now and then
+    // scrap for lamps and workbenches: pick loose metal off an iron ore now and then
     if ((this.supplies.scrap ?? 0) < 2 && Math.random() < 0.3) {
-      const ruin = this.scene.ruins.find((r) => r.open && Date.now() - (this.data.scavenged?.[r.index] ?? 0) > SUPPLIES.ruinCooldownMinutes * 60_000);
-      if (ruin) return { task: 'scavenge', ruinIndex: ruin.index };
+      const ore = this.scene.nodes.find((n) => n.kind === 'iron' && n.alive && Date.now() - (this.data.scavenged?.[n.index] ?? 0) > SUPPLIES.scrapCooldownMinutes * 60_000);
+      if (ore) return { task: 'scavenge', oreIndex: ore.index };
     }
     // bed: at its own bedtime, when weary, or when it has simply been a while; never twice in quick succession
     const r = WARREN.rest;
@@ -356,19 +356,19 @@ export class Warren {
     if (!ok) this.entranceDigger = null;
   }
 
-  /** A copy picks over an opened ruin for scrap. */
-  scavenge(npc: Npc, ruinIndex: number) {
-    const ruin = this.scene.ruins.find((r) => r.index === ruinIndex);
-    if (!ruin) return;
-    const m = ruin.machinePos;
+  /** A copy picks scrap off an iron ore (node index `oreIndex`). */
+  scavenge(npc: Npc, oreIndex: number) {
+    const ore = this.scene.nodes.find((n) => n.index === oreIndex);
+    if (!ore) return;
+    const m = { x: ore.x, y: ore.y + 6 };
     npc.startChore({
       x: m.x, y: m.y + 4, swings: 4,
       swing: () => { this.scene.fx.sparks(m.x + (Math.random() - 0.5) * 8, m.y - 8, PALETTE[9], 3); if (Math.hypot(this.scene.player.x - m.x, this.scene.player.y - m.y) < 180) sound.hit(); },
       done: () => {
-        this.data.scavenged = { ...(this.data.scavenged ?? {}), [ruinIndex]: Date.now() };
-        this.scene.flyMaterial('scrap', m, this.hatch, SUPPLIES.scrapPerRuin);
+        this.data.scavenged = { ...(this.data.scavenged ?? {}), [oreIndex]: Date.now() };
+        this.scene.flyMaterial('scrap', m, this.hatch, SUPPLIES.scrapPerOre);
         this.save();
-        this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} scavenged ${SUPPLIES.scrapPerRuin} scrap from a ruin` });
+        this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} picked ${SUPPLIES.scrapPerOre} scrap off an iron ore` });
       },
     });
   }

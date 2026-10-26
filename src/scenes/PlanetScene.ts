@@ -19,7 +19,6 @@ import { demoWarren } from '../world/warren';
 import { planetAt } from '../world/system';
 import { Player, squash } from '../entities/Player';
 import { CrystalNode, NODE, Shard, Spark, type NodeKind } from '../entities/Resources';
-import { Ruin } from '../entities/Ruin';
 import { Skitter } from '../entities/Skitter';
 import { Spitter, Spore } from '../entities/Spitter';
 import { Butterflies, Flock, Grazer } from '../entities/Wildlife';
@@ -77,7 +76,6 @@ export class PlanetScene extends Phaser.Scene {
   beacon?: Beacon;
   guardian?: Guardian;
   litBeacons: string[] = [];
-  ruins: Ruin[] = [];
   npcs: Npc[] = [];
   village!: Village;
   warren!: Warren;
@@ -196,7 +194,7 @@ export class PlanetScene extends Phaser.Scene {
       ?? PLANETS[0];
     this.seed = data.seed;
     this.shot = !!data.shot;
-    this.enemies = []; this.nodes = []; this.shards = []; this.spores = []; this.ruins = []; this.embers = 0; this.stopped = false; this.frozen = false;
+    this.enemies = []; this.nodes = []; this.shards = []; this.spores = []; this.embers = 0; this.stopped = false; this.frozen = false;
     this.grazers = []; this.flocks = []; this.butterflies = undefined; this.bendables = new Map(); this.slow = 1;
     this.npcs = []; this.replicating = false; this.launching = false;
     this.sparks = []; this.beacon = undefined; this.guardian = undefined; this.litBeacons = [];
@@ -310,7 +308,6 @@ export class PlanetScene extends Phaser.Scene {
     tm.createBlankLayer('ground', ts)!.putTilesAt(waterOnly, 0, 0).setDepth(DEPTH.ground);
     this.walls = tm.createBlankLayer('walls', ts)!.putTilesAt(m.walls, 0, 0).setDepth(DEPTH.walls);
     this.walls.setCollision(COLLIDE_TILES);
-    this.drawRockEdges();
     this.drawWaterEdges();
     this.env = new Environment(this, p, this.lighting, this.atmosphere, (x, y) => this.surfaceAt(x, y) !== 'void' && this.isWalkable(x, y), this.shot ? 21 : undefined);
 
@@ -324,7 +321,6 @@ export class PlanetScene extends Phaser.Scene {
         this.bendables.get(k)!.push(img);
       }
     }
-    m.ruins.forEach((r, i) => this.ruins.push(new Ruin(this, i, r.door, r.machine, r.inside, save?.data.doors?.[i])));
     // Trees keep their own solid so a copy can cut one down (felled ones are remembered per planet)
     const felled = new Set(save?.data.felled ?? []);
     const treeBlockers = new Set<number>();
@@ -529,26 +525,6 @@ export class PlanetScene extends Phaser.Scene {
     this.add.image(0, 0, key).setOrigin(0).setDepth(DEPTH.walls + 0.5);
   }
 
-  /** 1px rims on the sides of ruins so they read as raised shapes, not flat blocks (rock paints its own edges). */
-  private drawRockEdges() {
-    const m = this.map;
-    const at = (x: number, y: number) => (x < 0 || y < 0 || x >= m.w || y >= m.h ? Cell.Void : m.cells[y * m.w + x]);
-    const solid = (c: number) => c === Cell.Rock || c === Cell.Ruin;
-    const g = this.add.graphics().setDepth(DEPTH.walls + 1);
-    for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
-      if (at(x, y) !== Cell.Ruin) continue;
-      const face = !solid(at(x, y + 1));
-      if (!solid(at(x - 1, y)) && at(x - 1, y) !== Cell.Void) {
-        g.fillStyle(PALETTE[face ? 22 : 21]).fillRect(x * 16, y * 16, 1, 16);
-        g.fillStyle(PALETTE[25], 0.5).fillRect(x * 16 - 1, y * 16 + 2, 1, 14);
-      }
-      if (!solid(at(x + 1, y)) && at(x + 1, y) !== Cell.Void) {
-        g.fillStyle(PALETTE[face ? 24 : 23]).fillRect(x * 16 + 15, y * 16, 1, 16);
-        g.fillStyle(PALETTE[25], 0.5).fillRect(x * 16 + 16, y * 16 + 2, 1, 14);
-      }
-    }
-  }
-
   /** Dark 1px banks along pond sides so water reads as sunk into the ground. */
   private drawWaterEdges() {
     const m = this.map;
@@ -738,7 +714,6 @@ export class PlanetScene extends Phaser.Scene {
         px = (i % m.w) * 16 + 8; py = Math.floor(i / m.w) * 16 + 8; break;
       }
     }
-    if (view === 'ruin' && this.ruins.length) { const r = this.ruins[0]; px = r.inside.x + 12; py = r.inside.y + 24; }
     const atBeacon = view?.startsWith('beacon') && this.map.beacon;
     if (atBeacon) { px = this.map.beacon!.guardian.x - 6; py = this.map.beacon!.guardian.y + 46; }
     this.player.setPosition(px, py);
@@ -793,7 +768,6 @@ export class PlanetScene extends Phaser.Scene {
       this.sparks = this.sparks.filter((s) => !s.collected);
       this.updateSpores(time, dt);
     }
-    for (const r of this.ruins) r.update(time);
     this.beacon?.update(time);
     for (const g of this.grazers) g.update(time, dt);
     for (const f of this.flocks) f.update(time, dt);
@@ -1167,12 +1141,11 @@ export class PlanetScene extends Phaser.Scene {
   // ------------------------------------------------------------------ the copies' minds
 
   /**
-   * The replicant can understand the copies: it holds the listening module, or it was a copy itself until a Spark
-   * awakened it (traits.handedBy) and has always spoken their tongue (or ?hear=1 for screenshots).
+   * The replicant understands the copies. It used to need the listening module from a ruin; the ruins were taken out
+   * (2026-10-26), so every replicant reads their words from the start.
    */
   canHear() {
-    const t = session.replicant?.traits;
-    return !!t?.mods?.includes('listen') || !!t?.handedBy || new URLSearchParams(location.search).has('hear');
+    return true;
   }
 
   /** "EARTH - SOL" or "TITAN - SATURN" */
@@ -1223,8 +1196,7 @@ export class PlanetScene extends Phaser.Scene {
       sound.crystal();
       hit = true;
     }
-    for (const r of this.ruins) if (r.hitMachine(hx, hy, radius)) hit = true;
-    // nothing alive in reach: the swing works on the village (a tree, rock, a ruin, a building being raised)
+    // nothing alive in reach: the swing works on the village (a tree, rock, a building being raised)
     if (!hit && this.hands.swing(hx, hy, radius)) hit = true;
     for (const sp of this.spores) {
       if (sp.dead || sp.reflected || Math.hypot(sp.x - hx, sp.y - hy) > radius + 8) continue;
@@ -1314,31 +1286,6 @@ export class PlanetScene extends Phaser.Scene {
     this.fx.sparks(x, y - 4, PALETTE[19], 6);
     this.fx.floatIcon(this.player.x, this.player.y - 24, 'spark');
     this.game.events.emit('sparks', n);
-  }
-
-  onDoorChanged(r: Ruin) {
-    this.pending.doors[r.index] = { open: r.open, taken: r.taken };
-    void this.saver.flushPlanet();
-  }
-
-  onModuleTaken(r: Ruin) {
-    this.onDoorChanged(r);
-    const rep = session.replicant;
-    if (rep) {
-      rep.traits.mods = [...(rep.traits.mods ?? []), r.kind];
-      void this.saver.saveReplicant();
-    }
-    this.fx.floatIcon(this.player.x, this.player.y - 24, 'module');
-    const who = (rep?.name ?? session.profile?.name ?? 'YOU').toUpperCase();
-    if (r.kind === 'listen') {
-      // the Plaything moment: from now on their songs are words, and they greet it with a chorus
-      this.game.events.emit('notice', `${who} HEARS THEM NOW`);
-      this.minds.mindLog.push({ t: this.minds.mindClock, text: `${rep?.name ?? 'the original'} found the listening module in a ruin and can understand you from now on` });
-      this.time.delayedCall(1400, () => this.minds.chorus(true));
-    } else {
-      this.game.events.emit('notice', `${who} GETS +20% ${r.kind.toUpperCase()}`);
-    }
-    this.minds.mindLog.push({ t: this.minds.mindClock, text: `${rep?.name ?? 'the original'} opened a ruin door and took its ${r.kind} module` });
   }
 
   surfaceAt(x: number, y: number): 'grass' | 'stone' | 'water' | 'void' {
@@ -1452,7 +1399,6 @@ export class PlanetScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.fadeOut(300, 24, 20, 37);
     cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      for (const r of this.ruins) r.dropCore();
       this.player.respawn(this.home.x, this.home.y);
       cam.centerOn(this.home.x, this.home.y);
       cam.fadeIn(500, 24, 20, 37);

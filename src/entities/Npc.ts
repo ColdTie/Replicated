@@ -400,7 +400,7 @@ export class Npc {
     const down = this.scene.warren.pickTask(this, this.scene.env.night);
     if (down?.task === 'entrance') { this.scene.warren.digEntrance(this); return; }
     if (down?.task === 'wood') { if (this.scene.cutTree(this)) return; }
-    else if (down?.task === 'scavenge') { this.scene.warren.scavenge(this, down.ruinIndex ?? 0); return; }
+    else if (down?.task === 'scavenge') { this.scene.warren.scavenge(this, down.oreIndex ?? 0); return; }
     else if (down) {
       this.descent = { task: down.task, room: down.room };
       this.mineAt = null;
@@ -463,7 +463,7 @@ export class Npc {
   }
 
   /**
-   * Steps toward a point; true when arrived. When rock or a ruin wall is in the way it finds a way round over open
+   * Steps toward a point; true when arrived. When rock is in the way it finds a way round over open
    * ground once (src/world/town.ts surfaceRoute) and follows it; it gives up (clears target) only when there is none.
    */
   private walkTo(t: Pt, dt: number) {
