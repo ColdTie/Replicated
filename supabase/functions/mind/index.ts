@@ -430,6 +430,8 @@ Deno.serve(async (req) => {
       .eq("id", replicant_id).single();
     if (meErr || !me) return json({ error: "no such replicant" }, 404);
     const rep = me as Replicant;
+    // held asleep for a new player: no mind until it is handed over
+    if ((rep.traits as { held?: boolean }).held) return json({ skipped: true, reason: "held" });
     if (rep.status !== "npc") return json({ error: "only copies have minds here" }, 400);
     const gap = context.talk ? TALK_GAP_SECONDS : MIN_GAP_SECONDS;
     if (rep.last_tick_at && Date.now() - Date.parse(rep.last_tick_at) < gap * 1000) return json({ skipped: true });
@@ -1149,7 +1151,7 @@ async function awayRun(req: Request) {
   const names = new Map(everyone.map((r) => [r.id, r.name]));
   const playing = (r: Replicant) => (players ?? []).some((p) => p.galaxy_id === r.galaxy_id && p.status === "active" && p.star_id === r.star_id && p.planet_index === r.planet_index
     && now - Date.parse(p.updated_at) < PLAYING_MINUTES * 60_000);
-  const copies = (npcs ?? []) as Replicant[];
+  const copies = ((npcs ?? []) as Replicant[]).filter((r) => !(r.traits as { held?: boolean }).held); // held asleep: no mind
   // long wakes stop once a galaxy has spent awayShare of its day's budget: the rest is kept for when the original plays
   const spent = new Map<string, number | null>();
   for (const g of new Set(copies.map((r) => r.galaxy_id))) spent.set(g, await spentToday(sb, g));

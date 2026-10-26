@@ -184,7 +184,7 @@ export class Talk {
     const told = tell && t.exchanges.some((x) => x.answer && x.answer === tell.text) ? undefined : tell;
     const low = n.lowNeeds();
     return composeTalk({
-      copyId: n.data.id, name: n.data.name, blank: !!n.data.traits.blank, canHear: this.s.canHear(), hint: HEAR_HINT, now: Date.now(),
+      copyId: n.data.id, name: n.data.name, blank: n.blank, canHear: this.s.canHear(), hint: HEAR_HINT, now: Date.now(),
       playerId: me?.id, tell: told ?? undefined, tellNew: !!t.fresh, composing: t.composing,
       notes: t.journal ? t.journal.notes.filter((x) => x.replicant_id === n.data.id) : null,
       mail: t.journal ? t.journal.mail : null,

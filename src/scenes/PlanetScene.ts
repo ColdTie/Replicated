@@ -37,6 +37,7 @@ import { BEACONS, planetFor, starById } from '../world/galaxy';
 import { Departure } from './planet/Departure';
 import { Link } from './planet/Link';
 import { Homeworld } from './planet/Homeworld';
+import { WakeChoice, type WakeOrHold } from '../ui/wakeChoice';
 import { Hands } from './planet/Hands';
 import { Homecoming } from './planet/Homecoming';
 import { Trade } from './planet/Trade';
@@ -44,7 +45,8 @@ import { Minds } from './planet/Minds';
 import { Saving } from './planet/Saving';
 import { Talk } from './planet/Talk';
 import { Town } from './planet/Town';
-import { kitLists } from './planet/shared';
+import { NO_INPUT, kitLists } from './planet/shared';
+import { PARTS } from '../core/body';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
 
@@ -158,6 +160,8 @@ export class PlanetScene extends Phaser.Scene {
   readonly trade = new Trade(this);
   readonly linker = new Link(this);
   readonly homeworld = new Homeworld(this);
+  /** the maker's choice over the Replicator (wake or hold) while it is open */
+  choice?: WakeChoice;
 
   constructor() { super('planet'); }
 
@@ -209,6 +213,7 @@ export class PlanetScene extends Phaser.Scene {
     this.homecoming.reset();
     this.trade.reset();
     this.homeworld.reset();
+    this.choice = undefined;
     this.townState = { lots: {}, civic: {} };
     this.migrated = false;
     this.npcsLoaded = true;
@@ -485,6 +490,8 @@ export class PlanetScene extends Phaser.Scene {
       this.linker.playLinkIn(this.link);
     } else if (this.visit) {
       this.playReturn();
+    } else if (!awake && r?.traits.handedBy) {
+      this.homeworld.playHeldWake();
     } else if (p.intro === 'scan' && !awake) {
       this.homeworld.playScan();
     } else if (p.intro === 'wake' && !awake) {
@@ -765,7 +772,9 @@ export class PlanetScene extends Phaser.Scene {
   update(time: number, dt: number) {
     if (!this.player) return; // still loading the save
     dt = Math.min(dt, 50) * this.slow;
-    const input = this.talker.routeTalk(time, this.controls.read());
+    let input = this.talker.routeTalk(time, this.controls.read());
+    // wake or hold: the choice over the Replicator has the buttons
+    if (this.choice) { this.choice.route(input, dt); input = NO_INPUT; }
     if (!this.stopped) {
       this.player.update(time, dt, input);
       this.playerSafe = this.inTown(this.player.x, this.player.y);
@@ -1010,11 +1019,22 @@ export class PlanetScene extends Phaser.Scene {
       sound.denied();
       return true; // standing on the spot: never swing at the Replicator
     }
+    // the maker chooses first: wake the copy now, or hold it asleep for a new player (src/ui/wakeChoice.ts)
+    this.replicating = true;
+    const pl = this.player;
+    pl.locked = true;
+    pl.body.setVelocity(0, 0);
+    pl.setPosition(this.base.spotX, this.base.spotY);
+    this.choice = new WakeChoice(this, this.base.x, this.base.y - 40, (kind) => { this.choice = undefined; this.replicate(kind); });
+    return true;
+  }
+
+  /** The Replicator makes the copy: woken (born blank; its first wake makes it itself) or held (asleep in its maker's likeness). */
+  private replicate(kind: WakeOrHold) {
     const me = session.replicant!;
     // with a Spark and a copy standing by the ring, the newborn comes from that copy and carries its memories
     const elder = (me.traits.sparks ?? 0) > 0 && !this.visit ? this.sparkElder() : undefined;
     const parent = elder?.data ?? me;
-    this.replicating = true;
     this.embers -= DRIFT.cost;
     this.pending.embers -= DRIFT.cost;
     this.game.events.emit('embers', this.embers);
@@ -1039,6 +1059,12 @@ export class PlanetScene extends Phaser.Scene {
     const side = this.isWalkable(this.base.x + 24, this.base.y + 8) ? 24 : -24;
     const bx = this.base.x + side, by = this.base.y + 8;
     const row = replicate(parent, this.planet.star, this.planet.planetIndex, bx, by);
+    if (kind === 'hold') {
+      // asleep in its maker's likeness until a new player takes it (the journal gives it away)
+      const t = parent.traits;
+      row.traits = { v: 1, awake: true, held: true, body: structuredClone(t.body ?? PARTS.defaults), feature: t.feature, trail: t.trail, gear: t.gear ?? 0 };
+      this.mindLog.push({ t: this.mindClock, text: `${me.name} made a copy and held it asleep for a new player` });
+    }
     if (elder) {
       const wants = (elder.data.traits.wants ?? []).filter((w) => !w.done).map((w) => w.text);
       row.traits.inherit = { from: elder.data.id, name: elder.data.name, ...(wants.length ? { wants } : {}) };
@@ -1059,7 +1085,7 @@ export class PlanetScene extends Phaser.Scene {
       this.warren.refreshHatch();
       sound.birth();
       npc.playBirth(() => {
-        pl.locked = false;
+        this.player.locked = false;
         this.replicating = false;
         this.floatName(npc);
       });
@@ -1088,7 +1114,7 @@ export class PlanetScene extends Phaser.Scene {
   /** The copy's name floats above it for a moment so the family knows who is who (a blank copy has none yet). */
   floatName(npc: Npc) {
     if (npc.data.traits.blank) return;
-    const t = this.add.bitmapText(npc.x, npc.y - 30, 'pixel', npc.data.name).setOrigin(0.5).setTint(npc.trailColor).setDepth(6300).setAlpha(0);
+    const t = this.add.bitmapText(npc.x, npc.y - 30, 'pixel', npc.data.name.toUpperCase()).setOrigin(0.5).setTint(npc.trailColor).setDepth(6300).setAlpha(0);
     this.tweens.add({ targets: t, alpha: 1, y: t.y - 4, duration: 400, ease: 'Sine.easeOut' });
     this.tweens.add({ targets: t, alpha: 0, delay: 2200, duration: 600, onComplete: () => t.destroy() });
   }

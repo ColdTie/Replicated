@@ -1,7 +1,7 @@
 // Scripted headless playtest of session 10: a lonely copy walks over to another and they stand together; a full
 // store starts the Meeting Hall on its own, the copies raise it and gather at its door; a full store of stone
 // improves a warren room (and the painting shows it); what the copies did in an away wake plays out on landing;
-// a Spark awakens a copy as a player of its own. Usage: npm run build && node tools/playtest-together.mjs
+// a Vessel held asleep is given to a new player (no Spark). Usage: npm run build && node tools/playtest-together.mjs
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
 const port = 4186;
@@ -101,22 +101,27 @@ try {
   if (away.log.some((t) => t.includes('Nowhere'))) fail('a failed away deed was told');
   await page.waitForFunction((i) => !!window.__scene.npcs[i].bubble, away.i, { timeout: 45000 }).catch(() => fail('the away song was never sung'));
 
-  // 5. a Spark awakens a copy: a profile in its name, its row active, the copy gone from the planet
+  // 5. a held Vessel is given to a new player: a profile in its name, its row active, the copy gone from the planet;
+  // a woken copy cannot be given, and no Spark is spent
   const woke = await ev(async () => {
     const s = window.__scene, st = window.__session.store, me = window.__session.replicant;
-    // a copy up here and itself (one down in the warren, or blank, is rightly refused)
     const n = s.npcs.find((x, i) => i > 0 && !x.below && !x.blank) ?? s.npcs[2];
-    const saved = await st.createReplicant({ ...n.data }); n.data.id = saved.id;
-    me.traits.sparks = 1;
+    const saved = await st.createReplicant({ ...n.data, traits: { ...n.data.traits, held: true } }); n.data.id = saved.id;
+    me.traits.sparks = 0;
     s.shot = false;
+    await s.awakenCopy(n.data.id);
+    const refused = s.npcs.length;
+    n.data.traits.held = true; n.state = 'held';
     await s.awakenCopy(n.data.id);
     s.shot = true;
     const profiles = await st.listProfiles();
     const row = st.db.replicants.find((r) => r.id === saved.id);
-    return { npcs: s.npcs.length, sparks: me.traits.sparks, profile: profiles.find((p) => p.id === row.profile_id)?.name, name: n.data.name, status: row.status, below: !!n.below };
+    return { refused, npcs: s.npcs.length, sparks: me.traits.sparks, profile: profiles.find((p) => p.id === row.profile_id)?.name, name: n.data.name, status: row.status, traits: { held: row.traits.held, unnamed: row.traits.unnamed, awake: row.traits.awake } };
   });
-  log('awaken', JSON.stringify(woke));
+  log('hand over', JSON.stringify(woke));
+  if (woke.refused !== 3) fail('a woken copy could be given away');
   if (woke.npcs !== 2 || woke.sparks !== 0 || woke.status !== 'active' || woke.profile !== woke.name) fail('the handoff did not happen');
+  if (woke.traits.held || !woke.traits.unnamed || woke.traits.awake) fail('the given Vessel will not wake and name itself');
   await page.waitForTimeout(2500);
   // the awakened copy plays as itself: its profile loads it
   const plays = await ev(async () => { const st = window.__session.store; const p = (await st.listProfiles()).find((x) => x.name !== 'STEVE' && x.name !== window.__session.replicant.name) ?? (await st.listProfiles()).slice(-1)[0]; const r = await st.loadReplicant(p); return { name: r.name, status: r.status, body: !!r.traits.body }; });

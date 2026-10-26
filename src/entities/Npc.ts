@@ -19,7 +19,7 @@ import type { BelowTask } from './Warren';
 import type { WarrenRoom } from '../net/store';
 import { squash, type Player } from './Player';
 
-type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below' | 'blank' | 'visit' | 'talk';
+type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 'chore' | 'below' | 'blank' | 'held' | 'visit' | 'talk';
 /** Something a copy decided to do with its hands: walk there, swing a few times, then it happens. */
 interface Chore { x: number; y: number; swings: number; swing: () => void; done: () => void }
 type Pt = { x: number; y: number };
@@ -100,6 +100,7 @@ export class Npc {
     this.needs = { company: saved?.company ?? 0.7, purpose: saved?.purpose ?? 0.7 };
     this.sync();
     if (data.traits.blank) this.setBlank();
+    else if (data.traits.held) this.setHeld();
   }
 
   /** rest, company and purpose averaged, lifted a little by the warren's murals. */
@@ -161,7 +162,18 @@ export class Npc {
   }
 
   /** Born blank: grey, dim and still by the Replicator until its first wake makes it itself. */
-  get blank() { return this.state === 'blank'; }
+  get blank() { return this.state === 'blank' || this.state === 'held'; }
+  /** Held asleep for a new player (wake or hold at the Replicator): dim, still, its visor dark, no mind. */
+  get held() { return this.state === 'held'; }
+  private setHeld() {
+    this.state = 'held';
+    this.sprite.setTint(0x6a7096);
+    this.sprite.anims.pause();
+    this.gear.image.setAlpha(0.4);
+    this.light.intensity = 0.18;
+    this.light.active = true;
+    this.scene.tweens.add({ targets: this.light, intensity: 0.32, duration: 2600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
   private setBlank() {
     this.state = 'blank';
     this.sprite.setTint(0x7a7f96);
@@ -233,6 +245,7 @@ export class Npc {
         this.scene.fx.sparks(s.x, s.y - 10, this.trailColor, 18);
         this.gear.image.setAlpha(1);
         if (this.data.traits.blank) { s.play(anim(this.key, 'idle')); this.setBlank(); done(); return; }
+        if (this.data.traits.held) { s.play(anim(this.key, 'idle')); this.setHeld(); done(); return; }
         // the visor flickers through colors and settles on its own drift color (copies born before session 9)
         const keys = PLAYER.featureColors.map((f) => bodyFor(this.scene, { ...this.data, traits: { ...this.data.traits, feature: f[1] } }).key);
         let i = 0;
@@ -251,7 +264,7 @@ export class Npc {
 
   /** The original handed it something, or works beside it: it turns to them and hops. */
   thank() {
-    if (this.state === 'born' || this.state === 'below' || this.state === 'blank') return;
+    if (this.state === 'born' || this.state === 'below' || this.blank) return;
     this.sprite.setFlipX(this.scene.player.x < this.x);
     this.hop();
     sound.pet();
@@ -266,7 +279,7 @@ export class Npc {
   get below() { return this.state === 'below'; }
 
   update(time: number, dt: number) {
-    if (this.state === 'born' || this.state === 'blank') { this.sync(); return; }
+    if (this.state === 'born' || this.state === 'blank' || this.state === 'held') { this.sync(); return; }
     if (this.state === 'below') return;
     const p = this.scene.player;
     const dp = Math.hypot(p.x - this.x, p.y - this.y);
@@ -605,7 +618,7 @@ export class Npc {
 
   /** Go and do something by hand (cut a tree, take a build down). Drops whatever it was doing. */
   startChore(c: Chore) {
-    if (this.state === 'born' || this.state === 'below' || this.state === 'blank' || this.state === 'talk') return false;
+    if (this.state === 'born' || this.state === 'below' || this.blank || this.state === 'talk') return false;
     if (this.job) { this.scene.village.release(this.job); this.job = null; }
     if (this.carried) { this.carried.destroy(); this.carried = undefined; }
     this.mineAt = null;
@@ -676,7 +689,7 @@ export class Npc {
 
   /** The original stops to talk: it leaves what it was doing as it is, turns to face them, hops and chirps. */
   startTalk() {
-    if (this.state === 'born' || this.state === 'below' || this.state === 'blank' || this.state === 'talk') return false;
+    if (this.state === 'born' || this.state === 'below' || this.blank || this.state === 'talk') return false;
     const now = this.scene.time.now;
     this.talkResume = { state: this.state, left: Math.max(0, this.until - now) };
     this.state = 'talk';

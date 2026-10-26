@@ -412,6 +412,16 @@ class SoundEngine {
     [0, 7, 12, 16, 19, 24].forEach((s, i) => this.tone(midi(62 + s), 1.8, { type: i % 2 ? 'sine' : 'triangle', vol: 0.07, delay: i * 0.09, rev: 0.8 }));
   }
 
+  /** Wake or hold: the two lights open over the Replicator (a held breath), move between them, and the pick: a
+   * rising open fifth for a waking, a low falling lullaby for one held asleep. */
+  choiceOpen() { if (this.ready('choice', 300)) [0, 7].forEach((s, i) => this.tone(midi(69 + s), 0.6, { type: 'sine', vol: 0.05, delay: i * 0.12, attack: 0.08, rev: 0.7 })); }
+  choiceMove(i: number) { if (this.ready('choiceMove', 60)) this.tone(midi(i ? 76 : 81), 0.12, { type: 'triangle', vol: 0.05, rev: 0.3 }); }
+  choicePick(kind: 'wake' | 'hold') {
+    if (!this.ready('choicePick', 300)) return;
+    const notes = kind === 'wake' ? [0, 7, 12] : [12, 7, 3, 0];
+    notes.forEach((s, i) => this.tone(midi((kind === 'wake' ? 69 : 57) + s), kind === 'wake' ? 0.5 : 0.9, { type: kind === 'wake' ? 'triangle' : 'sine', vol: 0.07, delay: i * (kind === 'wake' ? 0.08 : 0.16), rev: 0.7 }));
+  }
+
   /** Not enough Embers: a low double buzz. */
   denied() {
     if (!this.ready('denied', 400)) return;

@@ -58,7 +58,8 @@ other devices. The profile `kid_mode` flag, no counter and no death, still exist
 3. Gather and build: resource counter, a base area near the landing site, place the Replicator with one button when you have enough.
 4. Replicate: the Replicator creates a copy with drift. Copy becomes an NPC that walks around the base and generates resources while you are away.
 5. Travel: launch the vessel, pick the next planet from a simple star map, land on a new seed and accent hue.
-6. Handoff: Spark resource awakens an NPC replicant and assigns it to another profile.
+6. Handoff: a Vessel held asleep at its making is given to another profile, which wakes in it and names itself (since
+   2026-10-26 no Spark is needed; the story: being copied and handed over is the only way to join).
 
 ## Phase plan
 
@@ -198,7 +199,8 @@ src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star, tap again fo
 src/scenes/TravelScene   departure orbit (globe, giant behind a moon), warp, real-time cruise + ETA, visits, arrival
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame (attack, dash, interact; the talk
                          box's next/back/close/reply while it is open)
-src/ui/overlay.ts        HTML forms over the canvas (sign-in, new profile)
+src/ui/overlay.ts        HTML forms over the canvas (sign-in; askName: a Vessel names itself at its first wake)
+src/ui/wakeChoice.ts     WAKE or HOLD over the Replicator before a copy is made (open eye / closed eye, keys, stick, click)
 src/ui/talk.ts           what a copy says when you talk to it: pages SAYS (traits.tell), THOUGHTS (journal notes),
                          WANTS (and a feeling), LETTERS (to you first), wrapped for the box (pure; src/data/talk.json)
 src/ui/dialogue.ts       the talk box at the bottom (portrait, name, pages, typing in the copy's voice, reply line);
@@ -257,6 +259,9 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | mind | `wants` | `[{ text, category, done, at }]` 1 to 3 goals in its own words (`set_wants` / `finish_want`) |
 | state | `blank` | born and not yet itself (grey, still; the first wake is the becoming) |
 | state | `awake`, `mods`, `sparks` | intro played; ruin modules from before 2026-10-26 (light, dash, swing still count); Sparks held |
+| state | `thales` | Thales, the first Vessel (`src/data/homeworld.json`): fixed by his work, never handed over or held |
+| state | `held` | held asleep at its making for a new player (WAKE or HOLD at the Replicator): its maker's body, dimmed, no mind |
+| state | `unnamed` | a player's Vessel that has not named itself yet: it is asked at its first wake |
 | state | `handedBy` | the replicant that awakened this one with a Spark (it was a copy, so it reads the copies without `listen`) |
 | state | `cargo` | `{ material, n, from }` what the vessel's hold carries between worlds (supplies.json signature), or null |
 | state | `inherit` | `{ from, name, wants }`: born with a Spark beside that copy; it carries its notes and remembers being it |
@@ -302,7 +307,8 @@ side (three quick attacks = heavy combo finisher; presses during the cooldown ar
 reach, a swing works on the village: a tree (6 swings fell it), rock (4 break off stone), a building being
 raised (a blow). Walk into a building waiting for what you carry, a copy, or the hatch to
 hand the load over. Stand on the open hatch for a moment (a warm ring fills) or press attack on it to go down; walking
-or dashing across it never does. Attack on the manny dock's pad (lit, with a ghost of you, once the store holds enough
+or dashing across it never does. At the Replicator (attack on its ring with enough Ember) two lights open over it: WAKE (left) and HOLD (right);
+Left / Right (or the stick) choose, attack / E or a click on one picks. Attack on the manny dock's pad (lit, with a ghost of you, once the store holds enough
 iron and hydrogen) builds a manny. At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
 LINK; at the empty berth (the vessel is elsewhere) it has LINK and TO VESSEL / TO SHIP; in flight a world with your
 manny in the top-left row links you there. Dash Shift/K/X, gamepad
@@ -665,3 +671,21 @@ fly to (its intro is now a landing).
   1140 b can be reached by flying there.
 - The playtests that test Earth-only things now start there (`&at=sol&pi=3`); `tools/playtest-homeworld.mjs` is new.
 - Verified: build, `npm test` (15 of 15), `screenshots/homeworld-day.png`, `homeworld-night.png`, `opening-*.png`.
+
+**Step 2, players join only by being copied.**
+- No card to add a profile on the home screen. A login (or a device) with no profile makes the first one by itself:
+  Thales' first copy ("THALES II" until it names itself) goes straight into the opening.
+- At the Replicator the maker chooses first (`src/ui/wakeChoice.ts`): WAKE makes the copy as before (born blank, its
+  first wake makes it itself and it names itself with `choose_name`); HOLD makes it asleep in its maker's likeness
+  (`traits.held`: the maker's body and visor, dimmed and still, its light breathing slowly) with no mind: the game
+  never wakes it and the mind function skips it (live and away).
+- In the journal a held Vessel has GIVE TO A NEW PLAYER (press twice). No Spark is needed: a new profile in its name
+  appears on the home screen, and the row becomes that profile's (`held` false, `awake` false, `unnamed`, `handedBy`).
+  Woken copies and Thales cannot be given. The Spark AWAKEN of woken copies is gone; beacons, the Spark pickup and
+  Spark inheritance stay as they were.
+- The first wake of a player's Vessel asks its name ("WHO ARE YOU?", `askName`; the game's keys stand down while it
+  is typed) and writes it to the row and the profile (`GameStore.renameSelf`). A handed-over Vessel wakes where it
+  slept: dark, then its visor flickers on, then its name. Steve's existing profiles and original are unchanged.
+- Verified: build, `npm test` 15 of 15 (`playtest-homeworld` now covers the first profile, naming, HOLD, the handover
+  and the new player's first wake; `playtest-together` the handover without a Spark). Screenshots
+  `opening-name.png`, `choice-wake-hold.png`, `held-vessel.png`, `home-profiles.png`.

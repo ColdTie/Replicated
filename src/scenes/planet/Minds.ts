@@ -226,7 +226,7 @@ export class Minds {
    */
   async requestTalk(npc: Npc, said = ''): Promise<string | null> {
     const st = session.store;
-    if (!st || this.s.shot || this.s.visit || npc.data.id === 'pending' || npc.data.traits.blank) return null;
+    if (!st || this.s.shot || this.s.visit || npc.data.id === 'pending' || npc.data.traits.blank || npc.data.traits.held) return null;
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     // ordinary wakes wait while a talk waits for its turn
     this.talkWaiting++;
@@ -335,7 +335,7 @@ export class Minds {
     this.s.npcs.forEach((n, i) => { if (!this.nextWake.has(n)) this.nextWake.set(n, this.firstWakeAt! + i * MIND.staggerMs); });
     if (!this.mindBusy && !this.talkWaiting) {
       for (const n of this.s.npcs) {
-        if (n.data.id === 'pending') continue; // its row is still being written
+        if (n.data.id === 'pending' || n.data.traits.held) continue; // its row is still being written; held: no mind yet
         if (time < this.nextWake.get(n)!) continue;
         this.nextWake.set(n, time + MIND.wakeMinutes * 60_000 + Math.random() * 20_000);
         void this.wake(n);
@@ -444,27 +444,25 @@ export class Minds {
   }
 
   /**
-   * The handoff (core loop step 6): a Spark awakens a copy as a player of its own. It gets a profile in its name on
-   * the home screen and plays as itself from then on, here on its planet; it is no longer a copy with a mind.
+   * The handoff (story/STORY.md): a Vessel held asleep at its making is given to a new person. It gets a profile in
+   * its name on the home screen; the new player wakes in it and names themselves. It is no longer a copy here.
    */
   async awakenCopy(id: string) {
     const me = session.replicant, st = session.store;
     const npc = this.s.npcs.find((n) => n.data.id === id);
-    if (!me || !st || !npc || npc.blank || npc.below || npc.data.traits.thales || (me.traits.sparks ?? 0) < 1 || this.s.visit) { sound.denied(); return; }
+    if (!me || !st || !npc || !npc.held || npc.data.traits.thales || this.s.visit) { sound.denied(); return; }
     const fake = this.s.shot || npc.data.id.startsWith('fake') || npc.data.id === 'pending';
     if (!fake) {
-      try { await st.awaken(npc.data, me); } catch (e) { console.warn('awaken failed', e); sound.denied(); return; }
+      try { await st.awaken(npc.data, me); } catch (e) { console.warn('hand over failed', e); sound.denied(); return; }
     }
-    me.traits.sparks = Math.max(0, (me.traits.sparks ?? 0) - 1);
-    this.s.game.events.emit('sparks', me.traits.sparks);
     this.s.npcs = this.s.npcs.filter((n) => n !== npc);
     sound.spark();
     this.s.time.delayedCall(500, () => sound.beacon());
     this.s.cameras.main.flash(300, 255, 255, 255);
     npc.ascend(() => this.s.announceLocation());
     const name = npc.data.name;
-    this.mindLog.push({ t: this.mindClock, text: `${me.name} spent a Spark and awakened ${name}: it plays as itself now` });
-    this.s.game.events.emit('notice', `${name.toUpperCase()} IS AWAKE: IT PLAYS AS ITSELF NOW`);
+    this.mindLog.push({ t: this.mindClock, text: `${me.name} gave the Vessel held asleep (${name}) to a new player` });
+    this.s.game.events.emit('notice', `${name.toUpperCase()} IS HANDED OVER: A NEW PLAYER WAKES IN IT`);
   }
 
   /** A gift of Embers from the pool into the copy's own hands: company and purpose lift, and it may spend them. */
