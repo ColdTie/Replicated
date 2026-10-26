@@ -45,12 +45,30 @@ try {
   log('approved', await ev(() => JSON.stringify({ approved: window.__scene.buildings.list[0].approved, journalOpen: !!document.querySelector('.jn') })));
   await ev(() => { document.querySelector('.jn')?.remove(); });
   await page.waitForFunction(() => window.__scene.buildings.list[0].progress > 0, null, { timeout: 25000 }).catch(() => fail('nobody joined the raising'));
+  // approved, it is printed: a printer stands beside it and its head moves with every blow
+  await page.waitForTimeout(1500);
+  await ev(() => { const s = window.__scene, bl = s.buildings.list[0]; s.cameras.main.stopFollow(); s.cameras.main.centerOn(bl.x, bl.y - 10); });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'screenshots/building-printing.png' });
+  await ev(() => { const s = window.__scene; s.cameras.main.startFollow(s.player.zone, true, 0.1, 0.1, 0, 8); });
+  const printer = await ev(async () => {
+    const s = window.__scene, bl = s.buildings.list[0], p = s.buildings.printers.get(bl.id);
+    if (!p) return null;
+    let pulses = 0; const pulse = p.pulse.bind(p); p.pulse = () => { pulses++; pulse(); };
+    await new Promise((r) => setTimeout(r, 6000));
+    return { at: [p.x, p.y], pulses };
+  });
+  log('printer', JSON.stringify(printer));
+  if (!printer) fail('no printer beside the approved building');
+  else if (!printer.pulses) fail('the printer did not print while the copies worked');
   log('raising', await ev(() => JSON.stringify({ progress: window.__scene.buildings.list[0].progress, paid: window.__scene.buildings.list[0].paid, wood: window.__scene.supplies.wood, helpers: window.__scene.buildings.list[0].helpers.length })));
   if ((await ev(() => window.__scene.supplies.wood)) >= 10) fail('the building took no wood');
   await page.waitForFunction(() => window.__scene.buildings.list[0].built, null, { timeout: 60000 }).catch(() => fail('the building never got finished'));
   await page.waitForTimeout(900);
   const built = await ev(() => { const s = window.__scene; const bl = s.buildings.list[0]; s.player.setPosition(bl.x - 30, bl.y + 10); s.cameras.main.centerOn(bl.x, bl.y - 10); return { built: bl.built, helpers: bl.helpers.length, progress: bl.progress, total: s.buildings.swingsFor(bl) }; });
   log('built', JSON.stringify(built));
+  await page.waitForTimeout(3200);
+  if (await ev(() => window.__scene.buildings.printers.size)) fail('the printer did not fold away once the building stood');
   if (built.helpers < 2) log('note: only one copy helped');
   await page.waitForTimeout(500);
   await page.screenshot({ path: 'screenshots/building-built.png' });

@@ -130,8 +130,9 @@ src/core/home.ts         HOME: the start world (the first planet in planets.json
 src/data/homeworld.json  the homeworld: Thales (body, voice, his word at the opening), the founded Metanoia structures, the goal
 src/scenes/planet/Homeworld.ts the homeworld at runtime: Thales' row (made on the first load), the founding (structures on civic
                          lots, the Replicator, data.founded), printers by unfinished founded work, the opening (playScan)
-src/entities/Printer.ts  a 3D printer beside a building: the head runs the gantry with every blow, a breathing light and a
-                         thread of light call for hands while it waits, standby once the building is done
+src/entities/Printer.ts  the 3D printer beside every building being made (Buildings.printers): the head runs the gantry and
+                         lays a layer with every blow, a breathing light and a thread of light call for hands; it folds
+                         away once the building stands (the Metanoia's stay on standby by their work)
 supabase/manual/         SQL Steve runs by hand (never applied by a session): 2026-10-26_homeworld_fresh_start.sql
 src/data/*.json          palette, planets, player, enemies, items, structures, backend, village, warren (all tunables)
 src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by tools/build-stars.mjs; edit the catalog there)
@@ -281,7 +282,8 @@ playtest, about 6 minutes; `npm test -- talk town` runs only those), `npm run sp
 `node tools/playtest-beacon.mjs` (beacon world: keeper wakes, charges, slams, falls; beacon lights; Spark saved),
 `node tools/playtest-warren.mjs` (rooms planned, a copy digs, a copy makes its bed, down the hatch, walk, back up),
 `node tools/playtest-become.mjs` (a blank birth, the becoming with the canned mind, eating, the journal's wants),
-`node tools/playtest-buildings.mjs` (a proposal, approval in the journal, paid and raised by three copies, talk, give),
+`node tools/playtest-buildings.mjs` (a proposal, approval in the journal, a printer beside it printing while three copies
+work, the printer folding away, talk, give),
 `node tools/playtest-return.mjs` (beats from an older snapshot, the tour gives the player back, a key skips it, a letter
 waits by the vessel and opens the sender's letters),
 `node tools/playtest-carry.mjs` (fell trees and carry the wood, a copy shows what its building waits for, the load pays
@@ -706,3 +708,14 @@ door. A husk you leave somewhere still stands there on standby. Player facing wo
 HUSKS", "TO SHIP"); the code keeps manny and vessel. New sounds: the vault door, the pods' hum, the menu.
 - Verified: build, `npm test` 15 of 15 (`playtest-manny` goes through the vault; `playtest-talk` keeps its test spot
   out of the doorway). Screenshots `vault-build-ready.png`, `vault-building.png`, `vault-husk.png`, `vault-menu.png`.
+
+**Step 4, 3D printers.** Every building is printed. When a building is approved a printer stands beside it
+(`Buildings.printers`, `src/entities/Printer.ts`). Each blow, yours or a woken Vessel's, slides the print head along
+the gantry, flares the nozzle, lays a white-hot line on the new top row of the building (cooling to the printer's warm
+light) and plays a layer sound (servo whir, click, hiss; panned and quieter with distance, never quite the same twice).
+Copies work at the printer instead of at the walls. A load of the material a building waits for is handed over at its
+walls or at its printer. When the last layer is laid, a rising chord plays and the printer folds its gantry away. The
+Metanoia's own printers stay on standby beside every founded structure on the homeworld. Costs are unchanged
+(`buildings.json`). Village builds (lamps, huts, flags) are still raised as before.
+- Verified: build, `npm test` 15 of 15 (`playtest-buildings` checks the printer, its pulses and the fold).
+  `screenshots/building-printing.png`.

@@ -66,7 +66,7 @@ try {
     const s = window.__scene, th = s.npcs.find((n) => n.data.traits.thales);
     return {
       buildings: s.buildings.list.map((x) => ({ id: x.id, built: x.built, civic: s.townState.civic[x.id] !== undefined })),
-      goal: s.buildings.list.find((x) => x.id === goal), printers: s.homeworld.printers.map((p) => p.b.id),
+      goal: s.buildings.list.find((x) => x.id === goal), printers: [...s.buildings.printers.keys()],
       replicator: s.base.built, founded: s.pending.founded || (await window.__session.store.loadPlanet(s.planet.star, s.planet.planetIndex, 0)).data.founded, thalesLot: s.townState.lots[th.data.id],
     };
   }, HW.goal);
@@ -86,7 +86,7 @@ try {
 
   // 6. your blows print it: the head moves with every one, and the last one finishes it
   const printed = await ev(async (goal) => {
-    const s = window.__scene, bl = s.buildings.list.find((x) => x.id === goal), p = s.homeworld.printers.find((x) => x.b.id === goal);
+    const s = window.__scene, bl = s.buildings.list.find((x) => x.id === goal), p = s.buildings.printers.get(goal);
     const aim = { x: 1, y: 0, lengthSq: () => 1 };
     s.player.setPosition(bl.x - bl.w * 8 - 6, bl.y);
     let pulses = 0; const pulse = p.pulse.bind(p); p.pulse = () => { pulses++; pulse(); };

@@ -138,7 +138,7 @@ export class Hands {
     this.stack.forEach((img, k) => img.setVisible(!hidden).setPosition(p.x + (k % 2 ? 2 : -1), p.y - 22 - k * 3 + bob));
     if (hidden || p.locked) return;
     const r = H.deliverRange, { material } = this.load;
-    const b = s.buildings.waitingFor(material).find((x) => Math.abs(p.x - x.x) < x.w * 8 + r && p.y > x.y - x.h * 8 - r && p.y < x.y + r);
+    const b = s.buildings.feedAt(p.x, p.y, r, material);
     if (b) { this.handOver(b, `${b.name}`); s.buildings.fund(b); return; }
     const npc = s.npcs.find((n) => !n.blank && !n.below && n.state !== 'born' && n.state !== 'talk' && Math.hypot(n.x - p.x, n.y - p.y) < r + 4);
     if (npc) {

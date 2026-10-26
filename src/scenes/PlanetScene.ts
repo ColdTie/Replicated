@@ -808,7 +808,7 @@ export class PlanetScene extends Phaser.Scene {
     this.hands.update(time);
     this.homecoming.update(time);
     this.trade.update(dt);
-    this.homeworld.update(time, dt);
+    this.buildings.update(time, dt);
     this.warren.update(dt);
     this.updateHatch(dt);
     this.minds.tickMinds(dt);
