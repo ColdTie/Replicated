@@ -156,7 +156,7 @@ export class StarMapScene extends Phaser.Scene {
 
     // Back to your own body aboard the vessel (link mode: you drive a manny and the vessel waits elsewhere)
     this.vesselBtn = this.add.container(w - 40, h - 44, [this.add.circle(0, 0, 24, PALETTE[24], 0.7).setStrokeStyle(2, visor), this.add.circle(0, 0, 16, PALETTE[9], 0.35),
-      this.add.image(0, 2, 'vessel', 0).setScale(0.75), label(this.d.vessel && shipFlying(this.d.vessel) ? 'TO SHIP' : 'TO VESSEL', visor)])
+      this.add.image(0, 2, 'vessel', 0).setScale(0.75), label('TO SHIP', visor)])
       .setSize(56, 56).setVisible(this.d.mode === 'link' && !!this.d.vessel).setDepth(5000);
     this.vesselBtn.setInteractive({ useHandCursor: true }).on('pointerdown', () => { const cb = this.d.onVessel; this.scene.stop(); cb?.(); });
 
@@ -212,7 +212,7 @@ export class StarMapScene extends Phaser.Scene {
   }
 
   private titleText() {
-    return this.d.mode === 'launch' ? 'WHERE TO?' : this.d.mode === 'link' ? 'YOUR MANNIES' : 'STAR MAP';
+    return this.d.mode === 'launch' ? 'WHERE TO?' : this.d.mode === 'link' ? 'YOUR HUSKS' : 'STAR MAP';
   }
 
   /** The planet of this star where a manny of yours waits (the given one if it has one), or null. */
@@ -315,8 +315,8 @@ export class StarMapScene extends Phaser.Scene {
         lines.push(`${planets.length} ${planets.length === 1 ? 'WORLD' : 'WORLDS'}${known ? ' KNOWN TO ASTRONOMERS' : ''}  - TAP FOR PLANETS`);
         if (this.d.mode === 'launch' && s.id !== this.d.from) lines.push(this.d.blocked ? 'A COPY MUST STAY BEHIND FIRST' : `FUEL ${fuel} OF ${this.d.embers ?? 0}`);
         const mp = this.mannyAt(s.id);
-        if (mp !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, mp) ? 'YOU DRIVE YOUR MANNY HERE' : `YOUR MANNY WAITS ON ${planetFor(s.id, mp)?.name ?? 'A WORLD'} - LINK`);
-        if (this.d.vessel?.star === s.id) lines.push(shipFlying(this.d.vessel) ? 'YOUR VESSEL IS ON ITS WAY HERE' : 'YOUR VESSEL WAITS HERE');
+        if (mp !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, mp) ? 'YOU DRIVE YOUR HUSK HERE' : `YOUR HUSK WAITS ON ${planetFor(s.id, mp)?.name ?? 'A WORLD'} - LINK`);
+        if (this.d.vessel?.star === s.id) lines.push(shipFlying(this.d.vessel) ? 'YOUR SHIP IS ON ITS WAY HERE' : 'YOUR SHIP WAITS HERE');
       } else {
         lines.push(s.id !== this.d.from ? formatDuration(travelMs(ly)) : 'HOME STAR');
       }
@@ -330,8 +330,8 @@ export class StarMapScene extends Phaser.Scene {
           lines.push(ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
           if (this.d.mode === 'launch') lines.push(this.d.blocked ? 'A COPY MUST STAY BEHIND FIRST' : `FUEL ${fuel} OF ${this.d.embers ?? 0}`);
         }
-        if (this.mannyAt(s.id, p.index) !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, p.index) ? 'YOU DRIVE YOUR MANNY HERE' : 'YOUR MANNY WAITS HERE - LINK');
-        if (this.d.vessel?.star === s.id && this.d.vessel.planet === p.index) lines.push(shipFlying(this.d.vessel) ? 'YOUR VESSEL IS ON ITS WAY HERE' : 'YOUR VESSEL WAITS HERE');
+        if (this.mannyAt(s.id, p.index) !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, p.index) ? 'YOU DRIVE YOUR HUSK HERE' : 'YOUR HUSK WAITS HERE - LINK');
+        if (this.d.vessel?.star === s.id && this.d.vessel.planet === p.index) lines.push(shipFlying(this.d.vessel) ? 'YOUR SHIP IS ON ITS WAY HERE' : 'YOUR SHIP WAITS HERE');
       } else if (!this.isHere(s.id, p.index)) lines.push(formatDuration(travelMs(ly)));
     } else {
       lines.push(s.name);
