@@ -70,3 +70,16 @@ export function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<
   for (const c of children) e.append(c);
   return e;
 }
+
+/** A Vessel's first wake: it names itself (one line, then WAKE). Resolves with the name; an empty one keeps `given`. */
+export function askName(given: string): Promise<string> {
+  return new Promise((resolve) => {
+    openOverlay((form, close) => {
+      const name = el('input', { type: 'text', placeholder: given, maxLength: 12, autocapitalize: 'words', autocomplete: 'off' }) as HTMLInputElement;
+      const ok = el('button', { type: 'submit' }, 'WAKE') as HTMLButtonElement;
+      form.append(el('h2', {}, 'WHO ARE YOU?'), el('p', {}, 'Every Vessel names itself.'), name, ok);
+      ok.onclick = () => { const v = name.value.trim().replace(/\s+/g, ' '); close(); resolve(v || given); };
+      name.focus();
+    });
+  });
+}

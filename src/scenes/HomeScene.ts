@@ -4,11 +4,15 @@ import Phaser from 'phaser';
 import { anim, featureTex } from '../core/assets';
 import { PALETTE, PLAYER } from '../core/data';
 import { session } from '../core/session';
+import { copyName } from '../core/drift';
+import HOMEWORLD from '../data/homeworld.json';
 import { makeSky, makeStars } from '../fx/textures';
 import { CloudStore, LocalStore, currentSession, signIn, signUp, type GameStore, type Profile } from '../net/store';
-import { el, openOverlay, overlayBusy, paletteCss } from '../ui/overlay';
+import { el, openOverlay, overlayBusy } from '../ui/overlay';
 
 const CARD_W = 76, CARD_H = 100;
+/** the first player's name until it names itself at its first wake: Thales' first copy */
+const FIRST_COPY = copyName(HOMEWORLD.thales.name, 1).toUpperCase();
 
 export class HomeScene extends Phaser.Scene {
   private cards: Phaser.GameObjects.Container[] = [];
@@ -105,8 +109,14 @@ export class HomeScene extends Phaser.Scene {
     this.cards = [];
     let profiles: Profile[];
     try { profiles = await store.listProfiles(); } catch (e) { console.warn(e); this.status.setText('COULD NOT LOAD PROFILES'); return; }
+    // nobody can join except as a copy made and handed over (story/STORY.md): the very first player is Thales' first
+    // copy, made here by itself; it names itself when it wakes
+    if (!profiles.length) {
+      try { return await this.play(store, await store.createProfile({ name: FIRST_COPY, kid_mode: false, feature_color: PLAYER.feature[1], sort: 0 })); }
+      catch (e) { console.warn(e); this.status.setText('COULD NOT WAKE'); return; }
+    }
     const { width: w, height: h } = this.scale;
-    const count = profiles.length + (profiles.length < 6 ? 1 : 0);
+    const count = profiles.length;
     const gap = 10;
     const total = count * CARD_W + (count - 1) * gap;
     let x = (w - total) / 2 + CARD_W / 2;
@@ -115,7 +125,6 @@ export class HomeScene extends Phaser.Scene {
       this.cards.push(this.profileCard(x, y, p, () => this.play(store, p)));
       x += CARD_W + gap;
     }
-    if (profiles.length < 6) this.cards.push(this.addCard(x, y, () => this.newProfile(store, profiles.length)));
 
     if (store.mode === 'cloud') {
       const out = this.add.bitmapText(w - 8, h - 10, 'pixel', 'SIGN OUT').setOrigin(1, 1).setTint(PALETTE[22]).setInteractive({ useHandCursor: true });
@@ -151,45 +160,6 @@ export class HomeScene extends Phaser.Scene {
       this.tweens.add({ targets: c, scale: 0.92, duration: 70, yoyo: true, onComplete: onPick });
     });
     return c;
-  }
-
-  private addCard(x: number, y: number, onPick: () => void) {
-    const c = this.cardFrame(x, y, PALETTE[23]);
-    const plus = this.add.bitmapText(0, -6, 'pixel', '+').setOrigin(0.5).setScale(4).setTint(PALETTE[21]);
-    c.add(plus);
-    c.on('pointerdown', () => { if (!overlayBusy() && !this.picking) onPick(); });
-    return c;
-  }
-
-  private newProfile(store: GameStore, sort: number) {
-    openOverlay((form, close) => {
-      const name = el('input', { type: 'text', placeholder: 'name', maxLength: 12, required: true, autocapitalize: 'words' }) as HTMLInputElement;
-      const kid = el('input', { type: 'checkbox' }) as HTMLInputElement;
-      let color = PLAYER.featureColors[sort % PLAYER.featureColors.length][1];
-      const swatches = el('div', { className: 'sw' });
-      for (const [, light] of PLAYER.featureColors) {
-        const b = el('button', { type: 'button', className: light === color ? 'on' : '' }) as HTMLButtonElement;
-        b.style.background = paletteCss(PALETTE[light]);
-        b.onclick = () => { color = light; swatches.querySelectorAll('button').forEach((x) => x.classList.remove('on')); b.classList.add('on'); };
-        swatches.append(b);
-      }
-      const msg = el('div', { className: 'msg' });
-      const ok = el('button', { type: 'submit' }, 'CREATE') as HTMLButtonElement;
-      const cancel = el('button', { type: 'button', className: 'link' }, 'cancel');
-      form.append(el('h2', {}, 'NEW REPLICANT'), name, el('p', {}, 'Visor color'), swatches,
-        el('label', { className: 'row' }, kid, 'Kid mode (no inventory, no dying)'), msg, ok, cancel);
-      ok.onclick = async () => {
-        if (!form.reportValidity()) return;
-        ok.disabled = true;
-        try {
-          await store.createProfile({ name: name.value.trim(), kid_mode: kid.checked, feature_color: color, sort });
-          close();
-          await this.showProfiles(store);
-        } catch (e) { ok.disabled = false; msg.textContent = (e as Error).message; }
-      };
-      cancel.onclick = close;
-      name.focus();
-    });
   }
 
   private async play(store: GameStore, profile: Profile) {

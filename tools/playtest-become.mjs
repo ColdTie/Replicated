@@ -30,6 +30,9 @@ try {
   await ev(() => { const s = window.__scene; s.base.placeReplicator(false); s.embers = 45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; });
   await page.waitForTimeout(300);
   log('replicate', await ev(() => window.__scene.tryReplicate()));
+  // wake or hold: WAKE (the first light) with Enter
+  await page.waitForFunction(() => !!window.__scene.choice, null, { timeout: 5000 });
+  await page.keyboard.press('Enter');
   await page.waitForFunction(() => window.__scene.npcs.length === 1 && !window.__scene.replicating, null, { timeout: 30000 });
   await page.waitForTimeout(400);
   const born = await ev(() => { const n = window.__scene.npcs[0]; return { name: n.data.name, blank: n.blank, state: n.state, key: n.sprite.texture.key, tinted: n.sprite.isTinted, light: n.light.intensity, traits: n.data.traits, stats: n.data.stats }; });
@@ -83,6 +86,7 @@ try {
     s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; s.shot = false;
     const n0 = s.npcs.length;
     s.tryReplicate();
+    s.choice?.route({ x: 0, y: 0, attack: true, dash: false, interact: false, back: false, forward: false, cancel: false, reply: false }, 16);
     for (let i = 0; i < 300 && (s.npcs.length === n0 || s.replicating || s.npcs.at(-1).data.id === 'pending'); i++) await new Promise((r) => setTimeout(r, 100));
     await new Promise((r) => setTimeout(r, 600));
     s.shot = true;

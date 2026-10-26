@@ -8,6 +8,7 @@ import { squash } from '../../entities/Player';
 import type { Npc } from '../../entities/Npc';
 import type { Building, PlanetSave, ReplicantSave } from '../../net/store';
 import { buildingSpot, lotForBuilding } from '../../world/town';
+import { askName } from '../../ui/overlay';
 import HOMEWORLD from '../../data/homeworld.json';
 import type { PlanetScene } from '../PlanetScene';
 
@@ -142,12 +143,46 @@ export class Homeworld {
     });
   }
 
-  /** The visor flickers on: dark, flash, dark, on. Then the game begins and Thales walks to his unfinished work. */
+  /** A Vessel held asleep and handed over: the new player wakes in it where it slept (no scan, no word). */
+  playHeldWake() {
+    const s = this.s, pl = s.player;
+    pl.locked = true;
+    pl.light.active = false;
+    pl.sprite.setTint(0x6a7096);
+    s.cameras.main.fadeIn(HOMEWORLD.intro.fadeMs, 24, 20, 37);
+    s.time.delayedCall(HOMEWORLD.intro.fadeMs, () => this.wake());
+  }
+
+  /** The visor flickers on: dark, flash, dark, on. A Vessel without a name of its own names itself; then the game
+   * begins and Thales walks to his unfinished work. */
   private wake() {
     const s = this.s, pl = s.player;
     const steps = [[0, 0], [140, 0], [260, 1], [360, 0], [HOMEWORLD.intro.flickerMs, 1]];
     for (const [t, v] of steps) s.time.delayedCall(t, () => { pl.light.active = v > 0.5; if (v > 0.5) pl.sprite.clearTint(); });
-    s.time.delayedCall(HOMEWORLD.intro.flickerMs + 120, () => {
+    s.time.delayedCall(HOMEWORLD.intro.flickerMs + 120, () => void this.nameSelf().then(() => this.begin()));
+  }
+
+  /** Its first wake: who it is. The profile and the row take the name (an empty answer keeps the given one). */
+  private async nameSelf() {
+    const me = session.replicant, st = session.store;
+    if (!me?.traits.unnamed || this.s.shot) return;
+    // the game's keys stand down while the name is typed (Space is captured for swinging)
+    const kb = this.s.input.keyboard;
+    if (kb) { kb.enabled = false; kb.disableGlobalCapture(); }
+    const name = await askName(me.name);
+    if (kb) { kb.enabled = true; kb.enableGlobalCapture(); }
+    this.s.controls.clear();
+    me.name = name;
+    me.traits.unnamed = false;
+    if (session.profile) session.profile.name = name;
+    try { await st?.renameSelf(me, name); } catch (e) { console.warn('rename failed', e); }
+    this.s.announceLocation();
+    this.s.mindLog.push({ t: this.s.mindClock, text: `The new Vessel named itself ${name}` });
+  }
+
+  private begin() {
+    const s = this.s, pl = s.player;
+    {
       squash(s, pl.sprite, 1.3, 0.75, 140);
       s.fx.sparks(pl.x, pl.y - 12, PALETTE[session.replicant?.traits.feature ?? PLAYER.feature[1]], 10);
       s.fx.dust(pl.x, pl.y + 2, 6);
@@ -157,6 +192,6 @@ export class Homeworld {
       s.game.events.emit('titlecard', s.planet.name, s.planet.subtitle);
       const th = this.thales;
       if (th) s.time.delayedCall(900, () => { th.hold = false; th.home = this.post(); });
-    });
+    }
   }
 }

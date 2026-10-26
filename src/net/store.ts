@@ -50,6 +50,10 @@ export interface ReplicantSave {
     ship?: { star: string; planet: number; journey?: Journey } | null;
     /** Thales, the first Vessel (src/data/homeworld.json): a fixed character with a mind, never handed over or held */
     thales?: boolean;
+    /** held asleep by its maker for a new player (wake or hold at the Replicator); it has no mind until handed over */
+    held?: boolean;
+    /** a player's Vessel that has not named itself yet: it does at its first wake */
+    unnamed?: boolean;
   };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
@@ -335,14 +339,19 @@ export interface GameStore {
   /** How the minds are doing (migration 0014), or null where there are no real minds (this device) or it cannot be read. */
   mindHealth(): Promise<MindHealth | null>;
   /**
-   * The handoff: a Spark awakens a copy as a player of its own. A new profile is made in its name and visor
-   * color and the copy becomes that profile's replicant (one row update); the giver spends the Spark.
+   * The handoff: a held Vessel is given to a new person. A new profile is made in its name and visor color and the
+   * Vessel becomes that profile's (one row update); it wakes and names itself the first time it is played.
    */
   awaken(copy: ReplicantSave, giver: ReplicantSave): Promise<Profile>;
+  /** A player's Vessel names itself (its first wake): the profile and the row take the name. */
+  renameSelf(r: ReplicantSave, name: string): Promise<void>;
   /** Atomic: adds emberDelta to the shared pool, merges node states, replaces structures if given. */
   applyPlanetDelta(star: string, planetIndex: number, emberDelta: number, data: PlanetData): Promise<PlanetSave | null>;
   signOut(): Promise<void>;
 }
+
+/** What a held Vessel's row becomes when it is given to a new person: no longer held, not yet awake or named. */
+const HANDED = (giver: ReplicantSave): Partial<ReplicantSave['traits']> => ({ held: false, awake: false, unnamed: true, handedBy: giver.id });
 
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
@@ -352,7 +361,7 @@ function newReplicant(profile: Profile): Omit<ReplicantSave, 'id'> {
     profile_id: profile.id,
     name: profile.name,
     model: PLAYER.model,
-    traits: { v: 1, awake: false, feature: profile.feature_color, body: { ...PARTS.defaults } },
+    traits: { v: 1, awake: false, unnamed: true, feature: profile.feature_color, body: { ...PARTS.defaults } },
     star_id: HOME.star,
     planet_index: HOME.planet,
     pos_x: null,
@@ -624,11 +633,17 @@ export class LocalStore implements GameStore {
   async awaken(copy: ReplicantSave, giver: ReplicantSave) {
     const profile = await this.createProfile({ name: copy.name, kid_mode: false, feature_color: copy.traits.feature ?? 10, sort: this.db.profiles.length });
     const r = this.db.replicants.find((x) => x.id === copy.id);
-    if (r) { r.status = 'active'; r.profile_id = profile.id; r.traits = { ...r.traits, awake: true, handedBy: giver.id }; }
-    const g = this.db.replicants.find((x) => x.id === giver.id);
-    if (g) g.traits = { ...g.traits, sparks: Math.max(0, (g.traits.sparks ?? 0) - 1) };
+    if (r) { r.status = 'active'; r.profile_id = profile.id; r.traits = { ...r.traits, ...HANDED(giver) }; }
     this.flush();
     return profile;
+  }
+
+  async renameSelf(r: ReplicantSave, name: string) {
+    const row = this.db.replicants.find((x) => x.id === r.id);
+    if (row) { row.name = name; row.traits = { ...row.traits, unnamed: false }; }
+    const p = this.db.profiles.find((x) => x.id === r.profile_id);
+    if (p) p.name = name;
+    this.flush();
   }
 
   async signOut() { /* nothing to sign out of */ }
@@ -855,9 +870,15 @@ export class CloudStore implements GameStore {
     const profile = await this.createProfile({ name: copy.name, kid_mode: false, feature_color: copy.traits.feature ?? 10, sort: count ?? 9 });
     const { error } = await this.sb.from('replicants').update({ status: 'active', profile_id: profile.id, updated_at: new Date().toISOString() }).eq('id', copy.id);
     if (error) throw error;
-    await this.patchTraits(copy.id, { awake: true, handedBy: giver.id });
-    await this.patchTraits(giver.id, { sparks: Math.max(0, (giver.traits.sparks ?? 0) - 1) });
+    await this.patchTraits(copy.id, HANDED(giver));
     return profile;
+  }
+
+  async renameSelf(r: ReplicantSave, name: string) {
+    const { error } = await this.sb.from('replicants').update({ name, updated_at: new Date().toISOString() }).eq('id', r.id);
+    if (error) throw error;
+    await this.patchTraits(r.id, { unnamed: false });
+    if (r.profile_id) { const p = await this.sb.from('profiles').update({ name }).eq('id', r.profile_id); if (p.error) throw p.error; }
   }
 
   async mindTick(replicantId: string, ctx: MindContext) {
