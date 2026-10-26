@@ -89,7 +89,7 @@
   },
   "signature": {
     "_doc": "Each world has a material only it makes (src/scenes/planet/Trade.ts): byWorld maps the world's id (planets.json / biomes.json) to it, names says it in words. The copies win perCopyHour of it each while you are away and while you play. The vessel's hold takes up to hold of this world's material when you launch and unloads it where you land (kept on the replicant as traits.cargo). Every kind of material from another world in the store lifts every copy's mood by importMood (up to importMoodMax): something from far away.",
-    "byWorld": { "earth": "seed", "verdant": "seed", "frost": "iceglass", "dune": "salt", "spore": "silk", "ember": "obsidian", "moon": "regolith", "solace": "regolith" },
+    "byWorld": { "homeworld": "iceglass", "earth": "seed", "verdant": "seed", "frost": "iceglass", "dune": "salt", "spore": "silk", "ember": "obsidian", "moon": "regolith", "solace": "regolith" },
     "names": { "iceglass": "ice glass", "salt": "salt", "obsidian": "obsidian", "silk": "spore silk", "seed": "seed", "regolith": "regolith" },
     "perCopyHour": 0.5,
     "hold": 10,

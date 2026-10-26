@@ -2,6 +2,7 @@
 // home and its street, mines crystals near home, carries Embers back to the Replicator, and greets you when you come
 // close. Its drift (visor, headgear, trail) tells it apart at a glance.
 import Phaser from 'phaser';
+import HOMEWORLD from '../data/homeworld.json';
 import { sound, type Instrument, type Mood, type Tempo } from '../audio/Sound';
 import { anim } from '../core/assets';
 import { bodyFor, ensureBodyTexture, kitColor } from '../core/body';
@@ -22,6 +23,8 @@ type State = 'idle' | 'walk' | 'mine' | 'carry' | 'greet' | 'born' | 'hammer' | 
 /** Something a copy decided to do with its hands: walk there, swing a few times, then it happens. */
 interface Chore { x: number; y: number; swings: number; swing: () => void; done: () => void }
 type Pt = { x: number; y: number };
+
+const THALES_KEEP = HOMEWORLD.thales.keepPx;
 
 export class Npc {
   readonly sprite: Phaser.GameObjects.Sprite;
@@ -53,6 +56,8 @@ export class Npc {
   z = 0;
   /** where it lives: the yard of its lot in the town (px); strolls and crystal trips start from here */
   home?: Pt;
+  /** stands where it is put (the opening holds Thales beside you) */
+  hold = false;
   /** a way round something in the way (waypoints over open ground) toward `routeFor` */
   private route: Pt[] | null = null;
   private routeFor: Pt | null = null;
@@ -396,6 +401,15 @@ export class Npc {
   private think(time: number) {
     const base = this.scene.baseCenter;
     const home = this.home ?? { x: base.x, y: base.y + 20 };
+    if (this.hold) { this.until = time + 1000; return; }
+    // Thales keeps near his work (homeworld.json keepPx): a few slow steps, long looks
+    if (this.data.traits.thales) {
+      if (Math.random() < 0.55 && Math.hypot(this.x - home.x, this.y - home.y) < THALES_KEEP) { this.until = time + 2500 + Math.random() * 4000; return; }
+      const a = Math.random() * Math.PI * 2, r = Math.random() * THALES_KEEP;
+      this.target = { x: home.x + Math.cos(a) * r, y: home.y + Math.sin(a) * r * 0.5 };
+      this.state = 'walk';
+      return;
+    }
     // the warren first: a room waiting to be dug, or bed when it is night and there is a bed
     const down = this.scene.warren.pickTask(this, this.scene.env.night);
     if (down?.task === 'entrance') { this.scene.warren.digEntrance(this); return; }
@@ -749,6 +763,12 @@ export class Npc {
       this.bubble = undefined;
       this.scene.tweens.add({ targets: b, alpha: 0, y: b.y - 4, duration: 400, onComplete: () => b.destroy() });
     }
+  }
+
+  setPosition(x: number, y: number) {
+    this.x = x; this.y = y;
+    this.target = null;
+    this.sync();
   }
 
   sync() {

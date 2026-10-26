@@ -39,6 +39,7 @@
     "dune": { "square": "earth", "streetWear": 0.75, "trackWear": 0.3, "edgePx": 8, "path": ["4e3230", "62403a", "7a5246", "8f6450"] },
     "spore": { "square": "earth", "streetWear": 0.85, "trackWear": 0.3, "edgePx": 7, "path": ["241d38", "30284a", "3e345c", "4e4270"] },
     "moon": { "square": "earth", "streetWear": 0.6, "trackWear": 0.25, "edgePx": 6, "path": ["262c42", "343b54", "444c68", "56607e"] },
+    "homeworld": { "square": "flags", "streetWear": 0.85, "trackWear": 0.3, "edgePx": 7, "path": ["262a36", "343a4a", "454c5e", "586072"] },
     "solace": { "square": "earth", "streetWear": 0.7, "trackWear": 0.25, "edgePx": 6, "path": ["231d36", "302848", "3f355a", "50456e"] },
     "ember": { "square": "earth", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["241c1e", "322a2c", "42383a", "524648"] },
     "frost": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 8, "path": ["56709a", "6c86b0", "869ec6", "a2b6d8"] }

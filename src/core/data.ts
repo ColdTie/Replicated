@@ -38,7 +38,11 @@ export interface PlanetDef {
   sporeRate: number;
   trees: number;
   towers: number;
-  intro: 'wake' | 'land';
+  intro: 'scan' | 'wake' | 'land';
+  /** multiplies the day cycle's light and sky (hex; a red dwarf's day) */
+  sunTint?: string;
+  /** surface gravity in Earth g (1 when missing) */
+  gravity?: number;
   dayCycle?: boolean;
   ponds?: number;
   flowers?: number;

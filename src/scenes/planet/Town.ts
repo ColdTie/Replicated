@@ -17,7 +17,7 @@ export class Town {
    */
   settleTown(save: PlanetSave | null, rows: ReplicantSave[]) {
     const town = this.s.map.town;
-    const ids = rows.map((r) => r.id);
+    const ids = rows.filter((r) => !r.traits.thales).map((r) => r.id); // Thales keeps by his work, not on a lot
     const data = save?.data;
     // only with the copies in hand: their builds go to their own lots (a failed load tries again next time)
     if (data && (data.layout ?? 0) < TOWN_LAYOUT && this.s.npcsLoaded) {

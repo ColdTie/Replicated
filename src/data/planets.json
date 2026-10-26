@@ -1,10 +1,74 @@
 {
-  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures. The first planet is the default start. intro: 'wake' (Earth cradle) or 'land' (vessel descends). ground = [dark, base, speckle] floor colors (default [25, 24, 23]). dayCycle: lighting follows the device clock (src/data/daycycle.json). weather: real-hour rain. ponds: number of ponds. flowers: chance per open tile. wildlife: peaceful creatures (grazers can be petted). poles: polar caps seen from orbit (size 0..1 from equator to pole, [edge, core] palette colors); leave out for none. shy: the world's creatures never attack; they flee from you (Earth is peaceful: humanity is gone, nature took the ruins back). On every world creatures leave you alone in the town (enemies.json townSafe).",
+  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures. The first planet is the default start. intro: 'scan' (the homeworld's opening: Thales finishes copying himself and wakes you, src/data/homeworld.json), 'wake' (a cradle opens; no world uses it since the Metanoia story, 2026-10-26) or 'land' (the ship descends). ground = [dark, base, speckle] floor colors (default [25, 24, 23]). dayCycle: lighting follows the device clock (src/data/daycycle.json). weather: real-hour rain. ponds: number of ponds. flowers: chance per open tile. wildlife: peaceful creatures (grazers can be petted). poles: polar caps seen from orbit (size 0..1 from equator to pole, [edge, core] palette colors); leave out for none. shy: the world's creatures never attack; they flee from you (Earth is peaceful: humanity is gone, nature took the ruins back). On every world creatures leave you alone in the town (enemies.json townSafe). gravity: surface gravity in Earth g (heavier worlds shorten the dash, make dust fall faster and landings heavier). sunTint: multiplies the day cycle's light and sky (a red dwarf's dim red day).",
   "planets": [
+    {
+      "id": "homeworld",
+      "shy": true,
+      "poles": {
+        "size": 0.42,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "LHS 1140 B",
+      "subtitle": "THE METANOIA HOMEWORLD",
+      "star": "lhs-1140",
+      "planetIndex": 2,
+      "seed": 1140,
+      "accent": [
+        15,
+        16,
+        17
+      ],
+      "ambient": "7a6a8c",
+      "sky": [
+        "181425",
+        "262b44",
+        "3e2731",
+        "733e39"
+      ],
+      "size": [
+        150,
+        116
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.75,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.08,
+      "sporeRate": 1,
+      "trees": 0.035,
+      "towers": 0,
+      "intro": "scan",
+      "ground": [
+        25,
+        15,
+        23
+      ],
+      "dayCycle": true,
+      "sunTint": "ffa088",
+      "gravity": 1.9,
+      "weather": false,
+      "ponds": 11,
+      "flowers": 0.006,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 0
+      }
+    },
     {
       "id": "earth",
       "shy": true,
-      "poles": { "size": 0.3, "colors": [20, 19] },
+      "poles": {
+        "size": 0.3,
+        "colors": [
+          20,
+          19
+        ]
+      },
       "name": "EARTH",
       "subtitle": "HOME, LONG AGO",
       "star": "sol",
@@ -39,7 +103,7 @@
       "sporeRate": 2,
       "trees": 0.05,
       "towers": 6,
-      "intro": "wake",
+      "intro": "land",
       "ground": [
         25,
         15,
@@ -57,7 +121,13 @@
     },
     {
       "id": "solace",
-      "poles": { "size": 0.2, "colors": [21, 20] },
+      "poles": {
+        "size": 0.2,
+        "colors": [
+          21,
+          20
+        ]
+      },
       "name": "SOLACE",
       "subtitle": "FIRST LANDING",
       "seed": 7741,

@@ -15,7 +15,7 @@ try {
   const page = await b.newPage({ viewport: { width: 960, height: 540 } });
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto(`http://localhost:${port}/Replicated/?shot=1&local&copies=3&view=base&hour=15&hear=1`);
+  await page.goto(`http://localhost:${port}/Replicated/?shot=1&at=sol&pi=3&local&copies=3&view=base&hour=15&hear=1`);
   await page.waitForFunction(() => !!window.__scene?.player && window.__scene.npcs.length === 3, null, { timeout: 15000 });
   await page.waitForTimeout(800);
   await page.mouse.click(480, 270);

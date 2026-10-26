@@ -2,6 +2,7 @@
   "_doc": "Painted floor per planet or biome id (src/world/groundPaint.ts). kind picks the surface detail: grass (blades, clover, flowers, leaves), snow (wind ridges, ice glints, sparkle), sand (ripples), spore (spongy pores, glowing specks), basalt (cracked plates with glowing seams), regolith (craters). soil = bare ground ramp dark to light, cover = what grows or lies on it (grass, snow, moss, ash), coverage = 0..1 how much of the floor it covers. detail = extra colors for the kind (blades, flowers, glow seams, specks). stone = ruin floor slabs. pebbles = per 10,000 px. relief = how strongly bumps are shaded. rock = painted outcrops (src/world/rockPaint.ts): ramp dark to light, cover (moss/snow in the hollows) + coverage, seams (glowing plate joints), cracks (contour crack density), relief (slope shading).",
   "default": "earth",
   "styles": {
+    "homeworld": {"kind": "grass", "relief": 8, "coverage": 0.62, "pebbles": 6, "soil": ["161a26", "1f2636", "2b3346", "3b4458"], "cover": ["142a30", "1b3a3e", "24504e", "2f625a", "9fb4c8"], "detail": ["1c3c40", "2c5a56", "467a70", "c8d6ea"], "flowers": ["c0cbdc", "2ce8f5", "e4e8f4", "8b9bb4"], "leaves": ["3a2a38", "5a3a44", "24504e"], "stone": ["232a40", "323b58", "434e6e", "56627f"], "rock": {"ramp": ["141826", "202740", "313b5c", "48587c", "6c7ea0", "a6b6d0"], "cover": ["c8d4e8", "e2e9f5", "f4f8fe"], "coverage": 0.48, "cracks": 0.9, "relief": 7}},
     "earth": {
       "kind": "grass",
       "relief": 7,

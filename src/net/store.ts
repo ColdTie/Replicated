@@ -1,6 +1,7 @@
 // Save layer. CloudStore talks to Supabase (family galaxy, RLS); LocalStore keeps the same shapes in
 // localStorage for offline play, screenshots and development (?local).
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { HOME, KNOWN_STARS } from '../core/home';
 import { BACKEND, MIND, PLAYER } from '../core/data';
 import { PARTS } from '../core/body';
 import TRAVEL from '../data/travel.json';
@@ -47,6 +48,8 @@ export interface ReplicantSave {
     /** while you drive a manny: where your own body waits aboard the vessel, a world or a flight that goes on
      * without you (star / planet: where the vessel is, or will land) */
     ship?: { star: string; planet: number; journey?: Journey } | null;
+    /** Thales, the first Vessel (src/data/homeworld.json): a fixed character with a mind, never handed over or held */
+    thales?: boolean;
   };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;
@@ -93,6 +96,8 @@ export interface PlanetData {
   supplies?: Record<string, number>;
   /** Surface buildings the copies designed (src/entities/Buildings.ts) */
   buildings?: Building[];
+  /** the homeworld's Metanoia structures and Replicator were placed (src/scenes/planet/Homeworld.ts) */
+  founded?: boolean;
   /** Layout version of the surface: 2 = the town (src/world/town.ts); missing = the old ring around the base, moved
    * into the town once on load (migrateToTown) */
   layout?: number;
@@ -348,8 +353,8 @@ function newReplicant(profile: Profile): Omit<ReplicantSave, 'id'> {
     name: profile.name,
     model: PLAYER.model,
     traits: { v: 1, awake: false, feature: profile.feature_color, body: { ...PARTS.defaults } },
-    star_id: 'sol',
-    planet_index: 3,
+    star_id: HOME.star,
+    planet_index: HOME.planet,
     pos_x: null,
     pos_y: null,
   };
@@ -376,7 +381,7 @@ export class LocalStore implements GameStore {
   constructor(private persist = true) {
     let db: LocalDb | null = null;
     try { db = persist ? JSON.parse(localStorage.getItem(this.key) ?? 'null') : null; } catch { db = null; }
-    this.db = { profiles: [], replicants: [], planets: {}, journeys: [], discovered: ['sol'], notes: [], mail: [], requests: [], ...(db ?? {}) };
+    this.db = { profiles: [], replicants: [], planets: {}, journeys: [], discovered: [...KNOWN_STARS], notes: [], mail: [], requests: [], ...(db ?? {}) };
   }
 
   /** No model on this device: a canned mind that still keeps notes and writes letters, so the game can be played
@@ -766,7 +771,7 @@ export class CloudStore implements GameStore {
   async discoveredStars() {
     const { data, error } = await this.sb.from('discovered_stars').select('star_id');
     if (error) throw error;
-    return ['sol', ...(data as { star_id: string }[]).map((d) => d.star_id)];
+    return [...KNOWN_STARS, ...(data as { star_id: string }[]).map((d) => d.star_id)];
   }
 
   async litBeacons() {

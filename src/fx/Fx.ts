@@ -27,6 +27,9 @@ export class Fx {
       alpha: { start: 0.55, end: 0 },
       tint: PALETTE[22],
     }).setDepth(90);
+    // a heavy world (planets.json gravity): dust drops back down instead of hanging in the air
+    const g = (scene as Phaser.Scene & { planet?: { gravity?: number } }).planet?.gravity ?? 1;
+    if (g > 1.05) this.dustEmitter.gravityY = 60 * (g - 1);
     this.debrisEmitter = scene.add.particles(0, 0, 'px', {
       emitting: false,
       lifespan: { min: 300, max: 700 },

@@ -15,6 +15,8 @@ function mix(c1: number, c2: number, t: number) {
   return (Math.round(lerp(a[0], b[0], t)) << 16) | (Math.round(lerp(a[1], b[1], t)) << 8) | Math.round(lerp(a[2], b[2], t));
 }
 const scale = (c: number, f: number) => mix(0, c, f);
+/** Channel by channel product: a red dwarf's light over the day cycle (planets.json sunTint). */
+const tintBy = (c: number, t: number) => (((((c >> 16) & 255) * ((t >> 16) & 255)) / 255) << 16) | (((((c >> 8) & 255) * ((t >> 8) & 255)) / 255) << 8) | (((c & 255) * (t & 255)) / 255);
 
 /** Hour of day (0..24, fractional) from ?hour=, else the device clock. */
 export function currentHour(fallback?: number) {
@@ -138,7 +140,8 @@ export class Environment {
     const a = keys[i], b = keys[i + 1];
     const t = (hr - a.hour) / (b.hour - a.hour);
     let ambient = mix(hex(a.ambient), hex(b.ambient), t);
-    const sky = mix(hex(a.sky), hex(b.sky), t);
+    let sky = mix(hex(a.sky), hex(b.sky), t);
+    if (this.planet.sunTint) { const k = hex(this.planet.sunTint); ambient = tintBy(ambient, k); sky = tintBy(sky, k); }
     this.night = lerp(a.night, b.night, t);
     ambient = scale(ambient, lerp(1, DAYCYCLE.rainDarken, this.rainLevel));
     this.lighting.setAmbient(ambient);

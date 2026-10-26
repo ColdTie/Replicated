@@ -131,7 +131,7 @@ export function openJournal(v: JournalView) {
     if (c.traits.blank) parts.push(`<p class="mute">${v.canHear ? 'Not yet itself. It has not chosen.' : runes('not yet itself')}</p>`);
     else if (t) parts.push(`<p class="mute">${show(`${t.pace}, ${t.sociability}, ${t.work === 'balanced' ? 'works and wanders' : t.work}, ${t.bedtime} to bed, ${t.risk}`)}</p>`);
     if (v.feelings?.[c.id]) parts.push(`<p class="mute">${show(v.feelings[c.id])}</p>`);
-    if (v.actions && !c.traits.blank) parts.push(`<div class="act"><input type="text" maxlength="200" placeholder="say something to ${esc(c.name)}" data-talk="${esc(c.id)}"><button type="button" data-send="${esc(c.id)}">TALK</button><button type="button" data-give="${esc(c.id)}">GIVE 5 EMBER</button>${v.sparks ? `<button type="button" class="spark" data-awaken="${esc(c.id)}">AWAKEN (1 SPARK)</button>` : ''}</div>`);
+    if (v.actions && !c.traits.blank) parts.push(`<div class="act"><input type="text" maxlength="200" placeholder="say something to ${esc(c.name)}" data-talk="${esc(c.id)}"><button type="button" data-send="${esc(c.id)}">TALK</button><button type="button" data-give="${esc(c.id)}">GIVE 5 EMBER</button>${v.sparks && !c.traits.thales ? `<button type="button" class="spark" data-awaken="${esc(c.id)}">AWAKEN (1 SPARK)</button>` : ''}</div>`);
     const wants = c.traits.wants ?? [];
     if (wants.length) {
       parts.push(`<div class="k">WANTS</div>`);

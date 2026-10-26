@@ -60,6 +60,7 @@ export class Buildings {
       sprite.setAlpha(1).clearTint();
       const rows = Math.max(2, Math.round(p.height * frac));
       sprite.setCrop(0, p.height - rows, sprite.width, rows);
+      this.scene.events.emit('building-blow', b);
     } else {
       sprite.setAlpha(1).clearTint().setCrop();
       if (!p.solid) p.solid = this.scene.addSolid(b.x, b.y - b.h * 4, b.w * 16, b.h * 8);
@@ -259,6 +260,7 @@ export class Buildings {
     b.built = true;
     const p = this.placed.get(b.id);
     if (p) this.refresh(p, true);
+    this.scene.events.emit('building-done', b);
     this.save();
     const helpers = b.helpers.map((id) => this.scene.npcs.find((n) => n.data.id === id)?.data.name ?? (id === session.replicant?.id ? session.replicant.name : 'someone'));
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${b.name} is built (${helpers.join(', ')})` });
