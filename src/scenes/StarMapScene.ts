@@ -4,13 +4,14 @@
 import Phaser from 'phaser';
 import { HOME, KNOWN_STARS } from '../core/home';
 import { sound } from '../audio/Sound';
-import { PALETTE } from '../core/data';
+import { PALETTE, SUPPLIES } from '../core/data';
 import { isKid, session } from '../core/session';
 import { Globe } from '../fx/Globe';
 import type { Journey, ReplicantSummary } from '../net/store';
 import { BEACONS, STAR_LIST, defaultPlanetIndex, distanceLy, formatDuration, fuelFor, planetFor, starById, travelMs, type Star } from '../world/galaxy';
 import { systemFor, type SystemPlanet } from '../world/system';
 import { shipFlying } from '../core/mannies';
+import { PlanetMenu, type PlanetEntry } from '../ui/planetMenu';
 
 export interface StarMapData {
   /** launch: at the vessel; view: from the ship in flight; link: at the empty berth while the vessel is elsewhere */
@@ -38,6 +39,10 @@ const CLASS_COLOR: Record<string, number> = {
 };
 const KIND_WORDS: Record<SystemPlanet['kind'], string> = { rock: 'ROCKY WORLD', super: 'SUPER-EARTH', neptune: 'ICE GIANT', giant: 'GAS GIANT' };
 const TEMP_COLOR: Record<SystemPlanet['temp'], number> = { hot: PALETTE[8], warm: PALETTE[12], cold: PALETTE[17] };
+const TEMP_WORDS: Record<SystemPlanet['temp'], string> = { hot: 'HOT', warm: 'TEMPERATE', cold: 'COLD' };
+const SIGNATURE = SUPPLIES.signature as { byWorld: Record<string, string>; names: Record<string, string> };
+/** how far (game px) a tap may land from a star or a planet and still pick it */
+const TAP_STAR = 24, TAP_PLANET = 22;
 
 interface Projected { star: Star; sx: number; sy: number; depth: number; r: number }
 interface SysItem { sp: SystemPlanet; img: Phaser.GameObjects.Image; label: Phaser.GameObjects.BitmapText; globe: Globe; x: number; y: number; angle: number; rx: number; ry: number }
@@ -75,6 +80,10 @@ export class StarMapScene extends Phaser.Scene {
   private nextGlobeAt = 0;
   /** your visor color: the mannies and the LINK button wear it */
   private visor = PALETTE[10];
+  /** the planet menu beside the map (src/ui/planetMenu.ts), and the room the map makes for it (game px) */
+  private menu?: PlanetMenu;
+  private offX = 0;
+  private visited: { star: string; planet: number }[] = [];
 
   constructor() { super('starmap'); }
 
@@ -104,6 +113,18 @@ export class StarMapScene extends Phaser.Scene {
       const vx = Math.round(x - r - 6), vy = Math.round(y - r - 4);
       g.fillStyle(PALETTE[9], 1).fillTriangle(vx, vy - 3, vx + 3, vy + 2, vx - 3, vy + 2);
       g.fillStyle(PALETTE[11], 0.6 + 0.4 * Math.sin(this.t * 5)).fillRect(vx - 1, vy + 2, 2, 2);
+    }
+  }
+
+  /** The picked star or planet: a soft halo in its own color and four corner brackets that breathe in and out. */
+  private drawPick(g: Phaser.GameObjects.Graphics, x: number, y: number, r: number, col: number) {
+    const k = r + 6 + Math.sin(this.t * 4) * 1.5, l = 4;
+    g.fillStyle(col, 0.18).fillCircle(x, y, r + 4);
+    g.lineStyle(1, PALETTE[19], 1);
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const cx = x + sx * k, cy = y + sy * k;
+      g.lineBetween(cx, cy, cx - sx * l, cy);
+      g.lineBetween(cx, cy, cx, cy - sy * l);
     }
   }
 
@@ -209,6 +230,79 @@ export class StarMapScene extends Phaser.Scene {
     // Title
     this.title = this.add.bitmapText(w / 2, 10, 'pixel', this.titleText()).setOrigin(0.5, 0).setTint(PALETTE[21]).setDepth(5000);
     sound.coreHum();
+
+    // The planet menu: the same worlds as a list beside the map (recent and closest, each with its details)
+    this.menu = new PlanetMenu(this.game.canvas, (star, planet) => this.pickFromMenu(star, planet), () => { sound.menuMove(0); this.layout(); });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.menu?.destroy(); this.menu = undefined; });
+    this.layout();
+    this.fillMenu();
+    if (st) st.visitedPlanets().then((v) => { this.visited = v; this.fillMenu(); }).catch(() => undefined);
+    this.time.delayedCall(1200, () => this.fillMenu()); // who lives where has loaded by then
+  }
+
+  /** The map makes room for the menu: its center and the info panel move right of it. */
+  private layout() {
+    this.offX = this.menu?.widthIn(this.scale.width) ?? 0;
+    this.info?.setX(this.offX + 8);
+  }
+
+  /** One world as the menu shows it: its name, star and distance, and its details when opened. */
+  private entry(star: string, planet: number): PlanetEntry | null {
+    const s = starById(star), sp = systemFor(star).find((p) => p.index === planet), def = planetFor(star, planet);
+    if (!s || !sp || !def) return null;
+    const here = this.isHere(star, planet), ly = distanceLy(this.d.from, star);
+    const people = this.replicants.filter((r) => r.status !== 'in_transit' && r.star_id === star && r.planet_index === planet).map((r) => r.name);
+    const husk = this.mannyAt(star, planet) !== null;
+    const material = SIGNATURE.byWorld[def.id];
+    const details = [
+      `STAR ${s.name} - CLASS ${s.cls}`,
+      here ? 'YOU ARE HERE' : ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`,
+      ...(here ? [] : [`FUEL ${fuelFor(ly)} EMBER${this.d.mode === 'launch' ? ` (YOU HAVE ${this.d.embers ?? 0})` : ''}`]),
+      `${KIND_WORDS[sp.kind]} - ${def.subtitle} - ${TEMP_WORDS[sp.temp]}`,
+      sp.hz ? 'IN THE HABITABLE ZONE' : 'OUTSIDE THE HABITABLE ZONE',
+      people.length ? `VESSELS: ${people.join(', ').toUpperCase()}` : 'NO VESSELS',
+      husk ? 'YOUR HUSK WAITS HERE' : 'NO HUSK OF YOURS',
+      material ? `MAKES ${(SIGNATURE.names[material] ?? material).toUpperCase()}` : '',
+      sp.real ? 'CONFIRMED BY ASTRONOMERS' : 'UNCHARTED',
+    ].filter(Boolean);
+    const mark = here ? 'HERE' : people.length ? `${people.length}` : husk ? 'HUSK' : '';
+    return { star, planet, name: sp.moon ?? sp.name, sub: here ? `${s.name} - YOU ARE HERE` : `${s.name} - ${ly.toFixed(1)} LY`, details, mark };
+  }
+
+  /** RECENT: worlds with a save, newest first (this one leads). CLOSEST: the worlds of the nearest stars. */
+  private fillMenu() {
+    if (!this.menu) return;
+    const from = this.d.fromPlanet ?? defaultPlanetIndex(this.d.from);
+    const seen = new Set<string>();
+    const recent: PlanetEntry[] = [];
+    for (const v of [{ star: this.d.from, planet: from }, ...this.visited]) {
+      const k = `${v.star}:${v.planet}`;
+      if (seen.has(k) || recent.length >= 10) continue;
+      const e = this.entry(v.star, v.planet);
+      if (e) { recent.push(e); seen.add(k); }
+    }
+    const closest: PlanetEntry[] = [];
+    for (const s of [...STAR_LIST].sort((a, b) => distanceLy(this.d.from, a.id) - distanceLy(this.d.from, b.id))) {
+      for (const p of systemFor(s.id)) {
+        if (closest.length >= 14) break;
+        if (this.isHere(s.id, p.index)) continue;
+        const e = this.entry(s.id, p.index);
+        if (e) closest.push(e);
+      }
+      if (closest.length >= 14) break;
+    }
+    this.menu.setGroups({ recent, closest });
+  }
+
+  /** A row was picked: the map flies into that star's system and picks the planet. */
+  pickFromMenu(star: string, planet: number) {
+    const s = starById(star);
+    if (!s) return;
+    if (this.view === 'system' && this.sysStar?.id !== star) this.closeSystem();
+    if (this.view === 'galaxy') { this.selected = s; this.center = { x: s.x, y: s.y, z: s.z }; this.openSystem(s); }
+    this.selPlanet = systemFor(star).find((p) => p.index === planet) ?? this.selPlanet;
+    sound.collect();
+    this.updateInfo();
   }
 
   private titleText() {
@@ -262,16 +356,16 @@ export class StarMapScene extends Phaser.Scene {
     const y2 = y1 * cp - z * sp, z2 = y1 * sp + z * cp;
     const scale = 7 * this.zoom;
     const persp = 60 / (60 + y2 * 0.8);
-    return { star: s, sx: w / 2 + x1 * scale * persp, sy: h / 2 - z2 * scale * persp, depth: y2, r: persp };
+    return { star: s, sx: (w + this.offX) / 2 + x1 * scale * persp, sy: h / 2 - z2 * scale * persp, depth: y2, r: persp };
   }
 
-  private tap(x: number, y: number) {
+  tap(x: number, y: number) {
     const { width: w, height: h } = this.scale;
     if ((x > w - 70 && y > h - 76 && (this.launchBtn.visible || this.vesselBtn.visible)) || (x > w - 126 && x < w - 74 && y > h - 72 && this.linkBtn.visible)
       || (x > w - 30 && y < 30) || (x < 30 && y < 30 && this.backBtn.visible)) return; // buttons
     if (this.info.visible && x < this.info.x + (this.info.list[0] as Phaser.GameObjects.Rectangle).width && y > this.info.y) return;
     if (this.view === 'system') { this.tapPlanet(x, y); return; }
-    let best: Projected | null = null, bd = 18;
+    let best: Projected | null = null, bd = TAP_STAR;
     for (const p of this.projected) {
       const d = Math.hypot(p.sx - x, p.sy - y);
       if (d < bd) { bd = d; best = p; }
@@ -281,6 +375,7 @@ export class StarMapScene extends Phaser.Scene {
     this.selected = best.star;
     sound.collect();
     this.updateInfo();
+    this.menu?.select(best.star.id);
   }
 
   private canAfford(s: Star) {
@@ -344,7 +439,7 @@ export class StarMapScene extends Phaser.Scene {
     this.linkBtn.setVisible(!!this.linkTarget());
     this.linkBtn.setX(this.d.mode === 'view' ? this.scale.width - 40 : this.scale.width - 100);
     (this.info.list[0] as Phaser.GameObjects.Rectangle).setSize(Math.max(160, this.infoText.width + 14), lines.length * 10 + 8);
-    this.info.setY(this.scale.height - (lines.length * 10 + 8) - 6);
+    this.info.setPosition(this.offX + 8, this.scale.height - (lines.length * 10 + 8) - 6);
   }
 
   launch() {
@@ -361,7 +456,7 @@ export class StarMapScene extends Phaser.Scene {
     cb?.(dest.star.id, dest.planet);
   }
 
-  private close() {
+  close() {
     const cb = this.d.onClose;
     this.scene.stop();
     cb?.();
@@ -382,7 +477,7 @@ export class StarMapScene extends Phaser.Scene {
     sound.doorOpen();
     const planets = systemFor(star.id);
     const n = planets.length;
-    const maxR = Math.min(w * 0.46, h * 0.9);
+    const maxR = Math.min((w - this.offX) * 0.46, h * 0.9);
     planets.forEach((sp, i) => {
       const def = planetFor(star.id, sp.index)!;
       const size = Phaser.Math.Clamp(Math.round(6 + sp.size * 6), 7, 26);
@@ -398,7 +493,7 @@ export class StarMapScene extends Phaser.Scene {
     this.updateInfo();
   }
 
-  private closeSystem() {
+  closeSystem() {
     this.view = 'galaxy';
     for (const it of this.sysItems) { it.img.destroy(); it.label.destroy(); this.textures.remove(it.globe.key); }
     this.sysItems = [];
@@ -411,7 +506,7 @@ export class StarMapScene extends Phaser.Scene {
   }
 
   private tapPlanet(x: number, y: number) {
-    let best: SysItem | null = null, bd = 16;
+    let best: SysItem | null = null, bd = TAP_PLANET;
     for (const it of this.sysItems) {
       const d = Math.hypot(it.x - x, it.y - y);
       if (d < bd) { bd = d; best = it; }
@@ -420,13 +515,14 @@ export class StarMapScene extends Phaser.Scene {
     this.selPlanet = best.sp;
     sound.collect();
     this.updateInfo();
+    this.menu?.select(best.sp.star, best.sp.index);
   }
 
   private drawSystem(dt: number) {
     const { width: w, height: h } = this.scale;
     const g = this.g;
     const star = this.sysStar!;
-    const cx = w / 2, cy = h * 0.44;
+    const cx = (w + this.offX) / 2, cy = h * 0.44;
     const col = CLASS_COLOR[star.cls[0]] ?? 0xffffff;
     const big = /III/.test(star.cls) || 'OBA'.includes(star.cls[0]);
     const sr = big ? 16 : star.cls[0] === 'M' ? 7 : 11;
@@ -469,7 +565,7 @@ export class StarMapScene extends Phaser.Scene {
       if (this.isHere(star.id, it.sp.index)) g.lineStyle(1, PALETTE[18], 0.9).strokeCircle(it.x, it.y, r + 7 + Math.sin(this.t * 4));
       this.drawMarks(g, it.x, it.y, r, this.mannyAt(star.id, it.sp.index) !== null,
         !!this.d.vessel && !shipFlying(this.d.vessel) && this.d.vessel.star === star.id && this.d.vessel.planet === it.sp.index);
-      if (this.selPlanet === it.sp) g.lineStyle(1, PALETTE[19], 1).strokeRect(it.x - r - 5, it.y - r - 5, (r + 5) * 2, (r + 5) * 2);
+      if (this.selPlanet === it.sp) this.drawPick(g, it.x, it.y, r, TEMP_COLOR[it.sp.temp]);
       it.label.setPosition(Math.round(it.x), Math.round(it.y + r + 4)).setVisible(this.selPlanet === it.sp || it.sp.real || this.sysItems.length <= 4 || front > 0.3);
     }
     if (this.t > this.nextGlobeAt) {
@@ -578,7 +674,7 @@ export class StarMapScene extends Phaser.Scene {
       }
       if (s.id === this.d.from) g.lineStyle(1, PALETTE[18], 0.9).strokeCircle(p.sx, p.sy, r + 7 + Math.sin(this.t * 4));
       this.drawMarks(g, p.sx, p.sy, r, this.mannyAt(s.id) !== null, !!this.d.vessel && !shipFlying(this.d.vessel) && this.d.vessel.star === s.id);
-      if (this.selected?.id === s.id) g.lineStyle(1, PALETTE[19], 1).strokeRect(p.sx - r - 5, p.sy - r - 5, (r + 5) * 2, (r + 5) * 2);
+      if (this.selected?.id === s.id) this.drawPick(g, p.sx, p.sy, r, col);
     }
 
     // Labels: home, here, beacons, selected and settled always; named stars as you zoom in; never on top of each other
@@ -600,7 +696,8 @@ export class StarMapScene extends Phaser.Scene {
       let label = this.labels.get(s.id);
       if (!show) { label?.setVisible(false); continue; }
       if (!label) {
-        label = this.add.bitmapText(0, 0, 'pixel', s.id === 'sol' ? 'SOL - EARTH' : s.id === HOME.star ? `${s.name} - HOMEWORLD` : s.name).setOrigin(0.5, 0);
+        label = this.add.bitmapText(0, 0, 'pixel', s.id === 'sol' ? 'SOL - EARTH' : s.id === HOME.star ? `${s.name} - HOMEWORLD` : s.name).setOrigin(0.5, 0)
+          .setDropShadow(1, 1, PALETTE[25], 1);
         this.labels.set(s.id, label);
       }
       const r = radii.get(s.id) ?? 1;
@@ -608,7 +705,7 @@ export class StarMapScene extends Phaser.Scene {
       if (pr >= 2 && taken.some((t) => Phaser.Geom.Intersects.RectangleToRectangle(t, rect))) { label.setVisible(false); continue; }
       taken.push(rect);
       const found = this.discovered.has(s.id);
-      label.setPosition(Math.round(p.sx), Math.round(p.sy + r + 5)).setVisible(true)
+      label.setPosition(Math.round(p.sx), Math.round(p.sy + r + (this.selected?.id === s.id ? 9 : 5))).setVisible(true).setDepth(this.selected?.id === s.id ? 10 : 1)
         .setTint(this.selected?.id === s.id ? PALETTE[19] : s.beacon ? (this.d.lit?.includes(s.id) ? PALETTE[18] : PALETTE[11]) : found ? PALETTE[21] : PALETTE[22]);
     }
   }

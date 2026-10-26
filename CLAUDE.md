@@ -204,6 +204,8 @@ src/scenes/TravelScene   departure orbit (globe, giant behind a moon), warp, rea
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame (attack, dash, interact; the talk
                          box's next/back/close/reply while it is open)
 src/ui/overlay.ts        HTML forms over the canvas (sign-in; askName: a Vessel names itself at its first wake)
+src/ui/planetMenu.ts     the planet menu beside the star map (HTML): RECENT and CLOSEST worlds, each row's details; a row
+                         picks its planet on the map and a pick on the map lights its row
 src/ui/wakeChoice.ts     WAKE or HOLD over the Replicator before a copy is made (open eye / closed eye, keys, stick, click)
 src/ui/talk.ts           what a copy says when you talk to it: pages SAYS (traits.tell), THOUGHTS (journal notes),
                          WANTS (and a feeling), LETTERS (to you first), wrapped for the box (pure; src/data/talk.json)
@@ -296,6 +298,8 @@ world is open; copies reach what they need; with a snapshot of the live data it 
 a blank copy, dash still on Shift, the real talk wake with the canned mind),
 `node tools/playtest-homeworld.mjs` (a new player on LHS 1140 b: the scan, Thales' word, the visor, the founded
 structures, Thales by his work, the Printworks printed to the end, Thales never handed over),
+`node tools/playtest-planetmenu.mjs` (the list opens with the map, a row picks its planet, Down follows, a map pick
+lights its row, L hides it, gone with the map),
 `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, the vault opens from its doorway, a husk built
 from its menu, linked
@@ -719,3 +723,23 @@ Metanoia's own printers stay on standby beside every founded structure on the ho
 (`buildings.json`). Village builds (lamps, huts, flags) are still raised as before.
 - Verified: build, `npm test` 15 of 15 (`playtest-buildings` checks the printer, its pulses and the fold).
   `screenshots/building-printing.png`.
+
+**Step 5, the planet menu** (the bible's "two views of the same information"; an exception to the almost-no-UI
+rule). Beside the 3D star map a list opens (`src/ui/planetMenu.ts`, HTML like the overlays): PLANETS with a count,
+then RECENT (worlds the galaxy has a save for, the most recently changed first, `GameStore.visitedPlanets`; this world
+leads, marked HERE) and CLOSEST (the worlds of the nearest stars by distance from where you are, up to 14). A row
+shows the world, its star and distance, a mark (HERE, how many Vessels live there, or HUSK); opening it shows the star
+and its class, distance and travel time, fuel (and what you have when launching), the kind of world, its biome words
+and temperature, the habitable zone, the Vessels there, your husk, the world's signature material, and whether
+astronomers confirmed it. A click or tap on a row flies the map into that star's system and picks the planet; a pick
+on the map (a star or a planet) lights and opens its row. Up / Down (W / S) walk the rows and the map follows, Enter
+or Space picks, L shows or hides the list, Esc hides it. It opens on its own on a wide screen (760 css px and up) and
+folded to its header on a phone.
+
+What changed on the 3D map so it reads clearly: (1) it centers in the room right of the list, and the info panel moves
+with it; (2) tap targets are wider (24 game px around a star, was 18; 22 around a planet, was 16); (3) the picked star
+or planet gets a soft halo in its own color and four corner brackets that breathe, instead of a thin square; (4) every
+star label has a dark shadow so it reads over the rings and the lattice, and the picked one is drawn on top, below
+its brackets; (5) Sol reads "SOL - EARTH" and LHS 1140 "HOMEWORLD" (step 1).
+- Verified: build, `npm test` 16 of 16 (`playtest-planetmenu` is new; `playtest-talk` waits for Esc to really close
+  the box before its next step, a slow-frame flake). Screenshots `planet-menu.png`, `planet-menu-details.png`.

@@ -324,6 +324,8 @@ export interface GameStore {
   discoveredStars(): Promise<string[]>;
   /** Stars whose beacon the family has lit. */
   litBeacons(): Promise<string[]>;
+  /** Worlds the galaxy has a save for, the most recently changed first (the planet menu's RECENT). */
+  visitedPlanets(): Promise<{ star: string; planet: number }[]>;
   /** A letter from one replicant to another (the original talking to a copy): arrives at once on the same star. */
   sendMessage(from: ReplicantSave, toId: string, body: string): Promise<void>;
   /** Takes (returns and clears) what the copies here did in their away wakes (migration 0010). */
@@ -554,6 +556,8 @@ export class LocalStore implements GameStore {
 
   async discoveredStars() { return [...this.db.discovered]; }
   async litBeacons() { return Object.values(this.db.planets).filter((p) => p.data.beacon?.lit).map((p) => p.star_id); }
+
+  async visitedPlanets() { return Object.values(this.db.planets).reverse().map((p) => ({ star: p.star_id, planet: p.planet_index })); }
 
   async listNpcs(star: string, planetIndex: number) {
     return this.db.replicants.filter((r) => r.status === 'npc' && r.star_id === star && r.planet_index === planetIndex)
@@ -793,6 +797,12 @@ export class CloudStore implements GameStore {
     const { data, error } = await this.sb.from('planet_states').select('star_id').eq('data->beacon->>lit', 'true');
     if (error) throw error;
     return (data as { star_id: string }[]).map((d) => d.star_id);
+  }
+
+  async visitedPlanets() {
+    const { data, error } = await this.sb.from('planet_states').select('star_id,planet_index').order('updated_at', { ascending: false }).limit(24);
+    if (error) throw error;
+    return (data as { star_id: string; planet_index: number }[]).map((d) => ({ star: d.star_id, planet: d.planet_index }));
   }
 
   async saveReplicant(r: ReplicantSave) {
