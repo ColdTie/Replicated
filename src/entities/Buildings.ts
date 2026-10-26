@@ -90,7 +90,7 @@ export class Buildings {
         p.glow = this.scene.add.image(b.x + dx, b.y - 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[l.color]).setAlpha(animate ? 0 : 0.14).setScale(0.6).setDepth(6100);
         if (animate) { this.scene.tweens.add({ targets: p.light, intensity: l.intensity, duration: 800 }); this.scene.tweens.add({ targets: p.glow, alpha: 0.14, duration: 800 }); }
       }
-      if (animate) { this.scene.fx.dust(b.x - b.w * 6, b.y + 2, 6); this.scene.fx.dust(b.x + b.w * 6, b.y + 2, 6); sound.build(); }
+      if (animate) { this.scene.fx.dust(b.x - b.w * 6, b.y + 2, 6); this.scene.fx.dust(b.x + b.w * 6, b.y + 2, 6); sound.build({ x: b.x, y: b.y }); }
     }
   }
 
@@ -238,7 +238,7 @@ export class Buildings {
         const p = this.placed.get(b.id);
         if (p) this.refresh(p, false);
         this.scene.fx.sparks(b.x + (Math.random() - 0.5) * b.w * 12, b.y - 4 - Math.random() * 10, PALETTE[10], 3);
-        if (Math.hypot(this.scene.player.x - b.x, this.scene.player.y - b.y) < 180) sound.hit();
+        sound.hit(false, { x: b.x, y: b.y });
         if (b.progress >= total) this.complete(b, npc);
       },
       done: () => { set.delete(npc); this.save(); },

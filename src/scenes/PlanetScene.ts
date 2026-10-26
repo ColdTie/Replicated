@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { sound } from '../audio/Sound';
+import SOUND_DATA from '../data/sound.json';
+import { sound, type Surface } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
 import { BACKEND, BEACON, BUILDINGS, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, SUPPLIES, TOWN_SAFE_TILES, VILLAGE, WARREN, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
 import { DRIFT, replicate, stat } from '../core/drift';
@@ -308,6 +309,7 @@ export class PlanetScene extends Phaser.Scene {
     // (the walls layer also holds invisible collision over the void)
     const tPaint0 = performance.now();
     this.addPaintedGround(p.id, this.seed ?? p.seed, save?.data.buildings);
+    sound.setWorld(p.id);
     const tPaint1 = performance.now();
     this.addPaintedRock(p.id, this.seed ?? p.seed);
     // paint times (ground, rock) for tools/playtest-town.mjs
@@ -610,6 +612,7 @@ export class PlanetScene extends Phaser.Scene {
       pl.light.active = false;
       pl.sprite.setTint(0x404060);
       // visor flickers on: dark, flash, dark, on
+      sound.wake();
       const steps = [[0, 0], [140, 0], [260, 1], [360, 0], [520, 1]];
       for (const [t, v] of steps) this.time.delayedCall(t, () => { pl.light.active = v > 0.5; if (v > 0.5) pl.sprite.clearTint(); });
     });
@@ -654,6 +657,7 @@ export class PlanetScene extends Phaser.Scene {
     shadow.setScale(0.6, 0.5).setAlpha(0.1);
     this.player.hide(); // nothing of the replicant on the ground until it hops out
     this.cameras.main.centerOn(this.vessel.x, ly);
+    sound.landing(1.7);
     light.intensity = 0.5;
     glow.setAlpha(0.1);
     const thrust = this.add.particles(0, 0, 'px', {
@@ -771,6 +775,7 @@ export class PlanetScene extends Phaser.Scene {
 
   update(time: number, dt: number) {
     if (!this.player) return; // still loading the save
+    sound.listen(this.player.x, this.player.y);
     dt = Math.min(dt, 50) * this.slow;
     let input = this.talker.routeTalk(time, this.controls.read());
     // wake or hold: the choice over the Replicator has the buttons
@@ -1270,14 +1275,14 @@ export class PlanetScene extends Phaser.Scene {
     this.spores = this.spores.filter((s) => !s.dead);
   }
 
-  onEnemyKilled(_e: Enemy) {
-    sound.enemyDie();
+  onEnemyKilled(e: Enemy) {
+    sound.enemyDie({ x: e.x, y: e.y });
     // the last creature of a fight goes down in slow motion
     const now = this.time.now;
     const fight = now - this.lastKillAt < 5000;
     this.lastKillAt = now;
     const p = this.player;
-    const others = this.enemies.some((o) => o !== _e && o.alive && Math.hypot(o.x - p.x, o.y - p.y) < 130);
+    const others = this.enemies.some((o) => o !== e && o.alive && Math.hypot(o.x - p.x, o.y - p.y) < 130);
     if (fight && !others) {
       this.slow = 0.3;
       this.physics.world.timeScale = 1 / 0.3;
@@ -1333,11 +1338,27 @@ export class PlanetScene extends Phaser.Scene {
     return m.ground[ty][tx] === TILE.ruinFloor ? 'stone' : 'grass';
   }
 
+  /** What a footstep here sounds like (sound.json footsteps): metal by the ship and the vault door, printed floor
+   * before a built building, stone on the square, ice by open water on a cold world, else the world's own ground. */
+  footSurface(x: number, y: number): Surface {
+    const s = this.surfaceAt(x, y);
+    if (s === 'water' || s === 'void') return s;
+    if (Math.hypot(x - this.vessel.x, y - this.vessel.y) < 24 || (this.dock && Math.hypot(x - this.dock.x, y - this.dock.y) < 14)) return 'metal';
+    if (this.buildings?.list.some((b) => b.built && !b.vetoed && Math.abs(x - b.x) < b.w * 8 + 4 && y > b.y - 6 && y < b.y + 12)) return 'printed';
+    const sq = this.map.town.square, tx = Math.floor(x / 16), ty = Math.floor(y / 16);
+    if (s === 'stone' || (tx >= sq.x && ty >= sq.y && tx < sq.x + sq.w && ty < sq.y + sq.h)) return 'stone';
+    const steps = SOUND_DATA.footsteps as Record<string, Surface>;
+    if (SOUND_DATA.iceNearWater.includes(this.planet.id)) {
+      for (const [dx, dy] of [[16, 0], [-16, 0], [0, 16], [0, -16]]) if (this.surfaceAt(x + dx, y + dy) === 'water') return 'ice';
+    }
+    return steps[this.planet.id] ?? steps.default;
+  }
+
   splash(x: number, y: number, big: boolean) {
     this.glints.explode(big ? 8 : 3, x, y);
     const ring = this.add.image(x, y, 'ring').setDepth(DEPTH.ground + 4).setAlpha(0.7).setScale(0.3);
     this.tweens.add({ targets: ring, scale: big ? 2 : 1.3, alpha: 0, duration: 500, onComplete: () => ring.destroy() });
-    if (big) sound.splash();
+    if (big) sound.splash({ x, y });
   }
 
   /** Grass leans away as you walk through it and sways gently in the wind. */

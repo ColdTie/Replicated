@@ -104,6 +104,7 @@ export class TalkBox {
   }
 
   show(who: TalkWho, pages: TalkPage[]) {
+    sound.duck('talk', true); // music and ambience step back under a voice
     this.who = who;
     this.pages = pages;
     this.index = 0;
@@ -122,6 +123,7 @@ export class TalkBox {
   }
 
   hide() {
+    sound.duck('talk', false);
     if (!this.isOpen) return;
     this.isOpen = false;
     this.who = null;

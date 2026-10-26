@@ -109,6 +109,7 @@ export class TravelScene extends Phaser.Scene {
 
     if (this.depart) this.playDeparture();
     sound.setNight(1);
+    sound.setWorld('space');
   }
 
   private async addVisits() {

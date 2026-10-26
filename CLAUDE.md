@@ -156,7 +156,9 @@ src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode
                          Base (pad + Replicator), Manny (the husk vault's bunker in the square: down its steps, a husk
                          left standing on standby)
 src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
-src/audio/Sound.ts       procedural WebAudio: every sound effect and the generative ambient music (no audio files)
+src/audio/Sound.ts       procedural WebAudio: every sound effect, the generative music, each world's ambience bed (no audio
+                         files); buses sfx / music / ambience / ui / voice, ducking under voices, distance and panning
+                         (listen, At), footsteps per surface (PlanetScene.footSurface); tunables in src/data/sound.json
 src/entities/            ... Spitter + Spore (reflectable), Wildlife
                          (Grazer you pet, bird Flock that scatters, Butterflies by day), Npc (drifted copies), Gear
 src/core/drift.ts        replication drift (visor, headgear, trail, stats) from src/data/drift.json
@@ -300,6 +302,8 @@ a blank copy, dash still on Shift, the real talk wake with the canned mind),
 structures, Thales by his work, the Printworks printed to the end, Thales never handed over),
 `node tools/playtest-planetmenu.mjs` (the list opens with the map, a row picks its planet, Down follows, a map pick
 lights its row, L hides it, gone with the map),
+`node tools/playtest-sound.mjs` (the buses, each world's bed and the cave's and vault's, footsteps by ground, the talk
+box ducking, distance and panning, every new sound plays),
 `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, the vault opens from its doorway, a husk built
 from its menu, linked
@@ -743,3 +747,29 @@ star label has a dark shadow so it reads over the rings and the lattice, and the
 its brackets; (5) Sol reads "SOL - EARTH" and LHS 1140 "HOMEWORLD" (step 1).
 - Verified: build, `npm test` 16 of 16 (`playtest-planetmenu` is new; `playtest-talk` waits for Esc to really close
   the box before its next step, a slow-frame flake). Screenshots `planet-menu.png`, `planet-menu-details.png`.
+
+**Step 6, deeper sound** (still all procedural WebAudio, `src/audio/Sound.ts`, tunables `src/data/sound.json`; every
+sound that was there still plays).
+- **Buses.** Ambience, UI and voice buses join master, sfx and music. Rain and the beds go to ambience; songs, the
+  chorus and the talk box's typing to voice; the wake or hold choice and the menus to UI.
+- **Ducking.** Music and ambience fall to `duck` (35%) while the talk box is open (Thales' first line included) and
+  for as long as a Vessel sings.
+- **Variation.** Steps, swings, hits, crystals, pickups and blips change pitch and loudness a little every time, and
+  steps, swings and hits pick among three variants.
+- **Layers.** Copying (the scan's relay click, then the birth: a bright burst, the warm chord, then air and a fading
+  shimmer), waking (`wake`: the visor relay, a hum rising an octave, a high chord hanging), printing (`printLayer` per
+  layer, `printDone` at the end), linking (`link`: the beam's zap, its hum sweeping along the column, sparkle),
+  launch (ignition thump and crack, the roar climbing, the whoosh thinning) and landing (the roar coming down, the
+  touchdown thump, a settling hiss).
+- **Surfaces.** Footsteps on grass, stone, water, snow (a two-part crunch), ice (a click with a glassy ring), metal
+  (a clank), printed floor (a hollow tap) and sand. `PlanetScene.footSurface` picks them: metal by the ship and the
+  vault door, printed before a built building, stone on the square, ice within a tile of open water on the homeworld
+  and frost worlds, else the world's own (`footsteps`: the homeworld's frost crunches).
+- **Space.** Each world has an ambience bed (`beds`: a filtered wind breathing slowly, a low drone, small events to
+  the sides: ice creaks on the homeworld, leaves on Earth, bubbles on spore worlds, embers, sand), the warren a cave
+  bed with drips and a long dark reverb, the vault a hum and ticks in a short metal room, the ship in flight a low
+  drone. Sounds in the world (a copy's work and steps, hits, crystals, splashes, birds, buildings) fade with distance
+  (`space.falloffPx` 320) and pan to their side.
+- **New sounds.** The printers, the husk vault (door, hum, menu), the wake or hold choice and the menus (steps 2 to 5).
+- Verified: build, `npm test` 17 of 17 (`playtest-sound` is new). There is nothing to hear in a screenshot: listen in
+  Chrome with the sound on.

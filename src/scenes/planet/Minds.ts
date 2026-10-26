@@ -360,7 +360,7 @@ export class Minds {
       x: tree.x, y: tree.y, swings: 6,
       swing: () => {
         this.s.fx.sparks(tree.x + (Math.random() - 0.5) * 6, tree.y - 10 - Math.random() * 8, PALETTE[this.s.planet.accent[1]], 3);
-        if (Math.hypot(this.s.player.x - tree.x, this.s.player.y - tree.y) < 180) sound.hit();
+        sound.hit(false, tree);
         this.s.tweens.add({ targets: tree.sprite, angle: { from: -3, to: 3 }, duration: 60, yoyo: true, repeat: 1 });
       },
       done: () => {
@@ -381,11 +381,11 @@ export class Minds {
       x: s.x, y: s.y, swings: 4,
       swing: () => {
         this.s.fx.sparks(s.x + (Math.random() - 0.5) * 8, s.y - 6 - Math.random() * 8, PALETTE[21], 3);
-        if (Math.hypot(this.s.player.x - s.x, this.s.player.y - s.y) < 180) sound.hit();
+        sound.hit(false, s);
       },
       done: () => {
         if (!this.s.village.remove(s)) return;
-        if (Math.hypot(this.s.player.x - s.x, this.s.player.y - s.y) < 220) sound.pop();
+        sound.pop(s);
         this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} took down its ${s.type}` });
         if (this.s.canHear()) this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} TOOK DOWN A ${s.type.toUpperCase()}`);
       },

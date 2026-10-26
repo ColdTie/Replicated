@@ -130,7 +130,7 @@ export class Player {
       this.stepTimer -= dt;
       if (this.stepTimer <= 0) {
         this.stepTimer = 170;
-        const surface = this.scene.surfaceAt(this.x, this.y);
+        const surface = this.scene.footSurface(this.x, this.y);
         if (surface === 'water') this.scene.splash(this.x, this.y + 2, false);
         else this.scene.fx.dust(this.x - this.facing * 3, this.y + 2, 2);
         sound.step(surface);
