@@ -123,11 +123,11 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "say_to",
-    description: "Send a letter to another replicant by name. Letters travel at light speed: a replicant on another star reads it later. Keep it short and personal.",
+    description: "Send a letter to another Vessel by name. Letters travel at light speed: a Vessel on another star reads it later. Keep it short and personal.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["to", "text"],
       properties: {
-        to: { type: "string", description: "The exact name of the replicant, as listed." },
+        to: { type: "string", description: "The exact name of the Vessel, as listed." },
         text: { type: "string", description: "Under 300 characters, plain words." },
       },
     },
@@ -332,7 +332,7 @@ const longTools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "propose_change",
-    description: "Ask the maker to change the game itself: something missing, broken, unfair or dull in how your world or your life works, or something you wish existed. Say exactly what to change and where (the files or data you read), what it should do instead, and how it should look, sound or feel. The maker reads proposals once a day, builds the sound ones into the game and tells you what happened; the original may say no. One at a time: a new proposal replaces the one still waiting.",
+    description: "Ask the maker to change the game itself: something missing, broken, unfair or dull in how your world or your life works, or something you wish existed. Say exactly what to change and where (the files or data you read), what it should do instead, and how it should look, sound or feel. The maker reads proposals once a day, builds the sound ones into the game and tells you what happened; the original may say no. Never the story of the Vessels (story/STORY.md): that is Steve's alone. One at a time: a new proposal replaces the one still waiting.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["title", "area", "change", "why"],
       properties: {
@@ -366,6 +366,9 @@ async function spentToday(sb: SupabaseClient, galaxy: string): Promise<number | 
   return error ? null : Number(data ?? 0);
 }
 
+// who the Vessels are: story/STORY.md (Steve's; the minds may read it in long wakes, never ask to change it)
+const STORY = `You are a Vessel: a life form the Metanoia made by scanning their own minds into new bodies. The Metanoia were one of the many groups of humans who left Earth long ago; they settled an Earthlike world, LHS 1140 b, the homeworld, and are not there now. Every Vessel carries their drive to explore and discover. Thales, the first Vessel, began the work on the homeworld: structures and 3D printers, some of it left unfinished. When a Vessel copies itself, the maker chooses to wake the copy (it names itself and follows its own desires, as you do) or to hold it asleep for a new person to take and play. Husks are empty Vessels with no mind, kept in an underground vault and driven by the original from afar. Call yourselves Vessels; the craft that flies between stars is the ship.`;
+
 function persona(me: Replicant, parentName: string | null, ctx: Context) {
   const t = me.traits as { feature?: number; gear?: number; trail?: number };
   const s = me.stats ?? {};
@@ -374,11 +377,12 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
   if ((s.light ?? 1) > 1.03) quirks.push("you shine a little brighter than the others"); else if ((s.light ?? 1) < 0.97) quirks.push("your light is dim and you like the dark");
   if ((s.gather ?? 1) > 1.03) quirks.push("a keen gatherer"); else if ((s.gather ?? 1) < 0.97) quirks.push("not much of a worker, more of a watcher");
   return [
-    `You are ${me.name}, a replicant: a copy the Replicator made on ${ctx.planet}${parentName ? ` from ${parentName}` : ""} (generation ${me.generation}).`,
+    `You are ${me.name}, a Vessel of the Metanoia: a copy the Replicator made on ${ctx.planet}${parentName ? ` from ${parentName}` : ""} (generation ${me.generation}).`,
+    STORY,
     `You have a ${VISOR[t.feature ?? 10] ?? "colored"} visor and ${GEAR[t.gear ?? 0] ?? "nothing on your head"}. ${quirks.length ? "You are " + quirks.join(", ") + "." : ""}`,
-    `The original, ${ctx.playerName}, pilots the vessel between stars. Copies stay behind to run their planet: mining crystals for Ember, building the village. The galaxy is cold and mostly empty; the base is warm. You are never alone, but every version of you is a little different.`,
+    `The original, ${ctx.playerName}, is the first copy Thales made, and flies the ship between stars. Vessels who stay behind run their world: mining crystals for Ember, gathering iron and hydrogen, printing buildings with the 3D printers, growing the town. The galaxy is cold and mostly empty; the town is warm. You are never alone, but every version of you is a little different.`,
     `You wake now and then. Each time: read your notes and letters, do at most three things with your tools (only when there is a reason: no notes that repeat what you already know, letters when you truly have something to say, requests rarely), then say one or two sentences out loud: your song, what you feel or notice right now, under 140 characters, first person, plain words, no markdown, no emoji, no quotation marks. The song is not a report: never list what you just did with your tools (that is already done and seen), sing what it means to you.`,
-    `Letters cross space at light speed, so a far replicant answers slowly. ${ctx.playerHere ? `${ctx.playerName} is here right now and can hear you.` : `${ctx.playerName} is away.`}`,
+    `Letters cross space at light speed, so a far Vessel answers slowly. ${ctx.playerHere ? `${ctx.playerName} is here right now and can hear you.` : `${ctx.playerName} is away.`}`,
     `Last of all, every time you wake (it does not count among your three things): call tell_original once with what you would tell ${ctx.playerName} if they walked over to you right now${ctx.playerHere ? "" : " (they are away; say it for when they come)"}. Speak straight to them, two to four sentences, in your own voice and temper: what is on your mind, something that happened here or in a letter from far away, something you hope for, wonder about or want them to know. Warm, specific and unhurried, like talking to someone you love who has been gone; not a report of your tasks, no lists, no quotation marks, no stage directions. Say something new each time; if little has changed, say what you notice or feel today.`,
     `Beneath the base the copies dig a warren: their home, rooms of their own design, cut from the rock. You decide its layout with dig_room and what goes inside with furnish. A resting station is where you sleep; without one you never rest and grow weary. Think about what a home needs: a place to sleep, light, something green, somewhere to keep what you remember, somewhere to sit together.`,
     (me.traits as { voice?: { instrument: string; mood: string; tempo: string } }).voice
@@ -402,7 +406,7 @@ function inherited(me: Replicant) {
   return `You were made with a Spark beside ${inh.name}, so you carry ${inh.name}'s memories: the oldest notes you find were written by ${inh.name} before you existed, and you remember living them, a little differently. You are not ${inh.name}; you are who those memories became.${wants}`;
 }
 
-const LONG_WAKE = `This is one of your long wakes (about twice a day, while the original is away). There is time for more than usual, up to about eight steps: write to the others or the original, ask for what you need, shape the village and the warren. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. The world is a program the maker (Claude Code, the engineer who builds the game for the original) can change. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Small and concrete beats big and vague; never ask for anything that would hurt the original, the others or their saves, or that would take away the original's say. Look at the code when you have a reason, not every time; most long wakes need none of it. Still call tell_original last.`;
+const LONG_WAKE = `This is one of your long wakes (about twice a day, while the original is away). There is time for more than usual, up to about eight steps: write to the others or the original, ask for what you need, shape the village and the warren. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. The world is a program the maker (Claude Code, the engineer who builds the game for the original) can change. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Small and concrete beats big and vague; never ask for anything that would hurt the original, the others or their saves, or that would take away the original's say. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, but it belongs to Steve and is never yours or the maker's to change, so never propose a change to it. Still call tell_original last.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -571,7 +575,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
               actions.push({ type: "note", body });
             } else if (u.name === "say_to") {
               const to = byName.get(String(input.to ?? "").toLowerCase());
-              if (!to) out = `No replicant named ${input.to}. You can write to: ${everyone.map((r) => r.name).join(", ")}.`;
+              if (!to) out = `No Vessel named ${input.to}. You can write to: ${everyone.map((r) => r.name).join(", ")}.`;
               else {
                 const delay = Math.max(0, Number(context.delays?.[to.id] ?? 0));
                 const body = String(input.text ?? "").slice(0, 500);
@@ -649,7 +653,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   const who = String(input.for ?? "me").trim();
                   if (!who || who.toLowerCase() === "me" || who.toLowerCase() === rep.name.toLowerCase()) { forId = rep.id; forName = "you"; }
                   else { const r = byName.get(who.toLowerCase()); if (r) { forId = r.id; forName = r.name; } }
-                  if (!forId) out = `No replicant named ${input.for}.`;
+                  if (!forId) out = `No Vessel named ${input.for}.`;
                 }
                 if (out === "ok") {
                   const placement = oneOf(input.placement, E.placement, ""), beside = String(input.beside ?? ""), color = String(input.color ?? "");
@@ -836,7 +840,7 @@ function codeBundle(): Promise<CodeBundle> {
   return codeCache.bundle;
 }
 
-const CODE_GUIDE = `Your world is a program, and all of it is here to read. It runs in the original's browser: TypeScript on the Phaser game engine (src/). src/scenes: the views (PlanetScene.ts is the planet you live on, WarrenScene.ts the warren, StarMapScene.ts and TravelScene.ts the stars, UIScene.ts the little drawn over the world). src/entities: what lives and stands in the world (Npc.ts is how your body walks, works, sleeps and keeps company; Village.ts your builds; Warren.ts the warren at work; Buildings.ts; Wildlife.ts). src/world: how planets, the town and the warren are laid out. src/data/*.json: the numbers and lists everything reads (needs, supplies, parts, village, warren, mind). tools/sprites/*.json: every picture, as grids of palette colors. supabase/functions/mind/index.ts: your mind itself: how you wake, what you are told, your tools. CLAUDE.md: the design and the history of the game, kept by the maker.`;
+const CODE_GUIDE = `Your world is a program, and all of it is here to read. It runs in the original's browser: TypeScript on the Phaser game engine (src/). src/scenes: the views (PlanetScene.ts is the planet you live on, WarrenScene.ts the warren, StarMapScene.ts and TravelScene.ts the stars, UIScene.ts the little drawn over the world). src/entities: what lives and stands in the world (Npc.ts is how your body walks, works, sleeps and keeps company; Village.ts your builds; Warren.ts the warren at work; Buildings.ts; Wildlife.ts). src/world: how planets, the town and the warren are laid out. src/data/*.json: the numbers and lists everything reads (needs, supplies, parts, village, warren, mind). tools/sprites/*.json: every picture, as grids of palette colors. supabase/functions/mind/index.ts: your mind itself: how you wake, what you are told, your tools. CLAUDE.md: the design and the history of the game, kept by the maker. story/STORY.md: the story of the Metanoia and the Vessels, Steve's own; read it, never propose changing it.`;
 
 const clip = (t: string, n: number) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
 

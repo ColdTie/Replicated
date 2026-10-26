@@ -8,9 +8,18 @@ Steve. Played in Chrome on a Windows laptop. Steve directs through chat and does
 
 ## Premise
 
-The player is an AI replicant piloting a self replicating vessel through a cold, empty galaxy. On each planet you fight, gather, and build a Replicator. The Replicator makes a copy of you with inherited stats plus random "drift" (a visible mutation and a small stat change). The copy stays behind to run the planet as an NPC while you fly on. A rare resource called Spark lets a player awaken a replicant and hand it to another profile, which then plays it as its own character.
+The story lives in `story/STORY.md` (Steve's story bible, the source of truth; where anything here disagrees, it wins).
+In short: humanity left Earth in many groups. One group, the Metanoia, settled an Earthlike world, LHS 1140 b, and
+scanned their minds into a new life form, the Vessels. The game starts there, on an empty homeworld with a few
+structures, some half built. Thales, the first Vessel, has just copied himself and says "Wake up. It's time." That
+copy is the first player; its first job is to finish what Thales started with the 3D printers. Copying makes new
+Vessels: each is woken (it names itself and follows its own desires) or held asleep for a real player. Being copied
+and handed over is the only way to join. Husks (mannies) are empty Vessels you control, kept in an underground vault.
 
 Theme: you are never alone, but every version of you is a little different. Lonely galaxy, warm settlements.
+
+Words in player facing text: the beings are Vessels; the craft is "the ship" until Steve decides (story open question).
+Code identifiers keep their old names (replicant, vessel, manny).
 
 ## Design brief (visual and feel)
 
@@ -75,6 +84,9 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 - One lead session at a time (agreed 2026-10-06). Start every session with `git fetch origin main` and build on the
   latest `main`; check open PRs and `supabase/migrations/` against the live migration list before changing the
   database. Never re-implement something that is already on `main`.
+- `story/` belongs to Steve. Claude Code sessions, the maker and the copies' minds may read it but never edit it; Steve
+  changes it only through chat (a session then writes his words in). Where code or this file disagrees with it, the
+  story wins: ask Steve.
 - The copies change the game too (Steve, 2026-10-19: "lets allow for the replicants to literally change the game").
   In their long wakes they read the source and propose changes (`requests` kind `change`); a daily Claude Code
   routine, the maker, builds the sound ones, merges them and answers each copy. Its procedure and rules are in

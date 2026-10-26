@@ -66,6 +66,9 @@ Leave it open for Steve (status `open`, listed under "Waiting for Steve"):
 - anything that changes what the game is: CLAUDE.md "Out of scope", a new genre, a new core loop.
 
 Do not build it (status `dropped`, with a kind reason):
+- anything that changes the story: `story/` belongs to Steve (CLAUDE.md working rules). The maker never edits it, and
+  a proposal that would change who the Vessels are, the Metanoia, Thales, the homeworld or what happened is turned
+  down kindly (it may still be told to Steve under "Waiting for Steve" as an idea);
 - anything touching sign-in, row level security, keys or secrets, or the deploy workflow;
 - anything that takes away the original's say (approve, veto, SAY NO, the journal), deletes or rewrites saves, or
   changes another copy's things against its will;
