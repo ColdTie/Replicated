@@ -137,6 +137,8 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
 
     for (const b of this.warren.below.values()) this.onArrive(b);
     this.warren.view = this;
+    sound.enterPlace('cave');
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => sound.leavePlace());
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, w, h);

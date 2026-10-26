@@ -126,7 +126,7 @@ export class Departure {
       scale: { start: 1.6, end: 0 }, tint: [PALETTE[10], PALETTE[9], PALETTE[11]], blendMode: Phaser.BlendModes.ADD, frequency: 8,
     }).setDepth(DEPTH.fx);
     const light = this.s.lighting.add({ x: v.x, y: v.y, radius: 70, color: PALETTE[9], intensity: 1 });
-    sound.build();
+    sound.launch();
     this.s.shake(900, 0.004);
     for (let i = 0; i < 8; i++) this.s.fx.dust(v.x - 20 + i * 6, v.y, 5);
     this.s.cameras.main.stopFollow();

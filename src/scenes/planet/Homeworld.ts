@@ -141,6 +141,7 @@ export class Homeworld {
    * begins and Thales walks to his unfinished work. */
   private wake() {
     const s = this.s, pl = s.player;
+    sound.wake();
     const steps = [[0, 0], [140, 0], [260, 1], [360, 0], [HOMEWORLD.intro.flickerMs, 1]];
     for (const [t, v] of steps) s.time.delayedCall(t, () => { pl.light.active = v > 0.5; if (v > 0.5) pl.sprite.clearTint(); });
     s.time.delayedCall(HOMEWORLD.intro.flickerMs + 120, () => void this.nameSelf().then(() => this.begin()));

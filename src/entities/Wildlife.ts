@@ -152,7 +152,7 @@ export class Flock {
       b.s.play('bird:fly').setFlipX(away < 0).setDepth(5900);
     }
     this.scene.fx.dust(this.birds[0].x, this.birds[0].y, 6);
-    sound.flutter();
+    sound.flutter({ x: this.birds[0].x, y: this.birds[0].y });
   }
 }
 

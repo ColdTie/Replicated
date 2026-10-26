@@ -336,7 +336,7 @@ export class Warren {
         e.swings++;
         this.scene.fx.dust(h.x + (Math.random() - 0.5) * 14, h.y + 2, 3);
         this.scene.fx.sparks(h.x + (Math.random() - 0.5) * 10, h.y - 2, PALETTE[4], 2);
-        if (Math.hypot(this.scene.player.x - h.x, this.scene.player.y - h.y) < 180) sound.hit();
+        sound.hit(false, h);
         this.refreshHatch();
       },
       done: () => {
@@ -348,7 +348,7 @@ export class Warren {
         this.save();
         this.refreshHatch();
         this.scene.fx.dust(h.x, h.y + 2, 12);
-        if (Math.hypot(this.scene.player.x - h.x, this.scene.player.y - h.y) < 240) sound.build();
+        sound.build(h);
         this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} dug the way down into the warren, in a corner of the square` });
         if (this.scene.canHear()) this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} DUG THE WAY DOWN`);
       },
@@ -363,7 +363,7 @@ export class Warren {
     const m = { x: ore.x, y: ore.y + 6 };
     npc.startChore({
       x: m.x, y: m.y + 4, swings: 4,
-      swing: () => { this.scene.fx.sparks(m.x + (Math.random() - 0.5) * 8, m.y - 8, PALETTE[9], 3); if (Math.hypot(this.scene.player.x - m.x, this.scene.player.y - m.y) < 180) sound.hit(); },
+      swing: () => { this.scene.fx.sparks(m.x + (Math.random() - 0.5) * 8, m.y - 8, PALETTE[9], 3); sound.hit(false, m); },
       done: () => {
         this.data.scavenged = { ...(this.data.scavenged ?? {}), [oreIndex]: Date.now() };
         this.scene.flyMaterial('scrap', m, this.hatch, SUPPLIES.scrapPerOre);
@@ -386,7 +386,7 @@ export class Warren {
     this.below.set(npc, b);
     npc.hideBelow();
     this.scene.fx.dust(this.hatch.x, this.hatch.y + 2, 6);
-    if (Math.hypot(this.scene.player.x - this.hatch.x, this.scene.player.y - this.hatch.y) < 200) sound.pop();
+    sound.pop(this.hatch);
     this.view?.onArrive(b);
   }
 

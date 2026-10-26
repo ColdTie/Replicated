@@ -1,8 +1,11 @@
 {
-  "_doc": "Volumes 0..1 (rain = loudness of the rain bed at full rain). chords = MIDI notes of the ambient pad progression, one chord every chordSeconds.",
+  "_doc": "Everything is procedural WebAudio (src/audio/Sound.ts). Volumes 0..1. Buses under master: sfx (the world's sounds), music (the generative pad), ambience (each world's bed, rain, the cave), ui (menus, the wake or hold choice) and voice (the Vessels' songs and the talk box's typing). rain = loudness of the rain bed at full rain. chords = MIDI notes of the ambient pad progression, one chord every chordSeconds. duck: music and ambience fall to this share of themselves under a voice (the talk box open, a song) over duckSeconds. space: sounds in the world fade with distance from you (silent beyond falloffPx) and pan across panPx; reverb per place (seconds of tail and how much is sent): open air, the cave (the warren), the vault. footsteps: what the ground sounds like underfoot per world (planets.json / biomes.json id; default for the rest); worlds in iceNearWater crackle like ice within a tile of open water; metal by the ship and the vault door, printed floor before a built building, stone on the square. beds: each world's ambience bed (a filtered wind, slowly breathing at lfo Hz, a low drone, and small events every few seconds: ice creaks, leaves, bubbles, embers, drips) by world id; cave is the warren's, vault the husk vault's, space the ship's in flight; default for the rest.",
   "master": 0.8,
   "sfx": 0.9,
   "music": 0.7,
+  "ambience": 0.8,
+  "ui": 0.8,
+  "voice": 1,
   "rain": 0.108,
   "chordSeconds": 9,
   "chords": [
@@ -10,5 +13,28 @@
     [47, 54, 59, 62],
     [43, 50, 55, 59],
     [45, 52, 57, 61]
-  ]
+  ],
+  "duck": 0.35,
+  "duckSeconds": 0.25,
+  "space": {
+    "falloffPx": 320,
+    "panPx": 220,
+    "reverb": { "open": { "seconds": 1.8, "send": 0.25 }, "cave": { "seconds": 3.8, "send": 0.6 }, "vault": { "seconds": 1.2, "send": 0.32 } }
+  },
+  "footsteps": { "homeworld": "snow", "frost": "snow", "dune": "sand", "ember": "stone", "moon": "stone", "solace": "stone", "default": "grass" },
+  "iceNearWater": ["homeworld", "frost"],
+  "beds": {
+    "homeworld": { "wind": { "freq": 520, "q": 0.7, "vol": 0.05, "lfo": 0.07 }, "drone": { "freq": 41, "vol": 0.03 }, "event": "creak", "every": 7 },
+    "earth": { "wind": { "freq": 900, "q": 0.6, "vol": 0.03, "lfo": 0.11 }, "event": "leaves", "every": 5 },
+    "verdant": { "wind": { "freq": 900, "q": 0.6, "vol": 0.03, "lfo": 0.11 }, "event": "leaves", "every": 5 },
+    "frost": { "wind": { "freq": 1300, "q": 1.1, "vol": 0.06, "lfo": 0.05 }, "event": "creak", "every": 6 },
+    "dune": { "wind": { "freq": 700, "q": 0.5, "vol": 0.05, "lfo": 0.09 }, "event": "sand", "every": 6 },
+    "spore": { "wind": { "freq": 400, "q": 0.8, "vol": 0.025, "lfo": 0.13 }, "drone": { "freq": 55, "vol": 0.02 }, "event": "bubble", "every": 3 },
+    "ember": { "wind": { "freq": 250, "q": 0.6, "vol": 0.04, "lfo": 0.08 }, "drone": { "freq": 36, "vol": 0.05 }, "event": "ember", "every": 4 },
+    "moon": { "wind": { "freq": 3000, "q": 3, "vol": 0.008, "lfo": 0.03 }, "drone": { "freq": 30, "vol": 0.02 } },
+    "cave": { "wind": { "freq": 180, "q": 0.9, "vol": 0.035, "lfo": 0.04 }, "drone": { "freq": 49, "vol": 0.03 }, "event": "drip", "every": 3 },
+    "vault": { "drone": { "freq": 55, "vol": 0.05 }, "event": "tick", "every": 4 },
+    "space": { "drone": { "freq": 33, "vol": 0.04 }, "event": "tick", "every": 9 },
+    "default": { "wind": { "freq": 800, "q": 0.6, "vol": 0.035, "lfo": 0.08 } }
+  }
 }

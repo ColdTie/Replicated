@@ -356,7 +356,7 @@ export class Npc {
             this.scene.village.complete(job);
             this.onWorked();
             this.job = null;
-            if (dp < 220) sound.build();
+            sound.build({ x: this.x, y: this.y });
             this.hop();
             this.state = 'idle';
             this.until = time + 1500;
@@ -369,7 +369,7 @@ export class Npc {
           this.sprite.setFlipX(job.x < this.x);
           this.scene.fx.sparks(job.x + (Math.random() - 0.5) * 8, job.y - 6 - Math.random() * 10, job.tint !== undefined ? PALETTE[job.tint] : PALETTE[10], 3);
           this.scene.village.showGhost(job, this.swings / VILLAGE.hammerSwings);
-          if (dp < 160) sound.hit();
+          sound.hit(false, { x: this.x, y: this.y });
         }
         break;
       case 'mine':
@@ -379,7 +379,7 @@ export class Npc {
           this.sprite.play(anim(this.key, 'attack'), true);
           this.sprite.setFlipX(this.mineAt!.x < this.x);
           this.scene.fx.sparks(this.mineAt!.x, this.mineAt!.y - 6, PALETTE[10], 3);
-          if (dp < 160) sound.crystal();
+          sound.crystal({ x: this.x, y: this.y });
         }
         break;
     }

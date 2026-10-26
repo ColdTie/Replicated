@@ -93,7 +93,7 @@ export class Link {
   /** A thin beam of the player's color between the sky and a body: arriving (down) or leaving (up). */
   beam(x: number, y: number, down: boolean) {
     const s = this.s, color = s.player.featureColor;
-    sound.spark();
+    sound.link(down);
     const top = s.cameras.main.worldView.y - 20;
     const ray = s.add.rectangle(x, y - 10, 3, y - 10 - top, color).setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.fx).setAlpha(0.9);
     const core = s.add.rectangle(x, y - 10, 1, y - 10 - top, 0xffffff).setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.fx);
