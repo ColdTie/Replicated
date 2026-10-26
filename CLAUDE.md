@@ -114,6 +114,15 @@ Steve's ideas for later phases. Do not build these until a phase explicitly pick
 - **Beacon systems.** Fixed, symmetrical points in space around the start hold enormous resources and a beacon. Reaching one should take about a full week of play, so they work as long-term goals.
 - **Star map.** Unique and easy to open, usable with a mouse and with touch. Possibly a 2D/3D map (pinch, rotate, tap a star) with toggleable overlays for other players' replicants and discovered resources. Note: "3D" here means the star map view only; the game itself stays 2D.
 - **FTL communication (Bobiverse style).** Replicants, and other people, can only talk to each other through a device that allows faster-than-light communication. It is something you build or find, not available from the start. Fits the "ownership handoff is a row update" model: messages are async rows, not realtime chat.
+- **Tech tree (recorded 2026-10-26, story/STORY.md).** 3D printers first (in the game since session 19), later
+  biological computers, quantum computers, SCUT technology (faster than light links: letters between worlds and
+  driving husks from far away; it would take over from the beacon lattice's role) and disease cure development
+  (helping a society through a pandemic). Order and prerequisites are Steve's to decide. Data model: unlocked
+  technologies would live on the galaxy (one row per tech, `galaxy_id`), so every profile shares them.
+- **Inhabited worlds (recorded 2026-10-26).** Far worlds with intelligent life; each society has a crisis (a pandemic,
+  an iron shortage, a labor shortage) and the player gathers resources for itself and for them. Data model: a society
+  would be per planet (`planet_states.data.society` or its own table by `galaxy_id`, star, planet) with its crisis
+  and what it still needs, fed like a printer is fed today.
 - **Wormholes (very late game).** Replicants eventually develop portal and wormhole technology for fast travel between explored systems.
 
 ## Architecture (as built)
@@ -773,3 +782,23 @@ sound that was there still plays).
 - **New sounds.** The printers, the husk vault (door, hum, menu), the wake or hold choice and the menus (steps 2 to 5).
 - Verified: build, `npm test` 17 of 17 (`playtest-sound` is new). There is nothing to hear in a screenshot: listen in
   Chrome with the sound on.
+
+**Session 19 notes.**
+- The bible and the brief differed on the homeworld (the brief: an ice world with an open-water band; the bible: an
+  Earthlike world). The bible won: Earthlike ground with frost, open water and polar caps under a red dwarf's day.
+- The tech tree and inhabited worlds are in the backlog above, not built.
+- Mind function v19 is live (deployed this session): the Vessels' story, Thales' persona, held Vessels skipped. Its
+  model, effort and $0.50 daily budget are unchanged. It also carries session 15's heartbeat, inheritance and lattice
+  code; migration 0014 (`mind_runs`) is still not applied, so the heartbeat only logs an error to the function log.
+- Bug found by CI and fixed: with a Spark in hand and Thales beside the ring, the copy came from Thales (Thales is no
+  longer a Spark elder; `playtest-homeworld` stages exactly that).
+
+**Waiting for Steve (session 19).**
+1. Live saves: run `supabase/manual/2026-10-26_homeworld_fresh_start.sql` in the Supabase SQL Editor for a fresh start
+   on LHS 1140 b (backup first, then erase), or the one-line alternative in the same file to move only the original.
+2. Day and night on LHS 1140 b: keep the device-clock day tinted red, or a fixed light for a tidally locked world?
+3. Other Vessels at the start: how many, and who?
+4. The game's title still reads "VESSEL METANOIA / REPLICANTS" on the home screen: keep it, or rename?
+5. Story open questions (STORY.md), among them whether the ship keeps the name "vessel" and the future of the
+   beacons, the lattice and the Spark.
+6. From session 15, still open: approve migration `0014_mind_runs.sql`, and require the "test" status check on main.

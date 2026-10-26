@@ -300,7 +300,8 @@ try {
     const s = window.__scene, n = s.npcs.find((q) => q.data.id === id);
     window.__session.replicant.traits.mods = [];
     s.player.setPosition(sp.x - 64, sp.y);
-    n.x = sp.x - 46; n.y = sp.y; n.sync();
+    // Prism stays put while it is talked to (a copy left to itself may stroll off before E)
+    n.hold = true; n.setPosition(sp.x - 46, sp.y);
   }, { id: prismId, sp: spot });
   await page.waitForTimeout(400);
   await page.keyboard.press('KeyE');
