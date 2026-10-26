@@ -111,7 +111,8 @@ try {
   if (!rest.stillNpc || rest.sparks !== 1) fail('Thales could be handed over');
 
   // 8. a copy made at the Replicator: the choice opens; HOLD keeps it asleep in your likeness, with no mind
-  await ev(() => { const s = window.__scene; s.embers = 45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; s.tryReplicate(); });
+  // (a Spark in hand and Thales beside the ring: the copy is still yours, never Thales')
+  await ev(() => { const s = window.__scene, th = s.npcs.find((n) => n.data.traits.thales); window.__session.replicant.traits.sparks = 1; th.hold = true; th.setPosition(s.base.spotX + 14, s.base.spotY); s.embers = 45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; s.tryReplicate(); });
   await page.waitForFunction(() => !!window.__scene.choice, null, { timeout: 5000 }).catch(() => fail('no wake or hold choice'));
   await page.waitForTimeout(400);
   await shot(page, 'choice-wake-hold');

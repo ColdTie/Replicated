@@ -1112,7 +1112,7 @@ export class PlanetScene extends Phaser.Scene {
   /** A copy (not blank, up here) standing close to the Replicator's ring: a Spark birth would come from it. */
   private sparkElder() {
     const sx = this.base.spotX, sy = this.base.spotY;
-    return this.npcs.filter((n) => !n.blank && !n.below && n.state !== 'born' && !n.data.id.startsWith('pending') && Math.hypot(n.x - sx, n.y - sy) < DRIFT.spark.range)
+    return this.npcs.filter((n) => !n.blank && !n.below && n.state !== 'born' && !n.data.traits.thales && !n.data.id.startsWith('pending') && Math.hypot(n.x - sx, n.y - sy) < DRIFT.spark.range)
       .sort((a, b) => Math.hypot(a.x - sx, a.y - sy) - Math.hypot(b.x - sx, b.y - sy))[0];
   }
 
