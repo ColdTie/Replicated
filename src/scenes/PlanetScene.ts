@@ -36,6 +36,7 @@ import { TOWN_TUNING, birthOrder, nextFreeLot, occupiedLots, type TownState } fr
 import { BEACONS, planetFor, starById } from '../world/galaxy';
 import { Departure } from './planet/Departure';
 import { Link } from './planet/Link';
+import { Homeworld } from './planet/Homeworld';
 import { Hands } from './planet/Hands';
 import { Homecoming } from './planet/Homecoming';
 import { Trade } from './planet/Trade';
@@ -119,7 +120,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean } = { embers: 0, nodes: {}, doors: {} };
   /** who lives on which lot of the town (planet_states.data.town) */
   townState: TownState = { lots: {}, civic: {} };
   /** this load moved an old save into the town: saved positions of the player and the copies are ignored once */
@@ -156,6 +157,7 @@ export class PlanetScene extends Phaser.Scene {
   readonly homecoming = new Homecoming(this);
   readonly trade = new Trade(this);
   readonly linker = new Link(this);
+  readonly homeworld = new Homeworld(this);
 
   constructor() { super('planet'); }
 
@@ -206,6 +208,7 @@ export class PlanetScene extends Phaser.Scene {
     this.hatchDwell = 0;
     this.homecoming.reset();
     this.trade.reset();
+    this.homeworld.reset();
     this.townState = { lots: {}, civic: {} };
     this.migrated = false;
     this.npcsLoaded = true;
@@ -232,7 +235,7 @@ export class PlanetScene extends Phaser.Scene {
       .catch((e) => { console.warn('planet load failed, playing without saving', e); this.loadFailed = true; return null; });
     const npcs = this.loadNpcs().catch(() => this.loadNpcs())
       .catch((e) => { console.warn('copies load failed', e); this.npcsLoaded = false; return [] as ReplicantSave[]; });
-    void Promise.all([save, npcs]).then(([s, n]) => this.build(s, n));
+    void Promise.all([save, npcs.then((n) => this.homeworld.ensureThales(n))]).then(([s, n]) => this.build(s, n));
   }
 
   get baseCenter() { return this.map.base.center; }
@@ -284,6 +287,8 @@ export class PlanetScene extends Phaser.Scene {
     const pw = m.w * 16, ph = m.h * 16;
     npcRows = this.withScreenshotCopies(npcRows);
     this.towner.settleTown(save, npcRows);
+    save = this.homeworld.found(save);
+    session.planet = save;
     this.embers = save?.embers ?? 0;
     this.supplies = { ...(save?.data.supplies ?? {}) };
     this.awayHours = 0;
@@ -405,6 +410,7 @@ export class PlanetScene extends Phaser.Scene {
     // the way down to the warren the copies dig (hatch spot kept per planet); it moved on while nobody was here
     this.warren = new Warren(this, save?.data.warren);
     this.buildings = new Buildings(this, save?.data.buildings);
+    this.homeworld.placePrinters();
     this.time.delayedCall(2500, () => this.towner.grantGifts(save?.data.gifts));
     if (!this.shot && !this.visit) { this.warren.applyOffline(this.awayHours); this.buildings.applyOffline(this.awayHours); this.trade.accrueAway(this.awayHours); }
     for (const e of m.enemies) {
@@ -479,9 +485,11 @@ export class PlanetScene extends Phaser.Scene {
       this.linker.playLinkIn(this.link);
     } else if (this.visit) {
       this.playReturn();
+    } else if (p.intro === 'scan' && !awake) {
+      this.homeworld.playScan();
     } else if (p.intro === 'wake' && !awake) {
       this.playWake();
-    } else if (p.intro === 'land' && !saved) {
+    } else if (p.intro === 'land' && !saved && !awake) {
       this.playLanding(vesselShadow, vesselLight, vesselGlow);
     } else {
       this.playReturn();
@@ -791,6 +799,7 @@ export class PlanetScene extends Phaser.Scene {
     this.hands.update(time);
     this.homecoming.update(time);
     this.trade.update(dt);
+    this.homeworld.update(time, dt);
     this.warren.update(dt);
     this.updateHatch(dt);
     this.minds.tickMinds(dt);

@@ -12,7 +12,7 @@ try {
   const page=await b.newPage({viewport:{width:960,height:540}});
   page.on('pageerror',e=>errors.push(String(e)));
   page.on('console',m=>{ if(m.type()==='error') errors.push(m.text()); });
-  await page.goto(`http://localhost:${port}/Replicated/?shot=1&hour=21`);
+  await page.goto(`http://localhost:${port}/Replicated/?shot=1&at=sol&pi=3&hour=21`);
   await page.waitForFunction(()=>!!window.__scene?.player,null,{timeout:15000});
   await page.waitForTimeout(1500);
   await page.mouse.click(480,270); // first gesture -> audio

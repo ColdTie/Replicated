@@ -2,6 +2,7 @@
 // again to see its planets turning around it and pick one. Opened from the vessel (launch mode) or from the ship
 // while flying (look only).
 import Phaser from 'phaser';
+import { HOME, KNOWN_STARS } from '../core/home';
 import { sound } from '../audio/Sound';
 import { PALETTE } from '../core/data';
 import { isKid, session } from '../core/session';
@@ -62,7 +63,7 @@ export class StarMapScene extends Phaser.Scene {
   private lastInputAt = 0;
   private pinchStart = 0;
   private zoomStart = 1;
-  private discovered = new Set<string>(['sol']);
+  private discovered = new Set<string>(KNOWN_STARS);
   private replicants: ReplicantSummary[] = [];
   private journeys: Journey[] = [];
   private t = 0;
@@ -584,7 +585,7 @@ export class StarMapScene extends Phaser.Scene {
     const priority = (p: Projected) => {
       const s = p.star;
       if (s.id === this.d.from || this.selected?.id === s.id) return 0;
-      if (s.id === 'sol' || s.beacon || settled.has(s.id)) return 1;
+      if (KNOWN_STARS.includes(s.id) || s.beacon || settled.has(s.id)) return 1;
       if (this.discovered.has(s.id)) return 2;
       return 3 + (s.planets ? 0 : 1) + Math.min(1, s.ly / 60);
     };
@@ -599,7 +600,7 @@ export class StarMapScene extends Phaser.Scene {
       let label = this.labels.get(s.id);
       if (!show) { label?.setVisible(false); continue; }
       if (!label) {
-        label = this.add.bitmapText(0, 0, 'pixel', s.id === 'sol' ? 'SOL - HOME' : s.name).setOrigin(0.5, 0);
+        label = this.add.bitmapText(0, 0, 'pixel', s.id === 'sol' ? 'SOL - EARTH' : s.id === HOME.star ? `${s.name} - HOMEWORLD` : s.name).setOrigin(0.5, 0);
         this.labels.set(s.id, label);
       }
       const r = radii.get(s.id) ?? 1;

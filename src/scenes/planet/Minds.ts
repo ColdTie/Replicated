@@ -450,7 +450,7 @@ export class Minds {
   async awakenCopy(id: string) {
     const me = session.replicant, st = session.store;
     const npc = this.s.npcs.find((n) => n.data.id === id);
-    if (!me || !st || !npc || npc.blank || npc.below || (me.traits.sparks ?? 0) < 1 || this.s.visit) { sound.denied(); return; }
+    if (!me || !st || !npc || npc.blank || npc.below || npc.data.traits.thales || (me.traits.sparks ?? 0) < 1 || this.s.visit) { sound.denied(); return; }
     const fake = this.s.shot || npc.data.id.startsWith('fake') || npc.data.id === 'pending';
     if (!fake) {
       try { await st.awaken(npc.data, me); } catch (e) { console.warn('awaken failed', e); sound.denied(); return; }

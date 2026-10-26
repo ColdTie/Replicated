@@ -2,7 +2,7 @@ import { sound } from '../../audio/Sound';
 import { PALETTE, PLAYER } from '../../core/data';
 import { HEAR_HINT, journalOpen } from '../../ui/journal';
 import { openReplyInput, type TalkBox, type TalkWho } from '../../ui/dialogue';
-import { composeTalk, type Exchange, type TalkPage } from '../../ui/talk';
+import { composeTalk, wrap, type Exchange, type TalkPage } from '../../ui/talk';
 import TALK from '../../data/talk.json';
 import type { UIScene } from '../UIScene';
 import { session } from '../../core/session';
@@ -29,6 +29,25 @@ export class Talk {
   afterTalk = new Map<Npc, (() => void)[]>();
 
   get talkBox(): TalkBox | undefined { return (this.s.scene.get('ui') as UIScene | null)?.talkBox; }
+
+  /** A scripted word in the talk box (Thales at the opening): his portrait, his voice, one page; then onClose. */
+  openScripted(npc: Npc, text: string, onClose: () => void) {
+    const box = this.talkBox, ui = this.s.scene.get('ui') as UIScene;
+    if (!box) { onClose(); return; }
+    this.talkable?.setTalkHint(false);
+    this.talkable = null;
+    this.talk = { npc, hp: this.s.player.hp, name: npc.data.name, journal: null, exchanges: [], composing: false, fresh: null, opening: null, reply: null, script: { text, onClose } };
+    this.s.controls.modal = true;
+    this.dropAttackBuffer();
+    npc.startTalk();
+    ui.setTalking(true);
+    box.canReply = false;
+    const look = (): ReturnType<TalkWho['look']> => {
+      const l = bodyFor(this.s, npc.data);
+      return { key: l.key, anchors: l.anchors, gear: npc.data.traits.gear ?? 0, gearTint: npc.trailColor, model: l.model, blank: false };
+    };
+    box.show({ name: () => npc.data.name, color: () => this.visorOf(npc), look, seed: npc.voiceSeed, voice: () => npc.data.traits.voice }, this.talkPages());
+  }
 
   /** The mind's talk wake (requestTalk): what the copy says, or null. */
   requestTalkFn() {
@@ -148,6 +167,7 @@ export class Talk {
 
   talkPages(): TalkPage[] {
     const t = this.talk!, n = t.npc, me = session.replicant, box = this.talkBox!;
+    if (t.script) return [{ key: 'script', section: '', lines: wrap([{ text: t.script.text, tone: 'body' }], box.tw, box.measure) }];
     const who = (id: string | null) => {
       if (!id) return { name: 'someone' };
       if (me && id === me.id) return { name: me.name };
@@ -210,6 +230,7 @@ export class Talk {
     this.s.game.events.off('tell', this.onTell, this);
     this.talkBox?.hide();
     (this.s.scene.get('ui') as UIScene | null)?.setTalking?.(false);
+    t.script?.onClose();
   }
 
   /** R: a line of your own, sent as a letter (it arrives at once); the copy's answer comes as a new SAYS page. */

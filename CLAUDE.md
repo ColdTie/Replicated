@@ -100,7 +100,7 @@ These shape the data model now, even where the feature comes later.
   `fixedSeconds` in `src/data/travel.json`. Since 2026-10-25 a trip takes 0.1 seconds per light year, `travel.json
   cruise.secondsPerLy`; `cruise.enabled` false and `fixedSeconds` 0 restore real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
 - **One shared galaxy per login.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
-- **Earth is the start.** Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
+- **Earth is the start.** (Superseded 2026-10-26 by the story: the game starts on the Metanoia homeworld, LHS 1140 b; Earth stays in the catalog as humanity's origin, a world you can fly to.) Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
 - **Messages travel at light speed until FTL comms exist.** A message between replicants in different systems arrives after a delay based on distance (scaled like travel). Building or finding the FTL comms device makes messages from that system instant.
 - **Stars are real.** The galaxy is real nearby stars (positions relative to the Sun). Each star's planets are generated from a seed derived from the star's id. Beacon systems sit at fixed, symmetrical points around the Sun, snapped to the nearest real star.
 
@@ -125,6 +125,13 @@ tools/gen-sprites.mjs    JSON -> public/assets/gen/*.png + manifest.json
 tools/screenshot.mjs     build preview + headless Chromium capture -> screenshots/<name>.png
 tools/build-code-view.mjs the deploy writes dist/code/source.json: every tracked text file with its line count and a
                          one-line "about", plus main's latest changes; the copies read it in their long wakes
+src/core/home.ts         HOME: the start world (the first planet in planets.json, LHS 1140 b) and the stars known from the start
+src/data/homeworld.json  the homeworld: Thales (body, voice, his word at the opening), the founded Metanoia structures, the goal
+src/scenes/planet/Homeworld.ts the homeworld at runtime: Thales' row (made on the first load), the founding (structures on civic
+                         lots, the Replicator, data.founded), printers by unfinished founded work, the opening (playScan)
+src/entities/Printer.ts  a 3D printer beside a building: the head runs the gantry with every blow, a breathing light and a
+                         thread of light call for hands while it waits, standby once the building is done
+supabase/manual/         SQL Steve runs by hand (never applied by a session): 2026-10-26_homeworld_fresh_start.sql
 src/data/*.json          palette, planets, player, enemies, items, structures, backend, village, warren (all tunables)
 src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by tools/build-stars.mjs; edit the catalog there)
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
@@ -277,6 +284,8 @@ room is improved, an away wake plays out, a Spark awakens a copy as a player),
 world is open; copies reach what they need; with a snapshot of the live data it checks the real planet),
 `node tools/playtest-talk.mjs` (the talk hint, E / right click open the box, pages, back, close, the reply line, words read without a module,
 a blank copy, dash still on Shift, the real talk wake with the canned mind),
+`node tools/playtest-homeworld.mjs` (a new player on LHS 1140 b: the scan, Thales' word, the visor, the founded
+structures, Thales by his work, the Printworks printed to the end, Thales never handed over),
 `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, a manny built at the dock, linked
 into from a ship in flight, from manny to manny, back to the ship once it landed alone, from your own body), `node tools/build-code-view.mjs [outDir]` (the source bundle the copies read; the deploy runs it),
@@ -304,7 +313,8 @@ R = reply (a letter it answers at once). M or the speaker icon (top right) mutes
 
 URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
 screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond` for other spots, `&kid` for kid mode),
-`?planet=solace`, `?seed=123`, `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
+`?planet=solace`, `?seed=123` (the default world is the first in planets.json: LHS 1140 b; the playtests that test Earth
+add `&at=sol&pi=3`), `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
 `?low` (force low-detail mode; also switches on by itself under 40 fps), `?perf` (the planet's load phases in seconds,
 bottom left, for 12 s: save, world, ground, rock, rest; also `window.__loadMs`), `?fast` (travel minutes become seconds; a cruise takes a twelfth as long),
 `?shot=1&view=warren&copies=3` (a dug, lived-in warren, you at the foot of the ladder), `?shot=1&star=tau-ceti&pi=2` (preview planet 2 of another star, as a hologram visit), `?shot=1&at=fomalhaut&pi=1`
@@ -623,3 +633,35 @@ would cost much of what it saves; decide on it after reading `?perf` on Steve's 
 - **Speed** `player.json speed` 99 -> 114 (+15%).
 - Verified: build, the layout comparison against main, `npm test`, `screenshots/no-ruins.png` (where an Earth ruin stood).
 
+
+### Session 19 (2026-10-26): the Metanoia pivot (Steve's story bible, `story/STORY.md`)
+**Step 0, the story is canon.** `story/STORY.md` is the bible word for word; the Premise points to it; `story/` is
+Steve's (working rule here, a refusal rule in NEEDS.md); the code view puts it first; the minds are Vessels of the
+Metanoia whose home is LHS 1140 b (`STORY` in the mind function), and the story is never theirs to propose changing.
+Player facing words: Vessels; the craft is "the ship" (story open question). Code identifiers keep their names.
+
+**Step 1, the homeworld and the opening.** The game starts on LHS 1140 b (`planets.json` id `homeworld`, star
+`lhs-1140`, planet 2; `src/core/home.ts`). Built from the real planet and the bible (an Earthlike super Earth): a
+cold teal and slate world with frost on the grass and rock, eleven ponds of open water, wide polar caps from orbit, no
+creatures (the bible: empty except for the Vessels), heavier gravity (`gravity` 1.9: a shorter dash, dust that drops),
+and a red dwarf's day: the device clock cycle multiplied by `sunTint` (Steve to decide whether a tidally locked world
+keeps a day). Its signature material is ice glass. Sol is still on the map ("SOL - EARTH"); Earth is a world you can
+fly to (its intro is now a landing).
+- **Thales** (`src/data/homeworld.json`): the first Vessel, a row of his own (`traits.thales`, status npc, made on the
+  first load of the homeworld), a crest head, wide gold visor and long cape, a slow ancient horn for a voice. He has a
+  mind (his own persona in the mind function), keeps near his unfinished work, has no home lot and can never be handed
+  over or held. No other Vessels at the start until Steve says who.
+- **The founded structures**: Thales' Hall and the Archive stand finished on civic lots; the Printworks stands 35%
+  printed with a 3D printer beside it (`src/entities/Printer.ts`). The printer's light breathes and a thread of light
+  runs from its head to the missing rows; every blow on the Printworks moves the head and lays a layer; finishing it
+  flashes the town warm, and the printer goes to standby. `data.founded` keeps it from happening twice.
+- **The opening** (`intro: 'scan'`, `src/scenes/planet/Homeworld.ts`): you stand dark on the Replicator's ring, the
+  scan sweeps over you, Thales beside you says "Wake up. It's time." in the talk box (his portrait, typed in his
+  voice, no reply), and when it closes your visor flickers on, the title card shows and Thales walks to his work.
+- **Live saves wait for Steve.** The live galaxy has his original on Earth (awake) with one copy, and three profiles.
+  `supabase/manual/2026-10-26_homeworld_fresh_start.sql` backs everything up into `backup_20261026` and erases
+  replicants, planets, journeys, stars, notes, letters and requests (profiles, the galaxy and the ledger stay); a one
+  line alternative in the same file moves only the original to the homeworld. Until then Earth plays as before and LHS
+  1140 b can be reached by flying there.
+- The playtests that test Earth-only things now start there (`&at=sol&pi=3`); `tools/playtest-homeworld.mjs` is new.
+- Verified: build, `npm test` (15 of 15), `screenshots/homeworld-day.png`, `homeworld-night.png`, `opening-*.png`.

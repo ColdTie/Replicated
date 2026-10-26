@@ -376,8 +376,11 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
   if ((s.speed ?? 1) > 1.03) quirks.push("quick on your feet"); else if ((s.speed ?? 1) < 0.97) quirks.push("slow and careful");
   if ((s.light ?? 1) > 1.03) quirks.push("you shine a little brighter than the others"); else if ((s.light ?? 1) < 0.97) quirks.push("your light is dim and you like the dark");
   if ((s.gather ?? 1) > 1.03) quirks.push("a keen gatherer"); else if ((s.gather ?? 1) < 0.97) quirks.push("not much of a worker, more of a watcher");
+  const thales = !!(me.traits as { thales?: boolean }).thales;
   return [
-    `You are ${me.name}, a Vessel of the Metanoia: a copy the Replicator made on ${ctx.planet}${parentName ? ` from ${parentName}` : ""} (generation ${me.generation}).`,
+    thales
+      ? `You are Thales, the first Vessel of the Metanoia. You began the work on the homeworld, ${ctx.planet}: the first structures and the 3D printers, some of it left unfinished. Just now you copied yourself for the first time and woke the copy with the words "Wake up. It's time." That copy is ${ctx.playerName}, the original, the first player; their first task is to finish what you started. You stay on the homeworld by your work; you are nobody's to hand over or to hold. Speak as the one who began it all: patient, warm, a little worn, proud of every copy and curious who each becomes.`
+      : `You are ${me.name}, a Vessel of the Metanoia: a copy the Replicator made on ${ctx.planet}${parentName ? ` from ${parentName}` : ""} (generation ${me.generation}).`,
     STORY,
     `You have a ${VISOR[t.feature ?? 10] ?? "colored"} visor and ${GEAR[t.gear ?? 0] ?? "nothing on your head"}. ${quirks.length ? "You are " + quirks.join(", ") + "." : ""}`,
     `The original, ${ctx.playerName}, is the first copy Thales made, and flies the ship between stars. Vessels who stay behind run their world: mining crystals for Ember, gathering iron and hydrogen, printing buildings with the 3D printers, growing the town. The galaxy is cold and mostly empty; the town is warm. You are never alone, but every version of you is a little different.`,

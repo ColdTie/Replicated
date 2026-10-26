@@ -37,6 +37,8 @@ export interface TalkSession {
   opening: { text: string; at: number } | null;
   /** close() of the reply input while it is open */
   reply: (() => void) | null;
+  /** a scripted word (the homeworld's opening): one page, no journal, no reply; onClose runs when the box shuts */
+  script?: { text: string; onClose: () => void };
 }
 /** A frame with nothing pressed: what the player gets while the talk box has the buttons. */
 export const NO_INPUT: InputFrame = { x: 0, y: 0, attack: false, dash: false, interact: false, back: false, forward: false, cancel: false, reply: false };

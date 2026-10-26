@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { HOME } from '../core/home';
 import { anim } from '../core/assets';
 import { bodyFor } from '../core/body';
 import type { ReplicantSave } from '../net/store';
@@ -67,7 +68,7 @@ export class Player {
     this.featureColor = PALETTE[traits?.trail ?? feature];
     // ?model=drone tries a hand-made body; otherwise the replicant's own (composed from the kit when it has one)
     const q = new URLSearchParams(location.search).get('model');
-    const data = q && q in PLAYER.models ? ({ ...(rep ?? { id: '', profile_id: null, name: '', star_id: 'sol', planet_index: 3, pos_x: null, pos_y: null }), model: q, traits: { ...(traits ?? {}), body: undefined, blank: false } } as ReplicantSave) : rep;
+    const data = q && q in PLAYER.models ? ({ ...(rep ?? { id: '', profile_id: null, name: '', star_id: HOME.star, planet_index: HOME.planet, pos_x: null, pos_y: null }), model: q, traits: { ...(traits ?? {}), body: undefined, blank: false } } as ReplicantSave) : rep;
     const look = bodyFor(scene, data ?? undefined, feature);
     this.key = look.key;
     this.headY = look.headY;
@@ -260,7 +261,8 @@ export class Player {
     this.dashDir.normalize();
     this.aim.copy(this.dashDir);
     if (Math.abs(this.dashDir.x) > 0.15) this.facing = Math.sign(this.dashDir.x);
-    this.dashUntil = time + PLAYER.dash.ms;
+    // a heavy world (planets.json gravity) cuts the dash short
+    this.dashUntil = time + PLAYER.dash.ms * Math.pow(this.scene.planet.gravity ?? 1, -0.25);
     this.dashReadyAt = time + PLAYER.dash.cooldownMs;
     this.attackingUntil = 0;
     this.nextAfterimage = 0;

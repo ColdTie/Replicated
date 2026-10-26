@@ -1,0 +1,40 @@
+{
+  "_doc": "The printer's head (src/entities/Printer.ts): it slides along the gantry; the nozzle glows while it lays a layer.",
+  "size": [
+    8,
+    8
+  ],
+  "tinted": false,
+  "legend": {
+    ".": null,
+    "o": 25,
+    "s": 22,
+    "S": 21,
+    "y": 10,
+    "Y": 11,
+    "w": 19
+  },
+  "animations": {},
+  "frames": [
+    [
+      "oooooooo",
+      "oSSSSSSo",
+      "osssssso",
+      ".oSSSSo.",
+      "..osso..",
+      "..oyyo..",
+      "...oo...",
+      "........"
+    ],
+    [
+      "oooooooo",
+      "oSSSSSSo",
+      "osssssso",
+      ".oSSSSo.",
+      "..osso..",
+      "..oYYo..",
+      "...ww...",
+      "...yy..."
+    ]
+  ]
+}

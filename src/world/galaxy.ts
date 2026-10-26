@@ -113,9 +113,9 @@ export function planetFor(starId: string, planetIndex: number): PlanetDef | unde
   return def;
 }
 
-/** The planet a ship lands on at a star when none was chosen: Earth at Sol, else the first planet. */
+/** The planet a ship lands on at a star when none was chosen: a fixed world (Earth at Sol, the homeworld at LHS 1140), else the first planet. */
 export function defaultPlanetIndex(starId: string) {
-  return starId === 'sol' ? 3 : TRAVEL.landedPlanetIndex;
+  return PLANETS.find((p) => p.star === starId)?.planetIndex ?? TRAVEL.landedPlanetIndex;
 }
 
 export const BIOME_LIST = BIOMES.biomes;
