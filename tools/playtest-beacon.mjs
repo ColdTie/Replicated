@@ -99,6 +99,6 @@ try {
   log('errors', JSON.stringify(errors));
 } finally {
   await b.close();
-  process.kill(-server.pid);
+  try { process.kill(-server.pid); } catch { /* the preview server already stopped */ }
 }
 process.exit(errors.length ? 1 : 0);
