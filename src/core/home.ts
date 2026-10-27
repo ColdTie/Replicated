@@ -4,5 +4,5 @@ import { PLANETS } from './data';
 
 export const HOME = { id: PLANETS[0].id, star: PLANETS[0].star, planet: PLANETS[0].planetIndex };
 /** The homeworld's star and Sol (where humanity came from): known from the start. */
-export const KNOWN_STARS = [HOME.star, 'sol'];
+export const KNOWN_STARS = [HOME.star, 'sol', 'gliese-12'];
 export const isHome = (star: string, planet: number) => star === HOME.star && planet === HOME.planet;

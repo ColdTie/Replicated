@@ -30,9 +30,8 @@ try {
   // the opening, quickly: Thales' word, the name
   await page.waitForFunction(() => !!window.__scene.talker.talk?.script, null, { timeout: 15000 });
   await page.waitForTimeout(1500);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(250);
-  if (await ev(() => !!window.__scene.talker.talk)) await page.keyboard.press('Enter');
+  // (Thales' opening is two pages: Enter until the box closes)
+  for (let i = 0; i < 10 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
   await page.waitForSelector('.ov input', { timeout: 8000 });
   await page.type('.ov input', 'Sower');
   await page.click('.ov button');
@@ -48,9 +47,16 @@ try {
     const s = window.__scene, bl = s.buildings.list.find((x) => x.id === goal);
     const aim = { x: 1, y: 0, lengthSq: () => 1 };
     s.player.setPosition(bl.x - bl.w * 8 - 6, bl.y);
+    // Thales' printer waits for its supplies (homeworld.json founded cost): give them, wait until it takes them
+    for (const [k, n] of Object.entries(bl.cost)) { if (k === 'ember') s.addEmbers(n); else s.supplies[k] = (s.supplies[k] ?? 0) + n; }
+    s.markSupplies();
+    for (let i = 0; i < 60 && !bl.paid; i++) await new Promise((r) => setTimeout(r, 100));
     for (let i = 0; i < 80 && !bl.built; i++) { s.resolveAttack(bl.x - bl.w * 8 + 4, bl.y - 4, 14, aim); await new Promise((r) => setTimeout(r, 40)); }
   }, HW.goal);
   await page.waitForFunction(() => window.__scene.bioworks.awake, null, { timeout: 8000 }).catch(() => fail('the Cems did not wake when the Printworks was finished'));
+  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out
+  await page.waitForFunction(() => !!window.__scene.talker.talk?.script, null, { timeout: 9000 }).catch(() => fail('Thales did not speak when the Cems woke'));
+  for (let i = 0; i < 16 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
   await page.waitForTimeout(1200);
 
   // 3. launch: the hold takes a culture of the awake Cems
@@ -106,11 +112,21 @@ try {
   if (house) fail(`the House cannot be printed on the seeded world: ${house}`);
   for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(80); }
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => !window.__game.scene.isActive('designs') && window.__scene.buildings.printing.length === 1, null, { timeout: 8000 }).catch(() => fail('Enter at the design stone did not print the House'));
+  const printed = await page.waitForFunction(() => !window.__game.scene.isActive('designs') && window.__scene.buildings.printing.length === 1, null, { timeout: 8000 }).then(() => true).catch(() => false);
+  if (!printed) {
+    // what the menu and the world were doing, so a failure says why
+    log('menu state', JSON.stringify(await ev(() => {
+      const s = window.__scene, d = window.__designs;
+      return { open: window.__game.scene.isActive('designs'), row: d?.rows?.[d.index]?.id, busy: d?.busy, why: s.buildings.whyNot('house'), printing: s.buildings.printing.length,
+        list: s.buildings.list.map((b) => `${b.design ?? b.name}:${b.built ? 'built' : 'up'}`), talk: !!s.talker.talk, locked: s.player.locked, scenes: window.__game.scene.getScenes(true).map((x) => x.scene.key) };
+    })));
+    fail('Enter at the design stone did not print the House');
+  }
   await page.waitForTimeout(3400);
   const printing = await ev(() => { const s = window.__scene, b = s.buildings.printing[0]; return { design: b?.design, trails: s.bioworks.trails.filter((t) => t.id.startsWith(b?.id)).length }; });
   log('printing', JSON.stringify(printing));
   if (printing.design !== 'house' || printing.trails !== 2) fail('the House is not printed with the ants carrying for it');
+  if (!printing.design) throw new Error('no print to follow');
   await ev(() => { const s = window.__scene, b = s.buildings.printing[0]; b.printStart = Date.now() - b.printMs * 0.6; s.player.setPosition(b.x - 50, b.y + 26); });
   await page.waitForTimeout(900);
   await shot('seedbed-printing');

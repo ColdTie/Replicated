@@ -1,6 +1,6 @@
 import { PALETTE, SUPPLIES } from '../../core/data';
 import { session } from '../../core/session';
-import { starById } from '../../world/galaxy';
+import { planetFor, starById } from '../../world/galaxy';
 import type { PlanetScene } from '../PlanetScene';
 
 const SIG = SUPPLIES.signature;
@@ -81,8 +81,46 @@ export class Trade {
     if (st && !s.shot) st.patchTraits(me.id, { culture: me.traits.culture }).catch((e) => console.warn('culture save failed', e));
   }
 
+  /**
+   * The Cems first wake for you (Thales' printer is finished): a culture of them goes aboard the ship at once. From
+   * then on they travel with you (story/STORY.md The beginning: they must be brought, and that happens by itself).
+   */
+  takeCulture(animate: boolean) {
+    const s = this.s, me = session.replicant, st = session.store;
+    if (!me || s.visit || me.traits.culture) return;
+    const strain = s.bioworks?.strain;
+    me.traits.culture = { from: `${s.planet.star}:${s.planet.planetIndex}`, at: Date.now(), ...(strain ? { strain } : {}) };
+    if (animate && !s.vesselAway) s.time.delayedCall(1800, () => s.bioworks?.sendCulture(s.vesselPos));
+    s.mindLog.push({ t: s.mindClock, text: `a culture of the Cems went aboard ${me.name}'s ship: they travel with it now` });
+    if (st && !s.shot) st.patchTraits(me.id, { culture: me.traits.culture }).catch((e) => console.warn('culture save failed', e));
+  }
+
+  /**
+   * Launching for a world that lacks a material (planets.json lacks: the homeworld has no copper or quartz): the hold
+   * also takes up to signature.lacksHold of each from this store, for the store there.
+   */
+  loadGoods(to: string, toPlanet: number) {
+    const s = this.s, me = session.replicant, st = session.store;
+    if (!me || s.visit) return;
+    const lacks = planetFor(to, toPlanet)?.lacks ?? [];
+    const items: Record<string, number> = {};
+    for (const m of lacks) {
+      const n = Math.min(SIG.lacksHold, Math.floor(s.supplies[m] ?? 0));
+      if (n < 1) continue;
+      items[m] = n;
+      s.supplies[m] = Math.round(((s.supplies[m] ?? 0) - n) * 100) / 100;
+      s.time.delayedCall(Object.keys(items).length * 250, () => s.flyMaterial(m, s.warren.hatch, s.vesselPos, 0));
+    }
+    if (!Object.keys(items).length) return;
+    s.markSupplies();
+    me.traits.goods = { from: `${s.planet.star}:${s.planet.planetIndex}`, to: `${to}:${toPlanet}`, items };
+    s.mindLog.push({ t: s.mindClock, text: `${me.name} loaded ${Object.entries(items).map(([m, n]) => `${n} ${m}`).join(' and ')} into the ship's hold` });
+    if (st && !s.shot) st.patchTraits(me.id, { goods: me.traits.goods }).catch((e) => console.warn('goods save failed', e));
+  }
+
   /** Landed: the hold is emptied into this world's store, flying from the vessel to the hatch. */
   unload() {
+    this.unloadGoods();
     const s = this.s, me = session.replicant, st = session.store;
     const c = me?.traits.cargo;
     if (!me || !c || s.visit) return;
@@ -93,5 +131,16 @@ export class Trade {
     const from = starById(c.from)?.name ?? c.from;
     s.mindLog.push({ t: s.mindClock, text: `${me.name} brought ${c.n} ${Trade.nameOf(c.material)} from ${from}` });
     if (c.material !== this.own) s.time.delayedCall(2200, () => s.fx.sparks(s.warren.hatch.x, s.warren.hatch.y - 8, PALETTE[(SUPPLIES.materials as Record<string, { color: number }>)[c.material]?.color ?? 19], 12));
+  }
+
+  /** What the hold brought for a world that lacks it: into the store, wherever the ship landed. */
+  private unloadGoods() {
+    const s = this.s, me = session.replicant, st = session.store;
+    const g = me?.traits.goods;
+    if (!me || !g || s.visit) return;
+    me.traits.goods = null;
+    if (st && !s.shot) st.patchTraits(me.id, { goods: null }).catch((e) => console.warn('goods save failed', e));
+    Object.entries(g.items).forEach(([m, n], i) => s.time.delayedCall(1200 + i * 500, () => s.flyMaterial(m, s.vesselPos, s.warren.hatch, n)));
+    s.mindLog.push({ t: s.mindClock, text: `${me.name} brought ${Object.entries(g.items).map(([m, n]) => `${n} ${m}`).join(' and ')} home in the ship's hold` });
   }
 }

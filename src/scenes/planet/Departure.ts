@@ -23,7 +23,8 @@ export class Departure {
   /** Someone has to stay behind: you can launch once this planet has a copy (travel.json needCopy), from the vessel
    * (not from its empty berth while you drive a manny and it waits elsewhere). */
   canLaunch() {
-    return !this.s.visit && !this.s.vesselAway && (!TRAVEL.needCopy || this.s.npcs.length > 0);
+    // (the beginning's trips need nobody left behind: Tutorial.free)
+    return !this.s.visit && !this.s.vesselAway && (!TRAVEL.needCopy || this.s.npcs.length > 0 || this.s.tutorial.active);
   }
 
   /** Mannies on other worlds you could link into from here. */
@@ -63,6 +64,9 @@ export class Departure {
       embers: this.s.embers,
       lit: this.s.litBeacons,
       blocked: !this.canLaunch(),
+      ...(this.s.tutorial.active ? {
+        only: this.s.tutorial.allowedKeys(), free: true, gateWhy: this.s.tutorial.gateWhy, guide: this.s.tutorial.guide,
+      } : {}),
       mannies: mannyWorlds(r).map((w) => w.key),
       inManny: inManny(r),
       vessel: this.s.vesselAway ? r?.traits.ship ?? null : null,
@@ -90,8 +94,10 @@ export class Departure {
   /** Fuel paid, the replicant hops in, the vessel lifts off, then the flight begins. */
   launch(to: string, toPlanet: number) {
     this.s.scene.resume();
+    // a word still open in the talk box (Thales' at the beginning) does not fly along
+    if (this.s.talker.talk) this.s.talker.closeTalk();
     const ly = distanceLy(this.s.planet.star, to);
-    const fuel = fuelFor(ly);
+    const fuel = this.s.tutorial.free(to, toPlanet) ? 0 : fuelFor(ly);
     this.s.launching = true;
     // driving this world's manny: it steps back into its dock and you board in your own body
     const r = session.replicant;
@@ -103,6 +109,7 @@ export class Departure {
     this.s.hands.stow();
     this.s.trade.loadHold();
     this.s.trade.loadCulture();
+    this.s.trade.loadGoods(to, toPlanet);
     this.s.homecoming.remember();
     this.s.embers -= fuel;
     this.s.pending.embers -= fuel;

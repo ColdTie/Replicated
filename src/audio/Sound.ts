@@ -671,6 +671,26 @@ class SoundEngine {
     [0, 7, 12, 16].forEach((s, i) => this.tone(midi(76 + s), 1.6, { type: 'sine', vol: 0.03, delay: 0.8 + i * 0.1, attack: 0.1, rev: 0.9 }));
   }
 
+  /**
+   * Growing (the beginning, story/STORY.md): attack, a soft glassy breath in; body, a warm chord swelling from the
+   * ground up with bells climbing the pentatonic scale over it (one more bell and a step higher at every level);
+   * tail, a shimmer rising away and one high bell left hanging.
+   */
+  grow(level: number) {
+    if (!this.ready('grow', 1500)) return;
+    const root = 55 + PENTA[(level - 1) % 5] + (level > 5 ? 12 : 0);
+    this.noise(0.9, { type: 'bandpass', freq: 900, to: 2600, q: 0.8, vol: 0.025, attack: 0.5, rev: 0.8 });
+    [0, 7, 12, 16].forEach((st, i) => this.tone(midi(root + st), 2.6, { type: i % 2 ? 'triangle' : 'sine', vol: i ? 0.03 : 0.05, attack: 0.45, delay: 0.1 + i * 0.12, rev: 0.85 }));
+    const n = 3 + level;
+    for (let i = 0; i < n; i++) {
+      const st = 12 + PENTA[i % 5] + 12 * Math.floor(i / 5), d = 0.35 + i * 0.13;
+      this.tone(midi(root + st), 0.9, { type: 'sine', vol: 0.028, delay: d, rev: 0.9 });
+      this.tone(midi(root + st) * 2.76, 0.25, { type: 'sine', vol: 0.006, delay: d, rev: 0.9 });
+    }
+    this.noise(1.4, { type: 'highpass', freq: 3000, to: 9000, vol: 0.012, attack: 0.6, delay: 0.5, rev: 0.9 });
+    this.tone(midi(root + 31), 2.2, { type: 'sine', vol: 0.016, attack: 0.05, delay: 0.4 + n * 0.13, rev: 0.95 });
+  }
+
   /** A link: attack, the beam strikes (a high zap); body, its hum sweeping up or down the column; tail, sparkle. */
   link(down: boolean) {
     if (!this.ready('link', 400)) return;

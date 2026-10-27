@@ -28,6 +28,12 @@ export interface StarMapData {
   inManny?: boolean;
   /** where your vessel waits while you drive a manny (link mode) */
   vessel?: { star: string; planet: number; journey?: Journey } | null;
+  /** the beginning (src/scenes/planet/Tutorial.ts): the only worlds a launch may go to ('star:planet'), those trips
+   * free of fuel, why the others wait, and the world the step wants you to fly to (ringed in Thales' gold) */
+  only?: string[];
+  free?: boolean;
+  gateWhy?: string;
+  guide?: { star: string; planet: number } | null;
   onLaunch?: (to: string, planet: number) => void;
   onLink?: (to: string, planet: number) => void;
   onVessel?: () => void;
@@ -238,6 +244,17 @@ export class StarMapScene extends Phaser.Scene {
     this.fillMenu();
     if (st) st.visitedPlanets().then((v) => { this.visited = v; this.fillMenu(); }).catch(() => undefined);
     this.time.delayedCall(1200, () => this.fillMenu()); // who lives where has loaded by then
+    // the beginning wants you somewhere: the map opens picked on it
+    const guide = this.d.guide && starById(this.d.guide.star);
+    if (guide && this.d.mode === 'launch') { this.selected = guide; this.updateInfo(); this.menu?.select(guide.id); }
+  }
+
+  /** Thales' gold ring around the world the beginning wants you to fly to: two arcs turning, breathing. */
+  private drawGuide(g: Phaser.GameObjects.Graphics, x: number, y: number, r: number) {
+    const k = r + 10 + Math.sin(this.t * 3) * 2, a = this.t * 1.6;
+    g.lineStyle(1, PALETTE[11], 0.55 + 0.35 * Math.sin(this.t * 3));
+    for (const o of [0, Math.PI]) { g.beginPath(); g.arc(x, y, k, a + o, a + o + 2.1); g.strokePath(); }
+    g.fillStyle(PALETTE[11], 0.9).fillRect(Math.round(x + Math.cos(a) * k) - 1, Math.round(y + Math.sin(a) * k) - 1, 2, 2);
   }
 
   /** The map makes room for the menu: its center and the info panel move right of it. */
@@ -257,7 +274,7 @@ export class StarMapScene extends Phaser.Scene {
     const details = [
       `STAR ${s.name} - CLASS ${s.cls}`,
       here ? 'YOU ARE HERE' : ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`,
-      ...(here ? [] : [`FUEL ${fuelFor(ly)} EMBER${this.d.mode === 'launch' ? ` (YOU HAVE ${this.d.embers ?? 0})` : ''}`]),
+      ...(here ? [] : [this.d.only ? this.fuelLine(star, planet, fuelFor(ly)) : `FUEL ${fuelFor(ly)} EMBER${this.d.mode === 'launch' ? ` (YOU HAVE ${this.d.embers ?? 0})` : ''}`]),
       `${KIND_WORDS[sp.kind]} - ${def.subtitle} - ${TEMP_WORDS[sp.temp]}`,
       sp.hz ? 'IN THE HABITABLE ZONE' : 'OUTSIDE THE HABITABLE ZONE',
       people.length ? `VESSELS: ${people.join(', ').toUpperCase()}` : 'NO VESSELS',
@@ -265,7 +282,8 @@ export class StarMapScene extends Phaser.Scene {
       material ? `MAKES ${(SIGNATURE.names[material] ?? material).toUpperCase()}` : '',
       sp.real ? 'CONFIRMED BY ASTRONOMERS' : 'UNCHARTED',
     ].filter(Boolean);
-    const mark = here ? 'HERE' : people.length ? `${people.length}` : husk ? 'HUSK' : '';
+    const guide = this.d.guide?.star === star && this.d.guide.planet === planet;
+    const mark = here ? 'HERE' : guide ? 'THALES' : people.length ? `${people.length}` : husk ? 'HUSK' : '';
     return { star, planet, name: sp.moon ?? sp.name, sub: here ? `${s.name} - YOU ARE HERE` : `${s.name} - ${ly.toFixed(1)} LY`, details, mark };
   }
 
@@ -384,8 +402,20 @@ export class StarMapScene extends Phaser.Scene {
     this.menu?.select(best.star.id);
   }
 
-  private canAfford(s: Star) {
+  private canAfford(s: Star, planet = defaultPlanetIndex(s.id)) {
+    if (this.d.free && this.allowed(s.id, planet)) return true;
     return (this.d.embers ?? 0) >= fuelFor(distanceLy(this.d.from, s.id));
+  }
+
+  /** The beginning lets the ship fly only to some worlds (StarMapData only). */
+  private allowed(star: string, planet: number) { return !this.d.only || this.d.only.includes(`${star}:${planet}`); }
+
+  /** What a launch there would take, in words: the fuel, or why it cannot go yet. */
+  private fuelLine(star: string, planet: number, fuel: number) {
+    if (this.d.blocked) return 'A COPY MUST STAY BEHIND FIRST';
+    if (!this.allowed(star, planet)) return this.d.gateWhy ?? 'NOT YET';
+    if (this.d.free) return 'THALES FILLED THE TANKS';
+    return `FUEL ${fuel} OF ${this.d.embers ?? 0}`;
   }
 
   /** Where a launch from the current selection would go. */
@@ -414,7 +444,7 @@ export class StarMapScene extends Phaser.Scene {
         if (s.id !== this.d.from) lines.push(`${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
         const known = planets.some((p) => p.real);
         lines.push(`${planets.length} ${planets.length === 1 ? 'WORLD' : 'WORLDS'}${known ? ' KNOWN TO ASTRONOMERS' : ''}  - TAP FOR PLANETS`);
-        if (this.d.mode === 'launch' && s.id !== this.d.from) lines.push(this.d.blocked ? 'A COPY MUST STAY BEHIND FIRST' : `FUEL ${fuel} OF ${this.d.embers ?? 0}`);
+        if (this.d.mode === 'launch' && s.id !== this.d.from) lines.push(this.fuelLine(s.id, defaultPlanetIndex(s.id), fuel));
         const mp = this.mannyAt(s.id);
         if (mp !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, mp) ? 'YOU DRIVE YOUR HUSK HERE' : `YOUR HUSK WAITS ON ${planetFor(s.id, mp)?.name ?? 'A WORLD'} - LINK`);
         if (this.d.vessel?.star === s.id) lines.push(shipFlying(this.d.vessel) ? 'YOUR SHIP IS ON ITS WAY HERE' : 'YOUR SHIP WAITS HERE');
@@ -429,7 +459,7 @@ export class StarMapScene extends Phaser.Scene {
         lines.push(p.real ? 'CONFIRMED BY ASTRONOMERS' : 'UNCHARTED');
         if (!this.isHere(s.id, p.index)) {
           lines.push(ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
-          if (this.d.mode === 'launch') lines.push(this.d.blocked ? 'A COPY MUST STAY BEHIND FIRST' : `FUEL ${fuel} OF ${this.d.embers ?? 0}`);
+          if (this.d.mode === 'launch') lines.push(this.fuelLine(s.id, p.index, fuel));
         }
         if (this.mannyAt(s.id, p.index) !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, p.index) ? 'YOU DRIVE YOUR HUSK HERE' : 'YOUR HUSK WAITS HERE - LINK');
         if (this.d.vessel?.star === s.id && this.d.vessel.planet === p.index) lines.push(shipFlying(this.d.vessel) ? 'YOUR SHIP IS ON ITS WAY HERE' : 'YOUR SHIP WAITS HERE');
@@ -441,7 +471,7 @@ export class StarMapScene extends Phaser.Scene {
     this.infoText.setText(lines.join('\n'));
     const canGo = !!dest && this.d.mode === 'launch' && !this.isHere(dest.star.id, dest.planet);
     this.launchBtn.setVisible(canGo);
-    this.launchBtn.setAlpha(canGo && !this.d.blocked && this.canAfford(dest!.star) ? 1 : 0.35);
+    this.launchBtn.setAlpha(canGo && !this.d.blocked && this.allowed(dest!.star.id, dest!.planet) && this.canAfford(dest!.star, dest!.planet) ? 1 : 0.35);
     this.linkBtn.setVisible(!!this.linkTarget());
     this.linkBtn.setX(this.d.mode === 'view' ? this.scale.width - 40 : this.scale.width - 100);
     (this.info.list[0] as Phaser.GameObjects.Rectangle).setSize(Math.max(160, this.infoText.width + 14), lines.length * 10 + 8);
@@ -452,7 +482,7 @@ export class StarMapScene extends Phaser.Scene {
     const dest = this.destination();
     if (!dest || this.d.mode !== 'launch') return;
     if (this.isHere(dest.star.id, dest.planet)) { this.openSystem(dest.star); return; }
-    if (this.d.blocked || !this.canAfford(dest.star)) {
+    if (this.d.blocked || !this.allowed(dest.star.id, dest.planet) || !this.canAfford(dest.star, dest.planet)) {
       sound.denied();
       this.tweens.add({ targets: this.launchBtn, x: this.launchBtn.x + 3, duration: 40, yoyo: true, repeat: 3 });
       return;
@@ -572,6 +602,7 @@ export class StarMapScene extends Phaser.Scene {
       this.drawMarks(g, it.x, it.y, r, this.mannyAt(star.id, it.sp.index) !== null,
         !!this.d.vessel && !shipFlying(this.d.vessel) && this.d.vessel.star === star.id && this.d.vessel.planet === it.sp.index);
       if (this.selPlanet === it.sp) this.drawPick(g, it.x, it.y, r, TEMP_COLOR[it.sp.temp]);
+      if (this.d.guide?.star === star.id && this.d.guide.planet === it.sp.index) this.drawGuide(g, it.x, it.y, r);
       it.label.setPosition(Math.round(it.x), Math.round(it.y + r + 4)).setVisible(this.selPlanet === it.sp || it.sp.real || this.sysItems.length <= 4 || front > 0.3);
     }
     if (this.t > this.nextGlobeAt) {
@@ -605,7 +636,7 @@ export class StarMapScene extends Phaser.Scene {
     // Planned route
     if (this.selected && here && this.selected.id !== this.d.from) {
       const to = this.projected.find((p) => p.star.id === this.selected!.id)!;
-      const ok = this.d.mode !== 'launch' || this.canAfford(this.selected);
+      const ok = this.d.mode !== 'launch' || (this.allowed(this.selected.id, defaultPlanetIndex(this.selected.id)) && this.canAfford(this.selected));
       g.lineStyle(1, ok ? PALETTE[9] : PALETTE[22], 0.9);
       const n = Math.max(2, Math.floor(Math.hypot(to.sx - here.sx, to.sy - here.sy) / 4));
       for (let i = 0; i < n; i += 2) {
@@ -681,6 +712,7 @@ export class StarMapScene extends Phaser.Scene {
       if (s.id === this.d.from) g.lineStyle(1, PALETTE[18], 0.9).strokeCircle(p.sx, p.sy, r + 7 + Math.sin(this.t * 4));
       this.drawMarks(g, p.sx, p.sy, r, this.mannyAt(s.id) !== null, !!this.d.vessel && !shipFlying(this.d.vessel) && this.d.vessel.star === s.id);
       if (this.selected?.id === s.id) this.drawPick(g, p.sx, p.sy, r, col);
+      if (this.d.guide?.star === s.id) this.drawGuide(g, p.sx, p.sy, r);
     }
 
     // Labels: home, here, beacons, selected and settled always; named stars as you zoom in; never on top of each other

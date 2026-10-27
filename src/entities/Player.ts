@@ -11,6 +11,9 @@ import { Gear } from './Gear';
 import type { Light } from '../fx/Lighting';
 import type { InputFrame } from '../input/Controls';
 import type { PlanetScene } from '../scenes/PlanetScene';
+import TUT from '../data/tutorial.json';
+
+const GROW = TUT.grow;
 
 const WARM = PALETTE[10];
 const WARM_RGB = Phaser.Display.Color.IntegerToColor(0xffe2b8);
@@ -55,6 +58,11 @@ export class Player {
   private nextDamageFx = 0;
   private hurtFlashUntil = 0;
   private lowHpFlickerUntil = 0;
+  /** how far this Vessel has grown in the beginning (tutorial.json grow): its light, halo and motes widen with it */
+  private grown = 0;
+  private nextMote = 0;
+  /** fully grown: two small lights circling the head */
+  private orbit: Phaser.GameObjects.Image[] = [];
 
   constructor(private scene: PlanetScene, x: number, y: number) {
     this.zone = scene.add.zone(x, y, 8, 5);
@@ -79,6 +87,69 @@ export class Player {
     this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.3).setScale(0.45).setDepth(6100);
     this.pool = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(WARM).setAlpha(0.07).setScale(1.5, 1.0).setDepth(6100);
     this.light = scene.lighting.add({ x, y, radius: 70, color: 0xffe2b8, intensity: 1 });
+    this.setGrowth(traits?.tutorial?.grown ?? 0, false);
+  }
+
+  /**
+   * Grown to `level` (story/STORY.md The beginning): the light around the Vessel reaches further, the halo at its visor
+   * brightens, it sheds motes of its own color more often, and once fully grown two small lights circle its head.
+   * bloom: the moment of growing, a ring of its color, motes spiralling up, a swell of light and a rising chord.
+   */
+  setGrowth(level: number, bloom: boolean) {
+    this.grown = Math.max(0, Math.min(GROW.levels, level));
+    if (this.grown >= GROW.levels && !this.orbit.length) {
+      for (let i = 0; i < 2; i++) this.orbit.push(this.scene.add.image(this.x, this.y, 'px').setBlendMode(Phaser.BlendModes.ADD).setTint(i ? 0xfff4c0 : this.featureColor).setDepth(6101));
+    }
+    if (bloom) this.bloom();
+  }
+
+  private bloom() {
+    const s = this.scene, x = this.x, y = this.y + this.headY, col = this.featureColor;
+    sound.grow(this.grown);
+    squash(s, this.sprite, 0.8, 1.32, 220);
+    // a ring of its color running out over the ground, and a second, fainter one after it
+    for (let k = 0; k < 2; k++) {
+      const ring = s.add.graphics().setDepth(6150).setBlendMode(Phaser.BlendModes.ADD);
+      const t = { r: 4 };
+      s.tweens.add({
+        targets: t, r: GROW.ringPx * (1 - k * 0.3), duration: GROW.ms * (0.7 + k * 0.2), delay: k * 220, ease: 'Cubic.easeOut',
+        onUpdate: (tw) => { ring.clear(); ring.lineStyle(1, col, (1 - tw.progress) * 0.9).strokeEllipse(this.x, this.y + 2, t.r * 2, t.r * 0.9); },
+        onComplete: () => ring.destroy(),
+      });
+    }
+    // motes spiralling up around the body and fading into the dark
+    for (let i = 0; i < GROW.motes; i++) {
+      const m = s.add.image(x, y, 'px').setBlendMode(Phaser.BlendModes.ADD).setTint(i % 3 ? col : 0xfff4c0).setDepth(6160).setAlpha(0);
+      const a0 = (i / GROW.motes) * Math.PI * 2, t = { k: 0 };
+      s.tweens.add({
+        targets: t, k: 1, duration: GROW.ms + (i % 5) * 90, delay: i * 30, ease: 'Sine.easeOut',
+        onUpdate: () => {
+          const a = a0 + t.k * Math.PI * 2.2, r = 6 + t.k * 14;
+          m.setPosition(Math.round(this.x + Math.cos(a) * r), Math.round(this.y + this.headY + 4 - t.k * 30 + Math.sin(a) * r * 0.35)).setAlpha(Math.sin(t.k * Math.PI));
+        },
+        onComplete: () => m.destroy(),
+      });
+    }
+    // a swell of light, and the visor flares
+    const swell = s.lighting.add({ x, y, radius: 40, color: col, intensity: 0 });
+    s.tweens.add({ targets: swell, intensity: 0.9, radius: 150, duration: GROW.ms * 0.4, yoyo: true, ease: 'Sine.easeInOut', onUpdate: () => { swell.x = this.x; swell.y = this.y + this.headY; }, onComplete: () => s.lighting.remove(swell) });
+    const flare = s.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(col).setScale(0.1).setAlpha(0.9).setDepth(6160);
+    s.tweens.add({ targets: flare, scale: 0.9, alpha: 0, duration: GROW.ms * 0.6, ease: 'Cubic.easeOut', onUpdate: () => flare.setPosition(this.x, this.y + this.headY), onComplete: () => flare.destroy() });
+    s.fx.sparks(x, y, col, 10);
+  }
+
+  /** The motes a grown Vessel sheds, and the lights that circle a fully grown one. */
+  private updateGrowth(time: number) {
+    const show = !this.hidden && !this.dead && !this.hologram;
+    this.orbit.forEach((o, i) => {
+      const a = time / 900 + i * Math.PI;
+      o.setVisible(show).setPosition(Math.round(this.x + Math.cos(a) * 9), Math.round(this.y + this.headY + 2 + Math.sin(a) * 3)).setDepth(Math.sin(a) > 0 ? 6101 : 99 + this.y);
+    });
+    if (!this.grown || !show || time < this.nextMote) return;
+    this.nextMote = time + GROW.moteEveryMs[this.grown - 1] * (0.7 + Math.random() * 0.6);
+    const m = this.scene.add.image(this.x + (Math.random() - 0.5) * 8, this.y + this.headY + 6 + Math.random() * 6, 'px')
+      .setBlendMode(Phaser.BlendModes.ADD).setTint(Math.random() < 0.3 ? 0xfff4c0 : this.featureColor).setDepth(6100).setAlpha(0.8);
+    this.scene.tweens.add({ targets: m, y: m.y - 14 - Math.random() * 10, x: m.x + (Math.random() - 0.5) * 6, alpha: 0, duration: 1400 + Math.random() * 600, ease: 'Sine.easeOut', onComplete: () => m.destroy() });
   }
 
   get x() { return this.body.center.x; }
@@ -159,13 +230,13 @@ export class Player {
     // only shrinks a little, and a hurt body sheds sparks and smoke (faster the worse it is) with a red flicker.
     const frac = this.hp / PLAYER.maxHp;
     const hurt = 1 - frac;
-    this.light.radius = (80 + 20 * frac) * PLAYER.lightRadius * this.mod('light') * stat(session.replicant, 'light');
+    this.light.radius = (80 + 20 * frac) * PLAYER.lightRadius * this.mod('light') * stat(session.replicant, 'light') * (1 + GROW.lightPerLevel * this.grown);
     this.light.intensity = 1;
     const col = Phaser.Display.Color.Interpolate.ColorWithColor(WARM_RGB, HURT_RGB, 100, Math.round(hurt * 100));
     const colNum = Phaser.Display.Color.GetColor(col.r, col.g, col.b);
     this.light.color = this.hologram ? 0x9fe8ff : colNum;
     // The halo is the health readout: it dims and tightens as hp drops (and turns red); the pool fades less.
-    this.glow.setTint(colNum).setAlpha(0.3 - 0.16 * hurt).setScale(0.45 - 0.1 * hurt);
+    this.glow.setTint(colNum).setAlpha(0.3 + GROW.haloPerLevel * this.grown - 0.16 * hurt).setScale(0.45 + 0.02 * this.grown - 0.1 * hurt);
     this.pool.setTint(colNum).setAlpha(0.07 - 0.04 * hurt);
     if (hurt > 0 && !this.dead && time > this.nextDamageFx) {
       this.nextDamageFx = time + (frac <= 0.4 ? 180 : 700) / (0.5 + hurt);
@@ -184,6 +255,7 @@ export class Player {
     this.applyTint(time, dashing);
     if (this.hologram) this.sprite.setAlpha(Math.random() < 0.04 ? 0.5 : 0.85);
     this.syncVisuals();
+    this.updateGrowth(time);
   }
 
   /** One place decides the body tint so no effect can leave the sprite in a half state. */

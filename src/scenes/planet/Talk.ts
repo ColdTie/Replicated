@@ -30,8 +30,9 @@ export class Talk {
 
   get talkBox(): TalkBox | undefined { return (this.s.scene.get('ui') as UIScene | null)?.talkBox; }
 
-  /** A scripted word in the talk box (Thales at the opening): his portrait, his voice, one page; then onClose. */
-  openScripted(npc: Npc, text: string, onClose: () => void) {
+  /** A scripted word in the talk box (Thales at the opening and through the beginning): his portrait, his voice, a
+   * page for each line; then onClose. */
+  openScripted(npc: Npc, text: string | string[], onClose: () => void) {
     const box = this.talkBox, ui = this.s.scene.get('ui') as UIScene;
     if (!box) { onClose(); return; }
     this.talkable?.setTalkHint(false);
@@ -167,7 +168,8 @@ export class Talk {
 
   talkPages(): TalkPage[] {
     const t = this.talk!, n = t.npc, me = session.replicant, box = this.talkBox!;
-    if (t.script) return [{ key: 'script', section: '', lines: wrap([{ text: t.script.text, tone: 'body' }], box.tw, box.measure) }];
+    if (t.script) return (typeof t.script.text === 'string' ? [t.script.text] : t.script.text)
+      .map((text, i) => ({ key: `script${i}`, section: '', lines: wrap([{ text, tone: 'body' }], box.tw, box.measure) }));
     const who = (id: string | null) => {
       if (!id) return { name: 'someone' };
       if (me && id === me.id) return { name: me.name };

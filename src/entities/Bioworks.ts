@@ -478,6 +478,12 @@ export class Bioworks {
     return b ? { ...buildingDoor(b), top: b.y - b.h * 12 - roofHeight(b) - 6, dir: 1 } : null;
   }
 
+  /** Where the design menu opens (the Printworks' door, or a seeded bed's design stone), once the Cems are awake. */
+  get menuSpot(): Pt | null { const d = this.awake ? this.door : null; return d ? { x: d.x, y: d.y } : null; }
+
+  /** The middle of the bed this world could have (no bed yet, a culture aboard), or null. */
+  get ghostSpot(): Pt | null { return this.ghost && !this.ghost.seeding ? { ...this.center } : null; }
+
   /** Standing in the Printworks' doorway (in front of it), or before the design stone. */
   playerAtDoor() {
     const d = this.door, p = this.scene.player;

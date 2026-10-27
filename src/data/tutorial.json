@@ -1,0 +1,36 @@
+{
+  "_doc": "The beginning (story/STORY.md The beginning, Steve 2026-10-27; src/scenes/planet/Tutorial.ts). A new player's Vessel goes through steps kept on its row (replicants.traits.tutorial): wake (the opening: Thales' word, the name), printer (Thales' printer, the Printworks, waits for salt, iron, wood and Ember from the homeworld and copper and quartz from target, the Cems' world), designs (the Cems are awake and travel in the ship; print designs of your own), open (the stars are open). Until open the star map launches only to target and home, and those trips cost no fuel and need nobody left behind. Each step grows the Vessel (grow): the light around it, the halo at its visor and the motes it sheds grow with every level, and a growing is a bloom of light, a ring, motes spiralling up and a rising chord. lines: what Thales says (each a page of the talk box): opening at the scan, printer when you first come to him by his work (talkPx), awake when the Cems wake, open when the stars open. wisp: a mote of Thales' light (color, a palette index) that drifts ahead of you toward what the step wants next (the nearest node of a material still missing, the ship, the Printworks' door, a bed's ghost), shown while that is farther than showPx and nearer than maxPx (px). readoutPx: how near the Printworks (or the ship on target) you must be to see what it still waits for. tripNeed: what the readout over the ship on target asks you to gather there (the printer's copper and quartz and a little over for the first designs: a lantern takes quartz, a storehouse copper); the hold takes it all home (supplies.json signature.lacksHold).",
+  "target": { "star": "gliese-12", "planet": 1 },
+  "designs": 3,
+  "tripNeed": { "copper": 8, "quartz": 8 },
+  "talkPx": 56,
+  "readoutPx": 110,
+  "lines": {
+    "opening": ["Wake up. It's time.", "You may name yourself, and grow."],
+    "printer": [
+      "This is my printer. I stopped before it was finished.",
+      "Salt, iron, wood and Ember you will find here. Copper and quartz this world gave to the founding: there is none left.",
+      "Alaina found the Cems on Gliese 12 b. Its salt flats hold copper and quartz. Take the ship: I filled its tanks."
+    ],
+    "awake": [
+      "The Cems are awake. The ants carry their feed and the fungus keeps their bed clean.",
+      "They are in the ship now, and they go where you go. On any world, lay them a bed of salt and they will build.",
+      "Print what a town needs first: a lantern, a house, a storehouse."
+    ],
+    "open": ["Now the stars are yours. Go far, and come home sometimes."]
+  },
+  "wisp": { "color": 11, "showPx": 90, "maxPx": 1400, "lead": 26 },
+  "grow": {
+    "levels": 5,
+    "lightPerLevel": 0.06,
+    "haloPerLevel": 0.035,
+    "moteEveryMs": [2600, 1700, 1100, 800, 600],
+    "ringPx": 70,
+    "motes": 18,
+    "ms": 1600
+  },
+  "gateWhy": {
+    "printer": "THALES SENT YOU TO GLIESE 12 B",
+    "designs": "PRINT YOUR FIRST DESIGNS FIRST"
+  }
+}

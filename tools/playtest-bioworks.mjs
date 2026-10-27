@@ -1,6 +1,6 @@
 // Scripted headless playtest of the Cems (story/STORY.md; src/entities/Bioworks.ts, src/scenes/DesignScene.ts,
-// src/data/designs.json): a new player on LHS 1140 b finds the Cem bed asleep beside the Printworks, gathers salt,
-// quartz and copper into the store, finishes the Printworks and the Cems wake; standing in its door opens the designs;
+// src/data/designs.json): a new player on LHS 1140 b finds the Cem bed asleep beside the Printworks, gathers salt
+// into the store (no quartz or copper at home), supplies and finishes the Printworks and the Cems wake; standing in its door opens the designs;
 // a House is printed (paid at once, the ants carry its supplies, it rises with the clock, its lights come on), which
 // opens the Cem Nursery and lifts every mood; a Storehouse raises the store; the prints survive a reload, and one whose
 // time ran out while nobody played stands finished.
@@ -29,9 +29,8 @@ try {
   // the opening, quickly: Thales' word, the name
   await page.waitForFunction(() => !!window.__scene.talker.talk?.script, null, { timeout: 15000 });
   await page.waitForTimeout(1500);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(250);
-  if (await ev(() => !!window.__scene.talker.talk)) await page.keyboard.press('Enter');
+  // (Thales' opening is two pages: Enter until the box closes)
+  for (let i = 0; i < 10 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
   await page.waitForSelector('.ov input', { timeout: 8000 });
   await page.type('.ov input', 'Tenth');
   await page.click('.ov button');
@@ -50,8 +49,10 @@ try {
   if (bed.blooms < 3) fail('no salt blooms on the bed\'s rim');
   if (bed.surface !== 'salt') fail(`footsteps on the flat are not salt (${bed.surface})`);
 
-  // 2. salt, quartz and copper: break one of each beside the player; the pickups fly in and fill the store
-  for (const kind of ['salt', 'quartz', 'copper']) {
+  // 2. salt: break a bloom beside the player; the pickups fly in and fill the store. The homeworld has no quartz or
+  // copper (planets.json lacks; they come from Gliese 12 b, tools/playtest-tutorial.mjs)
+  if (await ev(() => window.__scene.nodes.some((n) => n.kind === 'quartz' || n.kind === 'copper'))) fail('the homeworld has quartz or copper');
+  for (const kind of ['salt']) {
     const got = await ev(async (kind) => {
       const s = window.__scene, c = s.baseCenter;
       const n = s.nodes.filter((x) => x.kind === kind && x.alive).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
@@ -74,9 +75,16 @@ try {
     const s = window.__scene, bl = s.buildings.list.find((x) => x.id === goal);
     const aim = { x: 1, y: 0, lengthSq: () => 1 };
     s.player.setPosition(bl.x - bl.w * 8 - 6, bl.y);
+    // Thales' printer waits for its supplies (homeworld.json founded cost): give them, wait until it takes them
+    for (const [k, n] of Object.entries(bl.cost)) { if (k === 'ember') s.addEmbers(n); else s.supplies[k] = (s.supplies[k] ?? 0) + n; }
+    s.markSupplies();
+    for (let i = 0; i < 60 && !bl.paid; i++) await new Promise((r) => setTimeout(r, 100));
     for (let i = 0; i < 80 && !bl.built; i++) { s.resolveAttack(bl.x - bl.w * 8 + 4, bl.y - 4, 14, aim); await new Promise((r) => setTimeout(r, 40)); }
   }, HW.goal);
   await page.waitForFunction(() => window.__scene.bioworks.awake, null, { timeout: 8000 }).catch(() => fail('the Cems did not wake when the Printworks was finished'));
+  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out
+  await page.waitForFunction(() => !!window.__scene.talker.talk?.script, null, { timeout: 9000 }).catch(() => fail('Thales did not speak when the Cems woke'));
+  for (let i = 0; i < 16 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
   await page.waitForTimeout(1500);
   const awake = await ev(() => { const bw = window.__scene.bioworks; return { trails: bw.trails.map((t) => t.id), ants: bw.trails.reduce((a, t) => a + t.ants.length, 0) + bw.loiter.length }; });
   log('awake', JSON.stringify(awake));

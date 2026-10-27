@@ -33,9 +33,8 @@ try {
   // the opening, quickly: Thales' word, the name
   await page.waitForFunction(() => !!window.__scene.talker.talk?.script, null, { timeout: 15000 });
   await page.waitForTimeout(1500);
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(250);
-  if (await ev(() => !!window.__scene.talker.talk)) await page.keyboard.press('Enter');
+  // (Thales' opening is two pages: Enter until the box closes)
+  for (let i = 0; i < 10 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
   await page.waitForSelector('.ov input', { timeout: 8000 });
   await page.type('.ov input', 'Grower');
   await page.click('.ov button');

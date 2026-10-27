@@ -557,6 +557,18 @@ export class Buildings {
     return true;
   }
 
+  /** A layer laid by the building's own printer (Thales' printer, once fed: homeworld.json printer), as a blow without hands. */
+  lay(id: string) {
+    const b = this.list.find((x) => x.id === id);
+    if (!b || b.vetoed || b.built || !b.paid || this.printed(b)) return false;
+    b.progress = Math.min(this.swingsFor(b), b.progress + 1);
+    const p = this.placed.get(b.id);
+    if (p) this.refresh(p, false);
+    if (b.progress >= this.swingsFor(b)) this.complete(b);
+    else if (Math.random() < 0.15) this.save();
+    return true;
+  }
+
   private complete(b: Building, npc?: Npc) {
     b.built = true;
     const p = this.placed.get(b.id);

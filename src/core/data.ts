@@ -56,6 +56,8 @@ export interface PlanetDef {
   shy?: boolean;
   /** Fields of wild Cems on the salt (planets.json; the Cems' world, src/entities/WildCems.ts) */
   wildCems?: { fields: number; perField: [number, number]; blooms: number };
+  /** materials this world has no nodes of (planets.json; the homeworld gave its copper and quartz to the founding) */
+  lacks?: string[];
 }
 
 export type SkitterDef = (typeof enemiesJson)['skitter'];
