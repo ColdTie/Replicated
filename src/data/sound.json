@@ -21,10 +21,11 @@
     "panPx": 220,
     "reverb": { "open": { "seconds": 1.8, "send": 0.25 }, "cave": { "seconds": 3.8, "send": 0.6 }, "vault": { "seconds": 1.2, "send": 0.32 } }
   },
-  "footsteps": { "homeworld": "snow", "frost": "snow", "dune": "sand", "ember": "stone", "moon": "stone", "solace": "stone", "default": "grass" },
+  "footsteps": { "homeworld": "snow", "cemworld": "salt", "frost": "snow", "dune": "sand", "ember": "stone", "moon": "stone", "solace": "stone", "default": "grass" },
   "iceNearWater": ["homeworld", "frost"],
   "beds": {
     "homeworld": { "wind": { "freq": 520, "q": 0.7, "vol": 0.05, "lfo": 0.07 }, "drone": { "freq": 41, "vol": 0.03 }, "event": "creak", "every": 7 },
+    "cemworld": { "wind": { "freq": 640, "q": 0.5, "vol": 0.04, "lfo": 0.06 }, "drone": { "freq": 38, "vol": 0.022 }, "event": "crust", "every": 4 },
     "earth": { "wind": { "freq": 900, "q": 0.6, "vol": 0.03, "lfo": 0.11 }, "event": "leaves", "every": 5 },
     "verdant": { "wind": { "freq": 900, "q": 0.6, "vol": 0.03, "lfo": 0.11 }, "event": "leaves", "every": 5 },
     "frost": { "wind": { "freq": 1300, "q": 1.1, "vol": 0.06, "lfo": 0.05 }, "event": "creak", "every": 6 },

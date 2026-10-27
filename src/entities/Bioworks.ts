@@ -49,7 +49,7 @@ function curve(a: Pt, b: Pt, bow: number) {
 }
 
 /** The salt flat: a ragged pale oval of salt crust broken into polygons, a little damp at its rim. Pure pixels. */
-function paintFlat(rx: number, ry: number, seed: number) {
+export function paintFlat(rx: number, ry: number, seed: number) {
   const W = rx * 2 + 8, H = ry * 2 + 8, data = new Uint8ClampedArray(W * H * 4);
   let s = seed >>> 0 || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };

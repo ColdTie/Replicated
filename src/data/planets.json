@@ -1,5 +1,5 @@
 {
-  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures. The first planet is the default start. intro: 'scan' (the homeworld's opening: Thales finishes copying himself and wakes you, src/data/homeworld.json), 'wake' (a cradle opens; no world uses it since the Metanoia story, 2026-10-26) or 'land' (the ship descends). ground = [dark, base, speckle] floor colors (default [25, 24, 23]). dayCycle: lighting follows the device clock (src/data/daycycle.json). weather: real-hour rain. ponds: number of ponds. flowers: chance per open tile. wildlife: peaceful creatures (grazers can be petted). poles: polar caps seen from orbit (size 0..1 from equator to pole, [edge, core] palette colors); leave out for none. shy: the world's creatures never attack; they flee from you (Earth is peaceful: humanity is gone, nature took the ruins back). On every world creatures leave you alone in the town (enemies.json townSafe). gravity: surface gravity in Earth g (heavier worlds shorten the dash, make dust fall faster and landings heavier). sunTint: multiplies the day cycle's light and sky (a red dwarf's dim red day).",
+  "_doc": "Colors are Endesga 32 palette indexes. accent = [dark, mid, light] tints tiles, sky and creatures. The first planet is the default start. intro: 'scan' (the homeworld's opening: Thales finishes copying himself and wakes you, src/data/homeworld.json), 'wake' (a cradle opens; no world uses it since the Metanoia story, 2026-10-26) or 'land' (the ship descends). ground = [dark, base, speckle] floor colors (default [25, 24, 23]). dayCycle: lighting follows the device clock (src/data/daycycle.json). weather: real-hour rain. ponds: number of ponds. flowers: chance per open tile. wildlife: peaceful creatures (grazers can be petted). poles: polar caps seen from orbit (size 0..1 from equator to pole, [edge, core] palette colors); leave out for none. shy: the world's creatures never attack; they flee from you (Earth is peaceful: humanity is gone, nature took the ruins back). On every world creatures leave you alone in the town (enemies.json townSafe). gravity: surface gravity in Earth g (heavier worlds shorten the dash, make dust fall faster and landings heavier). sunTint: multiplies the day cycle's light and sky (a red dwarf's dim red day). wildCems: fields of wild Cems lying in the salt (the Cems' world, Gliese 12 b; src/entities/WildCems.ts): how many fields, Cems per field [min, max], and salt blooms around each (saved as nodes wild0, wild1, ...).",
   "planets": [
     {
       "id": "homeworld",
@@ -117,6 +117,72 @@
         "grazers": 8,
         "birds": 14,
         "butterflies": 10
+      }
+    },
+    {
+      "id": "cemworld",
+      "shy": true,
+      "poles": {
+        "size": 0.12,
+        "colors": [
+          2,
+          19
+        ]
+      },
+      "name": "GLIESE 12 B",
+      "subtitle": "WHERE ALAINA FOUND THE CEMS",
+      "star": "gliese-12",
+      "planetIndex": 1,
+      "seed": 1212,
+      "accent": [
+        27,
+        28,
+        29
+      ],
+      "ambient": "8c6e78",
+      "sky": [
+        "181425",
+        "3e2731",
+        "68386c",
+        "be4a2f"
+      ],
+      "size": [
+        146,
+        110
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.8,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.035,
+      "sporeRate": 0.6,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        25,
+        27,
+        31
+      ],
+      "dayCycle": true,
+      "sunTint": "ffae96",
+      "gravity": 1,
+      "weather": false,
+      "ponds": 7,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 0
+      },
+      "wildCems": {
+        "fields": 11,
+        "perField": [
+          5,
+          9
+        ],
+        "blooms": 3
       }
     },
     {

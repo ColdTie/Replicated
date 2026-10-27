@@ -233,6 +233,11 @@ class SoundEngine {
     else if (kind === 'ember') this.noise(0.04, { ...o, type: 'highpass', freq: vary(5000, 0.2), vol: 0.03 });
     else if (kind === 'drip') this.tone(vary(1600, 0.25), 0.18, { ...o, type: 'sine', to: vary(1100, 0.2), vol: 0.03, rev: 0.9 });
     else if (kind === 'tick') this.noise(0.03, { ...o, freq: 2400, q: 6, vol: 0.02, rev: 0.4 });
+    else if (kind === 'crust') {
+      // salt crust ticking as it dries in the sun: a few tiny crackles, now and then a far breath of wild Cems
+      for (let i = 0, n = 2 + Math.floor(Math.random() * 4); i < n; i++) this.noise(0.012, { ...o, type: 'highpass', freq: vary(6000, 0.25), vol: vary(0.018, 0.4), delay: i * vary(0.07, 0.6) });
+      if (Math.random() < 0.3) this.noise(1.6, { ...o, freq: 500, to: 900, q: 1.1, vol: 0.01, attack: 0.7, rev: 0.8 });
+    }
   }
 
   private impulse(seconds: number) {
