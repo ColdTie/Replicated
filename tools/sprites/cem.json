@@ -1,0 +1,39 @@
+{
+ "_doc": "A Cem (story/STORY.md): an algae-like mat lying flat on the salt, green with gold veins, drinking the light. It breathes slowly. Frames: breathing out to in.",
+ "size": [16, 8],
+ "tinted": false,
+ "legend": {".": null, "a": 14, "b": 12, "c": 11, "d": 13, "e": 10},
+ "animations": {"breathe": {"fps": 2, "frames": [0, 1, 2, 1], "repeat": -1}},
+ "frames": [
+  [
+   "................",
+   "...aaaaaaaaaa...",
+   "..abbbcbbbbcba..",
+   ".acdcbdddcdddca.",
+   "adddbeedbdddedda",
+   ".adbdddbeddbdda.",
+   "..aaadbdddeaaa..",
+   ".....aaaaaa....."
+  ],
+  [
+   "......aaaa......",
+   "..aaaabbbcaaaa..",
+   ".acbbbcbbbbcbca.",
+   "abcdcbdddcdddcda",
+   "adddbeedbdddedda",
+   ".adbdddbeddbdda.",
+   "..aaedbdddeeaa..",
+   "....aaaaaaaa...."
+  ],
+  [
+   "....aaaaaaaa....",
+   "..aabbbbbccbaa..",
+   ".acbbbcbbbbcbca.",
+   "abcdcbdddcdddcda",
+   "bdddbeedbdddedde",
+   "aedbdddbeddbddda",
+   ".aadedbdddeedaa.",
+   "...aaaaaaaaaa..."
+  ]
+ ]
+}

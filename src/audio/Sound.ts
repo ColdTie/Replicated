@@ -6,7 +6,7 @@ import TALK from '../data/talk.json';
 type Wave = OscillatorType;
 type Bus = 'sfx' | 'ui' | 'voice' | 'ambience';
 /** what the ground sounds like underfoot (sound.json footsteps; PlanetScene.footSurface) */
-export type Surface = 'grass' | 'stone' | 'water' | 'void' | 'snow' | 'ice' | 'metal' | 'printed' | 'sand';
+export type Surface = 'grass' | 'stone' | 'water' | 'void' | 'snow' | 'ice' | 'metal' | 'printed' | 'sand' | 'salt';
 /** a point in the world (px): sounds there fade with distance from you and pan to its side */
 export type At = { x: number; y: number };
 /** never twice the same: a value nudged by up to +-amount of itself */
@@ -338,6 +338,11 @@ class SoundEngine {
         this.noise(0.04, { ...o, freq: vary(1500, 0.1), q: 3, vol: v(0.05) });
         return;
       case 'sand': this.noise(vary(0.1, 0.2), { ...o, type: 'lowpass', freq: vary(1100, 0.2), vol: v(0.06), attack: 0.02 }); return;
+      case 'salt':
+        // a dry crisp crunch on the crust, and a few grains skittering away
+        this.noise(0.04, { ...o, type: 'bandpass', freq: vary(2600, 0.2), q: 1.4, vol: v(0.07) });
+        for (let i = 0; i < 3; i++) this.noise(0.005, { ...o, type: 'highpass', freq: vary(6500, 0.2), vol: v(0.03), delay: 0.02 + Math.random() * 0.06 });
+        return;
       default: this.noise(vary(0.07, 0.2), { ...o, freq: vary(pick([650, 750, 850]), 0.1), q: 1.5, vol: v(0.09) });
     }
   }
@@ -365,6 +370,67 @@ class SoundEngine {
     this.tone(midi(n), 0.9, { type: 'sine', vol: vary(0.07, 0.15) * k, rev: 0.6, pan });
     this.tone(midi(n) * 2.76, 0.4, { type: 'sine', vol: 0.025 * k, rev: 0.6, pan });
     this.noise(0.03, { type: 'highpass', freq: vary(5000, 0.1), vol: 0.07 * k, pan });
+  }
+
+  /**
+   * A swing lands on a resource node, each kind its own voice: an Ember crystal rings; iron clinks like an anvil;
+   * hydrogen hisses and bloops; salt crunches with a rattle of grains and a tiny tinkle; quartz sings like a glass
+   * harmonica, two close tones beating as they fade; copper hums like a struck singing bowl, wobbling slowly.
+   */
+  mineral(kind: string, at?: At) {
+    if (kind === 'ember') { this.crystal(at); return; }
+    if (!this.ready(`mineral.${kind}`, 30)) return;
+    const { k, pan } = this.spatial(at);
+    if (k < 0.02) return;
+    const o = { pan };
+    switch (kind) {
+      case 'iron': {
+        const f = vary(pick([880, 990, 1110]), 0.04);
+        [1, 2.76, 5.4].forEach((r, i) => this.tone(f * r, 0.28 - i * 0.07, { ...o, type: 'sine', vol: (0.07 - i * 0.02) * k, rev: 0.3 }));
+        this.noise(0.03, { ...o, type: 'highpass', freq: 4500, vol: 0.09 * k });
+        return;
+      }
+      case 'hydrogen':
+        this.noise(vary(0.18, 0.2), { ...o, type: 'highpass', freq: vary(3500, 0.2), to: 6000, vol: 0.05 * k, attack: 0.02 });
+        this.tone(vary(240, 0.15), 0.12, { ...o, type: 'sine', to: vary(720, 0.1), vol: 0.09 * k, delay: 0.04 });
+        return;
+      case 'salt':
+        this.noise(0.05, { ...o, type: 'lowpass', freq: vary(1800, 0.2), to: 600, vol: 0.12 * k });
+        for (let i = 0; i < 9; i++) this.noise(0.006, { ...o, type: 'highpass', freq: vary(6000, 0.25), vol: vary(0.05, 0.4) * k, delay: 0.02 + Math.random() * 0.16 });
+        this.tone(vary(pick([3520, 3950, 4430]), 0.03), 0.09, { ...o, type: 'sine', vol: 0.018 * k, delay: 0.03, rev: 0.4 });
+        return;
+      case 'quartz': {
+        const f = midi(84 + PENTA[Math.floor(Math.random() * 5)] + 12 * Math.floor(Math.random() * 2));
+        this.tone(f, 1.7, { ...o, type: 'sine', vol: 0.05 * k, attack: 0.012, rev: 0.85 });
+        this.tone(f * 1.0045, 1.7, { ...o, type: 'sine', vol: 0.04 * k, attack: 0.02, rev: 0.85 });
+        this.tone(f * 2.41, 0.5, { ...o, type: 'sine', vol: 0.012 * k, rev: 0.9 });
+        this.noise(0.012, { ...o, type: 'highpass', freq: 7000, vol: 0.05 * k });
+        return;
+      }
+      case 'copper': {
+        const f = vary(pick([262, 294, 330]), 0.03);
+        this.tone(f, 1.5, { ...o, type: 'sine', vol: 0.09 * k, attack: 0.006, rev: 0.6 });
+        this.tone(f * 1.006, 1.5, { ...o, type: 'sine', vol: 0.06 * k, attack: 0.01, rev: 0.6 });
+        this.tone(f * 2.71, 0.8, { ...o, type: 'sine', vol: 0.025 * k, rev: 0.7 });
+        this.tone(f * 5.15, 0.3, { ...o, type: 'sine', vol: 0.01 * k, rev: 0.7 });
+        this.noise(0.08, { ...o, type: 'lowpass', freq: 700, to: 200, vol: 0.12 * k });
+        return;
+      }
+      default: this.crystal(at);
+    }
+  }
+
+  /** A material reaches you, under the pickup chime: a tink (iron), a bubble (hydrogen), a sprinkle (salt), a glass
+   * ping (quartz), a small warm bong (copper). */
+  pickup(kind: string) {
+    if (!this.ready(`pickup.${kind}`, 45)) return;
+    switch (kind) {
+      case 'iron': this.tone(vary(2200, 0.05), 0.12, { type: 'sine', vol: 0.03, delay: 0.02, rev: 0.3 }); this.tone(vary(2200 * 2.76, 0.05), 0.06, { type: 'sine', vol: 0.012, delay: 0.02 }); return;
+      case 'hydrogen': this.tone(vary(420, 0.1), 0.09, { type: 'sine', to: vary(1100, 0.1), vol: 0.05, delay: 0.02 }); return;
+      case 'salt': [0, 1, 2].forEach((i) => this.noise(0.008, { type: 'highpass', freq: 5000 + i * 900, vol: 0.05, delay: 0.015 + i * 0.035 })); return;
+      case 'quartz': { const f = midi(96 + PENTA[Math.floor(Math.random() * 5)]); this.tone(f, 0.6, { type: 'sine', vol: 0.03, delay: 0.02, rev: 0.85 }); this.tone(f * 1.005, 0.6, { type: 'sine', vol: 0.02, delay: 0.03, rev: 0.85 }); return; }
+      case 'copper': { const f = vary(523, 0.03); this.tone(f, 0.45, { type: 'sine', vol: 0.04, delay: 0.02, rev: 0.5 }); this.tone(f * 2.71, 0.2, { type: 'sine', vol: 0.012, delay: 0.02 }); return; }
+    }
   }
 
   collect() {
@@ -668,6 +734,71 @@ class SoundEngine {
     [0, 4, 7, 12].forEach((s, i) => this.tone(midi(64 + s), 0.6, { type: 'triangle', vol: 0.06, delay: i * 0.07, rev: 0.6 }));
     this.noise(0.4, { type: 'lowpass', freq: 400, to: 120, vol: 0.12, delay: 0.32 });
     this.tone(110, 1.4, { type: 'sine', vol: 0.05, delay: 0.3, attack: 0.05, rev: 0.4 });
+  }
+
+  // --- the Cem bed (src/entities/Bioworks.ts): soft, organic and woody, never mechanical
+
+  /** The Cems breathe on their salt: a slow airy swell, a low warm undertone. */
+  cemBreath(at?: At) {
+    if (!this.ready('cemBreath', 2500)) return;
+    const { k, pan } = this.spatial(at);
+    if (k < 0.03) return;
+    this.noise(2.2, { pan, freq: vary(500, 0.15), to: vary(900, 0.15), q: 1.3, vol: 0.028 * k, attack: 0.9, rev: 0.6, bus: 'ambience' });
+    this.tone(vary(110, 0.05), 2, { pan, type: 'sine', vol: 0.02 * k, attack: 0.8, bus: 'ambience' });
+  }
+  /** The fungus' light runs over the bed: a soft puff of spores, a low bloop, a breath of shimmer. */
+  fungusClean(at?: At) {
+    if (!this.ready('fungusClean', 2000)) return;
+    const { k, pan } = this.spatial(at);
+    if (k < 0.03) return;
+    this.noise(0.3, { pan, type: 'lowpass', freq: 900, to: 300, vol: 0.06 * k, attack: 0.04 });
+    this.tone(vary(190, 0.08), 0.35, { pan, type: 'sine', to: 120, vol: 0.05 * k, delay: 0.05 });
+    [0, 4, 7].forEach((st, i) => this.tone(midi(88 + st), 0.9, { pan, type: 'sine', vol: 0.012 * k, delay: 0.3 + i * 0.12, rev: 0.9 }));
+  }
+  /** Ants on the march nearby: a tiny dry patter. */
+  antPatter() {
+    if (!this.ready('antPatter', 500)) return;
+    for (let i = 0; i < 6; i++) this.noise(0.004, { type: 'highpass', freq: vary(7000, 0.2), vol: vary(0.012, 0.4), delay: Math.random() * 0.35, pan: (Math.random() - 0.5) * 0.6, bus: 'ambience' });
+  }
+  /** The bed wakes when the Printworks stands: a warm chord swelling like a breath in, a shimmer of light drunk. */
+  cemsWake(at?: At) {
+    if (!this.ready('cemsWake', 3000)) return;
+    const { k, pan } = this.spatial(at);
+    this.noise(2.4, { pan, freq: 400, to: 1600, q: 1, vol: 0.05 * Math.max(0.4, k), attack: 1.2, rev: 0.7 });
+    [0, 7, 12, 16, 19].forEach((st, i) => this.tone(midi(55 + st), 2.6, { pan, type: i % 2 ? 'sine' : 'triangle', vol: 0.05, attack: 0.5, delay: 0.2 + i * 0.18, rev: 0.85 }));
+    [24, 28, 31].forEach((st, i) => this.tone(midi(55 + st), 1.2, { pan, type: 'sine', vol: 0.02, delay: 1.4 + i * 0.15, rev: 0.95 }));
+  }
+  /** A row of Cems settles into a print and hardens: a soft wet tick, then a short woody creak as the lignin sets. */
+  cemLayer(at?: At) {
+    if (!this.ready('cemLayer', 120)) return;
+    const { k, pan } = this.spatial(at);
+    if (k < 0.03) return;
+    this.noise(0.03, { pan, freq: vary(1300, 0.2), q: 3, vol: 0.05 * k });
+    this.tone(vary(pick([170, 190, 215]), 0.06), 0.22, { pan, type: 'triangle', to: vary(140, 0.05), vol: 0.022 * k, delay: 0.06, attack: 0.03 });
+    this.tone(vary(pick([660, 740, 880]), 0.02), 0.25, { pan, type: 'sine', vol: 0.012 * k, delay: 0.08, rev: 0.6 });
+  }
+  /** A design is finished: struck lignin like a marimba run, a warm chord under it, the bed's breath. */
+  cemDone(at?: At) {
+    if (!this.ready('cemDone', 1500)) return;
+    const { k, pan } = this.spatial(at);
+    const kk = Math.max(0.35, k);
+    [0, 2, 4, 7, 9, 12].forEach((st, i) => this.marimba(midi(67 + st), i * 0.09, 0.07 * kk, pan));
+    [0, 4, 7, 12].forEach((st, i) => this.tone(midi(55 + st), 2.2, { pan, type: 'sine', vol: 0.045 * kk, attack: 0.3, delay: 0.55 + i * 0.05, rev: 0.8 }));
+    this.noise(1.6, { pan, freq: 600, to: 1200, q: 1.2, vol: 0.025 * kk, attack: 0.6, delay: 0.5, rev: 0.7 });
+  }
+  /** A struck bar of lignin: a quick sine with its fourth-octave partial, woody and round. */
+  private marimba(freq: number, delay: number, vol: number, pan = 0, bus: Bus = 'sfx') {
+    this.tone(freq, 0.5, { pan, type: 'sine', vol, delay, rev: 0.45, bus });
+    this.tone(freq * 4, 0.08, { pan, type: 'sine', vol: vol * 0.35, delay, bus });
+    this.tone(freq * 10, 0.03, { pan, type: 'triangle', vol: vol * 0.08, delay, bus });
+  }
+  /** The design menu: it opens with a little rising marimba figure; each row its own bar; a design chosen; a print begun. */
+  designOpen() { if (this.ready('designOpen', 300)) [0, 4, 7].forEach((st, i) => this.marimba(midi(72 + st), i * 0.07, 0.05, 0, 'ui')); }
+  designMove(i: number) { if (this.ready('designMove', 40)) this.marimba(midi(72 + PENTA[i % 5] + 12 * Math.floor(i / 5)), 0, 0.045, 0, 'ui'); }
+  designPrint() {
+    if (!this.ready('designPrint', 600)) return;
+    [0, 2, 4, 7, 9, 12, 16].forEach((st, i) => this.marimba(midi(67 + st), i * 0.06, 0.05, 0, 'ui'));
+    this.noise(1.2, { freq: 300, to: 2400, q: 1.5, vol: 0.03, attack: 0.5, delay: 0.2, rev: 0.7, bus: 'ui' });
   }
 
   /** Not enough Embers: a low double buzz. */

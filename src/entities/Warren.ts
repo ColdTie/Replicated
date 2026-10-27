@@ -98,11 +98,11 @@ export class Warren {
 
   // ------------------------------------------------------------ supplies
 
-  /** Storage per material: the base plus every shelf in a dug room. */
+  /** Storage per material: the base plus every shelf in a dug room and every Storehouse the Cems built. */
   get cap() {
     const dug = new Set(['entrance', ...this.data.rooms.filter((r) => r.dug).map((r) => r.id)]);
     const shelves = this.data.items.filter((i) => i.kind === 'shelf' && dug.has(i.room)).length;
-    return SUPPLIES.baseCap + shelves * SUPPLIES.shelfCap;
+    return SUPPLIES.baseCap + shelves * SUPPLIES.shelfCap + (this.scene.buildings?.storeBonus ?? 0);
   }
 
   /** Adds to the planet's supplies (Ember to the pool); returns what fit. */

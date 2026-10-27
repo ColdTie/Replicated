@@ -36,7 +36,7 @@ export class Homecoming {
   snapshot(): SeenState {
     const s = this.s;
     const buildings: Record<string, number> = {};
-    for (const b of s.buildings.list) if (!b.vetoed) buildings[b.id] = b.built ? 1 : Math.min(1, b.progress / s.buildings.swingsFor(b));
+    for (const b of s.buildings.list) if (!b.vetoed) buildings[b.id] = s.buildings.fraction(b);
     const copies: Record<string, string> = {};
     for (const n of s.npcs) if (!n.data.id.startsWith('pending')) copies[n.data.id] = `${n.data.name}|${n.data.traits.body ? 'b' : ''}`;
     return {
@@ -58,7 +58,7 @@ export class Homecoming {
     }
     for (const b of s.buildings.list) {
       if (b.vetoed) continue;
-      const now = b.built ? 1 : b.progress / s.buildings.swingsFor(b), was = old.buildings[b.id] ?? 0;
+      const now = s.buildings.fraction(b), was = old.buildings[b.id] ?? 0;
       if ((now >= 1 && was < 1) || now - was >= RETURN.buildingStep) out.push({ x: b.x, y: b.y - b.h * 8, by: s.npcs.find((n) => n.data.id === b.by) });
     }
     const seen = new Set(old.builds);

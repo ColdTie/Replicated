@@ -1,0 +1,205 @@
+// The design menu (story/STORY.md: you pick a design and the Cems build it on command; src/data/designs.json). Opens
+// over the paused planet from the Printworks' door (src/entities/Bioworks.ts). Left: every design, what it is, and
+// whether it can be printed now (READY), wants more of something (NEED), waits for another building (LOCKED), or how
+// many stand here. Right: the chosen design turning in 3D (drag it to turn it yourself), its complexity, volume and
+// print time, what it gives, and its price, each material with what the store holds. Up / Down (W / S, the stick)
+// choose, attack / E / Enter prints, Esc closes; a click on a row chooses it and a click on PRINT prints.
+import Phaser from 'phaser';
+import { sound } from '../audio/Sound';
+import { PALETTE } from '../core/data';
+import { CAT, DESIGNS, designModel, paintTexture, turntableView } from '../core/designs';
+import { Controls } from '../input/Controls';
+import { turntableSize, type Model } from '../world/voxel';
+import type { PlanetScene } from './PlanetScene';
+
+const ICON: Record<string, number> = { salt: 8, iron: 13, quartz: 15, copper: 16, wood: 2, ember: 6, hydrogen: 14 };
+const LIST_X = 14, LIST_Y = 38, ROW_H = 24, INFO_X = 200, INFO_W = 270, PREV_Y = 14, PREV_H = 124;
+const TIERS = CAT.costing.tiers.map((t) => t.name);
+
+type Row = { id: string; m: Model; why: string | null; built: number };
+
+/** "55 SEC", "1 MIN 46 SEC" */
+export function printTime(ms: number) {
+  const s = Math.max(1, Math.round(ms / 1000)), m = Math.floor(s / 60);
+  return m ? `${m} MIN${s % 60 ? ` ${s % 60} SEC` : ''}` : `${s} SEC`;
+}
+
+export class DesignScene extends Phaser.Scene {
+  host!: PlanetScene;
+  private controls!: Controls;
+  private rows: Row[] = [];
+  private index = 0;
+  private list!: Phaser.GameObjects.Container;
+  private info!: Phaser.GameObjects.Container;
+  private preview!: Phaser.GameObjects.Image;
+  private yaw = 0.6;
+  private spin = 0;
+  private drag: { x: number; yaw: number } | null = null;
+  private frame = 0;
+  private busy = false;
+  private stickHeld = false;
+  private why?: Phaser.GameObjects.BitmapText;
+
+  constructor() { super('designs'); }
+
+  init(d: { host: PlanetScene }) {
+    this.host = d.host;
+    this.rows = []; this.index = 0; this.busy = false; this.stickHeld = false; this.drag = null; this.yaw = 0.6; this.spin = 0;
+  }
+
+  create() {
+    const { width: w, height: h } = this.scale;
+    // the world stays behind, dimmed
+    this.add.rectangle(0, 0, w, h, PALETTE[25], 0.8).setOrigin(0);
+    const g = this.add.graphics();
+    g.fillStyle(PALETTE[24], 0.92).fillRect(8, 8, 184, h - 16).lineStyle(1, PALETTE[23], 1).strokeRect(8.5, 8.5, 184, h - 17);
+    g.fillStyle(PALETTE[24], 0.92).fillRect(INFO_X - 4, 8, INFO_W + 6, h - 16).lineStyle(1, PALETTE[23], 1).strokeRect(INFO_X - 3.5, 8.5, INFO_W + 6, h - 17);
+    // the platform the design turns on: a ring of the Cems' light, faint lines rising
+    const cx = INFO_X + INFO_W / 2, base = PREV_Y + PREV_H - 6;
+    g.lineStyle(1, PALETTE[13], 0.8).strokeEllipse(cx, base, 150, 22).lineStyle(1, PALETTE[12], 0.35).strokeEllipse(cx, base, 120, 16);
+    g.fillStyle(PALETTE[14], 0.35).fillEllipse(cx, base, 116, 14);
+    for (let i = 0; i < 9; i++) g.lineStyle(1, PALETTE[15], 0.5).lineBetween(INFO_X + 6, PREV_Y + 8 + i * 14, INFO_X + INFO_W - 6, PREV_Y + 8 + i * 14);
+    this.add.image(cx, base, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[12]).setAlpha(0.25).setScale(1.6, 0.35);
+    this.preview = this.add.image(cx, base + 2, '__WHITE').setOrigin(0.5, 1);
+    this.add.bitmapText(LIST_X, 16, 'pixel', 'DESIGNS').setTint(PALETTE[12]);
+    this.add.bitmapText(LIST_X, 26, 'pixel', 'YOU CHOOSE, THE CEMS BUILD').setTint(PALETTE[22]);
+    this.list = this.add.container(0, 0);
+    this.info = this.add.container(0, 0);
+    this.controls = new Controls(this);
+    this.controls.modal = true;
+    this.buildRows();
+    const ready = this.rows.findIndex((r) => !r.why);
+    this.index = ready >= 0 ? ready : Math.max(0, this.rows.findIndex((r) => !r.why?.startsWith('NEEDS')));
+    this.drawList();
+    this.drawInfo();
+    for (const [key, d] of [['UP', -1], ['W', -1], ['DOWN', 1], ['S', 1]] as const) this.input.keyboard?.on(`keydown-${key}`, () => this.move(d));
+    for (const [key, d] of [['LEFT', -1], ['A', -1], ['RIGHT', 1], ['D', 1]] as const) this.input.keyboard?.on(`keydown-${key}`, () => { this.yaw += d * 0.6; });
+    // drag the model to turn it
+    const zone = this.add.zone(INFO_X, PREV_Y, INFO_W, PREV_H).setOrigin(0).setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', (p: Phaser.Input.Pointer) => { this.drag = { x: p.x, yaw: this.yaw }; });
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => { if (this.drag && p.isDown) this.yaw = this.drag.yaw + (p.x - this.drag.x) * 0.03; });
+    this.input.on('pointerup', () => { this.drag = null; });
+    this.cameras.main.fadeIn(220, 11, 10, 22);
+    (window as unknown as { __designs: DesignScene }).__designs = this;
+  }
+
+  private buildRows() {
+    const b = this.host.buildings, built = b.designsBuilt();
+    this.rows = DESIGNS.map((d) => ({ id: d.id, m: designModel(d.id)!, why: b.whyNot(d.id), built: built.get(d.id) ?? 0 }));
+  }
+
+  private drawList() {
+    this.list.removeAll(true);
+    const add = <T extends Phaser.GameObjects.GameObject>(o: T) => { this.list.add(o); return o; };
+    this.rows.forEach((r, i) => {
+      const y = LIST_Y + i * ROW_H, on = i === this.index;
+      const locked = !!r.why?.startsWith('NEEDS');
+      const bg = add(this.add.rectangle(LIST_X - 4, y - 3, 176, ROW_H - 2, on ? PALETTE[23] : PALETTE[24], on ? 1 : 0.5).setOrigin(0, 0).setStrokeStyle(1, on ? PALETTE[12] : PALETTE[23], on ? 1 : 0.5));
+      bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => { if (this.busy) return; if (this.index === i) this.print(); else { this.index = i; sound.designMove(i); this.refresh(); } });
+      add(this.add.bitmapText(LIST_X, y, 'pixel', r.m.def.name.toUpperCase()).setTint(locked ? PALETTE[22] : on ? PALETTE[19] : PALETTE[20]));
+      // complexity as five pips
+      const tier = TIERS.indexOf(r.m.tier);
+      for (let k = 0; k < TIERS.length; k++) add(this.add.rectangle(LIST_X + k * 5, y + 12, 3, 3, k <= tier ? (locked ? PALETTE[22] : PALETTE[12]) : on ? PALETTE[22] : PALETTE[23]).setOrigin(0));
+      add(this.add.bitmapText(LIST_X + 28, y + 10, 'pixel', r.m.tier).setTint(PALETTE[22]));
+      const [word, tint] = locked ? ['LOCKED', 22] : !r.why ? ['READY', 12] : r.why.startsWith('NEED MORE') ? ['NEED', 29] : ['WAIT', 21];
+      add(this.add.bitmapText(LIST_X + 168, y, 'pixel', word).setOrigin(1, 0).setTint(PALETTE[tint]));
+      if (r.built) add(this.add.bitmapText(LIST_X + 168, y + 10, 'pixel', `x${r.built}`).setOrigin(1, 0).setTint(PALETTE[10]));
+    });
+  }
+
+  private drawInfo() {
+    this.info.removeAll(true);
+    const r = this.rows[this.index];
+    if (!r) return;
+    const add = <T extends Phaser.GameObjects.GameObject>(o: T) => { this.info.add(o); return o; };
+    const m = r.m, x = INFO_X + 4;
+    let y = PREV_Y + PREV_H + 6;
+    add(this.add.bitmapText(x, y, 'pixel', m.def.name.toUpperCase()).setTint(PALETTE[19]));
+    add(this.add.bitmapText(INFO_X + INFO_W - 4, y, 'pixel', `${m.tier}  COMPLEXITY ${m.complexity}`).setOrigin(1, 0).setTint(PALETTE[12]));
+    y += 12;
+    add(this.add.bitmapText(x, y, 'pixel', `VOLUME ${m.volume}`).setTint(PALETTE[21]));
+    add(this.add.bitmapText(INFO_X + INFO_W - 4, y, 'pixel', `PRINT ${printTime(this.host.buildings.printMsFor(r.id))}`).setOrigin(1, 0).setTint(PALETTE[21]));
+    y += 12;
+    add(this.add.bitmapText(x, y, 'pixel', m.def.gives).setTint(PALETTE[11]).setMaxWidth(INFO_W - 8));
+    y += 12;
+    add(this.add.bitmapText(x, y, 'prose', m.def.about).setTint(PALETTE[20]).setMaxWidth(INFO_W - 8));
+    // the price: each material, what the store holds of what it needs
+    y = 226;
+    const entries = Object.entries(m.cost);
+    const step = Math.min(46, (INFO_W - 4) / Math.max(1, entries.length));
+    entries.forEach(([k, n], i) => {
+      const have = k === 'ember' ? this.host.embers : Math.floor(this.host.supplies[k] ?? 0);
+      const ex = x + i * step;
+      add(this.add.image(ex + 4, y + 4, 'supplies', ICON[k] ?? 0));
+      add(this.add.bitmapText(ex + 10, y, 'pixel', `${Math.min(have, n)}/${n}`).setTint(PALETTE[have >= n ? 12 : 29]));
+    });
+    // print, or why not
+    y = 242;
+    if (!r.why) {
+      const btn = add(this.add.rectangle(INFO_X + INFO_W / 2, y + 4, 90, 14, PALETTE[14], 1).setStrokeStyle(1, PALETTE[12], 1));
+      btn.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.print());
+      add(this.add.bitmapText(INFO_X + INFO_W / 2, y + 1, 'pixel', 'PRINT').setOrigin(0.5, 0).setTint(PALETTE[19]));
+      this.tweens.add({ targets: btn, alpha: { from: 1, to: 0.6 }, duration: 700, yoyo: true, repeat: -1 });
+    } else {
+      this.why = add(this.add.bitmapText(INFO_X + INFO_W / 2, y + 1, 'pixel', r.why).setOrigin(0.5, 0).setTint(PALETTE[r.why.startsWith('NEED MORE') ? 29 : 22]));
+    }
+  }
+
+  private refresh() { this.drawList(); this.drawInfo(); this.frame = 0; }
+
+  private move(d: number) {
+    if (this.busy || !this.rows.length) return;
+    this.index = (this.index + d + this.rows.length) % this.rows.length;
+    sound.designMove(this.index);
+    this.refresh();
+  }
+
+  /** The chosen design goes to the Cems, or the menu says why it cannot. */
+  print() {
+    const r = this.rows[this.index];
+    if (!r || this.busy) return;
+    if (r.why) {
+      sound.denied();
+      if (this.why) this.tweens.add({ targets: this.why, x: this.why.x + 3, duration: 50, yoyo: true, repeat: 2 });
+      return;
+    }
+    this.busy = true;
+    sound.designPrint();
+    this.cameras.main.fadeOut(260, 11, 10, 22);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      const s = this.host;
+      this.scene.stop();
+      s.bioworks?.closed();
+      const b = s.buildings.print(r.id);
+      if (b) s.bioworks?.showPrint(b);
+    });
+  }
+
+  private close() {
+    if (this.busy) return;
+    this.busy = true;
+    sound.menuMove(0);
+    this.cameras.main.fadeOut(200, 11, 10, 22);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => { const s = this.host; this.scene.stop(); s.bioworks?.closed(); });
+  }
+
+  update(_time: number, dt: number) {
+    const f = this.controls.read();
+    if (!this.busy) {
+      if (Math.abs(f.y) > 0.6) { if (!this.stickHeld) this.move(Math.sign(f.y)); this.stickHeld = true; } else if (Math.abs(f.y) < 0.3) this.stickHeld = false;
+      if (f.cancel) this.close();
+      else if ((f.attack || f.interact) && !f.click) this.print();
+    }
+    if (!this.drag) this.yaw += (CAT.view.turntableSpeed * Math.PI / 180) * (dt / 1000);
+    // the turntable: redrawn every other frame
+    if (this.frame++ % 2) return;
+    const r = this.rows[this.index];
+    if (!r) return;
+    const R = Math.hypot(r.m.w, r.m.d), p = (CAT.view.turntablePitch * Math.PI) / 180;
+    const ppv = Math.min(6, (INFO_W - 24) / R, (PREV_H - 16) / (R * Math.sin(p) + r.m.h * Math.cos(p)));
+    const img = turntableView(r.m, this.yaw, ppv, turntableSize(r.m, CAT.view.turntablePitch, ppv));
+    this.preview.setTexture(paintTexture(this, `design-preview:${r.id}`, img));
+    // the platform's ellipse is the model's floor: its center sits on the platform
+    this.preview.setOrigin(0.5, img.toImage(r.m.w / 2, r.m.d / 2, 0).y / img.height);
+  }
+}

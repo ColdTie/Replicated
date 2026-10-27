@@ -1,5 +1,8 @@
 // Surface buildings the copies design (design_building) and print together (since 2026-10-26 every building is
-// printed: a 3D printer stands beside it while it is made, src/entities/Printer.ts, and lays a layer with each blow). A proposal is placed on a free civic lot
+// printed: a 3D printer stands beside it while it is made, src/entities/Printer.ts, and lays a layer with each blow);
+// and the designs the original picks at the Printworks (src/data/designs.json, 2026-10-27), which the Cems build on
+// their own: paid at once, shipped by the ants from the store and the bed (src/entities/Bioworks.ts), rising voxel row
+// by voxel row with the clock (also while nobody plays), the newest rows still living Cems. A proposal is placed on a free civic lot
 // of the town (src/world/town.ts; else a home lot nobody lives on) and waits for the original's word (journal: approve / veto; after autoApproveMinutes it goes
 // ahead anyway). The first copy to join pays its material; every copy that joins adds hammer blows to one shared
 // progress, and the building rises row by row (src/world/buildingPaint.ts draws it from its blueprint). Saved in
@@ -7,16 +10,24 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { BUILDINGS, PALETTE, SUPPLIES } from '../core/data';
+import { CAT, designModel, designNeeds, designOpen, designPrintMs, paintTexture, worldView } from '../core/designs';
+import BIO from '../data/bioworks.json';
 import { session } from '../core/session';
 import type { Light } from '../fx/Lighting';
 import type { Building, MindAction } from '../net/store';
 import type { PlanetScene } from '../scenes/PlanetScene';
 import { paintBuilding, roofHeight } from '../world/buildingPaint';
-import { buildingSpot, lotForBuilding } from '../world/town';
+import { buildingSpot, lotForBuilding, type Lot } from '../world/town';
+import { footprintDepthPx, type Model } from '../world/voxel';
 import type { Npc } from './Npc';
 import { Printer } from './Printer';
 
-interface Placed { b: Building; sprite: Phaser.GameObjects.Image; light?: Light; glow?: Phaser.GameObjects.Image; solid?: Phaser.GameObjects.Zone; height: number; printedRows?: number }
+interface Placed {
+  b: Building; sprite: Phaser.GameObjects.Image; light?: Light; glow?: Phaser.GameObjects.Image; solid?: Phaser.GameObjects.Zone; height: number; printedRows?: number;
+  /** a Cem print: its model, how many voxels the drawing shows, when it was last drawn, its lit windows */
+  cem?: { m: Model; cut: number; drawnAt: number; lights: Light[]; glows: Phaser.GameObjects.Image[] };
+}
+const CARGO_COLORS: Record<string, number> = { salt: 19, iron: 20, quartz: 28, copper: 9, ember: 10, wood: 4 };
 
 export class Buildings {
   list: Building[];
@@ -28,13 +39,29 @@ export class Buildings {
 
   constructor(private scene: PlanetScene, data: Building[] | undefined) {
     this.list = data ? structuredClone(data) : [];
+    // a print whose time ran out while nobody was here stands finished
+    let done = false;
+    for (const b of this.list) if (b.design && !b.built && !b.vetoed && this.fraction(b) >= 1) { b.built = true; b.progress = 1; done = true; }
     for (const b of this.list) if (!b.vetoed) this.place(b, false);
+    // written with the planet's next flush
+    if (done && !scene.visit) scene.pending.buildings = structuredClone(this.list);
+  }
+
+  /** How far along a building is, 0..1: a Cem print by the clock, the others by their blows. */
+  fraction(b: Building) {
+    if (b.built) return 1;
+    if (b.design) return Math.max(0, Math.min(1, (Date.now() - (b.printStart ?? Date.now())) / Math.max(1, b.printMs ?? 1)));
+    return Math.min(1, b.progress / this.swingsFor(b));
   }
 
   get swingsFor() { return (b: Building) => b.w * b.h * BUILDINGS.swingsPerTile; }
 
   private texture(b: Building) {
     const key = `bld:${b.id}`;
+    if (b.design) {
+      const m = designModel(b.design);
+      if (m) return paintTexture(this.scene, key, worldView(m, b.built ? undefined : Math.floor(m.volume * this.fraction(b)), b.built ? 0 : BIO.alive * m.w));
+    }
     if (this.scene.textures.exists(key)) return key;
     const g = paintBuilding(b);
     const ct = this.scene.textures.createCanvas(key, g.width, g.height)!;
@@ -45,6 +72,8 @@ export class Buildings {
 
   /** Puts a blueprint in the world: a ghost footprint while it waits, the building rising as it is worked on. */
   private place(b: Building, animate: boolean) {
+    const m = b.design ? designModel(b.design) : undefined;
+    if (m) { this.placeCem(b, m, animate); return; }
     const key = this.texture(b);
     const h = b.h * 12 + roofHeight(b) + 2;
     const sprite = this.scene.add.image(b.x, b.y + 2, key).setOrigin(0.5, 1).setDepth(100 + b.y);
@@ -63,6 +92,150 @@ export class Buildings {
 
   update(time: number, dt: number) {
     for (const p of this.printers.values()) p.update(time, dt);
+    // the Cems' prints rise with the clock: redraw a print when a few more voxels are laid
+    for (const p of this.placed.values()) {
+      const c = p.cem;
+      if (!c || p.b.built || time < c.drawnAt + 180) continue;
+      const cut = Math.floor(c.m.volume * this.fraction(p.b));
+      if (cut >= c.m.volume) { this.complete(p.b); continue; }
+      if (cut - c.cut < Math.max(2, c.m.w / 2)) continue;
+      const row = Math.floor(cut / c.m.w) !== Math.floor(c.cut / c.m.w);
+      c.cut = cut; c.drawnAt = time;
+      this.drawCem(p);
+      if (row) {
+        this.printers.get(p.b.id)?.pulse();
+        // a few of the newest Cems shine as they settle
+        const v = c.m.order[Math.max(0, cut - 1)], img = this.lastDraw.get(p.b.id);
+        if (img) {
+          const q = img.toImage((v % c.m.w) + 0.5, Math.floor(v / c.m.w) % c.m.d, Math.floor(v / (c.m.w * c.m.d)) + 1);
+          this.scene.fx.sparks(p.sprite.x - p.sprite.displayOriginX + q.x, p.sprite.y - p.sprite.displayOriginY + q.y, PALETTE[12], 2);
+        }
+      }
+    }
+  }
+
+  private lastDraw = new Map<string, ReturnType<typeof worldView>>();
+
+  /** A Cem print or a finished design: its drawing, anchored by the middle of its front at its foot. */
+  private placeCem(b: Building, m: Model, animate: boolean) {
+    const s = this.scene;
+    const cut = b.built ? m.volume : Math.floor(m.volume * this.fraction(b));
+    const r = worldView(m, b.built ? undefined : cut, b.built ? 0 : BIO.alive * m.w);
+    this.lastDraw.set(b.id, r);
+    const key = paintTexture(s, `bld:${b.id}`, r);
+    const foot = r.toImage(m.w / 2, 0, 0);
+    const sprite = s.add.image(b.x, b.y + 2, key).setOrigin(foot.x / r.width, foot.y / r.height).setDepth(100 + b.y);
+    const p: Placed = { b, sprite, height: r.height, cem: { m, cut, drawnAt: 0, lights: [], glows: [] } };
+    this.placed.set(b.id, p);
+    if (!b.built) {
+      if (!this.printers.has(b.id)) this.printers.set(b.id, new Printer(s, b, true));
+      const cargo = Object.keys(b.cost).map((k) => PALETTE[CARGO_COLORS[k] ?? 20]);
+      s.bioworks?.startFlow(b.id, { x: b.x, y: b.y + 4 }, cargo, Date.now() - (b.printStart ?? 0) < 3000);
+    } else this.finishCem(p, animate);
+  }
+
+  /** Redraws a print at its current cut. */
+  private drawCem(p: Placed) {
+    const c = p.cem!;
+    const r = worldView(c.m, p.b.built ? undefined : c.cut, p.b.built ? 0 : BIO.alive * c.m.w);
+    this.lastDraw.set(p.b.id, r);
+    paintTexture(this.scene, `bld:${p.b.id}`, r);
+    p.sprite.setTexture(`bld:${p.b.id}`);
+  }
+
+  /** A finished design: solid, its windows lit (a light where its glowing voxels show), the ground under it walkable around. */
+  private finishCem(p: Placed, animate: boolean) {
+    const s = this.scene, c = p.cem!, b = p.b;
+    if (c.cut < c.m.volume) { c.cut = c.m.volume; this.drawCem(p); }
+    const depth = footprintDepthPx(c.m, CAT.view.pitch, CAT.view.ppv);
+    if (!p.solid) p.solid = s.addSolid(b.x, b.y - depth / 2, c.m.w * CAT.view.ppv * 0.9, Math.max(8, depth * 0.85));
+    const r = this.lastDraw.get(b.id);
+    if (r && !c.lights.length && r.lit.length) {
+      // the lit pixels in up to three groups, left to right
+      const groups = [0, 1, 2].map((k) => r.lit.filter((q) => Math.floor((q.x / r.width) * 3) === k)).filter((g) => g.length > 2);
+      for (const g of groups) {
+        const x = g.reduce((a, q) => a + q.x, 0) / g.length, y = g.reduce((a, q) => a + q.y, 0) / g.length;
+        const wx = p.sprite.x - p.sprite.displayOriginX + x, wy = p.sprite.y - p.sprite.displayOriginY + y;
+        const l = s.lighting.add({ x: wx, y: wy, radius: 20 + Math.min(30, g.length / 2), color: PALETTE[10], intensity: animate ? 0 : 0.6, flicker: 0.08 });
+        const glow = s.add.image(wx, wy, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[10]).setAlpha(animate ? 0 : 0.12).setScale(0.4).setDepth(6100);
+        if (animate) { s.tweens.add({ targets: l, intensity: 0.6, duration: 900 }); s.tweens.add({ targets: glow, alpha: 0.12, duration: 900 }); }
+        c.lights.push(l); c.glows.push(glow);
+      }
+    }
+    if (animate) { s.fx.dust(b.x - c.m.w * 2, b.y + 2, 6); s.fx.dust(b.x + c.m.w * 2, b.y + 2, 6); s.fx.sparks(b.x, b.y - 10, PALETTE[12], 12); sound.cemDone({ x: b.x, y: b.y }); }
+  }
+
+  // ------------------------------------------------------------ the designs (the original's choice, built by the Cems)
+
+  /** Designs standing finished on this world (id -> how many). */
+  designsBuilt() {
+    const out = new Map<string, number>();
+    for (const b of this.list) if (b.design && b.built && !b.vetoed) out.set(b.design, (out.get(b.design) ?? 0) + 1);
+    return out;
+  }
+  private builtOf(id: string) { return this.designsBuilt().get(id) ?? 0; }
+  /** Every House lifts every Vessel's mood a little (designs.json gives). */
+  get homeMood() { return Math.min(CAT.gives.houseMoodMax, this.builtOf('house') * CAT.gives.houseMood); }
+  /** Every Storehouse holds more of each material. */
+  get storeBonus() { return this.builtOf('storehouse') * CAT.gives.storehouseCap; }
+  /** Cem prints under way. */
+  get printing() { return this.list.filter((b) => b.design && !b.built && !b.vetoed); }
+  /** How long a design takes to print here now (ms): every Nursery makes the Cems quicker. */
+  printMsFor(id: string) { const m = designModel(id); return m ? designPrintMs(m, this.builtOf('nursery')) : 0; }
+
+  /** The lot a new print goes on: the free one nearest the square (-1: none). */
+  private printLot(): number {
+    const s = this.scene, town = s.map.town, st = s.townState;
+    const used = new Set([...Object.values(st.lots), ...Object.values(st.civic)]);
+    const sq = town.square, cx = (sq.x + sq.w / 2) * 16, cy = (sq.y + sq.h / 2) * 16;
+    const mid = (l: Lot) => ({ x: (l.rect.x + l.rect.w / 2) * 16, y: (l.rect.y + l.rect.h / 2) * 16 });
+    const free = town.lots.filter((l) => !used.has(l.index)).sort((a, b) => Math.hypot(mid(a).x - cx, mid(a).y - cy) - Math.hypot(mid(b).x - cx, mid(b).y - cy));
+    return free[0]?.index ?? -1;
+  }
+
+  /** A street lamp spot nobody has used (a lamp a copy raised, or another design standing there), nearest the square. */
+  private freePost(): { x: number; y: number } | null {
+    const s = this.scene, town = s.map.town, sq = town.square, cx = (sq.x + sq.w / 2) * 16, cy = (sq.y + sq.h / 2) * 16;
+    const taken = [...(s.village?.structures ?? []), ...this.list.filter((b) => !b.vetoed)].map((q) => ({ x: q.x, y: q.y }));
+    return town.posts.filter((p) => taken.every((q) => Math.hypot(q.x - p.x, q.y - p.y) > 10) && s.isWalkable(p.x, p.y))
+      .sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy))[0] ?? null;
+  }
+
+  /** Why a design cannot be printed right now (words for the menu), or null when it can. */
+  whyNot(id: string): string | null {
+    const m = designModel(id);
+    if (!m) return 'UNKNOWN DESIGN';
+    const built = new Set(this.designsBuilt().keys());
+    if (!designOpen(id, built)) return `NEEDS ${designNeeds(id, built).join(' AND ')}`;
+    if (!this.scene.bioworks?.awake) return 'THE CEMS ARE ASLEEP';
+    if (this.printing.length >= BIO.maxPrints) return 'THE CEMS ARE BUSY';
+    if (m.def.place === 'post' ? !this.freePost() : this.printLot() < 0) return 'NO ROOM IN THE TOWN';
+    const short = Object.entries(m.cost).find(([k, n]) => (k === 'ember' ? this.scene.embers : Math.floor(this.scene.supplies[k] ?? 0)) < n);
+    if (short) return `NEED MORE ${short[0].toUpperCase()}`;
+    return null;
+  }
+
+  /** The original picks a design: paid at once, placed on the lot nearest the square, the ants start carrying. */
+  print(id: string): Building | null {
+    const m = designModel(id), s = this.scene, me = session.replicant;
+    if (!m || this.whyNot(id)) return null;
+    const post = m.def.place === 'post';
+    const lotIndex = post ? -1 : this.printLot();
+    const spot = post ? this.freePost()! : buildingSpot(s.map.town.lots[lotIndex]);
+    s.warren.pay(m.cost);
+    const depth = footprintDepthPx(m, CAT.view.pitch, CAT.view.ppv);
+    const b: Building = {
+      id: `d${Date.now().toString(36)}${this.list.length}`, name: m.def.name, purpose: m.def.about, w: Math.ceil(m.w / 4), h: Math.max(1, Math.round(depth / 8)),
+      x: spot.x, y: spot.y, by: me?.id ?? '', material: 'lignin', roof: 'flat', door: 'south', primary: 'umber', secondary: 'moss',
+      approved: true, progress: 0, built: false, helpers: me ? [me.id] : [], cost: { ...m.cost }, paid: true, at: Date.now(),
+      design: id, printStart: Date.now(), printMs: this.printMsFor(id),
+    };
+    this.list.push(b);
+    if (lotIndex >= 0) { s.townState.civic[b.id] = lotIndex; s.markTown(); }
+    this.place(b, false);
+    this.save();
+    s.mindLog.push({ t: s.mindClock, text: `${me?.name ?? 'the original'} chose a design for the Cems: a ${b.name} (${m.tier.toLowerCase()}, ${Object.entries(m.cost).map(([k, n]) => `${n} ${k}`).join(', ')}); the ants carry its supplies and the Cems build it` });
+    return b;
   }
 
   private refresh(p: Placed, animate: boolean) {
@@ -163,6 +336,19 @@ export class Buildings {
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${session.replicant?.name ?? 'the original'} vetoed ${b.name}` });
   }
 
+  /** Finished at once, quietly (screenshots and playtests stage a world with it). */
+  finishNow(id: string) {
+    const b = this.list.find((x) => x.id === id);
+    if (!b || b.built) return;
+    b.built = true;
+    b.progress = b.design ? 1 : this.swingsFor(b);
+    const p = this.placed.get(id);
+    if (p?.cem) this.finishCem(p, false); else if (p) this.refresh(p, false);
+    const pr = this.printers.get(id);
+    if (pr) { pr.finish(); if (b.by !== 'thales') { pr.fold(); this.printers.delete(id); } }
+    this.scene.bioworks?.stopFlow(id);
+  }
+
   /** A built shared building of this kind (hall, workshop, lookout). */
   has(kind: string) { return this.list.some((b) => b.kind === kind && b.built && !b.vetoed); }
 
@@ -200,7 +386,7 @@ export class Buildings {
     this.maybeCommunal(npc);
     const now = Date.now();
     for (const b of this.list) {
-      if (b.vetoed || b.built) continue;
+      if (b.vetoed || b.built || b.design) continue;
       if (!b.approved && now - b.at > BUILDINGS.autoApproveMinutes * 60_000) { b.approved = true; const p = this.placed.get(b.id); if (p) this.refresh(p, false); this.save(); }
       if (!b.approved) continue;
       if (!b.paid) {
@@ -274,7 +460,7 @@ export class Buildings {
 
   /** The original swings at a building being raised: a blow worth hands.swingWorth of a copy's. True when it struck one. */
   playerSwing(hx: number, hy: number, radius: number) {
-    const b = this.list.find((x) => !x.vetoed && !x.built && x.approved && x.paid
+    const b = this.list.find((x) => !x.vetoed && !x.built && x.approved && x.paid && !x.design
       && Math.abs(hx - x.x) < x.w * 8 + radius && hy > x.y - x.h * 8 - radius - 10 && hy < x.y + radius);
     if (!b) return false;
     const me = session.replicant;
@@ -294,7 +480,8 @@ export class Buildings {
   private complete(b: Building, npc?: Npc) {
     b.built = true;
     const p = this.placed.get(b.id);
-    if (p) this.refresh(p, true);
+    if (p?.cem) { b.progress = 1; this.finishCem(p, true); this.scene.bioworks?.stopFlow(b.id); }
+    else if (p) this.refresh(p, true);
     // its printer powers down; a village printer folds away (the Metanoia's stay by their work)
     const pr = this.printers.get(b.id);
     if (pr) {
@@ -317,7 +504,7 @@ export class Buildings {
     if (swings < 1) return;
     let left = swings;
     for (const b of this.list) {
-      if (b.vetoed || b.built || !b.approved || !b.paid || left <= 0) continue;
+      if (b.vetoed || b.built || !b.approved || !b.paid || b.design || left <= 0) continue;
       const total = this.swingsFor(b);
       const add = Math.min(left, total - b.progress);
       b.progress += add; left -= add;
@@ -340,6 +527,7 @@ export class Buildings {
   /** The buildings in words, for the minds and the journal. */
   describe(nameOf: (id: string) => string): string[] {
     return this.list.filter((b) => !b.vetoed).map((b) => {
+      if (b.design) return `- ${b.name} (a design the Cems built for ${nameOf(b.by)}): ${b.built ? 'built' : `the Cems are building it, ${Math.round(this.fraction(b) * 100)}%`} "${b.purpose ?? ''}"`;
       const total = this.swingsFor(b);
       const state = b.built ? 'built' : !b.approved ? "waiting for the original's word" : !b.paid ? `waits for ${this.scene.warren.shortage(b.cost)}` : `being raised, ${Math.round((b.progress / total) * 100)}% (${b.helpers.map(nameOf).join(', ') || 'nobody yet'})`;
       return `- ${b.name} (${b.w}x${b.h} ${b.material}, ${b.roof} roof, door ${b.door}, ${nameOf(b.by)}'s design): ${state}${b.purpose ? ` "${b.purpose}"` : ''}`;

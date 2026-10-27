@@ -31,8 +31,8 @@ try {
   await page.screenshot({ path: 'screenshots/planet-menu.png' });
 
   // a click on a CLOSEST row: its details open and the map picks that planet
-  const rowEls = await page.$$('.pm .pm-row');
-  await rowEls[2].click();
+  // (a locator: the list refills once the map's clock reaches its timer, which a slow headless frame can delay)
+  await page.locator('.pm .pm-row').nth(2).click();
   await page.waitForTimeout(700);
   const picked = await ev(() => { const m = window.__game.scene.getScene('starmap'); const on = document.querySelector('.pm .pm-row.on'); return { view: m.view, star: m.sysStar?.id, planet: m.selPlanet?.index, row: on?.querySelector('.n').textContent, details: [...(on?.querySelectorAll('.d div') ?? [])].map((d) => d.textContent) }; });
   log('picked', JSON.stringify(picked));

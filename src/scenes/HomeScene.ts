@@ -11,8 +11,8 @@ import { CloudStore, LocalStore, currentSession, signIn, signUp, type GameStore,
 import { el, openOverlay, overlayBusy } from '../ui/overlay';
 
 const CARD_W = 76, CARD_H = 100;
-/** the first player's name until it names itself at its first wake: Thales' first copy */
-const FIRST_COPY = copyName(HOMEWORLD.thales.name, 1).toUpperCase();
+/** the first player's name until it names itself at its first wake: the tenth Vessel, made by Thales himself */
+const FIRST_COPY = copyName(HOMEWORLD.thales.name, HOMEWORLD.playerNumber - 1).toUpperCase();
 
 export class HomeScene extends Phaser.Scene {
   private cards: Phaser.GameObjects.Container[] = [];
@@ -109,8 +109,8 @@ export class HomeScene extends Phaser.Scene {
     this.cards = [];
     let profiles: Profile[];
     try { profiles = await store.listProfiles(); } catch (e) { console.warn(e); this.status.setText('COULD NOT LOAD PROFILES'); return; }
-    // nobody can join except as a copy made and handed over (story/STORY.md): the very first player is Thales' first
-    // copy, made here by itself; it names itself when it wakes
+    // nobody can join except as a copy made and handed over (story/STORY.md): the very first player is the tenth
+    // Vessel, the one Thales makes at the opening, made here by itself; it names itself when it wakes
     if (!profiles.length) {
       try { return await this.play(store, await store.createProfile({ name: FIRST_COPY, kid_mode: false, feature_color: PLAYER.feature[1], sort: 0 })); }
       catch (e) { console.warn(e); this.status.setText('COULD NOT WAKE'); return; }

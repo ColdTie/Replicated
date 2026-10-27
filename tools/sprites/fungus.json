@@ -1,0 +1,45 @@
+{
+ "_doc": "The fungus (story/STORY.md: from Earth, changed to clean the Cems' bed): pale caps over gills that glow cyan, threads of it running through the salt.",
+ "size": [16, 16],
+ "tinted": false,
+ "legend": {".": null, "a": 25, "b": 21, "c": 20, "d": 17, "e": 2, "f": 30, "g": 18, "h": 15},
+ "animations": {"glow": {"fps": 1.5, "frames": [0, 1], "repeat": -1}},
+ "frames": [
+  [
+   "................",
+   "................",
+   "................",
+   ".....aaaaaa.....",
+   "....abccbcca....",
+   "...abccbccbca...",
+   "....addddddaaa..",
+   ".aaaaaaefacbcca.",
+   "abccbaaefcbccbca",
+   "bccbccaefadddda.",
+   "aggggaaefaaefa..",
+   ".aefa.aefaaefa..",
+   ".aefaadefdaefaa.",
+   "ahefhhdhhdhefhha",
+   "ahhdhhdhhdhhdhha",
+   ".aaaaadhhdaaaaa."
+  ],
+  [
+   "................",
+   "................",
+   "................",
+   ".....aaaaaa.....",
+   "....abccbcca....",
+   "...abccbccbca...",
+   "....aggggggaaa..",
+   ".aaaaaaefacbcca.",
+   "abccbaaefcbccbca",
+   "bccbccaefagggga.",
+   "addddaaefaaefa..",
+   ".aefa.aefaaefa..",
+   ".aefaadefdaefaa.",
+   "ahefhhdhhdhefhha",
+   "ahhdhhdhhdhhdhha",
+   ".aaaaadhhdaaaaa."
+  ]
+ ]
+}

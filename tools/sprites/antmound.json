@@ -1,0 +1,45 @@
+{
+ "_doc": "The ants' mound (story/STORY.md: ants from Earth, changed to carry the Cems' feed): a dome of salt grains and lignin crumbs with dark doorways; ants come and go.",
+ "size": [16, 16],
+ "tinted": false,
+ "legend": {".": null, "a": 25, "b": 4, "c": 3, "d": 5, "e": 31, "f": 6},
+ "animations": {"busy": {"fps": 3, "frames": [0, 1, 0, 0, 1, 1], "repeat": -1}},
+ "frames": [
+  [
+   "................",
+   "................",
+   "................",
+   "................",
+   "................",
+   ".....aaaaaa.....",
+   "...aabcbdbbaa...",
+   "..abbbdcbbbdba..",
+   ".acbdbbaadbbbba.",
+   ".adceeedeceedea.",
+   "aeeecdeeeecaaeea",
+   "aeedaceedeecedea",
+   "adeeeeceeeedceea",
+   "aceedeecedeeecda",
+   "aeceeeedceeedeca",
+   ".aaaaaaaaaaaaaa."
+  ],
+  [
+   "................",
+   "................",
+   "................",
+   "................",
+   "................",
+   ".....aaaaaa.....",
+   "...aabcbdbbaa...",
+   "..abbbdcbfbdba..",
+   ".acbdbfaadbbbba.",
+   ".adceeedeceedfa.",
+   "aeeecdeeeecaaeea",
+   "aeedaceedeecedea",
+   "adefeeceeeedceea",
+   "aceedeecedeeecda",
+   "aeceeeedceeedeca",
+   ".aaaaaaaaaaaaaa."
+  ]
+ ]
+}
