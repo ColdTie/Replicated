@@ -1,5 +1,7 @@
 // Surface buildings the copies design (design_building) and print together (since 2026-10-26 every building is
-// printed: a 3D printer stands beside it while it is made, src/entities/Printer.ts, and lays a layer with each blow);
+// printed: a 3D printer stands beside it while it is made, src/entities/Printer.ts, and lays a layer with each blow;
+// since 2026-10-27, on a world whose Cem bed is awake, the Cems print a copy's blueprint too once it is paid, and the
+// copies tend the bed instead of swinging: one building system);
 // and the designs the original picks at the Printworks (src/data/designs.json, 2026-10-27), which the Cems build on
 // their own: paid at once, shipped by the ants from the store and the bed (src/entities/Bioworks.ts), rising voxel row
 // by voxel row with the clock (also while nobody plays), the newest rows still living Cems. A proposal is placed on a free civic lot
@@ -10,7 +12,7 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { BUILDINGS, PALETTE, SUPPLIES } from '../core/data';
-import { CAT, designModel, designNeeds, designOpen, designPrintMs, paintTexture, worldView } from '../core/designs';
+import { blueprintModel, CAT, designModel, designNeeds, designOpen, designPrintMs, paintTexture, worldView } from '../core/designs';
 import BIO from '../data/bioworks.json';
 import { session } from '../core/session';
 import type { Light } from '../fx/Lighting';
@@ -27,7 +29,7 @@ interface Placed {
   /** a Cem print: its model, how many voxels the drawing shows, when it was last drawn, its lit windows */
   cem?: { m: Model; cut: number; drawnAt: number; lights: Light[]; glows: Phaser.GameObjects.Image[] };
 }
-const CARGO_COLORS: Record<string, number> = { salt: 19, iron: 20, quartz: 28, copper: 9, ember: 10, wood: 4 };
+const CARGO_COLORS: Record<string, number> = { salt: 19, iron: 20, quartz: 28, copper: 9, ember: 10, wood: 4, stone: 21, scrap: 22 };
 
 export class Buildings {
   list: Building[];
@@ -36,21 +38,27 @@ export class Buildings {
   /** the printer beside each building being made (approved, not yet built) */
   readonly printers = new Map<string, Printer>();
   private nextCommunal = 0;
+  private nextTakeOver = 0;
 
   constructor(private scene: PlanetScene, data: Building[] | undefined) {
     this.list = data ? structuredClone(data) : [];
     // a print whose time ran out while nobody was here stands finished
     let done = false;
-    for (const b of this.list) if (b.design && !b.built && !b.vetoed && this.fraction(b) >= 1) { b.built = true; b.progress = 1; done = true; }
+    for (const b of this.list) if (this.printed(b) && !b.built && !b.vetoed && this.fraction(b) >= 1) { b.built = true; b.progress = 1; done = true; }
     for (const b of this.list) if (!b.vetoed) this.place(b, false);
     // written with the planet's next flush
     if (done && !scene.visit) scene.pending.buildings = structuredClone(this.list);
   }
 
+  /** Printed by the Cems (a design, or a copy's blueprint they took over): it rises with the clock. */
+  printed(b: Building) { return !!(b.design || b.cems); }
+  /** The voxel model the Cems print: the design's, or one made from the copy's blueprint. */
+  modelOf(b: Building): Model | undefined { return b.design ? designModel(b.design) : b.cems ? blueprintModel(b) : undefined; }
+
   /** How far along a building is, 0..1: a Cem print by the clock, the others by their blows. */
   fraction(b: Building) {
     if (b.built) return 1;
-    if (b.design) return Math.max(0, Math.min(1, (Date.now() - (b.printStart ?? Date.now())) / Math.max(1, b.printMs ?? 1)));
+    if (this.printed(b)) return Math.max(0, Math.min(1, (Date.now() - (b.printStart ?? Date.now())) / Math.max(1, b.printMs ?? 1)));
     return Math.min(1, b.progress / this.swingsFor(b));
   }
 
@@ -58,8 +66,8 @@ export class Buildings {
 
   private texture(b: Building) {
     const key = `bld:${b.id}`;
-    if (b.design) {
-      const m = designModel(b.design);
+    if (this.printed(b)) {
+      const m = this.modelOf(b);
       if (m) return paintTexture(this.scene, key, worldView(m, b.built ? undefined : Math.floor(m.volume * this.fraction(b)), b.built ? 0 : BIO.alive * m.w));
     }
     if (this.scene.textures.exists(key)) return key;
@@ -72,7 +80,7 @@ export class Buildings {
 
   /** Puts a blueprint in the world: a ghost footprint while it waits, the building rising as it is worked on. */
   private place(b: Building, animate: boolean) {
-    const m = b.design ? designModel(b.design) : undefined;
+    const m = this.modelOf(b);
     if (m) { this.placeCem(b, m, animate); return; }
     const key = this.texture(b);
     const h = b.h * 12 + roofHeight(b) + 2;
@@ -92,6 +100,7 @@ export class Buildings {
 
   update(time: number, dt: number) {
     for (const p of this.printers.values()) p.update(time, dt);
+    if (time > this.nextTakeOver) { this.nextTakeOver = time + 1500; this.cemsTakeOver(); }
     // the Cems' prints rise with the clock: redraw a print when a few more voxels are laid
     for (const p of this.placed.values()) {
       const c = p.cem;
@@ -163,6 +172,28 @@ export class Buildings {
       }
     }
     if (animate) { s.fx.dust(b.x - c.m.w * 2, b.y + 2, 6); s.fx.dust(b.x + c.m.w * 2, b.y + 2, 6); s.fx.sparks(b.x, b.y - 10, PALETTE[12], 12); sound.cemDone({ x: b.x, y: b.y }); }
+  }
+
+  /**
+   * One building system: where the Cems are awake, a copy's approved blueprint is theirs to print once it is paid
+   * (its material in the store). Whatever the copies had raised by hand is kept: the print goes on from there.
+   */
+  cemsTakeOver() {
+    if (!this.scene.bioworks?.awake || this.scene.visit) return;
+    for (const b of this.list) {
+      if (b.vetoed || b.built || this.printed(b) || !b.approved || !b.paid || b.by === 'thales') continue;
+      const old = this.placed.get(b.id);
+      if (old) { old.sprite.destroy(); if (old.light) this.scene.lighting.remove(old.light); old.glow?.destroy(); old.solid?.destroy(); this.placed.delete(b.id); }
+      this.printers.get(b.id)?.fold(); this.printers.delete(b.id);
+      this.workers.delete(b.id);
+      b.cems = true;
+      const m = blueprintModel(b);
+      b.printMs = designPrintMs(m, this.builtOf('nursery'));
+      b.printStart = Date.now() - Math.min(0.95, b.progress / this.swingsFor(b)) * b.printMs;
+      this.place(b, false);
+      this.save();
+      this.scene.mindLog.push({ t: this.scene.mindClock, text: `the Cems took up ${b.name} (${this.scene.npcs.find((n) => n.data.id === b.by)?.data.name ?? 'a copy'}'s design) and print it now; the copies tend their bed` });
+    }
   }
 
   // ------------------------------------------------------------ the designs (the original's choice, built by the Cems)
@@ -341,7 +372,7 @@ export class Buildings {
     const b = this.list.find((x) => x.id === id);
     if (!b || b.built) return;
     b.built = true;
-    b.progress = b.design ? 1 : this.swingsFor(b);
+    b.progress = this.printed(b) ? 1 : this.swingsFor(b);
     const p = this.placed.get(id);
     if (p?.cem) this.finishCem(p, false); else if (p) this.refresh(p, false);
     const pr = this.printers.get(id);
@@ -385,8 +416,14 @@ export class Buildings {
   pickJob(npc: Npc): Building | null {
     this.maybeCommunal(npc);
     const now = Date.now();
+    // a print under way: the copies tend the Cems' bed for it (up to tend.perPrint at a time)
+    if (this.scene.bioworks?.awake) {
+      const tend = this.printing.concat(this.list.filter((b) => b.cems && !b.built && !b.vetoed))
+        .find((b) => (this.workers.get(b.id)?.size ?? 0) < BIO.tend.perPrint);
+      if (tend) return tend;
+    }
     for (const b of this.list) {
-      if (b.vetoed || b.built || b.design) continue;
+      if (b.vetoed || b.built || this.printed(b)) continue;
       if (!b.approved && now - b.at > BUILDINGS.autoApproveMinutes * 60_000) { b.approved = true; const p = this.placed.get(b.id); if (p) this.refresh(p, false); this.save(); }
       if (!b.approved) continue;
       if (!b.paid) {
@@ -408,8 +445,9 @@ export class Buildings {
       .map((b) => `${b.name} waits for ${this.scene.warren.shortage(b.cost)}`);
   }
 
-  /** The copy walks to the footprint and hammers; every blow is shared progress. */
+  /** The copy walks to the footprint and hammers; every blow is shared progress. (A Cem print: it tends their bed.) */
   work(npc: Npc, b: Building) {
+    if (this.printed(b)) return this.tend(npc, b);
     const total = this.swingsFor(b);
     const side = npc.x < b.x ? -1 : 1;
     const set = this.workers.get(b.id) ?? new Set<Npc>();
@@ -419,13 +457,36 @@ export class Buildings {
     return npc.startChore({
       x: pr ? pr.x + (npc.x < pr.x ? -12 : 12) : b.x + side * (b.w * 8 + 6), y: pr ? pr.y + 4 : b.y + 6, swings: Math.max(1, Math.min(14, total - b.progress)),
       swing: () => {
-        if (b.built) return;
+        // (the Cems may have taken it up since this copy set out)
+        if (b.built || this.printed(b)) return;
         b.progress++;
         const p = this.placed.get(b.id);
         if (p) this.refresh(p, false);
         this.scene.fx.sparks(b.x + (Math.random() - 0.5) * b.w * 12, b.y - 4 - Math.random() * 10, PALETTE[10], 3);
         sound.hit(false, { x: b.x, y: b.y });
         if (b.progress >= total) this.complete(b, npc);
+      },
+      done: () => { set.delete(npc); this.save(); },
+    });
+  }
+
+  /**
+   * Tending the Cems' bed for a print: the copy kneels at the salt's rim and works it; every stroke (bioworks.json
+   * tend.ms) brings the print that much nearer, and the Cems near its hands brighten.
+   */
+  private tend(npc: Npc, b: Building) {
+    const bw = this.scene.bioworks;
+    const spot = bw?.tendSpot(npc.x, npc.y);
+    if (!bw || !spot) return false;
+    const set = this.workers.get(b.id) ?? new Set<Npc>();
+    set.add(npc); this.workers.set(b.id, set);
+    if (!b.helpers.includes(npc.data.id)) b.helpers.push(npc.data.id);
+    return npc.startChore({
+      x: spot.x, y: spot.y, swings: BIO.tend.strokes,
+      swing: () => {
+        if (b.built) return;
+        b.printStart = (b.printStart ?? Date.now()) - BIO.tend.ms;
+        bw.tended(spot.x, spot.y);
       },
       done: () => { set.delete(npc); this.save(); },
     });
@@ -460,7 +521,7 @@ export class Buildings {
 
   /** The original swings at a building being raised: a blow worth hands.swingWorth of a copy's. True when it struck one. */
   playerSwing(hx: number, hy: number, radius: number) {
-    const b = this.list.find((x) => !x.vetoed && !x.built && x.approved && x.paid && !x.design
+    const b = this.list.find((x) => !x.vetoed && !x.built && x.approved && x.paid && !this.printed(x)
       && Math.abs(hx - x.x) < x.w * 8 + radius && hy > x.y - x.h * 8 - radius - 10 && hy < x.y + radius);
     if (!b) return false;
     const me = session.replicant;
@@ -504,7 +565,7 @@ export class Buildings {
     if (swings < 1) return;
     let left = swings;
     for (const b of this.list) {
-      if (b.vetoed || b.built || !b.approved || !b.paid || b.design || left <= 0) continue;
+      if (b.vetoed || b.built || !b.approved || !b.paid || this.printed(b) || left <= 0) continue;
       const total = this.swingsFor(b);
       const add = Math.min(left, total - b.progress);
       b.progress += add; left -= add;
@@ -528,6 +589,7 @@ export class Buildings {
   describe(nameOf: (id: string) => string): string[] {
     return this.list.filter((b) => !b.vetoed).map((b) => {
       if (b.design) return `- ${b.name} (a design the Cems built for ${nameOf(b.by)}): ${b.built ? 'built' : `the Cems are building it, ${Math.round(this.fraction(b) * 100)}%`} "${b.purpose ?? ''}"`;
+      if (b.cems) return `- ${b.name} (${b.w}x${b.h}, ${b.roof} roof, ${nameOf(b.by)}'s design, printed by the Cems): ${b.built ? 'built' : `the Cems are printing it, ${Math.round(this.fraction(b) * 100)}%, the copies tend their bed`}${b.purpose ? ` "${b.purpose}"` : ''}`;
       const total = this.swingsFor(b);
       const state = b.built ? 'built' : !b.approved ? "waiting for the original's word" : !b.paid ? `waits for ${this.scene.warren.shortage(b.cost)}` : `being raised, ${Math.round((b.progress / total) * 100)}% (${b.helpers.map(nameOf).join(', ') || 'nobody yet'})`;
       return `- ${b.name} (${b.w}x${b.h} ${b.material}, ${b.roof} roof, door ${b.door}, ${nameOf(b.by)}'s design): ${state}${b.purpose ? ` "${b.purpose}"` : ''}`;

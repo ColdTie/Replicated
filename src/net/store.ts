@@ -159,6 +159,8 @@ export interface Building extends Blueprint {
   /** printed by the Cems from a design (src/data/designs.json): which one, when the print began and how long it takes
    * (ms); it rises with the clock, also while nobody plays */
   design?: string; printStart?: number; printMs?: number;
+  /** a copy's blueprint the Cems print (where a bed is awake): it rises with the clock from printStart like a design */
+  cems?: boolean;
 }
 /** Something placed in a room (tile coords); a resting station has `for` = the replicant it belongs to. */
 export interface WarrenItem { id: string; kind: string; room: string; x: number; y: number; by: string; for?: string; note?: string; at: number; /** palette index the copy chose */ tint?: number; placement?: string }

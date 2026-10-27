@@ -898,7 +898,7 @@ export async function codeTool(name: string, input: Record<string, unknown>, bud
 // ------------------------------------------------------------------ away wakes
 
 interface PlanetRow { galaxy_id: string; star_id: string; planet_index: number; embers: number; data: Record<string, unknown> }
-type Bld = { name: string; w: number; h: number; material: string; roof: string; door: string; by: string; purpose?: string; approved: boolean; vetoed?: boolean; built: boolean; paid: boolean; progress: number; helpers: string[]; cost: Record<string, number>; design?: string; printStart?: number; printMs?: number };
+type Bld = { name: string; w: number; h: number; material: string; roof: string; door: string; by: string; purpose?: string; approved: boolean; vetoed?: boolean; built: boolean; paid: boolean; progress: number; helpers: string[]; cost: Record<string, number>; design?: string; printStart?: number; printMs?: number; cems?: boolean };
 type Action = Record<string, unknown>;
 /** One entry of planet_states.data.awayQueue: what a copy did in an away wake, for the game to play out on landing. */
 interface AwayItem { id: string; name: string; at: number; song?: string; actions: Action[]; became: boolean }
@@ -1225,6 +1225,11 @@ function awayContext(rep: Replicant, original: string, p: AwayPlanet, delays: Re
     if (b.design) {
       const share = Math.min(1, (Date.now() - (b.printStart ?? Date.now())) / Math.max(1, b.printMs ?? 1));
       return `- ${b.name} (a design the Cems built for ${who(b.by)}): ${b.built || share >= 1 ? "built" : `the Cems are building it, ${Math.round(share * 100)}%`}${b.purpose ? ` "${b.purpose}"` : ""}`;
+    }
+    // a copy's blueprint the Cems took up once it was paid (one building system): the copies tend their bed for it
+    if (b.cems) {
+      const share = Math.min(1, (Date.now() - (b.printStart ?? Date.now())) / Math.max(1, b.printMs ?? 1));
+      return `- ${b.name} (${b.w}x${b.h}, ${b.roof} roof, ${who(b.by)}'s design, printed by the Cems): ${b.built || share >= 1 ? "built" : `the Cems are printing it, ${Math.round(share * 100)}%, the copies tend their bed`}${b.purpose ? ` "${b.purpose}"` : ""}`;
     }
     const total = b.w * b.h * KIT.buildingKit.swingsPerTile;
     const state = b.built ? "built" : !b.approved ? "waiting for the original's word" : !b.paid ? "waits for materials" : `being raised, ${Math.round((b.progress / total) * 100)}%`;

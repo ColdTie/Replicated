@@ -325,6 +325,23 @@ export class Bioworks {
     return true;
   }
 
+  /** Where a copy tends the bed: a point on the salt's rim (north or south, clear of the mound and the fungus) near it. */
+  tendSpot(x: number, y: number): Pt | null {
+    if (!this.active || !this.awake || !this.lot) return null;
+    const c = this.center, F = BIO.flat;
+    const side = y < c.y ? -1 : 1, a = side * (Math.PI / 2 + (Math.random() - 0.5) * 1.6) + (x < c.x ? 0.15 : -0.15) * side;
+    return { x: Math.round(c.x + Math.cos(a) * (F.rx - 6)), y: Math.round(c.y + Math.sin(a) * (F.ry - 2)) };
+  }
+
+  /** A stroke of tending: the Cems nearest the hands brighten, a little light rises. */
+  tended(x: number, y: number) {
+    const s = this.scene;
+    const near = this.mats.filter((m) => Math.hypot(m.sprite.x - x, m.sprite.y - y) < 30);
+    for (const m of near) { m.sprite.setTintFill(PALETTE[12]); s.time.delayedCall(100, () => m.sprite.active && m.sprite.clearTint()); }
+    s.fx.sparks(x, y - 2, PALETTE[12], 3);
+    sound.cemBreath({ x, y });
+  }
+
   /** Launching from here with the Cems awake: a jar of them goes aboard (true when one did). */
   sendCulture(to: Pt) {
     if (!this.active || !this.awake) return false;
