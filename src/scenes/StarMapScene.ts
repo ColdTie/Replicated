@@ -269,7 +269,11 @@ export class StarMapScene extends Phaser.Scene {
     return { star, planet, name: sp.moon ?? sp.name, sub: here ? `${s.name} - YOU ARE HERE` : `${s.name} - ${ly.toFixed(1)} LY`, details, mark };
   }
 
-  /** RECENT: worlds with a save, newest first (this one leads). CLOSEST: the worlds of the nearest stars. */
+  /**
+   * RECENT: worlds with a save, newest first (this one leads). CLOSEST: the worlds of the nearest other stars, at most
+   * PER_STAR of each (those in the habitable zone first), so the list reaches past one big system; the planets of the
+   * star you are at are on the map (tap it), not in this list.
+   */
   private fillMenu() {
     if (!this.menu) return;
     const from = this.d.fromPlanet ?? defaultPlanetIndex(this.d.from);
@@ -282,14 +286,16 @@ export class StarMapScene extends Phaser.Scene {
       if (e) { recent.push(e); seen.add(k); }
     }
     const closest: PlanetEntry[] = [];
+    const PER_STAR = 3, MAX = 14;
     for (const s of [...STAR_LIST].sort((a, b) => distanceLy(this.d.from, a.id) - distanceLy(this.d.from, b.id))) {
-      for (const p of systemFor(s.id)) {
-        if (closest.length >= 14) break;
-        if (this.isHere(s.id, p.index)) continue;
+      if (s.id === this.d.from) continue;
+      const worlds = systemFor(s.id).slice().sort((a, b) => Number(b.hz) - Number(a.hz) || a.index - b.index).slice(0, PER_STAR).sort((a, b) => a.index - b.index);
+      for (const p of worlds) {
+        if (closest.length >= MAX) break;
         const e = this.entry(s.id, p.index);
         if (e) closest.push(e);
       }
-      if (closest.length >= 14) break;
+      if (closest.length >= MAX) break;
     }
     this.menu.setGroups({ recent, closest });
   }
