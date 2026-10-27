@@ -967,6 +967,9 @@ copies' own buildings are untouched (still raised by swings).
   printer. Swings no longer raise it; the copies tend the bed's rim instead, and each stroke brings the print 1.5 s
   nearer (`bioworks.json tend`), for your own designs too. Without a bed, blueprints are raised by hand as before.
   The mind function describes such a print the same way (in the repo; it waits for the next deploy).
+- Fix: a copy greeting you mid-walk dropped back to idle with its chore still pending, so the chore (a swing at a
+  building, now a stroke of tending) was done wherever it walked next. After the hello it takes up its walk, load,
+  chore or hammering again.
 - Verified: build, typecheck, the mind tool check, `deno check` of the function, `playtest-planetmenu` (CLOSEST has no
   0.0 LY rows), the new `playtest-seedbed` and `playtest-cemprint`, `playtest-sound` (the new sounds), the full
   `npm test`. Screenshots `planet-menu-sol.png`, `seed-ghost.png`, `seed-done.png`, `seedbed-*.png`, `cemworld-*.png`,
