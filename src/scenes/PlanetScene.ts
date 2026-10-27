@@ -127,7 +127,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean; cembed?: PlanetData['cembed'] } = { embers: 0, nodes: {}, doors: {} };
   /** who lives on which lot of the town (planet_states.data.town) */
   townState: TownState = { lots: {}, civic: {} };
   /** this load moved an old save into the town: saved positions of the player and the copies are ignored once */
@@ -717,6 +717,7 @@ export class PlanetScene extends Phaser.Scene {
         this.fx.dust(ex, ey + 2, 6);
         this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
         this.trade.unload();
+        this.bioworks?.announce();
         this.homecoming.run(() => { pl.locked = false; this.saver.markAwake(); });
       },
     });
@@ -789,6 +790,19 @@ export class PlanetScene extends Phaser.Scene {
         if (first) { px = first.x - 50; py = first.y + 26; }
       }
       if (view === 'designs') this.time.delayedCall(300, () => { if (this.bioworks) { this.bioworks.readyAt = 0; this.bioworks.openMenu(); } });
+      this.player.setPosition(px, py);
+      this.cameras.main.centerOn(px, py - 10);
+    }
+    // a culture of Cems aboard on a world without a bed: the ghost of the bed with the salt for it; seeded
+    if ((view === 'seed' || view === 'seeded') && !this.bioworks?.active) {
+      const me = session.replicant;
+      if (me) me.traits.culture = { from: 'lhs-1140:2', at: Date.now() };
+      this.supplies.salt = 14;
+      this.markSupplies();
+      this.bioworks?.offer(session.planet);
+      const bw = this.bioworks;
+      if (bw?.lot) { px = bw.center.x - 34; py = bw.center.y + 40; }
+      if (view === 'seeded') this.time.delayedCall(400, () => this.bioworks?.seed());
       this.player.setPosition(px, py);
       this.cameras.main.centerOn(px, py - 10);
     }
@@ -978,6 +992,7 @@ export class PlanetScene extends Phaser.Scene {
   /** The action button does something other than attack here (build). Returns true if it did. */
   tryInteract(): boolean {
     if (this.bioworks?.playerAtDoor()) { this.bioworks.openMenu(); return true; }
+    if (this.bioworks?.playerOnGhost() && this.bioworks.canSeed()) return this.bioworks.seed();
     if (this.departure.playerOnBoardSpot()) return this.departure.tryBoard();
     if (this.dock.playerOnPad()) return this.dock.tryBuild();
     if (this.time.now > this.hatchReadyAt && this.warren.playerOnHatch()) { this.descend(); return true; }

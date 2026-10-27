@@ -5,11 +5,17 @@
 // the fungus on the other side, whose light runs over the bed now and then as it cleans it; salt blooms around the rim.
 // It sleeps (grey, still) until Thales' Printworks is finished; then the Cems wake and the Printworks' door opens the
 // design menu (src/scenes/DesignScene.ts), with a little turning model of a design over it.
+// The bed travels: launching from a world whose Cems are awake, the ship's hold takes a culture of them (a glass jar,
+// replicants.traits.culture). On a world without a bed a ghost of the flat waits on the free lot nearest the square,
+// with what it still needs over it; standing on it with the salt in the store seeds it (planet_states.data.cembed):
+// the jar flies from the ship and breaks open, the Cems take to the salt and wake at once, and a design stone on the
+// bed's rim opens the design menu where there is no Printworks.
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
-import { BACKEND, PALETTE } from '../core/data';
+import { BACKEND, PALETTE, SUPPLIES } from '../core/data';
 import { designModel, DESIGNS, paintTexture, turntableView } from '../core/designs';
 import { isHome } from '../core/home';
+import { session } from '../core/session';
 import BIO from '../data/bioworks.json';
 import HOMEWORLD from '../data/homeworld.json';
 import type { Light } from '../fx/Lighting';
@@ -70,9 +76,14 @@ function paintFlat(rx: number, ry: number, seed: number) {
   return { width: W, height: H, data };
 }
 
+/** A culture of Cems the ship's hold carries, if any. */
+export const shipCulture = () => session.replicant?.traits.culture ?? null;
+
 export class Bioworks {
-  /** this world has a Cem bed */
-  readonly active: boolean;
+  /** the homeworld's bed, founded with the town (it wakes with the Printworks) */
+  readonly founded: boolean;
+  /** this world has a Cem bed (founded, or seeded from a culture) */
+  active: boolean;
   lot?: Lot;
   center: Pt = { x: 0, y: 0 };
   awake = false;
@@ -95,13 +106,33 @@ export class Bioworks {
   private ring?: Phaser.GameObjects.Graphics;
   readyAt = 0;
   private holo?: { image: Phaser.GameObjects.Image; light: Light; t: number; at: number; design: string };
+  /** a seeded bed's design stone (where the menu opens on a world without the Printworks); dir 1: you stand south of it */
+  private plinth?: { x: number; y: number; dir: 1 | -1; sprite: Phaser.GameObjects.Sprite; light: Light };
+  /** no bed yet, but the ship holds a culture: the flat's outline on the lot it would take, the jar over it */
+  private ghost?: { gfx: Phaser.GameObjects.Graphics; jar: Phaser.GameObjects.Sprite; light: Light; readout: Phaser.GameObjects.Container; dwell: number; seeding: boolean };
 
   constructor(private scene: PlanetScene, save: PlanetSave | null) {
-    this.active = BIO.worlds.includes(scene.planet.id) && isHome(scene.planet.star, scene.planet.planetIndex) && !scene.visit;
-    if (!this.active) return;
-    this.reserve(save);
-    if (!this.lot) return;
-    this.place(save);
+    this.founded = BIO.worlds.includes(scene.planet.id) && isHome(scene.planet.star, scene.planet.planetIndex) && !scene.visit;
+    this.active = this.founded || (!scene.visit && !!save?.data.cembed);
+    if (this.active) {
+      this.reserve(save);
+      if (!this.lot) return;
+      this.place(save);
+      if (!this.founded) this.wake(false);
+      return;
+    }
+    // a world without a bed, the ship here with a culture aboard: the bed it could have
+    if (!scene.visit && !scene.vesselAway && shipCulture()) this.showGhost(save);
+  }
+
+  /** The free lot a bed takes: the one nearest the goal (the homeworld's Printworks), else nearest the square. */
+  private pickLot(save: PlanetSave | null): Lot | undefined {
+    const s = this.scene, town = s.map.town, st = s.townState;
+    const used = new Set([...Object.values(st.lots), ...Object.values(st.civic)]);
+    const goal = save?.data.buildings?.find((b) => b.id === HOMEWORLD.goal) ?? { x: s.baseCenter.x, y: s.baseCenter.y };
+    const mid = (l: Lot) => ({ x: (l.rect.x + l.rect.w / 2) * 16, y: (l.rect.y + l.rect.h / 2) * 16 });
+    return town.lots.filter((l) => !used.has(l.index))
+      .sort((a, b) => Math.hypot(mid(a).x - goal.x, mid(a).y - goal.y) - Math.hypot(mid(b).x - goal.x, mid(b).y - goal.y))[0];
   }
 
   /** The bed's lot: kept in planet_states.data.town.civic.cembed; the first time, the free lot nearest the goal. */
@@ -109,18 +140,18 @@ export class Bioworks {
     const s = this.scene, town = s.map.town, st = s.townState;
     let i = st.civic[BED_KEY];
     if (i === undefined || !town.lots[i]) {
-      const used = new Set([...Object.values(st.lots), ...Object.values(st.civic)]);
-      const goal = save?.data.buildings?.find((b) => b.id === HOMEWORLD.goal) ?? { x: s.baseCenter.x, y: s.baseCenter.y };
-      const free = town.lots.filter((l) => !used.has(l.index));
-      const mid = (l: Lot) => ({ x: (l.rect.x + l.rect.w / 2) * 16, y: (l.rect.y + l.rect.h / 2) * 16 });
-      free.sort((a, b) => Math.hypot(mid(a).x - goal.x, mid(a).y - goal.y) - Math.hypot(mid(b).x - goal.x, mid(b).y - goal.y));
-      if (!free[0]) return;
-      i = free[0].index;
+      const free = this.pickLot(save);
+      if (!free) return;
+      i = free.index;
       st.civic[BED_KEY] = i;
       if (!s.shot) s.markTown();
     }
-    this.lot = town.lots[i];
-    const r = this.lot.rect;
+    this.setLot(town.lots[i]);
+  }
+
+  private setLot(lot: Lot) {
+    this.lot = lot;
+    const r = lot.rect;
     this.center = { x: Math.round((r.x + r.w / 2) * 16), y: Math.round((r.y + r.h / 2) * 16 + 4) };
   }
 
@@ -161,7 +192,7 @@ export class Bioworks {
     }).setDepth(DEPTH_GLOW);
     this.gfx = s.add.graphics().setDepth(DEPTH_ANTS);
     this.glowGfx = s.add.graphics().setDepth(DEPTH_GLOW).setBlendMode(Phaser.BlendModes.ADD);
-    this.ring = s.add.graphics().setDepth(6150);
+    this.ring ??= s.add.graphics().setDepth(6150);
     // salt blooms around the rim (saved under their own keys; they regrow like every node)
     const regrowMs = BACKEND.nodeRegrowMinutes * 60_000;
     for (let k = 0; k < BIO.blooms; k++) {
@@ -171,9 +202,25 @@ export class Bioworks {
       const key = `bed${k}`;
       let hits = save?.data.nodes?.[key]?.hits ?? 0;
       if (hits >= NODE.salt.hits && Date.now() - (save?.data.nodes?.[key]?.at ?? 0) > regrowMs) { hits = 0; s.pending.nodes[key] = { hits: 0, at: Date.now() }; }
-      s.nodes.push(new CrystalNode(s, x, y, -1 - k, hits, 'salt', key));
+      const node = new CrystalNode(s, x, y, -1 - k, hits, 'salt', key);
+      s.nodes.push(node);
+      // seeded while you play: the world's colliders were made before these blooms
+      if (s.player) s.physics.add.collider(s.player.zone, node.zone);
     }
+    if (!this.founded) this.placePlinth();
     this.sleep();
+  }
+
+  /** A seeded bed's design stone: on the rim toward the street (the south rim when the street runs past a side). */
+  private placePlinth() {
+    const s = this.scene, c = this.center, F = BIO.flat;
+    const dir: 1 | -1 = this.lot?.face === 'n' ? -1 : 1;
+    const x = c.x, y = c.y + dir * (F.ry + (dir > 0 ? 6 : 2));
+    const sprite = s.add.sprite(x, y + 1, 'plinth', 0).setOrigin(0.5, 1).setDepth(100 + y);
+    sprite.play('plinth:glow');
+    s.addSolid(x, y - 2, 8, 4);
+    const light = s.lighting.add({ x, y: y - 11, radius: 22, color: PALETTE[12], intensity: 0.3, flicker: 0.2 });
+    this.plinth = { x, y, dir, sprite, light };
   }
 
   /** Before the Printworks stands: the Cems grey and slow, the mound still, no ants. */
@@ -184,8 +231,151 @@ export class Bioworks {
     this.drink?.stop();
   }
 
-  /** The goal building is finished (or was already): the Cems wake and the ants come out. */
-  wake(animate: boolean) {
+  // ------------------------------------------------------------ the bed travels: a culture in the hold, a bed seeded
+
+  /** The bed this world could have: its outline on the lot it would take, the culture's jar floating over it. */
+  private showGhost(save: PlanetSave | null) {
+    const s = this.scene, lot = this.pickLot(save);
+    if (!lot) return;
+    this.setLot(lot);
+    const c = this.center;
+    const gfx = s.add.graphics().setDepth(1.7);
+    const jar = s.add.sprite(c.x, c.y - 14, 'culture', 0).setBlendMode(Phaser.BlendModes.ADD).setTint(0x9ff8ff).setAlpha(0.7).setDepth(DEPTH_GLOW);
+    jar.play('culture:breathe');
+    const light = s.lighting.add({ x: c.x, y: c.y - 8, radius: 34, color: PALETTE[12], intensity: 0.3, flicker: 0.15 });
+    const readout = s.add.container(c.x, c.y - 36).setDepth(6200).setAlpha(0);
+    this.ghost = { gfx, jar, light, readout, dwell: 0, seeding: false };
+    this.ring ??= s.add.graphics().setDepth(6150);
+    this.drawReadout();
+  }
+
+  /** What the seeding takes, against what the store holds: an icon and have/need per material. */
+  private drawReadout() {
+    const g = this.ghost;
+    if (!g) return;
+    const s = this.scene, cost = BIO.seed.cost as Record<string, number>, entries = Object.entries(cost);
+    g.readout.removeAll(true);
+    entries.forEach(([m, n], i) => {
+      const have = Math.min(n, Math.floor(s.supplies[m] ?? 0)), x = (i - (entries.length - 1) / 2) * 30;
+      const icon = (SUPPLIES.materials as Record<string, { icon: number }>)[m]?.icon ?? 0;
+      g.readout.add(s.add.image(x - 7, 0, 'supplies', icon));
+      g.readout.add(s.add.bitmapText(x + 1, -3, 'pixel', `${have}/${n}`).setTint(have >= n ? PALETTE[12] : PALETTE[21]));
+    });
+  }
+
+  /** A culture came aboard while here (or a screenshot stages one): the ghost of the bed appears. */
+  offer(save: PlanetSave | null) {
+    if (!this.active && !this.ghost && !this.scene.visit && shipCulture()) this.showGhost(save);
+  }
+
+  /** Landed with a culture aboard on a world without a bed: a word about it once the title card has gone. */
+  announce() {
+    if (this.ghost) this.scene.time.delayedCall(3800, () => this.ghost && this.scene.game.events.emit('notice', 'THE CEMS IN THE HOLD COULD LIVE HERE'));
+  }
+
+  /** The ghost has all it needs. */
+  canSeed() { return !!this.ghost && !this.ghost.seeding && !this.scene.warren.shortage(BIO.seed.cost); }
+
+  /** Standing on the ghost's middle. */
+  playerOnGhost() {
+    const p = this.scene.player;
+    return !!this.ghost && !!p && ((p.x - this.center.x) / (BIO.flat.rx * 0.5)) ** 2 + ((p.y - this.center.y) / (BIO.flat.ry * 0.6)) ** 2 < 1;
+  }
+
+  /**
+   * Seeds the bed: the salt flies from the store to the flat, the culture from the ship; the jar breaks open over the
+   * salt, the Cems spill out and take to it, the mound and the fungus come up and the bed wakes. Saved at once.
+   */
+  seed() {
+    const s = this.scene, g = this.ghost, me = session.replicant;
+    if (!g || !this.canSeed()) return false;
+    g.seeding = true;
+    this.ring?.clear();
+    s.warren.pay(BIO.seed.cost);
+    this.reserve(session.planet);
+    if (!this.lot) { g.seeding = false; return false; }
+    const c = this.center, culture = shipCulture();
+    for (const m of Object.keys(BIO.seed.cost)) s.flyMaterial(m, s.warren.hatch, c, 0);
+    s.tweens.add({ targets: [g.readout], alpha: 0, duration: 300 });
+    // the jar comes down out of the ship
+    const v = s.vesselPos, jar = s.add.sprite(v.x, v.y - 12, 'culture', 0).setDepth(6300);
+    const arc = { t: 0 }, sx = jar.x, sy = jar.y;
+    sound.cultureLoad({ x: v.x, y: v.y });
+    s.tweens.add({ targets: g.jar, alpha: 0, duration: 500 });
+    s.tweens.add({
+      targets: arc, t: 1, delay: 500, duration: 1100, ease: 'Sine.easeInOut',
+      onUpdate: () => jar.setPosition(sx + (c.x - sx) * arc.t, sy + (c.y - 10 - sy) * arc.t - Math.sin(arc.t * Math.PI) * 40),
+      onComplete: () => {
+        jar.destroy();
+        s.fx.sparks(c.x, c.y - 8, PALETTE[12], 16);
+        s.fx.sparks(c.x, c.y - 8, PALETTE[19], 6);
+        s.shake(120, 0.002);
+        sound.cultureSeed({ x: c.x, y: c.y });
+        g.gfx.destroy(); g.jar.destroy(); s.lighting.remove(g.light); g.readout.destroy();
+        this.ghost = undefined;
+        this.active = true;
+        this.place(session.planet);
+        this.wake(true, 'THE CEMS TAKE TO THE SALT: THIS WORLD CAN BUILD');
+      },
+    });
+    const data = { at: Date.now(), by: me?.id, from: culture?.from };
+    if (!s.shot) { s.pending.cembed = data; void s.flushPlanet(); }
+    if (session.planet) session.planet.data.cembed = data;
+    s.mindLog.push({ t: s.mindClock, text: `${me?.name ?? 'the original'} seeded a Cem bed here from a culture the ship brought; the Cems build on this world now` });
+    return true;
+  }
+
+  /** Launching from here with the Cems awake: a jar of them goes aboard (true when one did). */
+  sendCulture(to: Pt) {
+    if (!this.active || !this.awake) return false;
+    const s = this.scene, far = Math.hypot(this.center.x - to.x, this.center.y - to.y) > 260;
+    const from = far ? s.warren.hatch : this.center;
+    const jar = s.add.sprite(from.x, from.y - 10, 'culture', 0).setDepth(6300);
+    const arc = { t: 0 }, sx = jar.x, sy = jar.y;
+    s.tweens.add({
+      targets: arc, t: 1, duration: 800, ease: 'Sine.easeInOut',
+      onUpdate: () => jar.setPosition(sx + (to.x - sx) * arc.t, sy + (to.y - 10 - sy) * arc.t - Math.sin(arc.t * Math.PI) * 30),
+      onComplete: () => { jar.destroy(); s.fx.sparks(to.x, to.y - 10, PALETTE[12], 4); },
+    });
+    sound.cultureLoad({ x: to.x, y: to.y });
+    return true;
+  }
+
+  private updateGhost(time: number, dt: number) {
+    const g = this.ghost, s = this.scene;
+    if (!g) return;
+    const c = this.center, F = BIO.flat, breath = 0.5 + 0.5 * Math.sin(time / 900);
+    // the flat's outline, dashed, breathing in the Cems' green
+    // (salt white, so it reads on green worlds too)
+    g.gfx.clear();
+    g.gfx.fillStyle(PALETTE[20], 0.1 + 0.06 * breath).fillEllipse(c.x, c.y, F.rx * 2, F.ry * 2);
+    const n = 44;
+    for (let i = 0; i < n; i += 2) {
+      const a0 = (i / n) * Math.PI * 2 + time / 6000, a1 = ((i + 1) / n) * Math.PI * 2 + time / 6000;
+      g.gfx.lineStyle(1, PALETTE[2], 0.45 + 0.35 * breath).lineBetween(c.x + Math.cos(a0) * F.rx, c.y + Math.sin(a0) * F.ry, c.x + Math.cos(a1) * F.rx, c.y + Math.sin(a1) * F.ry);
+    }
+    for (let i = 0; i < n; i += 4) {
+      const a0 = (i / n) * Math.PI * 2 - time / 9000;
+      g.gfx.fillStyle(PALETTE[12], 0.35 + 0.4 * breath).fillRect(Math.round(c.x + Math.cos(a0) * F.rx * 0.6), Math.round(c.y + Math.sin(a0) * F.ry * 0.6), 1, 1);
+    }
+    if (g.seeding) return;
+    g.jar.y = c.y - 14 + Math.sin(time / 500) * 2;
+    g.light.intensity = 0.2 + 0.15 * breath;
+    // near: what it still needs; standing on it with all of it: the ring fills and the bed is seeded
+    const p = s.player, near = !!p && Math.hypot(p.x - c.x, p.y - c.y) < BIO.seed.readoutPx;
+    g.readout.setAlpha(Phaser.Math.Clamp(g.readout.alpha + (near ? dt : -dt) / 250, 0, 1));
+    if (near && time % 500 < dt) this.drawReadout();
+    const on = !!p && p.alive && !p.locked && !s.stopped && !s.talker.talk && this.playerOnGhost() && this.canSeed();
+    g.dwell = on ? g.dwell + dt : 0;
+    this.ring?.clear();
+    if (!g.dwell) return;
+    const k = Math.min(1, g.dwell / BIO.seed.dwellMs);
+    this.ring?.lineStyle(1, PALETTE[12], 0.4 + 0.5 * k).beginPath().arc(c.x, c.y, 12, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2).strokePath();
+    if (k >= 1) this.seed();
+  }
+
+  /** The goal building is finished (or was already), or the bed was just seeded: the Cems wake and the ants come out. */
+  wake(animate: boolean, notice = 'THE CEMS WAKE: THE PRINTWORKS TAKES DESIGNS') {
     if (!this.active || !this.lot || this.awake) return;
     this.awake = true;
     const s = this.scene;
@@ -198,7 +388,7 @@ export class Bioworks {
       s.tweens.add({ targets: t, k: 1, duration: 1800, ease: 'Sine.easeInOut', onUpdate: () => { const c = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0x7c8a84), Phaser.Display.Color.ValueToColor(0xffffff), 1, t.k); for (const m of this.mats) m.sprite.setTint(Phaser.Display.Color.GetColor(c.r, c.g, c.b)); }, onComplete: () => { for (const m of this.mats) m.sprite.clearTint(); } });
       s.fx.sparks(this.center.x, this.center.y - 4, PALETTE[12], 14);
       sound.cemsWake({ x: this.center.x, y: this.center.y });
-      s.time.delayedCall(1400, () => s.game.events.emit('notice', 'THE CEMS WAKE: THE PRINTWORKS TAKES DESIGNS'));
+      s.time.delayedCall(1400, () => s.game.events.emit('notice', notice));
     } else for (const m of this.mats) m.sprite.clearTint();
     // ants about the mound, and the line that carries the Cems their feed
     if (this.mound) for (let i = 0; i < BIO.ants.mound; i++) this.loiter.push({ x: this.mound.x + (Math.random() - 0.5) * 20, y: this.mound.y - 2 + (Math.random() - 0.5) * 10, a: Math.random() * Math.PI * 2, v: 6 + Math.random() * 6 });
@@ -250,13 +440,17 @@ export class Bioworks {
     return ((x - this.center.x) / BIO.flat.rx) ** 2 + ((y - this.center.y) / BIO.flat.ry) ** 2 < 1;
   }
 
-  /** The Printworks, where the design menu opens (built). */
-  private get door(): (Pt & { b: Building }) | null {
+  /**
+   * Where the design menu opens: the Printworks' door (built) on the homeworld, a seeded bed's design stone elsewhere.
+   * top: where the turning model floats; dir 1: you stand south of it, -1: north.
+   */
+  private get door(): (Pt & { top: number; dir: 1 | -1 }) | null {
+    if (this.plinth) return { x: this.plinth.x, y: this.plinth.y + (this.plinth.dir > 0 ? 0 : -14), top: this.plinth.y - 14, dir: this.plinth.dir };
     const b = this.scene.buildings?.list.find((x) => x.id === HOMEWORLD.goal && x.built && !x.vetoed);
-    return b ? { ...buildingDoor(b), b } : null;
+    return b ? { ...buildingDoor(b), top: b.y - b.h * 12 - roofHeight(b) - 6, dir: 1 } : null;
   }
 
-  /** Standing in the Printworks' doorway (in front of it). */
+  /** Standing in the Printworks' doorway (in front of it), or before the design stone. */
   playerAtDoor() {
     const d = this.door, p = this.scene.player;
     return !!d && this.awake && !!p && Math.abs(p.x - d.x) < 9 && p.y > d.y - 2 && p.y < d.y + 12;
@@ -282,7 +476,7 @@ export class Bioworks {
     const s = this.scene, d = this.door;
     s.scene.resume();
     s.player.locked = false;
-    if (d) s.player.setPosition(d.x, d.y + 16);
+    if (d) s.player.setPosition(d.x, d.dir > 0 ? d.y + 16 : d.y - 4);
     this.mustLeave = true;
     this.readyAt = s.time.now + 1800;
   }
@@ -304,6 +498,7 @@ export class Bioworks {
   }
 
   update(time: number, dt: number) {
+    if (this.ghost) this.updateGhost(time, dt);
     if (!this.active || !this.lot) return;
     const s = this.scene, night = s.env?.night ?? 0;
     // the Cems glow a little at night, and the bed with them; the fungus' light breathes
@@ -374,7 +569,7 @@ export class Bioworks {
     const s = this.scene, d = this.door;
     if (!d || !this.awake) { if (this.holo) { this.holo.image.setVisible(false); this.holo.light.intensity = 0; } return; }
     if (!this.holo) {
-      const light = s.lighting.add({ x: d.x, y: d.y - d.b.h * 12 - 12, radius: 34, color: PALETTE[18], intensity: 0.4, flicker: 0.2 });
+      const light = s.lighting.add({ x: d.x, y: d.top - 9, radius: 34, color: PALETTE[18], intensity: 0.4, flicker: 0.2 });
       const image = s.add.image(d.x, d.y - 26, '__WHITE').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH_GLOW).setAlpha(0.85).setTint(0x9ff8ff);
       this.holo = { image, light, t: 0, at: 0, design: DESIGNS[1].id };
     }
@@ -388,9 +583,11 @@ export class Bioworks {
       const which = shown[Math.floor(h.t / 9) % shown.length].id;
       const m = designModel(which);
       if (m) {
-        const r = turntableView(m, h.t * 0.9, BIO.hologram.ppv * (m.h > 16 ? 1.1 : 1.6));
-        h.image.setTexture(paintTexture(s, `design-holo:${which}`, r)).setOrigin(0.5, 1);
-        h.image.setPosition(d.x, d.y - d.b.h * 12 - roofHeight(d.b) - 3 + Math.sin(h.t * 2) * 1.5);
+        const r = turntableView(m, h.t * 0.9, BIO.hologram.ppv * (m.h > 16 ? 1.1 : 1.6) * (this.plinth ? 0.7 : 1));
+        // anchored by the middle of the model's foot, so it stands on the roof or the stone's lens
+        const foot = r.toImage(m.w / 2, m.d / 2, 0);
+        h.image.setTexture(paintTexture(s, `design-holo:${which}`, r)).setOrigin(foot.x / r.width, foot.y / r.height);
+        h.image.setPosition(d.x, d.top + Math.sin(h.t * 2) * 1.5);
       }
     }
     h.light.intensity = 0.3 + 0.12 * Math.sin(time / 300);

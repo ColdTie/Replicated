@@ -102,6 +102,7 @@ export class Departure {
     }
     this.s.hands.stow();
     this.s.trade.loadHold();
+    this.s.trade.loadCulture();
     this.s.homecoming.remember();
     this.s.embers -= fuel;
     this.s.pending.embers -= fuel;

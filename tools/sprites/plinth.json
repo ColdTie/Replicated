@@ -1,0 +1,45 @@
+{
+ "_doc": "The design stone of a seeded Cem bed (src/entities/Bioworks.ts): where a world without the Printworks picks its designs. A short post of laminated lignin the Cems printed on a salt foot, a lens of living Cems at its top that the turning design hologram rises from. Frames: the lens breathing.",
+ "size": [16, 16],
+ "tinted": false,
+ "legend": {".": null, "a": 25, "k": 5, "l": 4, "m": 3, "n": 30, "s": 2, "t": 21, "c": 13, "d": 12, "e": 18},
+ "animations": {"glow": {"fps": 1.5, "frames": [0, 1], "repeat": -1}},
+ "frames": [
+  [
+   "................",
+   "................",
+   "................",
+   "................",
+   "......aaaa......",
+   ".....acdeca.....",
+   "....aakkkkaa....",
+   "....ammmmmma....",
+   ".....alllla.....",
+   ".....annnna.....",
+   ".....alllla.....",
+   ".....annnna.....",
+   ".....alllla.....",
+   "....aakkkkaa....",
+   "...asssssssta...",
+   "....aaaaaaaa...."
+  ],
+  [
+   "................",
+   "................",
+   "................",
+   "................",
+   "......aaaa......",
+   ".....adedda.....",
+   "....aakkkkaa....",
+   "....ammmmmma....",
+   ".....alllla.....",
+   ".....annnna.....",
+   ".....alllla.....",
+   ".....annnna.....",
+   ".....alllla.....",
+   "....aakkkkaa....",
+   "...asssssssta...",
+   "....aaaaaaaa...."
+  ]
+ ]
+}

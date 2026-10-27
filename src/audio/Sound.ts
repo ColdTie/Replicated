@@ -786,6 +786,26 @@ class SoundEngine {
     [0, 4, 7, 12].forEach((st, i) => this.tone(midi(55 + st), 2.2, { pan, type: 'sine', vol: 0.045 * kk, attack: 0.3, delay: 0.55 + i * 0.05, rev: 0.8 }));
     this.noise(1.6, { pan, freq: 600, to: 1200, q: 1.2, vol: 0.025 * kk, attack: 0.6, delay: 0.5, rev: 0.7 });
   }
+  /** A culture of Cems goes aboard the ship: a small glass clink and a breath inside the jar. */
+  cultureLoad(at?: At) {
+    if (!this.ready('cultureLoad', 1200)) return;
+    const { k, pan } = this.spatial(at);
+    const kk = Math.max(0.4, k);
+    this.tone(vary(1760, 0.02), 0.4, { pan, type: 'sine', vol: 0.03 * kk, rev: 0.6 });
+    this.tone(vary(2640, 0.02), 0.25, { pan, type: 'sine', vol: 0.015 * kk, delay: 0.02, rev: 0.6 });
+    this.noise(0.5, { pan, freq: 700, to: 1100, q: 1.4, vol: 0.02 * kk, attack: 0.2, delay: 0.1 });
+  }
+  /** A culture opened over the salt: the cap pops, the glass rings, the Cems spill out wet and the bed takes them in. */
+  cultureSeed(at?: At) {
+    if (!this.ready('cultureSeed', 2500)) return;
+    const { k, pan } = this.spatial(at);
+    const kk = Math.max(0.5, k);
+    this.noise(0.05, { pan, freq: 2200, q: 2, vol: 0.06 * kk });
+    this.tone(vary(1320, 0.02), 0.6, { pan, type: 'sine', vol: 0.035 * kk, delay: 0.03, rev: 0.7 });
+    this.tone(vary(1980, 0.02), 0.4, { pan, type: 'sine', vol: 0.018 * kk, delay: 0.05, rev: 0.7 });
+    this.noise(0.7, { pan, freq: 500, to: 260, q: 1.6, vol: 0.05 * kk, attack: 0.05, delay: 0.15 });
+    [0, 3, 7, 12].forEach((st, i) => this.marimba(midi(62 + st), 0.5 + i * 0.1, 0.05 * kk, pan));
+  }
   /** A struck bar of lignin: a quick sine with its fourth-octave partial, woody and round. */
   private marimba(freq: number, delay: number, vol: number, pan = 0, bus: Bus = 'sfx') {
     this.tone(freq, 0.5, { pan, type: 'sine', vol, delay, rev: 0.45, bus });
