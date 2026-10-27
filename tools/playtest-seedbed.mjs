@@ -109,11 +109,21 @@ try {
   if (house) fail(`the House cannot be printed on the seeded world: ${house}`);
   for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(80); }
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => !window.__game.scene.isActive('designs') && window.__scene.buildings.printing.length === 1, null, { timeout: 8000 }).catch(() => fail('Enter at the design stone did not print the House'));
+  const printed = await page.waitForFunction(() => !window.__game.scene.isActive('designs') && window.__scene.buildings.printing.length === 1, null, { timeout: 8000 }).then(() => true).catch(() => false);
+  if (!printed) {
+    // what the menu and the world were doing, so a failure says why
+    log('menu state', JSON.stringify(await ev(() => {
+      const s = window.__scene, d = window.__designs;
+      return { open: window.__game.scene.isActive('designs'), row: d?.rows?.[d.index]?.id, busy: d?.busy, why: s.buildings.whyNot('house'), printing: s.buildings.printing.length,
+        list: s.buildings.list.map((b) => `${b.design ?? b.name}:${b.built ? 'built' : 'up'}`), talk: !!s.talker.talk, locked: s.player.locked, scenes: window.__game.scene.getScenes(true).map((x) => x.scene.key) };
+    })));
+    fail('Enter at the design stone did not print the House');
+  }
   await page.waitForTimeout(3400);
   const printing = await ev(() => { const s = window.__scene, b = s.buildings.printing[0]; return { design: b?.design, trails: s.bioworks.trails.filter((t) => t.id.startsWith(b?.id)).length }; });
   log('printing', JSON.stringify(printing));
   if (printing.design !== 'house' || printing.trails !== 2) fail('the House is not printed with the ants carrying for it');
+  if (!printing.design) throw new Error('no print to follow');
   await ev(() => { const s = window.__scene, b = s.buildings.printing[0]; b.printStart = Date.now() - b.printMs * 0.6; s.player.setPosition(b.x - 50, b.y + 26); });
   await page.waitForTimeout(900);
   await shot('seedbed-printing');
