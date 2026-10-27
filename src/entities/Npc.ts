@@ -45,6 +45,8 @@ export class Npc {
   private mineAt: Pt | null = null;
   private job: BuildJob | null = null;
   private chore: Chore | null = null;
+  /** what a hello interrupted, taken up again after it */
+  private afterGreet: State = 'idle';
   /** heading for the hatch to go down and do this */
   private descent: { task: BelowTask; room?: WarrenRoom } | null = null;
   private nextBuild: number;
@@ -289,6 +291,8 @@ export class Npc {
     const greetAt = soc === 'solitary' ? 18 : soc === 'clingy' ? 44 : 30;
     if (dp < greetAt && time > this.nextGreet && p.alive && this.state !== 'mine' && this.state !== 'talk') {
       this.nextGreet = time + (soc === 'solitary' ? 34_000 : soc === 'clingy' ? 11_000 : 20_000);
+      // a hello never drops what it was on its way to do (a chore left pending would be done wherever it walked next)
+      if (this.state !== 'greet') this.afterGreet = ['walk', 'carry', 'chore', 'hammer'].includes(this.state) ? this.state : 'idle';
       this.state = 'greet';
       this.until = time + 900;
       this.sprite.setFlipX(p.x < this.x);
@@ -298,7 +302,7 @@ export class Npc {
 
     switch (this.state) {
       case 'greet':
-        if (time > this.until) this.state = 'idle';
+        if (time > this.until) { this.state = this.afterGreet; this.afterGreet = 'idle'; }
         break;
       case 'idle':
         if (time > this.until) this.think(time);

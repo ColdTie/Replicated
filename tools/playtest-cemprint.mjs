@@ -49,11 +49,14 @@ try {
   if (swing.struck) fail('a swing still raised a building the Cems print');
 
   // 3. the copies tend the bed: they go to its rim and every stroke brings the print nearer
-  const t0 = await ev((id) => { const s = window.__scene; s.npcs.forEach((n) => { n.state = 'idle'; n.until = 0; n.nextBuild = 0; }); return s.buildings.list.find((x) => x.id === id).printStart; }, proposed.id);
+  // (every copy starts afresh: a chore it was walking to before the Cems took over is dropped)
+  const fresh = () => window.__scene.npcs.forEach((n) => { n.state = 'idle'; n.chore = null; n.target = null; n.until = 0; n.nextBuild = 0; });
+  const t0 = await ev(([id, f]) => { new Function(`return (${f})`)()(); return window.__scene.buildings.list.find((x) => x.id === id).printStart; }, [proposed.id, fresh.toString()]);
   await page.waitForFunction(([id, t]) => window.__scene.buildings.list.find((x) => x.id === id).printStart < t - 1000, [proposed.id, t0], { timeout: 30000 }).catch(() => fail('no copy tended the bed for the print'));
-  const tending = await ev(() => { const s = window.__scene, bw = s.bioworks; return s.npcs.map((n) => Math.round(Math.hypot(n.x - bw.center.x, n.y - bw.center.y))); });
-  log('copies from the bed', JSON.stringify(tending));
-  if (!tending.some((d) => d < 70)) fail('no copy is at the bed');
+  // the one tending kneels at the bed's rim
+  const tending = await page.waitForFunction(() => { const s = window.__scene, bw = s.bioworks; return s.npcs.some((n) => n.state === 'chore' && Math.hypot(n.x - bw.center.x, n.y - bw.center.y) < 70) && s.npcs.map((n) => `${n.state}:${Math.round(Math.hypot(n.x - bw.center.x, n.y - bw.center.y))}`); }, null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => null);
+  log('copies by the bed', JSON.stringify(tending));
+  if (!tending) fail('no copy tends at the bed');
   await ev(() => { const s = window.__scene, bw = s.bioworks; s.player.setPosition(bw.center.x - 50, bw.center.y + 50); });
   await page.waitForTimeout(800);
   await page.screenshot({ path: 'screenshots/cemprint-tending.png' });
@@ -78,7 +81,7 @@ try {
     for (const k of ['salt', 'iron', 'quartz', 'copper', 'wood']) s.supplies[k] = 38;
     s.addEmbers(40); s.markSupplies();
     const bl = s.buildings.print('house');
-    s.npcs.forEach((n) => { n.state = 'idle'; n.until = 0; n.nextBuild = 0; });
+    s.npcs.forEach((n) => { n.state = 'idle'; n.chore = null; n.target = null; n.until = 0; n.nextBuild = 0; });
     return bl && { id: bl.id, start: bl.printStart };
   });
   if (!design) fail('the House could not be printed on the seeded Earth');
