@@ -66,6 +66,19 @@ export class Trade {
     if (st && !s.shot) st.patchTraits(me.id, { cargo: me.traits.cargo }).catch((e) => console.warn('cargo save failed', e));
   }
 
+  /**
+   * Launching from a world whose Cems are awake: a culture of them goes into the hold (src/entities/Bioworks.ts) and
+   * stays there (the Cems in it keep growing), refreshed from every awake bed you leave.
+   */
+  loadCulture() {
+    const s = this.s, me = session.replicant, st = session.store;
+    if (!me || s.visit || !s.bioworks?.sendCulture(s.vesselPos)) return;
+    const first = !me.traits.culture;
+    me.traits.culture = { from: `${s.planet.star}:${s.planet.planetIndex}`, at: Date.now() };
+    if (first) s.mindLog.push({ t: s.mindClock, text: `${me.name} took a culture of the Cems aboard the ship, to seed a bed on other worlds` });
+    if (st && !s.shot) st.patchTraits(me.id, { culture: me.traits.culture }).catch((e) => console.warn('culture save failed', e));
+  }
+
   /** Landed: the hold is emptied into this world's store, flying from the vessel to the hatch. */
   unload() {
     const s = this.s, me = session.replicant, st = session.store;

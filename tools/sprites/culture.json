@@ -1,0 +1,45 @@
+{
+ "_doc": "A Cem culture (story/STORY.md: the Cems travel; src/entities/Bioworks.ts): a small glass jar with a lignin cap, living Cems inside breathing green and gold, a few ants on the glass. The ship's hold carries one from every world whose bed is awake; on a world without a bed it seeds one. Frames: the Cems breathing.",
+ "size": [16, 16],
+ "tinted": false,
+ "legend": {".": null, "a": 25, "k": 5, "l": 4, "m": 3, "g": 22, "h": 20, "w": 19, "b": 14, "c": 13, "d": 12, "y": 11},
+ "animations": {"breathe": {"fps": 2, "frames": [0, 1], "repeat": -1}},
+ "frames": [
+  [
+   "................",
+   ".....aaaaaa.....",
+   "....akllllka....",
+   "....ammmmmma....",
+   ".....aaaaaa.....",
+   "....agggggga....",
+   "...ag.w....ga...",
+   "...agw......a...",
+   "...ag.cdc.d.a...",
+   "...a.cddccd.a...",
+   "...acdcyddcda...",
+   "...adcdddcdca...",
+   "...acddcdydda...",
+   "...abcbcbcbba...",
+   "....aaaaaaaa....",
+   "................"
+  ],
+  [
+   "................",
+   ".....aaaaaa.....",
+   "....akllllka....",
+   "....ammmmmma....",
+   ".....aaaaaa.....",
+   "....agggggga....",
+   "...ag.w....ga...",
+   "...agw...a..a...",
+   "...ag.....c.a...",
+   "...a.cdccdd.a...",
+   "...acddcdydca...",
+   "...adcydcddca...",
+   "...acddcddcda...",
+   "...abcbcbcbba...",
+   "....aaaaaaaa....",
+   "................"
+  ]
+ ]
+}

@@ -62,7 +62,9 @@ other devices. The profile `kid_mode` flag, no counter and no death, still exist
 2. Fight: one tap attack with a generous hitbox, two enemy types, enemies drop resources.
 3. Gather and build: resource counter, a base area near the landing site, place the Replicator with one button when you have enough.
    Since 2026-10-27 (story/STORY.md) building is the Cems': gather salt, iron, quartz, copper, wood and Ember, pick a
-   design at the Printworks, and the ants ship the supplies to the print while the Cems build it.
+   design at the Printworks, and the ants ship the supplies to the print while the Cems build it. The bed travels: the
+   ship carries a culture from every awake bed and seeds one on any world; where a bed is awake the Cems print the
+   copies' buildings too (one building system).
 4. Replicate: the Replicator creates a copy with drift. Copy becomes an NPC that walks around the base and generates resources while you are away.
 5. Travel: launch the vessel, pick the next planet from a simple star map, land on a new seed and accent hue.
 6. Handoff: a Vessel held asleep at its making is given to another profile, which wakes in it and names itself (since
@@ -157,11 +159,19 @@ src/world/voxel.ts       pure: parts -> voxel grid, volume / complexity / tier /
                          that draws a model (laminated lignin, see-through glass, outline, contours) in the world's 3/4
                          view (printed voxels solid, the newest still green Cems, the rest a cyan guide lattice) or as a
                          turntable; tools/design-preview.mjs draws every design into screenshots/designs.png
-src/core/designs.ts      the catalog in the game: models built once, world and turntable views, canvas textures, unlocks
+src/core/designs.ts      the catalog in the game: models built once, world and turntable views, canvas textures, unlocks;
+                         blueprintModel: a copy's blueprint (footprint, walls, roof, door) as a voxel model the Cems print
 src/entities/Bioworks.ts the Cem bed (bioworks.json): a salt flat on the town lot nearest the Printworks (data.town.civic
                          .cembed), breathing Cems, the ants' mound and the fungus, salt blooms (nodes bed0..); asleep until
                          the Printworks stands; ant columns carry a print's supplies from the hatch and Cems from the bed;
-                         the Printworks' door (a turning hologram over it) opens the design menu
+                         the Printworks' door (a turning hologram over it) opens the design menu. It travels: launching
+                         from an awake bed puts a culture in the hold (traits.culture, Trade.loadCulture); a world without
+                         a bed shows a ghost of the flat by the square, seeded with bioworks.json seed.cost (salt) by
+                         standing on it (data.cembed), and a seeded bed has a design stone (plinth) for the menu; copies
+                         tend the bed's rim for every print (tendSpot / tended)
+src/entities/WildCems.ts the Cems' world's wild fields (planets.json cemworld wildCems): damp flats out on the salt pan
+                         with wild Cems that breathe, drink the red light, glow at night and stir as you pass; salt blooms
+                         on their rims (nodes wild0..)
 src/scenes/DesignScene.ts the design menu over the paused planet: rows (READY / NEED / LOCKED / WAIT, built count), the
                          chosen design turning in 3D (drag to turn), complexity, volume, print time, gives, price vs store
 supabase/manual/         SQL Steve runs by hand (never applied by a session): 2026-10-26_homeworld_fresh_start.sql
@@ -308,6 +318,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | state | `unnamed` | a player's Vessel that has not named itself yet: it is asked at its first wake |
 | state | `handedBy` | the replicant that awakened this one with a Spark (it was a copy, so it reads the copies without `listen`) |
 | state | `cargo` | `{ material, n, from }` what the vessel's hold carries between worlds (supplies.json signature), or null |
+| state | `culture` | `{ from, at }` a culture of Cems in the ship's hold (taken on launching from an awake bed, 'star:planet'); it seeds a bed on a world without one and stays aboard |
 | state | `inherit` | `{ from, name, wants }`: born with a Spark beside that copy; it carries its notes and remembers being it |
 | state | `weary`, `sleptAt` | tiredness carried over; last sleep |
 | state | `needs` | `{ company, purpose }` 0 empty .. 1 full (`src/data/needs.json`); rest is `1 - weary`. No food or water (Steve, 2026-10-08). |
@@ -343,6 +354,12 @@ box ducking, distance and panning, every new sound plays),
 `node tools/playtest-bioworks.mjs` (the bed asleep by the Printworks, salt / quartz / copper into the store, the Cems wake
 when the Printworks stands, its door opens the designs, a House printed by the clock with its ants and lights, the mood,
 the Nursery unlocked, a Storehouse's storage, two prints at once, prints across a reload, one finished while away),
+`node tools/playtest-seedbed.mjs` (the sleeping Cems give the ship nothing; awake, launching takes a culture aboard;
+on TRAPPIST-1 f its ghost waits by the square, seeds only with the salt, wakes at once with its design stone; a House
+printed there; all of it after a reload),
+`node tools/playtest-cemprint.mjs` (on a seeded Earth the copies' Meeting Hall, once paid, is printed by the Cems from
+its blueprint, going on from what was raised by hand; swings no longer raise it; the copies tend the bed and bring it
+nearer; it stands solid and lit and still gathers them; your own design is tended too),
 `node --experimental-strip-types tools/design-preview.mjs [--cut 0.6]` (every design in the world view and from four
 sides, with its volume, complexity, price and time -> `screenshots/designs.png`),
 `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
@@ -365,7 +382,8 @@ hand the load over. Stand on the open hatch for a moment (a warm ring fills) or 
 or dashing across it never does. At the Replicator (attack on its ring with enough Ember) two lights open over it: WAKE (left) and HOLD (right);
 Left / Right (or the stick) choose, attack / E or a click on one picks. Standing in the husk vault's doorway a moment (a ring
 fills) or attack there goes down to the vault; Up / Down choose a row, attack / E / Enter pick, Esc goes up. Standing in
-the Printworks' doorway a moment (once the Cems are awake; a green ring fills) or attack there opens the designs: Up /
+the Printworks' doorway (or before a seeded bed's design stone) a moment (once the Cems are awake; a green ring fills) or
+attack there opens the designs; standing on a bed's ghost with the salt for it (a green ring fills) or attack there seeds it: Up /
 Down choose, Left / Right or a drag turn the model, attack / E / Enter or a click on PRINT prints, Esc closes. At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
 LINK; at the empty berth (the vessel is elsewhere) it has LINK and TO VESSEL / TO SHIP; in flight a world with your
 manny in the top-left row links you there. Dash Shift/K/X, gamepad
@@ -383,7 +401,9 @@ bottom left, for 12 s: save, world, ground, rock, rest; also `window.__loadMs`),
 `?shot=1&view=warren&copies=3` (a dug, lived-in warren, you at the foot of the ladder), `?shot=1&star=tau-ceti&pi=2` (preview planet 2 of another star, as a hologram visit), `?shot=1&at=fomalhaut&pi=1`
 (start the replicant on another world for real; `&view=beacon` stands you before the sleeping keeper, `&view=beacon-lit`
 shows the lit monolith), `?shot=1&view=bioworks|printing|designs` (the Cem bed awake with a full store; a House and a
-Storehouse being printed; the design menu open), `&zoom=0.5` (a wider look in a screenshot; the lighting covers only the
+Storehouse being printed; the design menu open), `?shot=1&at=sol&pi=3&view=seed|seeded` (a culture aboard on a world
+without a bed: its ghost with the salt for it; seeded a moment later), `?shot=1&at=gliese-12&pi=1&view=wild` (the Cems'
+world beside its nearest wild field), `&zoom=0.5` (a wider look in a screenshot; the lighting covers only the
 middle).
 
 ## Progress
@@ -919,3 +939,49 @@ copies' own buildings are untouched (still raised by swings).
    arrive, so its runs find nothing to build; pause it too if wanted.
 2. Session 19's list still stands (live save fresh start, day and night on LHS 1140 b, the title, open story questions,
    migration 0014, the required status check).
+
+### Session 21 (2026-10-27): the Cems spread (Steve: "mars earth etc shouldnt be here", "Continue making the new changes in the bible ... Continue working on the building stuff from the lifeform Cem")
+- **Planet menu.** CLOSEST no longer lists the planets of the star you are at (they sat at 0.0 LY: from Mars, Mercury,
+  Venus, Europa, Titan, Miranda, Triton); they stay on the 3D map. At most three worlds a star, habitable-zone ones
+  first, so the list reaches the next systems. Merged on its own at once (PR #65, the small-fix rule).
+- **The bed travels** (`Bioworks`, `Trade.loadCulture`, `bioworks.json seed`). Launching from a world whose Cems are
+  awake, the ship's hold takes a culture of them (a glass jar; `traits.culture`, refreshed from every awake bed you leave,
+  never used up). On a world without a bed (the ship there, not a visit) a ghost of the salt flat waits on the free lot
+  nearest the square: a dashed salt-white outline, the jar floating over it, and near it what it needs (10 salt). Stand
+  on it with the salt (a green ring fills) or press attack there: the salt flies from the store, the jar comes down out
+  of the ship and breaks over the salt, the Cems, the mound and the fungus come up and the bed is awake at once
+  ("THE CEMS TAKE TO THE SALT: THIS WORLD CAN BUILD"; `planet_states.data.cembed`, no migration). A seeded bed has a
+  design stone on its rim toward the street (a lignin post with a lens of Cems, the turning hologram over it) that opens
+  the design menu as the Printworks' door does. New sprites `culture`, `plinth`; sounds `cultureLoad`, `cultureSeed`.
+- **Gliese 12 b, the Cems' world** (the bible's place where Alaina found them; `planets.json cemworld`, `WildCems.ts`).
+  Flat saltlands under a red sun: a new floor kind `salt` (a pale crust broken into stretched polygons with pressure
+  ridges, pink brine patches, glints), pink brine pools, no trees and no creatures, Earth gravity. Eleven fields of wild
+  Cems lie on damp flats out on the pan: they breathe, drink the red light by day, glow at night and flash green as
+  you walk among them; salt blooms crust their rims. Its own sound bed (wind over the pan, a low drone, salt crust
+  crackling as it dries, now and then a far breath of Cems), salt underfoot, salt as its signature material. Wild Cems
+  build nothing (Alaina's changes made the Cems that do); a culture you bring can seed a bed there.
+- **One building system** (`Buildings.cemsTakeOver`, `tend`, `designs.ts blueprintModel`). Where a bed is awake, a
+  copy's approved blueprint (its own or the village's Meeting Hall / Workshop / Lookout), once paid, is printed by the
+  Cems: a voxel model of its footprint, walls (wood as lignin, stone as pale salt, scrap as steel), roof, door and
+  windows (a Lookout gets its tower) rises with the clock from what was already raised by hand, with the ants and a Cem
+  printer. Swings no longer raise it; the copies tend the bed's rim instead, and each stroke brings the print 1.5 s
+  nearer (`bioworks.json tend`), for your own designs too. Without a bed, blueprints are raised by hand as before.
+  The mind function describes such a print the same way (in the repo; it waits for the next deploy).
+- Fix: a copy greeting you mid-walk dropped back to idle with its chore still pending, so the chore (a swing at a
+  building, now a stroke of tending) was done wherever it walked next. After the hello it takes up its walk, load,
+  chore or hammering again.
+- Verified: build, typecheck, the mind tool check, `deno check` of the function, `playtest-planetmenu` (CLOSEST has no
+  0.0 LY rows), the new `playtest-seedbed` and `playtest-cemprint`, `playtest-sound` (the new sounds), the full
+  `npm test`. Screenshots `planet-menu-sol.png`, `seed-ghost.png`, `seed-done.png`, `seedbed-*.png`, `cemworld-*.png`,
+  `cemprint-*.png`.
+
+**Waiting for Steve (session 21).**
+1. Your live save never reached the homeworld: your Vessel is on Mars (Sol), so the opening, Thales and the Cems have
+   not happened for you. Either run `supabase/manual/2026-10-26_homeworld_fresh_start.sql` (backup, then a fresh start
+   on LHS 1140 b), or its one-line alternative (moves only your Vessel to the homeworld; Earth, Mars and the copies
+   stay), or fly there yourself: LHS 1140 is about 49 ly from Sol, about 1 min 38 s and 108 Ember of fuel (Mars holds
+   15, Earth 229: hop to Earth first).
+2. Wild Cems on Gliese 12 b build nothing. Should the Biolab be able to change a wild culture into one that builds
+   (a faster strain, the next step of the tech tree), as Alaina did?
+3. Session 19's list still stands (day and night on LHS 1140 b, the title, open story questions, migration 0014, the
+   required status check); the minds stay paused.

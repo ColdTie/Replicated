@@ -10,7 +10,7 @@ import { fbm, mulberry32, valueNoise, type Rng } from '../core/rng';
 import { Cell, TILE, type PlanetMap } from './planetGen';
 import { footpath, type Pt, type Rect } from './town';
 
-type Kind = 'grass' | 'snow' | 'sand' | 'spore' | 'basalt' | 'regolith';
+type Kind = 'grass' | 'snow' | 'sand' | 'spore' | 'basalt' | 'regolith' | 'salt';
 interface FloorStyle {
   kind: Kind;
   relief: number;
@@ -239,6 +239,23 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number, occup
     pEdge = Math.sqrt(f2) - Math.sqrt(f1);
   };
 
+  // Salt pan: a crust broken into polygons (stretched a little, as drying pulls it); crust() leaves the distance to the
+  // ridge (F2 - F1), the polygon's id, and which side of the ridge the pixel lies on (1: the lit, upper-left side)
+  const CRUST = 24;
+  let cEdge = 0, cId = 0, cSide = 0;
+  const crust = (x: number, y: number) => {
+    const gx = Math.floor(x / CRUST), gy = Math.floor(y / (CRUST * 0.8));
+    let f1 = 1e9, f2 = 1e9, ddx = 0, ddy = 0;
+    for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+      const cx = gx + ox, cy = gy + oy;
+      const dx = (cx + 0.1 + hash(cx, cy, seed + 13) * 0.8) * CRUST - x, dy = ((cy + 0.1 + hash(cx, cy, seed + 14) * 0.8) * CRUST * 0.8 - y) * 1.25;
+      const d = dx * dx + dy * dy;
+      if (d < f1) { f2 = f1; f1 = d; cId = hash(cx, cy, seed + 15); ddx = dx; ddy = dy; } else if (d < f2) f2 = d;
+    }
+    cEdge = Math.sqrt(f2) - Math.sqrt(f1);
+    cSide = Math.max(-1, Math.min(1, -(ddx + ddy) / (CRUST * 0.6)));
+  };
+
   for (let ty = 0; ty < map.h; ty++) for (let tx = 0; tx < map.w; tx++) {
     if (cellAt(tx, ty) !== Cell.Floor) continue;
     const ruin = isRuin(tx, ty);
@@ -328,6 +345,14 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number, occup
         tc += (pId - 0.5) * 0.2;
         // heat bleeding into the plates next to hot seams
         hot = smoothstep(0.52, 0.66, heat(x, y)) * smoothstep(5, 1.4, pEdge);
+      } else if (st.kind === 'salt') {
+        // pale crust; each polygon its own tone; along the ridges the crust is pushed up: a bright crest, lit on its
+        // upper-left flank and shadowed on the other (worn flat on streets and the square)
+        crust(x, y);
+        const flat = 1 - Math.max(trod, paved);
+        const near = smoothstep(4.5, 0.4, cEdge) * flat;
+        ts += 0.2 + (cId - 0.5) * 0.14 + near * cSide * 0.2 + (cEdge < 1.1 ? 0.22 * flat : 0);
+        tc += (cId - 0.5) * 0.12 + near * cSide * 0.15;
       }
 
       // trodden earth is packed a little lighter and smoother
@@ -498,6 +523,13 @@ export function paintGround(map: PlanetMap, styleId: string, seed: number, occup
       const x = Math.floor(r() * W), y = Math.floor(r() * H);
       if (!open(x, y)) continue;
       blend(x, y, detail[2 + Math.floor(r() * (detail.length - 2))], 0.9);
+    }
+  } else if (st.kind === 'salt') {
+    // Glints of fresh crystal on the crust, and tiny cubes of salt along the ridges
+    for (let c = 0; c < area * 0.0025; c++) {
+      const x = Math.floor(r() * W), y = Math.floor(r() * H);
+      if (!open(x, y) || markAt(marks.pave, x, y) > 0.3) continue;
+      blend(x, y, detail[r() < 0.7 ? 0 : 1 + Math.floor(r() * (detail.length - 1))], 0.45 + r() * 0.5);
     }
   } else if (st.kind === 'regolith') {
     // Craters: shaded bowl (dark near wall toward the light, lit far wall) with a raised rim

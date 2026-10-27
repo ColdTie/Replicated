@@ -54,6 +54,8 @@ export interface PlanetDef {
   beacon?: boolean;
   /** Its creatures never attack: they flee from you (planets.json; Earth) */
   shy?: boolean;
+  /** Fields of wild Cems on the salt (planets.json; the Cems' world, src/entities/WildCems.ts) */
+  wildCems?: { fields: number; perField: [number, number]; blooms: number };
 }
 
 export type SkitterDef = (typeof enemiesJson)['skitter'];

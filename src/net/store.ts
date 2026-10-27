@@ -42,6 +42,9 @@ export interface ReplicantSave {
     inherit?: { from: string; name: string; wants?: string[] };
     /** what the vessel's hold carries between worlds (supplies.json signature): set at launch, unloaded on landing */
     cargo?: { material: string; n: number; from: string } | null;
+    /** a culture of Cems in the ship's hold (src/entities/Bioworks.ts): taken on launching from a world whose bed is
+     * awake ('star:planet', when); on a world without a bed it seeds one */
+    culture?: { from: string; at: number } | null;
     /** the original's mannies (manny.json), one per world ('star:planet'): when it was built, and where it stands
      * while you are elsewhere (no x / y: in its dock) */
     mannies?: Record<string, { at: number; x?: number; y?: number }>;
@@ -102,6 +105,8 @@ export interface PlanetData {
   buildings?: Building[];
   /** the homeworld's Metanoia structures and Replicator were placed (src/scenes/planet/Homeworld.ts) */
   founded?: boolean;
+  /** a Cem bed seeded here from a culture the ship brought (src/entities/Bioworks.ts): when, by whom, from where */
+  cembed?: { at: number; by?: string; from?: string };
   /** Layout version of the surface: 2 = the town (src/world/town.ts); missing = the old ring around the base, moved
    * into the town once on load (migrateToTown) */
   layout?: number;
@@ -154,6 +159,8 @@ export interface Building extends Blueprint {
   /** printed by the Cems from a design (src/data/designs.json): which one, when the print began and how long it takes
    * (ms); it rises with the clock, also while nobody plays */
   design?: string; printStart?: number; printMs?: number;
+  /** a copy's blueprint the Cems print (where a bed is awake): it rises with the clock from printStart like a design */
+  cems?: boolean;
 }
 /** Something placed in a room (tile coords); a resting station has `for` = the replicant it belongs to. */
 export interface WarrenItem { id: string; kind: string; room: string; x: number; y: number; by: string; for?: string; note?: string; at: number; /** palette index the copy chose */ tint?: number; placement?: string }

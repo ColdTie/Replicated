@@ -233,6 +233,11 @@ class SoundEngine {
     else if (kind === 'ember') this.noise(0.04, { ...o, type: 'highpass', freq: vary(5000, 0.2), vol: 0.03 });
     else if (kind === 'drip') this.tone(vary(1600, 0.25), 0.18, { ...o, type: 'sine', to: vary(1100, 0.2), vol: 0.03, rev: 0.9 });
     else if (kind === 'tick') this.noise(0.03, { ...o, freq: 2400, q: 6, vol: 0.02, rev: 0.4 });
+    else if (kind === 'crust') {
+      // salt crust ticking as it dries in the sun: a few tiny crackles, now and then a far breath of wild Cems
+      for (let i = 0, n = 2 + Math.floor(Math.random() * 4); i < n; i++) this.noise(0.012, { ...o, type: 'highpass', freq: vary(6000, 0.25), vol: vary(0.018, 0.4), delay: i * vary(0.07, 0.6) });
+      if (Math.random() < 0.3) this.noise(1.6, { ...o, freq: 500, to: 900, q: 1.1, vol: 0.01, attack: 0.7, rev: 0.8 });
+    }
   }
 
   private impulse(seconds: number) {
@@ -785,6 +790,26 @@ class SoundEngine {
     [0, 2, 4, 7, 9, 12].forEach((st, i) => this.marimba(midi(67 + st), i * 0.09, 0.07 * kk, pan));
     [0, 4, 7, 12].forEach((st, i) => this.tone(midi(55 + st), 2.2, { pan, type: 'sine', vol: 0.045 * kk, attack: 0.3, delay: 0.55 + i * 0.05, rev: 0.8 }));
     this.noise(1.6, { pan, freq: 600, to: 1200, q: 1.2, vol: 0.025 * kk, attack: 0.6, delay: 0.5, rev: 0.7 });
+  }
+  /** A culture of Cems goes aboard the ship: a small glass clink and a breath inside the jar. */
+  cultureLoad(at?: At) {
+    if (!this.ready('cultureLoad', 1200)) return;
+    const { k, pan } = this.spatial(at);
+    const kk = Math.max(0.4, k);
+    this.tone(vary(1760, 0.02), 0.4, { pan, type: 'sine', vol: 0.03 * kk, rev: 0.6 });
+    this.tone(vary(2640, 0.02), 0.25, { pan, type: 'sine', vol: 0.015 * kk, delay: 0.02, rev: 0.6 });
+    this.noise(0.5, { pan, freq: 700, to: 1100, q: 1.4, vol: 0.02 * kk, attack: 0.2, delay: 0.1 });
+  }
+  /** A culture opened over the salt: the cap pops, the glass rings, the Cems spill out wet and the bed takes them in. */
+  cultureSeed(at?: At) {
+    if (!this.ready('cultureSeed', 2500)) return;
+    const { k, pan } = this.spatial(at);
+    const kk = Math.max(0.5, k);
+    this.noise(0.05, { pan, freq: 2200, q: 2, vol: 0.06 * kk });
+    this.tone(vary(1320, 0.02), 0.6, { pan, type: 'sine', vol: 0.035 * kk, delay: 0.03, rev: 0.7 });
+    this.tone(vary(1980, 0.02), 0.4, { pan, type: 'sine', vol: 0.018 * kk, delay: 0.05, rev: 0.7 });
+    this.noise(0.7, { pan, freq: 500, to: 260, q: 1.6, vol: 0.05 * kk, attack: 0.05, delay: 0.15 });
+    [0, 3, 7, 12].forEach((st, i) => this.marimba(midi(62 + st), 0.5 + i * 0.1, 0.05 * kk, pan));
   }
   /** A struck bar of lignin: a quick sine with its fourth-octave partial, woody and round. */
   private marimba(freq: number, delay: number, vol: number, pan = 0, bus: Bus = 'sfx') {

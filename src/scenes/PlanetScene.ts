@@ -15,6 +15,7 @@ import { Village } from '../entities/Village';
 import { Warren } from '../entities/Warren';
 import { Buildings } from '../entities/Buildings';
 import { Bioworks } from '../entities/Bioworks';
+import { WildCems } from '../entities/WildCems';
 import { MannyDock } from '../entities/Manny';
 import { inManny, vesselAway, vesselHere } from '../core/mannies';
 import { demoWarren } from '../world/warren';
@@ -88,6 +89,8 @@ export class PlanetScene extends Phaser.Scene {
   buildings!: Buildings;
   /** the Cem bed (homeworld): where supplies are shipped and the Cems build from */
   bioworks?: Bioworks;
+  /** the Cems' world's wild fields (planets.json wildCems) */
+  wild?: WildCems;
   embers = 0;
   /** the planet's materials (src/data/supplies.json); Ember is `embers` */
   supplies: Record<string, number> = {};
@@ -127,7 +130,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean; cembed?: PlanetData['cembed'] } = { embers: 0, nodes: {}, doors: {} };
   /** who lives on which lot of the town (planet_states.data.town) */
   townState: TownState = { lots: {}, civic: {} };
   /** this load moved an old save into the town: saved positions of the player and the copies are ignored once */
@@ -220,6 +223,7 @@ export class PlanetScene extends Phaser.Scene {
     this.homeworld.reset();
     this.choice = undefined;
     this.bioworks = undefined;
+    this.wild = undefined;
     this.townState = { lots: {}, civic: {} };
     this.migrated = false;
     this.npcsLoaded = true;
@@ -422,6 +426,7 @@ export class PlanetScene extends Phaser.Scene {
     // the way down to the warren the copies dig (hatch spot kept per planet); it moved on while nobody was here
     this.warren = new Warren(this, save?.data.warren);
     this.bioworks = new Bioworks(this, save);
+    if (p.wildCems) this.wild = new WildCems(this, save, p.wildCems);
     this.buildings = new Buildings(this, save?.data.buildings);
     this.homeworld.placePrinters();
     this.time.delayedCall(2500, () => this.towner.grantGifts(save?.data.gifts));
@@ -717,6 +722,7 @@ export class PlanetScene extends Phaser.Scene {
         this.fx.dust(ex, ey + 2, 6);
         this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
         this.trade.unload();
+        this.bioworks?.announce();
         this.homecoming.run(() => { pl.locked = false; this.saver.markAwake(); });
       },
     });
@@ -792,6 +798,26 @@ export class PlanetScene extends Phaser.Scene {
       this.player.setPosition(px, py);
       this.cameras.main.centerOn(px, py - 10);
     }
+    // the Cems' world: beside the wild field nearest the town
+    if (view === 'wild' && this.wild?.fields.length) {
+      const c = this.baseCenter, f = [...this.wild.fields].sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
+      px = f.x - 10; py = f.y + f.ry + 14;
+      this.player.setPosition(px, py);
+      this.cameras.main.centerOn(px, py - 14);
+    }
+    // a culture of Cems aboard on a world without a bed: the ghost of the bed with the salt for it; seeded
+    if ((view === 'seed' || view === 'seeded') && !this.bioworks?.active) {
+      const me = session.replicant;
+      if (me) me.traits.culture = { from: 'lhs-1140:2', at: Date.now() };
+      this.supplies.salt = 14;
+      this.markSupplies();
+      this.bioworks?.offer(session.planet);
+      const bw = this.bioworks;
+      if (bw?.lot) { px = bw.center.x - 34; py = bw.center.y + 40; }
+      if (view === 'seeded') this.time.delayedCall(400, () => this.bioworks?.seed());
+      this.player.setPosition(px, py);
+      this.cameras.main.centerOn(px, py - 10);
+    }
     // a wider look for reviewing a layout (?zoom=0.5)
     const zoom = Number(new URLSearchParams(location.search).get('zoom') ?? 1);
     if (zoom > 0 && zoom !== 1) this.cameras.main.setZoom(zoom);
@@ -846,6 +872,7 @@ export class PlanetScene extends Phaser.Scene {
     this.trade.update(dt);
     this.buildings.update(time, dt);
     this.bioworks?.update(time, dt);
+    this.wild?.update(time);
     this.warren.update(dt);
     this.updateHatch(dt);
     this.minds.tickMinds(dt);
@@ -978,6 +1005,7 @@ export class PlanetScene extends Phaser.Scene {
   /** The action button does something other than attack here (build). Returns true if it did. */
   tryInteract(): boolean {
     if (this.bioworks?.playerAtDoor()) { this.bioworks.openMenu(); return true; }
+    if (this.bioworks?.playerOnGhost() && this.bioworks.canSeed()) return this.bioworks.seed();
     if (this.departure.playerOnBoardSpot()) return this.departure.tryBoard();
     if (this.dock.playerOnPad()) return this.dock.tryBuild();
     if (this.time.now > this.hatchReadyAt && this.warren.playerOnHatch()) { this.descend(); return true; }
@@ -1377,7 +1405,7 @@ export class PlanetScene extends Phaser.Scene {
     const s = this.surfaceAt(x, y);
     if (s === 'water' || s === 'void') return s;
     if (Math.hypot(x - this.vessel.x, y - this.vessel.y) < 24 || (this.dock && Math.hypot(x - this.dock.x, y - this.dock.y) < 14)) return 'metal';
-    if (this.bioworks?.onFlat(x, y)) return 'salt';
+    if (this.bioworks?.onFlat(x, y) || this.wild?.onFlat(x, y)) return 'salt';
     if (this.buildings?.list.some((b) => b.built && !b.vetoed && Math.abs(x - b.x) < b.w * 8 + 4 && y > b.y - 6 && y < b.y + 12)) return 'printed';
     const sq = this.map.town.square, tx = Math.floor(x / 16), ty = Math.floor(y / 16);
     if (s === 'stone' || (tx >= sq.x && ty >= sq.y && tx < sq.x + sq.w && ty < sq.y + sq.h)) return 'stone';

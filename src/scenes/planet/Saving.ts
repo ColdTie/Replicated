@@ -53,7 +53,7 @@ export class Saving {
     // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
     if (this.s.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
     if (p.npcTick !== undefined) this.npcTickAt = Date.now();
-    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && !p.town && !p.layout && !p.gifts && !p.seen && !p.founded && p.npcTick === undefined) return;
+    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && !p.town && !p.layout && !p.gifts && !p.seen && !p.founded && !p.cembed && p.npcTick === undefined) return;
     this.s.pending = { embers: 0, nodes: {}, doors: {} };
     this.saving = true;
     try {
@@ -73,6 +73,7 @@ export class Saving {
       if (p.layout) data.layout = p.layout;
       if (p.seen) data.seen = p.seen;
       if (p.founded) data.founded = true;
+      if (p.cembed) data.cembed = p.cembed;
       const row = await st.applyPlanetDelta(this.s.planet.star, this.s.planet.planetIndex, p.embers, data);
       if (row) {
         this.s.embers = row.embers + this.s.pending.embers;
