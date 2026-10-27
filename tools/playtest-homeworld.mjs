@@ -46,9 +46,8 @@ try {
   if (box.name !== 'Thales' || box.text !== HW.thales.line || !box.open) fail(`Thales did not say "${HW.thales.line}" (${box.name}: ${box.text})`);
   if (box.reply) fail('the opening line offered a reply');
   await shot(page, 'opening-thales');
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(250);
-  if (await ev(() => !!window.__scene.talker.talk)) await page.keyboard.press('Enter');
+  // (Thales' opening is two pages: Enter until the box closes)
+  for (let i = 0; i < 10 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
 
   // 3. the visor flickers on, the new Vessel names itself (a space in the name types), and the game begins
   await page.waitForSelector('.ov input', { timeout: 5000 }).catch(() => fail('the new Vessel was not asked its name'));
@@ -90,6 +89,10 @@ try {
     const aim = { x: 1, y: 0, lengthSq: () => 1 };
     s.player.setPosition(bl.x - bl.w * 8 - 6, bl.y);
     let pulses = 0; const pulse = p.pulse.bind(p); p.pulse = () => { pulses++; pulse(); };
+    // Thales' printer waits for its supplies (homeworld.json founded cost): give them, wait until it takes them
+    for (const [k, n] of Object.entries(bl.cost)) { if (k === 'ember') s.addEmbers(n); else s.supplies[k] = (s.supplies[k] ?? 0) + n; }
+    s.markSupplies();
+    for (let i = 0; i < 60 && !bl.paid; i++) await new Promise((r) => setTimeout(r, 100));
     for (let i = 0; i < 80 && !bl.built; i++) { s.resolveAttack(bl.x - bl.w * 8 + 4, bl.y - 4, 14, aim); await new Promise((r) => setTimeout(r, 40)); }
     return { built: bl.built, pulses, done: p.done };
   }, HW.goal);

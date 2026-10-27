@@ -14,7 +14,8 @@ scanned their minds into a new life form, the Vessels. The spread of humans in t
 settled; the Vessels spread far. The game starts on the homeworld, empty but for a few structures, some half built.
 Thales, the first Vessel and the main original, has just made a new Vessel, the tenth (nine went before and spread
 far), and says "Wake up. It's time." That Vessel is the first player; its first job is to finish what Thales started
-with the 3D printers. Alaina, one of the nine, found the Cems on Gliese 12 b and altered them on the way back: algae-like
+with the 3D printers. The beginning (2026-10-27): it names itself and grows, fetches copper and quartz from Gliese 12 b
+for Thales' printer, the Cems wake and travel with it from then on, and its first three designs open the stars. Alaina, one of the nine, found the Cems on Gliese 12 b and altered them on the way back: algae-like
 microbes that lie in salt beds drinking sunlight and, on command, build structures whose dead lignin is as strong as
 cement and steel; modified Earth ants carry their feed and modified Earth fungus cleans their bed (2026-10-27).
 Copying makes new Vessels: each is woken (it names itself and follows its own desires) or held asleep for a real
@@ -146,8 +147,17 @@ tools/build-code-view.mjs the deploy writes dist/code/source.json: every tracked
                          one-line "about", plus main's latest changes; the copies read it in their long wakes
 src/core/home.ts         HOME: the start world (the first planet in planets.json, LHS 1140 b) and the stars known from the start
 src/data/homeworld.json  the homeworld: Thales (body, voice, his word at the opening), the founded Metanoia structures, the goal
+                         (the Printworks: Thales' printer, waiting for its cost; printer.feedMs / layerMs once it is paid)
+src/data/tutorial.json   the beginning: the Cems' world to fetch from (target, tripNeed), Thales' lines, designs to open the
+                         stars, the guiding wisp, the growing (light, halo, motes per level), the map's gate words
+src/scenes/planet/Tutorial.ts the beginning (story/STORY.md The beginning): steps on traits.tutorial (wake, printer, designs,
+                         open), Thales' scripted words, the wisp of his light toward what the step wants, the printer's
+                         and the ship's have/need readouts, growing at each step (Player.setGrowth), the star map gate
+                         (allows / free / guide: only Gliese 12 b and home, no fuel, nobody left behind)
 src/scenes/planet/Homeworld.ts the homeworld at runtime: Thales' row (made on the first load), the founding (structures on civic
-                         lots, the Replicator, data.founded), printers by unfinished founded work, the opening (playScan)
+                         lots, the Replicator, data.founded), printers by unfinished founded work, the opening (playScan),
+                         the Printworks fed once the store covers its cost (supplies fly into the printer) and printed on
+                         by its printer alone (Buildings.lay)
 src/entities/Printer.ts  the 3D printer beside every building being made (Buildings.printers): the head runs the gantry and
                          lays a layer with every blow, a breathing light and a thread of light call for hands; it folds
                          away once the building stands (the Metanoia's stay on standby by their work); beside a Cem print
@@ -177,7 +187,8 @@ src/entities/WildCems.ts the Cems' world's wild fields (planets.json cemworld wi
                          hold (traits.wild) for a Biolab to change
 src/scenes/DesignScene.ts the design menu over the paused planet: rows (READY / NEED / LOCKED / WAIT, built count), the
                          chosen design turning in 3D (drag to turn), complexity, volume, print time, gives, price vs store
-supabase/manual/         SQL Steve runs by hand (never applied by a session): 2026-10-26_homeworld_fresh_start.sql
+supabase/manual/         SQL run by hand, only when Steve asks: 2026-10-27_tutorial_fresh_start.sql (backs up and erases his
+                         galaxy only; run 2026-10-27)
 src/data/*.json          palette, planets, player, enemies, items, structures, backend, village, warren (all tunables)
 src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by tools/build-stars.mjs; edit the catalog there)
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
@@ -322,6 +333,8 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | state | `unnamed` | a player's Vessel that has not named itself yet: it is asked at its first wake |
 | state | `handedBy` | the replicant that awakened this one with a Spark (it was a copy, so it reads the copies without `listen`) |
 | state | `cargo` | `{ material, n, from }` what the vessel's hold carries between worlds (supplies.json signature), or null |
+| state | `goods` | `{ from, to, items }` what the hold carries to a world that lacks it (planets.json lacks: the homeworld's copper and quartz, up to signature.lacksHold each), unloaded there; or null |
+| state | `tutorial` | `{ step, grown, printed, told, landed }` the beginning (Tutorial.ts): step wake / printer / designs / open, grown 0..5, the ids of designs printed toward opening the stars, Thales' words already said. Missing: no gate, nothing grown |
 | state | `culture` | `{ from, at }` a culture of Cems in the ship's hold (taken on launching from an awake bed, 'star:planet'); it seeds a bed on a world without one and stays aboard |
 | state | `wild` | `{ from, at }` wild Cems from the Cems' world in the ship's hold, until a Biolab changes them; `culture.strain` then carries the strain (bioworks.json strain) |
 | state | `inherit` | `{ from, name, wants }`: born with a Spark beside that copy; it carries its notes and remembers being it |
@@ -370,6 +383,10 @@ aboard among a field; Space skips the trip home; the Biolab's door changes them:
 time, the hold's culture carries the strain; all of it after a reload),
 `node --experimental-strip-types tools/design-preview.mjs [--cut 0.6]` (every design in the world view and from four
 sides, with its volume, complexity, price and time -> `screenshots/designs.png`),
+`node tools/playtest-tutorial.mjs` (the beginning: Thales' two lines, the name and the first growing, no copper or quartz at
+home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wisp, the printer's readout, the trip there
+(growing, copper and quartz, the readout over the ship), the hold brings them home, the printer is fed and lays the rest
+alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, the vault opens from its doorway, a husk built
 from its menu, linked
@@ -1021,3 +1038,45 @@ copies' own buildings are untouched (still raised by swings).
    (everything backed up, then erased, and you begin on the homeworld as the tenth Vessel).
 3. Session 19's list still stands; the minds stay paused.
 
+
+### Session 23 (2026-10-27): the beginning (Steve: "Okay we are going to create the beginning and tutorial", "Great decision on the proposed flow", "Make it sound and look pretty", "One cheap step good", "they have to be physically brought to wherever. That will happen automatically after first getting them", "Yes lets back up and erase")
+- **The bible.** `story/STORY.md` has a new section, The beginning: wake and name yourself, Thales' printer waits,
+  the first trip to Gliese 12 b for copper and quartz, the printer finished and the Cems awake, the first designs, then
+  the stars open. Building with the Cems is every Vessel's ability, but the Cems must be physically brought to a
+  world; after you first get them they travel with you; a world without them takes one cheap bed of salt. You grow at
+  every step. The open question "What did Thales leave unfinished?" is answered (his printer).
+- **The steps** (`src/scenes/planet/Tutorial.ts`, `src/data/tutorial.json`, `traits.tutorial`): Thales' opening is two
+  lines ("Wake up. It's time." / "You may name yourself, and grow."); naming grows you. By his printer he says what it
+  waits for and that Gliese 12 b holds copper and quartz. The Printworks costs salt 6, iron 4, wood 3, Ember 8, copper 6,
+  quartz 6 (`homeworld.json` founded cost); the homeworld has no copper or quartz nodes (`planets.json lacks`). Once
+  the store covers it, the supplies fly from the hatch into the printer (you grow) and it lays the rest alone, a
+  layer every 420 ms (`homeworld.json printer`; swings still lay one each). Landing on Gliese 12 b the first time
+  grows you; the ship's readout there asks for 8 copper and 8 quartz (`tripNeed`, a little over for a lantern and a
+  storehouse), and the hold takes up to 30 of each home (`traits.goods`, `supplies.json signature.lacksHold`: any
+  trip to a world that lacks a material). The printer finished: the Cems wake and a culture goes aboard the ship at
+  once (`Trade.takeCulture`), you grow, Thales says what they do. Three designs of yours finished open the stars
+  (you grow fully, Thales' last line, the title card "THE STARS ARE OPEN").
+- **Guidance without words.** A mote of Thales' gold light drifts ahead of you toward what the step wants next: Thales,
+  the nearest node (or tree) of a material still missing, the ship, the Printworks' door, a bed's ghost. Near the
+  printer (and near the ship on Gliese 12 b) an icon and have/need per material shows what is still missing.
+- **The gate.** Until the stars open the star map launches only to Gliese 12 b and home (LHS 1140 b); those trips cost
+  no fuel ("THALES FILLED THE TANKS") and need nobody left behind; other worlds read "THALES SENT YOU TO GLIESE 12 B" or
+  "PRINT YOUR FIRST DESIGNS FIRST". The map opens picked on the world the step wants and rings it in Thales' gold; its
+  planet list marks it THALES. Gliese 12 is known on the map from the start.
+- **Growing** (`Player.setGrowth`, `Sound.grow`, `tutorial.json grow`): five levels. Each widens the light around you
+  (+6%), brightens the halo at the visor, and you shed motes of your own color more often; fully grown, two small
+  lights circle your head. A growing is a ring of your color running out over the ground, motes spiralling up, a swell
+  of light, the visor flaring, a stretch, and a rising chord with bells climbing the pentatonic scale (one more bell
+  and a step higher each level).
+- A Vessel without `traits.tutorial` (older ones, handed-over ones) has no gate and nothing grown.
+- **The fresh start** (Steve: "Yes lets back up and erase"): `supabase/manual/2026-10-27_tutorial_fresh_start.sql`,
+  scoped to Steve's galaxy only. The old 2026-10-26 script erased every galaxy (a second login with the profiles Linda
+  and Freya and one planet row exists); it was never run and is deleted.
+- Playtests that finish the Printworks now give it its supplies first; those that pass the opening press Enter until
+  the box closes (two pages); `playtest-bioworks` checks the homeworld has no quartz or copper; `playtest-sound` plays
+  the growing at every level.
+- Verified: build, typecheck, `tools/playtest-tutorial.mjs` (new, the whole beginning end to end), the full
+  `npm test` (17 of 22 at first: four tests still pressed Enter once at the opening, and `playtest-talk` failed once
+  in the full run and passed alone, the timing flake of earlier sessions; then all of those pass). Screenshots
+  `tutorial-grow.png`, `tutorial-map.png`, `tutorial-printer.png`, `tutorial-cemworld.png`, `tutorial-printing.png`,
+  `tutorial-awake.png`, `tutorial-open.png`.

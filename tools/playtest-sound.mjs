@@ -69,6 +69,8 @@ try {
     // each resource its own voice (hit and pickup), and the Cem bed's sounds and the design menu's
     for (const k of ['ember', 'iron', 'hydrogen', 'salt', 'quartz', 'copper']) { s.mineral(k, at); s.pickup(k); }
     s.cemBreath(at); s.fungusClean(at); s.antPatter(); s.cemsWake(at); s.cemLayer(at); s.cemDone(at); s.designOpen(); s.designMove(3); s.designPrint(); s.cultureLoad(at); s.cultureSeed(at);
+    // growing, at every level (the beginning)
+    for (let level = 1; level <= 5; level++) { s.lastPlay = {}; s.grow(level); }
     s.enterPlace('cave'); const cave = s.bed.id; s.enterPlace('vault'); const vault = s.bed.id; s.leavePlace(); s.leavePlace();
     await new Promise((r) => setTimeout(r, 300));
     return { cave, vault, back: s.bed.id };

@@ -40,6 +40,7 @@ import { BEACONS, planetFor, starById } from '../world/galaxy';
 import { Departure } from './planet/Departure';
 import { Link } from './planet/Link';
 import { Homeworld } from './planet/Homeworld';
+import { Tutorial } from './planet/Tutorial';
 import { WakeChoice, type WakeOrHold } from '../ui/wakeChoice';
 import { Hands } from './planet/Hands';
 import { Homecoming } from './planet/Homecoming';
@@ -168,6 +169,7 @@ export class PlanetScene extends Phaser.Scene {
   readonly trade = new Trade(this);
   readonly linker = new Link(this);
   readonly homeworld = new Homeworld(this);
+  readonly tutorial = new Tutorial(this);
   /** the maker's choice over the Replicator (wake or hold) while it is open */
   choice?: WakeChoice;
 
@@ -221,6 +223,7 @@ export class PlanetScene extends Phaser.Scene {
     this.homecoming.reset();
     this.trade.reset();
     this.homeworld.reset();
+    this.tutorial.reset();
     this.choice = undefined;
     this.bioworks = undefined;
     this.wild = undefined;
@@ -723,6 +726,7 @@ export class PlanetScene extends Phaser.Scene {
         this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
         this.trade.unload();
         this.bioworks?.announce();
+        this.tutorial.landed();
         this.homecoming.run(() => { pl.locked = false; this.saver.markAwake(); });
       },
     });
@@ -884,6 +888,8 @@ export class PlanetScene extends Phaser.Scene {
     this.homecoming.update(time);
     this.trade.update(dt);
     this.buildings.update(time, dt);
+    this.homeworld.update(time);
+    this.tutorial.update(time, dt);
     this.bioworks?.update(time, dt);
     this.wild?.update(time);
     this.warren.update(dt);

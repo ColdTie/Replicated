@@ -60,6 +60,13 @@ export interface ReplicantSave {
     held?: boolean;
     /** a player's Vessel that has not named itself yet: it does at its first wake */
     unnamed?: boolean;
+    /** what the ship's hold carries to a world that lacks it (planets.json lacks, supplies.json signature.lacksHold):
+     * set at launch, unloaded into the store on landing */
+    goods?: { from: string; to: string; items: Record<string, number> } | null;
+    /** the beginning (src/scenes/planet/Tutorial.ts, src/data/tutorial.json): the step it is at, how far it has grown
+     * (0..5), the designs it printed toward opening the stars (building ids), Thales' words already said. Missing: a Vessel from
+     * before the beginning existed (no gate, nothing to grow) */
+    tutorial?: { step: 'wake' | 'printer' | 'designs' | 'open'; grown: number; printed: string[]; told: string[]; landed?: boolean };
   };
   stats?: Partial<Record<'speed' | 'light' | 'gather', number>>;
   parent_id?: string | null;

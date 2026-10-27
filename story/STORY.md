@@ -18,7 +18,22 @@ Because the Vessels before you went so far, one of them, Alaina, found a world w
 
 ## Opening scene
 
-The game opens the moment Thales finishes copying himself. He looks at the new Vessel, you, the tenth, and says: "Wake up. It's time." You wake, and the game begins.
+The game opens the moment Thales finishes copying himself. He looks at the new Vessel, you, the tenth, and says: "Wake up. It's time." Then: "You may name yourself, and grow." You wake, you name yourself, and the game begins.
+
+## The beginning
+
+The beginning teaches the game as it goes (Steve, 2026-10-27).
+
+1. **Wake.** Thales wakes you and you name yourself.
+2. **The printer.** Thales' 3D printer stands on the homeworld, unfinished. Salt, iron, Ember and wood are found on the homeworld. Copper and quartz are not: the homeworld gave its last to the founding.
+3. **The first trip.** Thales sends you to Gliese 12 b, the world where Alaina found the Cems. Its salt flats hold the copper and quartz. You gather them there, and the ship carries them home.
+4. **The printer is finished.** The supplies go into the printer and it finishes. The Cems wake, with the ants and the fungus. From then on you can build with them.
+5. **The first designs.** You print a few of the first designs: a lantern, a house, a storehouse.
+6. **The stars open.** After those first designs, you can explore.
+
+**Building with the Cems is an ability every Vessel has, but the Cems must be physically brought** to wherever they build. After you first get them, this happens by itself: they travel with you in the ship. On a world without them you lay down one small bed of salt, and they take to it.
+
+**Growing.** As you finish each step you grow: you look and sound a little more yourself.
 
 ## Characters
 
@@ -44,7 +59,7 @@ The game opens the moment Thales finishes copying himself. He looks at the new V
 | Earth | Humanity's origin, left behind. Not where the game starts. Most of the species the Vessels use come from it (the ants and the fungus). |
 | The Metanoia homeworld | Where the game starts. An Earthlike world, empty except for the Vessels and some structures already built. Set on LHS 1140 b, a real rocky super Earth in its star's habitable zone, about 49 light years from Earth and already in the game's star catalog. |
 | The town | Grows around your base as you print buildings and as new Vessels arrive. |
-| The Cem bed | A flat bed of salt in the town where the Cems lie in the light, with the ants' mound and the fungus beside it. The supplies you gather are shipped there, and from there the Cems build. It is on the homeworld. |
+| The Cem bed | A flat bed of salt in the town where the Cems lie in the light, with the ants' mound and the fungus beside it. The supplies you gather are shipped there, and from there the Cems build. The first is on the homeworld; one is laid on every world the Cems are brought to. |
 | The Cems' world | The planet with some life where Alaina found the Cems: flat saltlands under a red sun. Gliese 12 b, a real temperate world about 40 light years from Earth and 24 from the homeworld. |
 | The husk vault | A small underground building that stores your husks. You pick one from a menu when you need it. |
 | Inhabited worlds | Far away planets with intelligent life, reached later in the game. |
@@ -59,7 +74,7 @@ The game opens the moment Thales finishes copying himself. He looks at the new V
 | Vessel and ship | A Vessel is built together with its ship. The resources for making a Vessel are set accordingly. |
 | Wake or hold | When a copy is made, its maker chooses: bring it to life now, or hold it asleep until a real player takes possession of it. Being copied and handed over by an existing player is the only way to join the game. |
 | Husks | Empty Vessels the player builds and controls directly. They are stored underground and picked from a menu. |
-| Building with Cems | The 3D printers print with living things. You pick a design from a menu, and the Cems build it on command, with the ants carrying their feed and the fungus cleaning. A building's cost depends on its complexity and its volume: a house is less complex than a supercomputer. |
+| Building with Cems | The 3D printers print with living things. You pick a design from a menu, and the Cems build it on command, with the ants carrying their feed and the fungus cleaning. A building's cost depends on its complexity and its volume: a house is less complex than a supercomputer. Every Vessel can build this way, but the Cems must be physically brought to a world; after you first get them they travel with you. |
 | Supplies | You gather enough resources for a design, and the supplies are shipped off to the 3D printer. Each resource has its own look and its own sound. |
 | Core loop | Fight, gather resources, and make more Vessels and buildings. |
 | Helping societies | On inhabited worlds, you gather resources for yourself and for that society. Each society has a crisis, such as a pandemic, an iron shortage, or not enough workers. |
@@ -100,12 +115,14 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 7. Alaina, one of the nine, finds the Cems on Gliese 12 b, a world with life, and genetically changes them on the way back.
 8. The spread of humans in this region of space stops growing and settles.
 9. **The game starts here.** Thales, the main original, makes a new Vessel: you, awoken as the tenth, the first player. You finish what he started.
-10. You build with the Cems, copy yourself, unlock new technology, and the Vessels spread out further.
-11. Vessels reach worlds with intelligent life and start helping those societies.
+10. You fetch copper and quartz from Gliese 12 b, finish Thales' printer, the Cems wake, and you print your first designs. Then the stars open.
+11. You build with the Cems, copy yourself, unlock new technology, and the Vessels spread out further.
+12. Vessels reach worlds with intelligent life and start helping those societies.
 
 ## Open questions
 
-- [ ] What did Thales leave unfinished, and where is he now?
+- [x] What did Thales leave unfinished? His 3D printer on the homeworld (Steve, 2026-10-27: The beginning).
+- [ ] Where is Thales now?
 - [ ] Where did the Metanoia go after creating the Vessels?
 - [ ] Who are the other eight Vessels before you, where are they now, and can you meet them (Alaina among them)?
 - [ ] Where have the humans of this region settled, and do Vessels meet them?

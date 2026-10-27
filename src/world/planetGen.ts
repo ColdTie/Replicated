@@ -441,6 +441,8 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
       copper: (x: number, y: number) => near(x, y, 3, Cell.Rock) || near(x, y, 3, Cell.Water),
     };
     for (const kind of ['salt', 'quartz', 'copper'] as const) {
+      // (the homeworld has none of some: planets.json lacks)
+      if (def.lacks?.includes(kind)) continue;
       const item = ITEMS[kind];
       for (let i = 0, attempt = 0; i < item.starters && attempt < 400 * item.starters; attempt++) {
         const [qx, qy] = quarters[(i + (kind === 'salt' ? 1 : kind === 'quartz' ? 2 : 0)) % 4];

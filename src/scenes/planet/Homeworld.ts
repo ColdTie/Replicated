@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { sound } from '../../audio/Sound';
-import { PALETTE, PLAYER } from '../../core/data';
+import { PALETTE, PLAYER, SUPPLIES } from '../../core/data';
 import { isHome } from '../../core/home';
 import { session } from '../../core/session';
 import { squash } from '../../entities/Player';
@@ -9,9 +9,11 @@ import type { Building, PlanetSave, ReplicantSave } from '../../net/store';
 import { buildingSpot, lotForBuilding } from '../../world/town';
 import { askName } from '../../ui/overlay';
 import HOMEWORLD from '../../data/homeworld.json';
+import TUT from '../../data/tutorial.json';
 import type { PlanetScene } from '../PlanetScene';
 
 const T = HOMEWORLD.thales;
+const SUPPLY_COLORS = (SUPPLIES.materials as Record<string, { color: number }>);
 
 /**
  * The Metanoia homeworld (story/STORY.md, src/data/homeworld.json): Thales, the founded structures with their printer,
@@ -22,7 +24,12 @@ export class Homeworld {
 
   get here() { return isHome(this.s.planet.star, this.s.planet.planetIndex); }
 
-  reset() { /* nothing kept between worlds */ }
+  /** the goal was paid for when last looked (undefined: not looked yet); when its printer lays its next layer */
+  private fed?: boolean;
+  private layAt = 0;
+  private nextFeed = 0;
+
+  reset() { this.fed = undefined; this.layAt = 0; this.nextFeed = 0; }
 
   /** Thales lives on the homeworld: his row is made the first time anyone loads it (a stand-in for screenshots). */
   async ensureThales(rows: ReplicantSave[]): Promise<ReplicantSave[]> {
@@ -57,10 +64,11 @@ export class Homeworld {
       const at = buildingSpot(town.lots[i]);
       s.townState.civic[f.id] = i;
       const total = f.w * f.h * 3;
+      const cost = (f as { cost?: Record<string, number> }).cost ?? {};
       buildings.push({
         id: f.id, name: f.name, purpose: f.purpose, w: f.w, h: f.h, x: at.x, y: at.y, by: 'thales', at: Date.now(),
         material: f.material, roof: f.roof, door: f.door, primary: f.primary, secondary: f.secondary,
-        approved: true, paid: true, built: !!f.built, progress: f.built ? total : Math.round(total * (f.progress ?? 0)), helpers: [], cost: {},
+        approved: true, paid: !!f.built || !Object.keys(cost).length, built: !!f.built, progress: f.built ? total : Math.round(total * (f.progress ?? 0)), helpers: [], cost: { ...cost },
       });
     }
     const structures = [...(data.structures ?? [])];
@@ -95,6 +103,38 @@ export class Homeworld {
     return b ? { x: b.x + (b.x > this.s.baseCenter.x ? -1 : 1) * (b.w * 8 + 10), y: b.y + 10 } : undefined;
   }
 
+  /**
+   * Thales' printer waits for its supplies (homeworld.json founded cost); once the store covers them they fly from the
+   * hatch into the printer, and it lays the rest of the Printworks on its own, a layer every printer.layerMs.
+   */
+  update(time: number) {
+    if (!this.here || this.s.visit || this.s.shot) return;
+    const g = this.s.buildings?.list.find((x) => x.id === HOMEWORLD.goal);
+    if (!g || g.built || g.vetoed) return;
+    this.fed ??= g.paid;
+    if (!g.paid && time > this.nextFeed) {
+      this.nextFeed = time + 600;
+      if (!this.s.warren.shortage(g.cost)) this.s.buildings.fund(g);
+    }
+    if (!g.paid) return;
+    if (!this.fed) { this.fed = true; this.feed(g, time); }
+    if (time > this.layAt) { this.layAt = time + HOMEWORLD.printer.layerMs; this.s.buildings.lay(g.id); }
+  }
+
+  /** The supplies go in: each material flies from the store to the printer, which wakes with a swell. */
+  private feed(g: Building, time: number) {
+    const s = this.s, pr = s.buildings.printers.get(g.id), to = pr ? { x: pr.x, y: pr.y - 6 } : { x: g.x, y: g.y };
+    this.layAt = time + HOMEWORLD.printer.feedMs;
+    Object.keys(g.cost).forEach((m, i) => s.time.delayedCall(i * 160, () => s.flyMaterial(m, s.warren.hatch, to, 0)));
+    s.time.delayedCall(Object.keys(g.cost).length * 160 + 800, () => {
+      pr?.pulse();
+      s.fx.sparks(to.x, to.y - 6, PALETTE[11], 14);
+      for (const m of Object.keys(g.cost)) s.fx.sparks(to.x, to.y - 4, PALETTE[SUPPLY_COLORS[m]?.color ?? 20], 3);
+      sound.printLayer(0, 0);
+    });
+    s.tutorial.fed();
+  }
+
   private onBuilt(b: Building) {
     if (b.id !== HOMEWORLD.goal) return;
     // Thales' work, finished: the town lights up for a moment and he greets you
@@ -103,7 +143,7 @@ export class Homeworld {
     sound.build();
     if (th) { th.home = this.post(); th.thank(); }
     this.s.mindLog.push({ t: this.s.mindClock, text: `${session.replicant?.name ?? 'The new Vessel'} finished Thales' ${b.name}` });
-    this.s.time.delayedCall(1200, () => this.s.bioworks?.wake(true));
+    this.s.time.delayedCall(1200, () => { this.s.bioworks?.wake(true); this.s.tutorial.cemsAwake(); });
   }
 
   /**
@@ -113,6 +153,7 @@ export class Homeworld {
   playScan() {
     const s = this.s, pl = s.player, th = this.thales, I = HOMEWORLD.intro;
     const sx = s.base.spotX, sy = s.base.spotY;
+    s.tutorial.start();
     pl.locked = true;
     pl.setPosition(sx, sy);
     pl.facing = -1;
@@ -126,7 +167,8 @@ export class Homeworld {
       pl.sprite.setTint(0x6a6a88);
       if (!th) { this.wake(); return; }
       th.sprite.setFlipX(false);
-      s.talker.openScripted(th, T.line, () => this.wake());
+      // the beginning's first words (tutorial.json lines.opening; the first is homeworld.json thales.line)
+      s.talker.openScripted(th, s.tutorial.state ? TUT.lines.opening : T.line, () => this.wake());
     });
   }
 
@@ -177,6 +219,7 @@ export class Homeworld {
       pl.locked = false;
       s.saver.markAwake();
       s.homecoming.remember();
+      s.tutorial.begin();
       s.game.events.emit('titlecard', s.planet.name, s.planet.subtitle);
       const th = this.thales;
       if (th) s.time.delayedCall(900, () => { th.hold = false; th.home = this.post(); });
