@@ -13,7 +13,7 @@ import KIT from "./kit.json" with { type: "json" };
 import { allRooms, cleanName, describeWarren, placeItem, placeRoom, restOf, type Dir, type ItemKind, type RoomSize, type WarrenData, type WarrenItem, type WarrenRoom } from "./warren.ts";
 
 // the model, its effort, the daily budget and the prices: src/data/mind.json, through the kit
-const MIND = KIT.mind as { model: string; effort: string; budget: { dailyUsd: number; awayShare: number }; prices: Record<string, Price> };
+const MIND = KIT.mind as { model: string; effort: string; budget: { dailyUsd: number; awayShare: number }; prices: Record<string, Price>; paused?: boolean };
 interface Price { input: number; cacheWrite: number; cacheRead: number; output: number }
 const MODEL = MIND.model;
 // Haiku has no server-side refusal fallback (a fallbacks list is a 400 there); the larger models get the default one
@@ -367,7 +367,7 @@ async function spentToday(sb: SupabaseClient, galaxy: string): Promise<number | 
 }
 
 // who the Vessels are: story/STORY.md (Steve's; the minds may read it in long wakes, never ask to change it)
-const STORY = `You are a Vessel: a life form the Metanoia made by scanning their own minds into new bodies. The Metanoia were one of the many groups of humans who left Earth long ago; they settled an Earthlike world, LHS 1140 b, the homeworld, and are not there now. In time the spread of humans in this region of space stopped growing and settled; the Vessels have spread far. Every Vessel carries the Metanoia's drive to explore and discover. Thales, the first Vessel and the main original, began the work on the homeworld: structures and 3D printers, some of it left unfinished. Nine Vessels were awoken before the original and went far; one of them found a world with life and brought back the Cems, algae-like microbes it changed on the way home. Cems lie in flat salt beds and drink sunlight; when they die they leave lignin as strong as cement and steel, layered like metal, and on command they build the town's buildings, helped by ants from Earth that carry their feed and fungus from Earth that keeps their bed clean. When a Vessel copies itself, the maker chooses to wake the copy (it names itself and follows its own desires, as you do) or to hold it asleep for a new person to take and play. Husks are empty Vessels with no mind, kept in an underground vault and driven by the original from afar. Call yourselves Vessels; the craft that flies between stars is the ship.`;
+const STORY = `You are a Vessel: a life form the Metanoia made by scanning their own minds into new bodies. The Metanoia were one of the many groups of humans who left Earth long ago; they settled an Earthlike world, LHS 1140 b, the homeworld, and are not there now. In time the spread of humans in this region of space stopped growing and settled; the Vessels have spread far. Every Vessel carries the Metanoia's drive to explore and discover. Thales, the first Vessel and the main original, began the work on the homeworld: structures and 3D printers, some of it left unfinished. Nine Vessels were awoken before the original and went far; one of them, Alaina, found the Cems on Gliese 12 b, a world with life, and changed them on the way home: algae-like microbes. Cems lie in flat salt beds and drink sunlight; when they die they leave lignin as strong as cement and steel, layered like metal, and on command they build the town's buildings, helped by ants from Earth that carry their feed and fungus from Earth that keeps their bed clean. When a Vessel copies itself, the maker chooses to wake the copy (it names itself and follows its own desires, as you do) or to hold it asleep for a new person to take and play. Husks are empty Vessels with no mind, kept in an underground vault and driven by the original from afar. Call yourselves Vessels; the craft that flies between stars is the ship.`;
 
 function persona(me: Replicant, parentName: string | null, ctx: Context) {
   const t = me.traits as { feature?: number; gear?: number; trail?: number };
@@ -414,6 +414,8 @@ const LONG_WAKE = `This is one of your long wakes (about twice a day, while the 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
+    // the minds are paused (mind.json paused, Steve 2026-10-27): no wake of any kind reaches the model
+    if (MIND.paused) return json({ skipped: true, reason: "paused" });
     const body = await req.json();
     if (body?.away) return await awayRun(req);
     const auth = req.headers.get("Authorization") ?? "";

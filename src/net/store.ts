@@ -895,6 +895,8 @@ export class CloudStore implements GameStore {
   }
 
   async mindTick(replicantId: string, ctx: MindContext) {
+    // paused (mind.json paused): no call at all
+    if (MIND.paused) return { skipped: true, reason: 'paused' } as MindResult;
     const { data, error } = await this.sb.functions.invoke('mind', { body: { replicant_id: replicantId, context: ctx } });
     if (error) { console.warn('mind', error); return null; }
     return data as MindResult;

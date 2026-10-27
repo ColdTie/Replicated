@@ -14,7 +14,7 @@ scanned their minds into a new life form, the Vessels. The spread of humans in t
 settled; the Vessels spread far. The game starts on the homeworld, empty but for a few structures, some half built.
 Thales, the first Vessel and the main original, has just made a new Vessel, the tenth (nine went before and spread
 far), and says "Wake up. It's time." That Vessel is the first player; its first job is to finish what Thales started
-with the 3D printers. One of the nine found the Cems on a world with life and altered them on the way back: algae-like
+with the 3D printers. Alaina, one of the nine, found the Cems on Gliese 12 b and altered them on the way back: algae-like
 microbes that lie in salt beds drinking sunlight and, on command, build structures whose dead lignin is as strong as
 cement and steel; modified Earth ants carry their feed and modified Earth fungus cleans their bed (2026-10-27).
 Copying makes new Vessels: each is woken (it names itself and follows its own desires) or held asleep for a real
@@ -105,7 +105,7 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 These shape the data model now, even where the feature comes later.
 
 - **Travel runs on real-world time.** (Switched off 2026-10-06 at Steve's request: every trip took 5 seconds via
-  `fixedSeconds` in `src/data/travel.json`. Since 2026-10-25 a trip takes 0.1 seconds per light year, `travel.json
+  `fixedSeconds` in `src/data/travel.json`. Since 2026-10-27 a trip takes 2 seconds per light year, `travel.json
   cruise.secondsPerLy`; `cruise.enabled` false and `fixedSeconds` 0 restore real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
 - **One shared galaxy per login.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
 - **Earth is the start.** (Superseded 2026-10-26 by the story: the game starts on the Metanoia homeworld, LHS 1140 b; Earth stays in the catalog as humanity's origin, a world you can fly to.) Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
@@ -893,10 +893,29 @@ copies' own buildings are untouched (still raised by swings).
 - This container's Chromium is newer than the pinned Playwright: `/opt/pw-browsers/chromium_headless_shell-1194` was
   linked to the installed 1243 build for the tests (container only).
 
-**Waiting for Steve (session 20).**
-1. Confirm the picks: Gliese 12 b as the Cems' world; the Cem bed on the homeworld as the printer.
-2. Name the Vessel who found the Cems (and the other eight, when he wants them in the game).
-3. Merge this branch to main (it changes what the game is) and redeploy the `mind` function (story, Cem prints).
-4. Travel time: trips are 0.1 s a light year; shipping between worlds would mean more with longer trips.
-5. Session 19's list still stands (live save fresh start, day and night on LHS 1140 b, the title, open story questions,
+**Waiting for Steve (session 20).** Answered in session 20b below.
+
+### Session 20b (2026-10-27): Alaina; the minds paused; 2 s a light year (Steve: "Alaina", "Go ahead", "lets stop the api waking them up and having them do and think stuff. Lets put a pause on that right now", "Make it 2 seconds for each light year?")
+- **The picks stand.** Gliese 12 b is the Cems' world and the Cem bed on the homeworld is the printer. The Vessel who
+  found the Cems is **Alaina**, one of the nine (`story/STORY.md` premise, characters, timeline; the mind function's
+  `STORY`). The other eight are still unnamed.
+- **The minds are paused** (`src/data/mind.json paused` true). Nothing calls the model, so nothing is spent:
+  - the game's `CloudStore.mindTick` returns `{ skipped, reason: 'paused' }` without a request, and `Minds` rests the
+    minds as it does when the budget is out;
+  - the `mind` function (v20, deployed this session; `kit.json mind.paused`) refuses every wake first;
+  - the pg_cron job `mind-away-wakes` (job 1) is inactive.
+  While paused, a copy born WAKE stays blank, and nobody writes letters, notes, tells or proposals. To resume: set
+  `paused` false, run `node tools/build-mind-kit.mjs`, redeploy `mind`, and run
+  `select cron.alter_job(job_id := 1, active := true)`.
+- **Travel at 2 s a light year** (`travel.json cruise.secondsPerLy` 2, `inSystemSeconds` 3). From the homeworld:
+  TRAPPIST-1 (the nearest star) about 44 s, Gliese 12 about 49 s, Earth about 1 min 38 s, the farthest catalog star
+  about 4 min. Ships already flying land on the new schedule.
+- Merged to main (Steve: "Go ahead"), with session 20.
+- Verified: the live function answers `{"skipped":true,"reason":"paused"}` without calling the model; build;
+  `npm test`.
+
+**Waiting for Steve (session 20b).**
+1. The maker routine (`trig_01W1bBfgciouakZFzLHFK3FE`) still runs daily. With the minds paused no new proposals
+   arrive, so its runs find nothing to build; pause it too if wanted.
+2. Session 19's list still stands (live save fresh start, day and night on LHS 1140 b, the title, open story questions,
    migration 0014, the required status check).
