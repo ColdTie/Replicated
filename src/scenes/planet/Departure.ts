@@ -94,6 +94,8 @@ export class Departure {
   /** Fuel paid, the replicant hops in, the vessel lifts off, then the flight begins. */
   launch(to: string, toPlanet: number) {
     this.s.scene.resume();
+    // a word still open in the talk box (Thales' at the beginning) does not fly along
+    if (this.s.talker.talk) this.s.talker.closeTalk();
     const ly = distanceLy(this.s.planet.star, to);
     const fuel = this.s.tutorial.free(to, toPlanet) ? 0 : fuelFor(ly);
     this.s.launching = true;

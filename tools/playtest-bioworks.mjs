@@ -82,6 +82,9 @@ try {
     for (let i = 0; i < 80 && !bl.built; i++) { s.resolveAttack(bl.x - bl.w * 8 + 4, bl.y - 4, 14, aim); await new Promise((r) => setTimeout(r, 40)); }
   }, HW.goal);
   await page.waitForFunction(() => window.__scene.bioworks.awake, null, { timeout: 8000 }).catch(() => fail('the Cems did not wake when the Printworks was finished'));
+  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out
+  await page.waitForFunction(() => !!window.__scene.talker.talk?.script, null, { timeout: 9000 }).catch(() => fail('Thales did not speak when the Cems woke'));
+  for (let i = 0; i < 16 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
   await page.waitForTimeout(1500);
   const awake = await ev(() => { const bw = window.__scene.bioworks; return { trails: bw.trails.map((t) => t.id), ants: bw.trails.reduce((a, t) => a + t.ants.length, 0) + bw.loiter.length }; });
   log('awake', JSON.stringify(awake));

@@ -1072,6 +1072,10 @@ copies' own buildings are untouched (still raised by swings).
 - **The fresh start** (Steve: "Yes lets back up and erase"): `supabase/manual/2026-10-27_tutorial_fresh_start.sql`,
   scoped to Steve's galaxy only. The old 2026-10-26 script erased every galaxy (a second login with the profiles Linda
   and Freya and one planet row exists); it was never run and is deleted.
+- Launching closes a talk box still open (a word of Thales' does not fly along). CI found that his words when the
+  Cems wake (a modal box about 4 s later) got in the way of playtests that went on to the Printworks' door or the
+  ship: `playtest-bioworks`, `-seedbed` and `-homeworld` now hear him out, and `playtest-tutorial` no longer parks the
+  player on the boarding spot (standing there opens the star map).
 - Playtests that finish the Printworks now give it its supplies first; those that pass the opening press Enter until
   the box closes (two pages); `playtest-bioworks` checks the homeworld has no quartz or copper; `playtest-sound` plays
   the growing at every level.

@@ -103,8 +103,16 @@ try {
 
   // 4. by his printer Thales says what it waits for
   await page.waitForFunction(() => { const s = window.__scene, th = s.homeworld.thales; return th && th.home && !th.hold && Math.hypot(th.x - th.home.x, th.y - th.home.y) < 46; }, null, { timeout: 20000 }).catch(() => fail('Thales did not walk to his printer'));
-  const far = await ev(() => { const s = window.__scene; s.player.setPosition(s.boardSpot.x, s.boardSpot.y + 6); return true; });
-  void far;
+  const far = await ev(() => {
+    // open ground well away from Thales, and off the ship's boarding spot (standing on that opens the star map)
+    const s = window.__scene, th = s.homeworld.thales;
+    for (let r = 130; r <= 190; r += 20) for (let k = 0; k < 16; k++) {
+      const x = th.x + Math.cos(k / 16 * Math.PI * 2) * r, y = th.y + Math.sin(k / 16 * Math.PI * 2) * r;
+      if (s.isWalkable(x, y) && Math.hypot(x - s.boardSpot.x, y - s.boardSpot.y) > 40) { s.player.setPosition(x, y); return Math.round(r); }
+    }
+    return -1;
+  });
+  log('from Thales', far);
   await page.waitForTimeout(1200);
   const wisp = await ev(() => { const w = window.__scene.tutorial.wisp; return w ? { alpha: w.img.alpha, x: Math.round(w.x), y: Math.round(w.y) } : null; });
   log('wisp to Thales', JSON.stringify(wisp));
