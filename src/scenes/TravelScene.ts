@@ -1,7 +1,7 @@
 // In flight between stars. Departure shows the planet from orbit, then the warp; the cruise shows the ship,
 // streaking stars and the time left (real time). Settled planets can be visited while you wait, and a world with your
 // manny linked into (the ship flies on and lands by itself). On arrival the destination planet grows on screen and the
-// ship lands.
+// ship lands. SKIP (top right, or Space / Enter) cuts straight to the landing from any part of it.
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { PALETTE, type PlanetDef } from '../core/data';
@@ -37,6 +37,7 @@ export class TravelScene extends Phaser.Scene {
   private arriving = false;
   /** linking out into a manny: the ship flies on without you */
   private leaving = false;
+  private skipped = false;
   private t = 0;
   private nextGlobeAt = 0;
 
@@ -48,6 +49,7 @@ export class TravelScene extends Phaser.Scene {
     this.warp = this.depart ? 0 : 1;
     this.arriving = false;
     this.leaving = false;
+    this.skipped = false;
     this.streaks = [];
     this.globe = undefined; this.dest = undefined;
     this.globeImg = undefined; this.destImg = undefined;
@@ -106,6 +108,15 @@ export class TravelScene extends Phaser.Scene {
     mapBtn.on('pointerdown', () => this.openMap());
     this.ui.add(mapBtn);
     void this.addVisits();
+
+    // Skip: outside the fading ui, so it works from the first frame of the departure to the last of the arrival
+    const skipBtn = this.add.container(w - 62, 18, [
+      this.add.rectangle(0, 0, 40, 16, PALETTE[24], 0.85).setStrokeStyle(1, PALETTE[18]),
+      this.add.bitmapText(0, 0, 'pixel', 'SKIP').setOrigin(0.5).setTint(PALETTE[20]),
+    ]).setSize(40, 16).setInteractive({ useHandCursor: true });
+    skipBtn.on('pointerdown', () => this.skip());
+    this.input.keyboard?.on('keydown-SPACE', () => this.skip());
+    this.input.keyboard?.on('keydown-ENTER', () => this.skip());
 
     if (this.depart) this.playDeparture();
     sound.setNight(1);
@@ -197,6 +208,18 @@ export class TravelScene extends Phaser.Scene {
         this.tweens.add({ targets: this.ui, alpha: 1, duration: 800 });
       });
     });
+  }
+
+  /** Straight to the landing: the journey counts as done now, whatever its clock says. */
+  private skip() {
+    if (this.skipped || this.leaving) return;
+    this.skipped = true;
+    this.arriving = true;
+    sound.menuPick();
+    this.tweens.killAll();
+    this.time.removeAllEvents();
+    this.cameras.main.fadeOut(300, 24, 20, 37);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => void this.land());
   }
 
   private arrive() {

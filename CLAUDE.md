@@ -168,10 +168,13 @@ src/entities/Bioworks.ts the Cem bed (bioworks.json): a salt flat on the town lo
                          from an awake bed puts a culture in the hold (traits.culture, Trade.loadCulture); a world without
                          a bed shows a ghost of the flat by the square, seeded with bioworks.json seed.cost (salt) by
                          standing on it (data.cembed), and a seeded bed has a design stone (plinth) for the menu; copies
-                         tend the bed's rim for every print (tendSpot / tended)
+                         tend the bed's rim for every print (tendSpot / tended). The strain (bioworks.json strain): at a
+                         finished Biolab's door wild Cems in the hold are changed (alter); a bed with it prints faster
+                         (speed), and every awake bed you walk onto with it aboard takes it up (data.cembed.strain)
 src/entities/WildCems.ts the Cems' world's wild fields (planets.json cemworld wildCems): damp flats out on the salt pan
                          with wild Cems that breathe, drink the red light, glow at night and stir as you pass; salt blooms
-                         on their rims (nodes wild0..)
+                         on their rims (nodes wild0..); walking among them with the ship here puts a jar of them in the
+                         hold (traits.wild) for a Biolab to change
 src/scenes/DesignScene.ts the design menu over the paused planet: rows (READY / NEED / LOCKED / WAIT, built count), the
                          chosen design turning in 3D (drag to turn), complexity, volume, print time, gives, price vs store
 supabase/manual/         SQL Steve runs by hand (never applied by a session): 2026-10-26_homeworld_fresh_start.sql
@@ -248,7 +251,8 @@ src/scenes/VaultScene    the husk vault below the bunker: a pod per husk you own
                          this world's, back to your body, up)
 src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star, tap again for its system: planets as live globes
                          on temperature-tinted orbits, tap one to pick it), launch or look-only
-src/scenes/TravelScene   departure orbit (globe, giant behind a moon), warp, real-time cruise + ETA, visits, arrival
+src/scenes/TravelScene   departure orbit (globe, giant behind a moon), warp, real-time cruise + ETA, visits, arrival;
+                         SKIP (top right, Space or Enter) lands at once from any part of it
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame (attack, dash, interact; the talk
                          box's next/back/close/reply while it is open)
 src/ui/overlay.ts        HTML forms over the canvas (sign-in; askName: a Vessel names itself at its first wake)
@@ -319,6 +323,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | state | `handedBy` | the replicant that awakened this one with a Spark (it was a copy, so it reads the copies without `listen`) |
 | state | `cargo` | `{ material, n, from }` what the vessel's hold carries between worlds (supplies.json signature), or null |
 | state | `culture` | `{ from, at }` a culture of Cems in the ship's hold (taken on launching from an awake bed, 'star:planet'); it seeds a bed on a world without one and stays aboard |
+| state | `wild` | `{ from, at }` wild Cems from the Cems' world in the ship's hold, until a Biolab changes them; `culture.strain` then carries the strain (bioworks.json strain) |
 | state | `inherit` | `{ from, name, wants }`: born with a Spark beside that copy; it carries its notes and remembers being it |
 | state | `weary`, `sleptAt` | tiredness carried over; last sleep |
 | state | `needs` | `{ company, purpose }` 0 empty .. 1 full (`src/data/needs.json`); rest is `1 - weary`. No food or water (Steve, 2026-10-08). |
@@ -360,6 +365,9 @@ printed there; all of it after a reload),
 `node tools/playtest-cemprint.mjs` (on a seeded Earth the copies' Meeting Hall, once paid, is printed by the Cems from
 its blueprint, going on from what was raised by hand; swings no longer raise it; the copies tend the bed and bring it
 nearer; it stands solid and lit and still gathers them; your own design is tended too),
+`node tools/playtest-strain.mjs` (a Biolab by the awake bed; SKIP lands a trip to Gliese 12 b at once; wild Cems go
+aboard among a field; Space skips the trip home; the Biolab's door changes them: the bed prints a House in 0.6 of the
+time, the hold's culture carries the strain; all of it after a reload),
 `node --experimental-strip-types tools/design-preview.mjs [--cut 0.6]` (every design in the world view and from four
 sides, with its volume, complexity, price and time -> `screenshots/designs.png`),
 `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
@@ -403,7 +411,8 @@ bottom left, for 12 s: save, world, ground, rock, rest; also `window.__loadMs`),
 shows the lit monolith), `?shot=1&view=bioworks|printing|designs` (the Cem bed awake with a full store; a House and a
 Storehouse being printed; the design menu open), `?shot=1&at=sol&pi=3&view=seed|seeded` (a culture aboard on a world
 without a bed: its ghost with the salt for it; seeded a moment later), `?shot=1&at=gliese-12&pi=1&view=wild` (the Cems'
-world beside its nearest wild field), `&zoom=0.5` (a wider look in a screenshot; the lighting covers only the
+world beside its nearest wild field), `?shot=1&view=biolab|strain` (a Biolab by the awake bed, wild Cems aboard, you
+at its door; strain: the Biolab changing them), `&zoom=0.5` (a wider look in a screenshot; the lighting covers only the
 middle).
 
 ## Progress
@@ -985,3 +994,30 @@ copies' own buildings are untouched (still raised by swings).
    (a faster strain, the next step of the tech tree), as Alaina did?
 3. Session 19's list still stands (day and night on LHS 1140 b, the title, open story questions, migration 0014, the
    required status check); the minds stay paused.
+
+### Session 22 (2026-10-27): skip a trip; the Biolab's strain (Steve: "Lets make a skip button for now. So any travel screen can be skipped", "Should the Biolab be able to change wild Cems ... Yes this is great", "add to the bible that the vessel is built AND the ship together")
+- Session 21 was already on `main` (PR #66) when this session started; nothing was waiting to be pushed.
+- **SKIP.** The travel screen has a SKIP button (top right; Space or Enter too) from the first frame of the departure to
+  the last of the arrival: the ship lands at once, whatever the journey's clock says. Linking out into a husk still
+  works as before.
+- **The strain** (the tech tree's first step after Cem building; `bioworks.json strain`, no migration). On Gliese 12 b,
+  walking among a field of wild Cems with the ship there puts a jar of them in its hold (`traits.wild`; "WILD CEMS IN
+  THE HOLD: A BIOLAB COULD CHANGE THEM"). On a world whose bed is awake and where a Biolab stands, standing at the
+  Biolab's door (a green ring fills) or pressing attack there sends the jar from the ship into its domes; the vats pulse
+  and the wild Cems become the swift strain. That bed takes it up (`data.cembed.strain`): its prints take 0.6 of the
+  time and its Cems breathe faster. The hold's culture carries it (`traits.culture.strain`), so beds seeded from it are
+  swift, and any awake bed you walk onto with it aboard takes it up. Once you have it, wild fields give no more jars.
+- **The bible.** Steve's words are in `story/STORY.md`: a Vessel is built together with its ship (the resources for
+  making one are set accordingly; what that means in the game waits for Steve), and the Cem strains row in the tech tree.
+- Fix: a failed planet save dropped a pending `cembed` (a seeded bed) instead of retrying it.
+- Verified: build, typecheck, `tools/playtest-strain.mjs` (new), the full `npm test`. Screenshots
+  `strain-travel-skip.png`, `strain-sample.png`, `strain-altering.png`, `strain-bed.png`.
+
+**Waiting for Steve (session 22).**
+1. Vessel and ship built together: what should making a Vessel cost now (Ember for the body plus iron, hydrogen or
+   other materials for its ship?), and does every copy get its own ship or only players' Vessels?
+2. Your live Vessel is still on Mars. With SKIP the flight is instant: hop to Earth (229 Ember there) and on to
+   LHS 1140 b. Or say "move me" (only your Vessel moves to the homeworld, nothing else changes) or "fresh start"
+   (everything backed up, then erased, and you begin on the homeworld as the tenth Vessel).
+3. Session 19's list still stands; the minds stay paused.
+

@@ -188,7 +188,7 @@ export class Buildings {
       this.workers.delete(b.id);
       b.cems = true;
       const m = blueprintModel(b);
-      b.printMs = designPrintMs(m, this.builtOf('nursery'));
+      b.printMs = Math.round(designPrintMs(m, this.builtOf('nursery')) * (this.scene.bioworks?.speed ?? 1));
       b.printStart = Date.now() - Math.min(0.95, b.progress / this.swingsFor(b)) * b.printMs;
       this.place(b, false);
       this.save();
@@ -211,8 +211,8 @@ export class Buildings {
   get storeBonus() { return this.builtOf('storehouse') * CAT.gives.storehouseCap; }
   /** Cem prints under way. */
   get printing() { return this.list.filter((b) => b.design && !b.built && !b.vetoed); }
-  /** How long a design takes to print here now (ms): every Nursery makes the Cems quicker. */
-  printMsFor(id: string) { const m = designModel(id); return m ? designPrintMs(m, this.builtOf('nursery')) : 0; }
+  /** How long a design takes to print here now (ms): every Nursery makes the Cems quicker, and so does the strain. */
+  printMsFor(id: string) { const m = designModel(id); return m ? Math.round(designPrintMs(m, this.builtOf('nursery')) * (this.scene.bioworks?.speed ?? 1)) : 0; }
 
   /** The lot a new print goes on: the free one nearest the square (-1: none). */
   private printLot(): number {
@@ -266,6 +266,25 @@ export class Buildings {
     this.place(b, false);
     this.save();
     s.mindLog.push({ t: s.mindClock, text: `${me?.name ?? 'the original'} chose a design for the Cems: a ${b.name} (${m.tier.toLowerCase()}, ${Object.entries(m.cost).map(([k, n]) => `${n} ${k}`).join(', ')}); the ants carry its supplies and the Cems build it` });
+    return b;
+  }
+
+  /** A design standing finished at once, free (screenshots and playtests stage the later designs with it). */
+  standNow(id: string): Building | null {
+    const m = designModel(id), s = this.scene;
+    const lotIndex = this.printLot();
+    if (!m || lotIndex < 0) return null;
+    const spot = buildingSpot(s.map.town.lots[lotIndex]);
+    const depth = footprintDepthPx(m, CAT.view.pitch, CAT.view.ppv);
+    const b: Building = {
+      id: `d${Date.now().toString(36)}${this.list.length}`, name: m.def.name, purpose: m.def.about, w: Math.ceil(m.w / 4), h: Math.max(1, Math.round(depth / 8)),
+      x: spot.x, y: spot.y, by: session.replicant?.id ?? '', material: 'lignin', roof: 'flat', door: 'south', primary: 'umber', secondary: 'moss',
+      approved: true, progress: 1, built: true, helpers: [], cost: {}, paid: true, at: Date.now(), design: id, printStart: Date.now(), printMs: 1,
+    };
+    this.list.push(b);
+    s.townState.civic[b.id] = lotIndex; s.markTown();
+    this.place(b, false);
+    this.save();
     return b;
   }
 

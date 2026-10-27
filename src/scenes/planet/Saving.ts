@@ -97,6 +97,7 @@ export class Saving {
       this.s.pending.town ??= p.town; this.s.pending.layout ??= p.layout;
       this.s.pending.seen ??= p.seen;
       this.s.pending.founded ??= p.founded;
+      this.s.pending.cembed ??= p.cembed;
     } finally {
       this.saving = false;
     }

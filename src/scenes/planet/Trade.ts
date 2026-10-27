@@ -74,7 +74,9 @@ export class Trade {
     const s = this.s, me = session.replicant, st = session.store;
     if (!me || s.visit || !s.bioworks?.sendCulture(s.vesselPos)) return;
     const first = !me.traits.culture;
-    me.traits.culture = { from: `${s.planet.star}:${s.planet.planetIndex}`, at: Date.now() };
+    // the strain, once the hold or this bed has it, stays in the culture
+    const strain = s.bioworks.strain ?? me.traits.culture?.strain;
+    me.traits.culture = { from: `${s.planet.star}:${s.planet.planetIndex}`, at: Date.now(), ...(strain ? { strain } : {}) };
     if (first) s.mindLog.push({ t: s.mindClock, text: `${me.name} took a culture of the Cems aboard the ship, to seed a bed on other worlds` });
     if (st && !s.shot) st.patchTraits(me.id, { culture: me.traits.culture }).catch((e) => console.warn('culture save failed', e));
   }
