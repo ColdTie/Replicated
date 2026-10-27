@@ -3,9 +3,12 @@
 // untouched by Alaina's changes, so no ants and no fungus serve them and they build nothing on command. They breathe
 // and drink the red light by day (motes falling into them), glow faintly at night, and stir as you walk among them:
 // the ones near your feet flash green and the field breathes out. Salt blooms crust their rims (nodes wild0, ...).
+// Walking among them with the ship here (and no strain yet) puts a jar of them in its hold (traits.wild): a Biolab can
+// change them into a strain (bioworks.json strain; src/entities/Bioworks.ts alter).
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { BACKEND, PALETTE } from '../core/data';
+import { session } from '../core/session';
 import { paintTexture } from '../core/designs';
 import type { Light } from '../fx/Lighting';
 import type { PlanetSave } from '../net/store';
@@ -27,6 +30,7 @@ export class WildCems {
   readonly fields: Field[] = [];
   private nextLook = 0;
   private nextBreath = 0;
+  private sampling = false;
 
   constructor(private scene: PlanetScene, save: PlanetSave | null, def: { fields: number; perField: [number, number]; blooms: number }) {
     const s = scene, m = s.map, T = 16;
@@ -85,6 +89,33 @@ export class WildCems {
     });
   }
 
+  /** Wild Cems could go aboard: the ship is here, the hold has none yet, and the strain is not made yet. */
+  canSample() {
+    const s = this.scene, me = session.replicant;
+    return !this.sampling && !s.visit && !s.vesselAway && !!me && !me.traits.wild && !me.traits.culture?.strain;
+  }
+
+  /** A few of the field's Cems lift into a jar, and it flies to the ship's hold. */
+  sample(f: { x: number; y: number }) {
+    const s = this.scene, me = session.replicant, st = session.store;
+    if (!me || !this.canSample()) return;
+    this.sampling = true;
+    const v = s.vesselPos, jar = s.add.sprite(f.x, f.y - 8, 'culture', 0).setTint(0xf4ffc8).setDepth(6300).setAlpha(0);
+    s.fx.sparks(f.x, f.y - 4, PALETTE[12], 10);
+    sound.cemBreath({ x: f.x, y: f.y });
+    const arc = { t: 0 }, sy = f.y - 8;
+    s.tweens.add({ targets: jar, alpha: 1, y: sy - 6, duration: 500, ease: 'Sine.easeOut' });
+    s.tweens.add({
+      targets: arc, t: 1, delay: 600, duration: 1100, ease: 'Sine.easeInOut',
+      onUpdate: () => jar.setPosition(f.x + (v.x - f.x) * arc.t, sy - 6 + (v.y - 12 - sy + 6) * arc.t - Math.sin(arc.t * Math.PI) * 40),
+      onComplete: () => { jar.destroy(); s.fx.sparks(v.x, v.y - 12, PALETTE[12], 4); sound.cultureLoad({ x: v.x, y: v.y }); this.sampling = false; },
+    });
+    me.traits.wild = { from: `${s.planet.star}:${s.planet.planetIndex}`, at: Date.now() };
+    if (st && !s.shot) st.patchTraits(me.id, { wild: me.traits.wild }).catch((e) => console.warn('wild save failed', e));
+    s.time.delayedCall(1400, () => s.game.events.emit('notice', 'WILD CEMS IN THE HOLD: A BIOLAB COULD CHANGE THEM'));
+    s.mindLog.push({ t: s.mindClock, text: `${me.name} took wild Cems aboard the ship from a field on their own world, for a Biolab to change` });
+  }
+
   /** On a wild flat (footsteps crunch). */
   onFlat(x: number, y: number) {
     return this.fields.some((f) => ((x - f.x) / f.rx) ** 2 + ((y - f.y) / f.ry) ** 2 < 1);
@@ -119,6 +150,7 @@ export class WildCems {
         }
         c.glow.setAlpha(night * (0.1 + 0.08 * Math.sin(time / 900 + c.sprite.x)) + (time - c.stirred < 600 ? 0.25 * (1 - (time - c.stirred) / 600) : 0));
       }
+      if (on && this.canSample()) this.sample(f);
       if (on && time > this.nextBreath) { this.nextBreath = time + 4200 + Math.random() * 2500; sound.cemBreath({ x: f.x, y: f.y }); }
     }
   }

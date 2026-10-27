@@ -798,6 +798,19 @@ export class PlanetScene extends Phaser.Scene {
       this.player.setPosition(px, py);
       this.cameras.main.centerOn(px, py - 10);
     }
+    // a Biolab standing by the awake bed, wild Cems aboard: in front of its door (view=strain changes them a moment later)
+    if (view === 'biolab' || view === 'strain') {
+      const goal = this.buildings.list.find((b) => b.id === HOMEWORLD.goal);
+      if (goal && !goal.built) this.buildings.finishNow(goal.id);
+      this.bioworks?.wake(false);
+      const lab = this.buildings.standNow('biolab');
+      const me = session.replicant;
+      if (me) me.traits.wild = { from: 'gliese-12:1', at: Date.now() };
+      if (lab) { px = lab.x + 30; py = lab.y + 22; }
+      if (view === 'strain') this.time.delayedCall(400, () => this.bioworks?.alter());
+      this.player.setPosition(px, py);
+      this.cameras.main.centerOn(lab ? lab.x : px, py - 16);
+    }
     // the Cems' world: beside the wild field nearest the town
     if (view === 'wild' && this.wild?.fields.length) {
       const c = this.baseCenter, f = [...this.wild.fields].sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
@@ -1006,6 +1019,7 @@ export class PlanetScene extends Phaser.Scene {
   tryInteract(): boolean {
     if (this.bioworks?.playerAtDoor()) { this.bioworks.openMenu(); return true; }
     if (this.bioworks?.playerOnGhost() && this.bioworks.canSeed()) return this.bioworks.seed();
+    if (this.bioworks?.playerAtLab() && session.replicant?.traits.wild) return this.bioworks.alter();
     if (this.departure.playerOnBoardSpot()) return this.departure.tryBoard();
     if (this.dock.playerOnPad()) return this.dock.tryBuild();
     if (this.time.now > this.hatchReadyAt && this.warren.playerOnHatch()) { this.descend(); return true; }

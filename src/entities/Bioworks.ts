@@ -10,6 +10,9 @@
 // with what it still needs over it; standing on it with the salt in the store seeds it (planet_states.data.cembed):
 // the jar flies from the ship and breaks open, the Cems take to the salt and wake at once, and a design stone on the
 // bed's rim opens the design menu where there is no Printworks.
+// The strain (bioworks.json strain): wild Cems from the Cems' world (src/entities/WildCems.ts), brought to the door of a
+// finished Biolab, are changed into a strain that prints faster; the bed takes it up, the hold's culture carries it,
+// and every awake bed you walk onto with it aboard takes it up too.
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { BACKEND, PALETTE, SUPPLIES } from '../core/data';
@@ -87,6 +90,8 @@ export class Bioworks {
   lot?: Lot;
   center: Pt = { x: 0, y: 0 };
   awake = false;
+  /** the strain this bed's Cems are (bioworks.json strain), if the Biolab's changed Cems reached it */
+  strain?: string;
   private mats: { sprite: Phaser.GameObjects.Sprite; glow: Phaser.GameObjects.Image }[] = [];
   private mound?: Phaser.GameObjects.Sprite;
   private fungus?: Phaser.GameObjects.Sprite;
@@ -110,11 +115,16 @@ export class Bioworks {
   private plinth?: { x: number; y: number; dir: 1 | -1; sprite: Phaser.GameObjects.Sprite; light: Light };
   /** no bed yet, but the ship holds a culture: the flat's outline on the lot it would take, the jar over it */
   private ghost?: { gfx: Phaser.GameObjects.Graphics; jar: Phaser.GameObjects.Sprite; light: Light; readout: Phaser.GameObjects.Container; dwell: number; seeding: boolean };
+  /** standing at a Biolab's door with wild Cems aboard (ms), and while it changes them */
+  private labDwell = 0;
+  private labRing?: Phaser.GameObjects.Graphics;
+  private altering = false;
 
   constructor(private scene: PlanetScene, save: PlanetSave | null) {
     this.founded = BIO.worlds.includes(scene.planet.id) && isHome(scene.planet.star, scene.planet.planetIndex) && !scene.visit;
     this.active = this.founded || (!scene.visit && !!save?.data.cembed);
     if (this.active) {
+      this.strain = save?.data.cembed?.strain;
       this.reserve(save);
       if (!this.lot) return;
       this.place(save);
@@ -314,11 +324,12 @@ export class Bioworks {
         g.gfx.destroy(); g.jar.destroy(); s.lighting.remove(g.light); g.readout.destroy();
         this.ghost = undefined;
         this.active = true;
+        this.strain = culture?.strain;
         this.place(session.planet);
         this.wake(true, 'THE CEMS TAKE TO THE SALT: THIS WORLD CAN BUILD');
       },
     });
-    const data = { at: Date.now(), by: me?.id, from: culture?.from };
+    const data = { at: Date.now(), by: me?.id, from: culture?.from, ...(culture?.strain ? { strain: culture.strain } : {}) };
     if (!s.shot) { s.pending.cembed = data; void s.flushPlanet(); }
     if (session.planet) session.planet.data.cembed = data;
     s.mindLog.push({ t: s.mindClock, text: `${me?.name ?? 'the original'} seeded a Cem bed here from a culture the ship brought; the Cems build on this world now` });
@@ -399,7 +410,7 @@ export class Bioworks {
     this.mound?.play('antmound:busy');
     this.fungus?.play('fungus:glow');
     this.drink?.start();
-    for (const m of this.mats) m.sprite.anims.timeScale = 1;
+    for (const m of this.mats) m.sprite.anims.timeScale = this.breath;
     if (animate) {
       const t = { k: 0 };
       s.tweens.add({ targets: t, k: 1, duration: 1800, ease: 'Sine.easeInOut', onUpdate: () => { const c = Phaser.Display.Color.Interpolate.ColorWithColor(Phaser.Display.Color.ValueToColor(0x7c8a84), Phaser.Display.Color.ValueToColor(0xffffff), 1, t.k); for (const m of this.mats) m.sprite.setTint(Phaser.Display.Color.GetColor(c.r, c.g, c.b)); }, onComplete: () => { for (const m of this.mats) m.sprite.clearTint(); } });
@@ -514,6 +525,102 @@ export class Bioworks {
     });
   }
 
+  // ------------------------------------------------------------ the strain: wild Cems changed at a Biolab
+
+  /** How long this bed's prints take against an ordinary bed's. */
+  get speed() { return this.strain ? BIO.strain.printTimes : 1; }
+  private get breath() { return this.strain ? BIO.strain.breath : 1; }
+
+  /** A finished Biolab on this world, if any. */
+  private get biolab() { return this.scene.buildings?.list.find((b) => b.design === 'biolab' && b.built && !b.vetoed); }
+
+  /** Standing at the Biolab's door (in front of the middle of its front). */
+  playerAtLab() {
+    const b = this.biolab, p = this.scene.player;
+    return !!b && !!p && Math.abs(p.x - b.x) < 10 && p.y > b.y - 2 && p.y < b.y + 14;
+  }
+
+  /** The bed takes up the strain: its Cems flash, then breathe quicker. Saved with the bed (data.cembed.strain). */
+  private adopt(notice?: string) {
+    const s = this.scene, c = this.center;
+    this.strain = BIO.strain.id;
+    for (const m of this.mats) {
+      m.sprite.anims.timeScale = this.breath;
+      m.sprite.setTintFill(PALETTE[12]);
+      s.time.delayedCall(140 + Math.random() * 200, () => m.sprite.active && m.sprite.clearTint());
+    }
+    s.fx.sparks(c.x, c.y - 4, PALETTE[12], 16);
+    s.fx.sparks(c.x, c.y - 4, PALETTE[19], 6);
+    sound.cemsWake({ x: c.x, y: c.y });
+    if (notice) s.time.delayedCall(900, () => s.game.events.emit('notice', notice));
+    const data = { ...(session.planet?.data.cembed ?? { at: Date.now() }), strain: this.strain };
+    if (session.planet) session.planet.data.cembed = data;
+    if (!s.shot && !s.visit) { s.pending.cembed = data; void s.flushPlanet(); }
+  }
+
+  /**
+   * The Biolab changes the wild Cems in the hold: the jar flies from the ship into its domes, the vats pulse in the
+   * Cems' green while they change, and the strain goes into this world's bed and into the hold's culture.
+   */
+  alter() {
+    const s = this.scene, b = this.biolab, me = session.replicant, st = session.store;
+    if (!b || !me?.traits.wild || this.altering || !this.awake) return false;
+    this.altering = true;
+    this.labDwell = 0;
+    this.labRing?.clear();
+    const v = s.vesselPos, to = { x: b.x, y: b.y - 22 };
+    const jar = s.add.sprite(v.x, v.y - 12, 'culture', 0).setTint(0xf4ffc8).setDepth(6300);
+    const arc = { t: 0 }, sx = jar.x, sy = jar.y;
+    sound.cultureLoad({ x: v.x, y: v.y });
+    s.tweens.add({
+      targets: arc, t: 1, duration: 1000, ease: 'Sine.easeInOut',
+      onUpdate: () => jar.setPosition(sx + (to.x - sx) * arc.t, sy + (to.y - sy) * arc.t - Math.sin(arc.t * Math.PI) * 36),
+      onComplete: () => {
+        jar.destroy();
+        const light = s.lighting.add({ x: to.x, y: to.y, radius: 40, color: PALETTE[12], intensity: 0, flicker: 0.2 });
+        const pulses = 4, each = BIO.strain.alterMs / pulses;
+        for (let i = 0; i < pulses; i++) s.time.delayedCall(i * each, () => {
+          s.tweens.add({ targets: light, intensity: 0.9, duration: each * 0.35, yoyo: true, ease: 'Sine.easeInOut' });
+          s.fx.sparks(to.x + (i % 2 ? 9 : -9), to.y + 2, PALETTE[12], 5);
+          sound.cemBreath({ x: to.x, y: to.y });
+        });
+        s.time.delayedCall(BIO.strain.alterMs, () => {
+          s.lighting.remove(light);
+          s.fx.sparks(to.x, to.y, PALETTE[19], 14);
+          s.shake(100, 0.002);
+          sound.cultureSeed({ x: to.x, y: to.y });
+          this.altering = false;
+          this.adopt(`THE BIOLAB CHANGES THE WILD CEMS: ${BIO.strain.name} PRINTS FASTER`);
+        });
+      },
+    });
+    me.traits.wild = null;
+    me.traits.culture = { from: `${s.planet.star}:${s.planet.planetIndex}`, at: Date.now(), strain: BIO.strain.id };
+    if (st && !s.shot) st.patchTraits(me.id, { wild: null, culture: me.traits.culture }).catch((e) => console.warn('strain save failed', e));
+    s.mindLog.push({ t: s.mindClock, text: `${me.name} brought wild Cems to the Biolab and it changed them into ${BIO.strain.name.toLowerCase()}, as Alaina once changed the first; this bed prints faster now` });
+    return true;
+  }
+
+  /** The strain aboard reaches a bed without it (you walk onto the salt), and the Biolab's door with wild Cems aboard. */
+  private updateStrain(dt: number) {
+    const s = this.scene, p = s.player, me = session.replicant;
+    if (!this.awake || s.visit || !p || !me) return;
+    if (!this.strain && me.traits.culture?.strain && this.onFlat(p.x, p.y)) {
+      this.adopt(`${BIO.strain.name} TAKES TO THE BED`);
+      s.mindLog.push({ t: s.mindClock, text: `${me.name} brought ${BIO.strain.name.toLowerCase()} to this bed; it prints faster now` });
+    }
+    const b = this.biolab;
+    if (!b || !me.traits.wild || this.altering) { if (this.labDwell) { this.labDwell = 0; this.labRing?.clear(); } return; }
+    const on = p.alive && !p.locked && !s.stopped && !s.talker.talk && this.playerAtLab();
+    this.labDwell = on ? this.labDwell + dt : 0;
+    this.labRing ??= s.add.graphics().setDepth(6150);
+    this.labRing.clear();
+    if (!this.labDwell) return;
+    const k = Math.min(1, this.labDwell / BIO.strain.dwellMs);
+    this.labRing.lineStyle(1, PALETTE[12], 0.4 + 0.5 * k).beginPath().arc(b.x, b.y + 4, 10, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2).strokePath();
+    if (k >= 1) this.alter();
+  }
+
   update(time: number, dt: number) {
     if (this.ghost) this.updateGhost(time, dt);
     if (!this.active || !this.lot) return;
@@ -533,6 +640,7 @@ export class Bioworks {
     if (this.awake && near && time > this.nextBreath) { this.nextBreath = time + 5000 + Math.random() * 4000; sound.cemBreath({ x: this.center.x, y: this.center.y }); }
     this.updateAnts(dt, time, night);
     this.updateDoor(time, dt);
+    this.updateStrain(dt);
   }
 
   private clean() {

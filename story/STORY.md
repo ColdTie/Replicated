@@ -56,6 +56,7 @@ The game opens the moment Thales finishes copying himself. He looks at the new V
 | --- | --- |
 | Vessels | A life form made from scanned human minds, carrying the Metanoia's drive to explore. |
 | Copying | With enough resources, a Vessel makes a copy of itself. The copy is close to the original, picks a new name, and follows its own desires. |
+| Vessel and ship | A Vessel is built together with its ship. The resources for making a Vessel are set accordingly. |
 | Wake or hold | When a copy is made, its maker chooses: bring it to life now, or hold it asleep until a real player takes possession of it. Being copied and handed over by an existing player is the only way to join the game. |
 | Husks | Empty Vessels the player builds and controls directly. They are stored underground and picked from a menu. |
 | Building with Cems | The 3D printers print with living things. You pick a design from a menu, and the Cems build it on command, with the ants carrying their feed and the fungus cleaning. A building's cost depends on its complexity and its volume: a house is less complex than a supercomputer. |
@@ -71,6 +72,7 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 | --- | --- | --- |
 | 3D printers | Already on the homeworld at the start. They print buildings and other structures. | The early game |
 | Cem building | Biological organisms that build structures on command: the Cems, helped by modified ants and fungus. A menu of designs, from houses to supercomputers. | The early game onward |
+| Cem strains | At a Biolab, wild Cems from Gliese 12 b are changed into a new strain that builds, the way Alaina changed the first ones. | After Cem building |
 | Biological computers | To be defined | |
 | Quantum computers | To be defined | |
 | SCUT technology | Faster than light links | Letters between worlds, controlling husks from far away |
