@@ -1575,7 +1575,8 @@
      "letter": "b",
      "kind": "rock",
      "period": 12.76,
-     "hz": true
+     "hz": true,
+     "biome": "dune"
     }
    ]
   },

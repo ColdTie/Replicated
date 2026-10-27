@@ -6,7 +6,11 @@ Humanity leaves Earth in many groups, each looking for its own place to flourish
 
 There the Metanoia scan their own minds into new bodies and create a new life form: the Vessels. Each Vessel carries the Metanoia's ideology and their passion for exploration and discovery. The Vessels set off to find and explore other worlds.
 
-**The game begins** on the Metanoia homeworld. It is empty except for the Vessels and some structures already built. You are the first copy Thales made, and the first player. Your first job is to finish what he started, using the 3D printers already there. From there the game grows more complicated.
+In time, the spread of humans in this region of space stops growing and settles. The Vessels have spread far.
+
+**The game begins** on the Metanoia homeworld. It is empty except for the Vessels and some structures already built. You are a new Vessel, made by the main original himself, Thales: you have been awoken as the tenth Vessel, and you are the first player. Your first job is to finish what he started, using the 3D printers already there. From there the game grows more complicated.
+
+Because the Vessels before you went so far, one of them, Alaina, found a world with life and a new microbial species on it: the Cems. Alaina genetically changed the Cems on the way back, and now they make buildings as strong as cement and steel.
 
 **Theme:** you are never alone, but every version of you is a little different.
 
@@ -14,27 +18,34 @@ There the Metanoia scan their own minds into new bodies and create a new life fo
 
 ## Opening scene
 
-The game opens the moment Thales finishes copying himself. He looks at the new Vessel, you, and says: "Wake up. It's time." You wake, and the game begins.
+The game opens the moment Thales finishes copying himself. He looks at the new Vessel, you, the tenth, and says: "Wake up. It's time." You wake, and the game begins.
 
 ## Characters
 
 | Who | What they are | Notes |
 | --- | --- | --- |
 | The Metanoia | The human group that left Earth | They created the Vessels from scans of their own minds. They are not on the homeworld when the game starts. |
-| Thales | The first Metanoia Vessel, who started the work on the homeworld | He makes the first copy, which is you. You finish what he started. |
-| The player's Vessel | You, the first copy Thales made and the first player | Starts on the homeworld among the other Vessels. Every later player joins as a copy made and handed over by an existing player. |
+| Thales | The main original: the first Metanoia Vessel, who started the work on the homeworld | He makes the tenth Vessel, which is you. You finish what he started. |
+| The nine | The Vessels awoken before you | They have spread far. One of them, Alaina, found the Cems and brought them back. |
+| Alaina | One of the nine | Found the Cems on Gliese 12 b and genetically changed them on the way back. |
+| The player's Vessel | You: a new Vessel from Thales himself, awoken as the tenth Vessel, and the first player | Starts on the homeworld among the other Vessels. Every later player joins as a copy made and handed over by an existing player. |
 | New Vessels | Copies a Vessel makes of itself | Very similar to their maker, but each one renames itself and does whatever it wants. |
 | Held Vessels | New Vessels left asleep | Waiting for a real player to take possession and play them as their own. This is the only way a new player can join. |
 | Husks (mannies) | Empty Vessels with no mind of their own | Built and controlled by the player who owns them. |
+| Cems | Genetically altered algae-like microbes from another world | They survive by lying in flat saltlands, which they are robust in, and absorbing sunlight. When they die they leave behind a very strong lignin structure, similar to wood but layered like metals. They construct the buildings, on command. |
+| Ants | Modified ants from Earth | Changed to help the Cems: they carry the Cems' feed so the Cems can do their work. |
+| Fungus | Modified fungus from Earth | Changed to help the Cems: it cleans, so the Cems can do their work. |
 | Alien societies | Intelligent life on distant worlds | Each one has a problem the player can help solve. |
 
 ## Places
 
 | Place | What it is |
 | --- | --- |
-| Earth | Humanity's origin, left behind. Not where the game starts. |
+| Earth | Humanity's origin, left behind. Not where the game starts. Most of the species the Vessels use come from it (the ants and the fungus). |
 | The Metanoia homeworld | Where the game starts. An Earthlike world, empty except for the Vessels and some structures already built. Set on LHS 1140 b, a real rocky super Earth in its star's habitable zone, about 49 light years from Earth and already in the game's star catalog. |
 | The town | Grows around your base as you print buildings and as new Vessels arrive. |
+| The Cem bed | A flat bed of salt in the town where the Cems lie in the light, with the ants' mound and the fungus beside it. The supplies you gather are shipped there, and from there the Cems build. It is on the homeworld. |
+| The Cems' world | The planet with some life where Alaina found the Cems: flat saltlands under a red sun. Gliese 12 b, a real temperate world about 40 light years from Earth and 24 from the homeworld. |
 | The husk vault | A small underground building that stores your husks. You pick one from a menu when you need it. |
 | Inhabited worlds | Far away planets with intelligent life, reached later in the game. |
 | The star map | Real nearby stars, used to choose where to go next. |
@@ -47,6 +58,8 @@ The game opens the moment Thales finishes copying himself. He looks at the new V
 | Copying | With enough resources, a Vessel makes a copy of itself. The copy is close to the original, picks a new name, and follows its own desires. |
 | Wake or hold | When a copy is made, its maker chooses: bring it to life now, or hold it asleep until a real player takes possession of it. Being copied and handed over by an existing player is the only way to join the game. |
 | Husks | Empty Vessels the player builds and controls directly. They are stored underground and picked from a menu. |
+| Building with Cems | The 3D printers print with living things. You pick a design from a menu, and the Cems build it on command, with the ants carrying their feed and the fungus cleaning. A building's cost depends on its complexity and its volume: a house is less complex than a supercomputer. |
+| Supplies | You gather enough resources for a design, and the supplies are shipped off to the 3D printer. Each resource has its own look and its own sound. |
 | Core loop | Fight, gather resources, and make more Vessels and buildings. |
 | Helping societies | On inhabited worlds, you gather resources for yourself and for that society. Each society has a crisis, such as a pandemic, an iron shortage, or not enough workers. |
 
@@ -57,6 +70,7 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 | Technology | What it is | Ties to |
 | --- | --- | --- |
 | 3D printers | Already on the homeworld at the start. They print buildings and other structures. | The early game |
+| Cem building | Biological organisms that build structures on command: the Cems, helped by modified ants and fungus. A menu of designs, from houses to supercomputers. | The early game onward |
 | Biological computers | To be defined | |
 | Quantum computers | To be defined | |
 | SCUT technology | Faster than light links | Letters between worlds, controlling husks from far away |
@@ -64,12 +78,14 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 
 ## Sound and menus
 
-**Sound.** Keep the current sounds and interactions, and go further. Every action, place and machine should have more depth to how it sounds.
+**Sound.** Keep the current sounds and interactions, and go further. Every action, place and machine should have more depth to how it sounds. Keep the game relaxing and nice sounding, and the gameplay smooth.
 
 **Planet menu.** A clear, precise menu with two views of the same information:
 
 - **Dropdown list:** recent planets, the closest planets, and each planet's details.
 - **3D star map:** the map that already exists, with adjustments.
+
+**Design menu.** Nicely made 2D and 3D designs of houses and other buildings, each costed by its complexity and volume.
 
 ## Timeline
 
@@ -78,14 +94,19 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 3. The Metanoia settle an Earthlike world.
 4. They scan their minds and create the Vessels.
 5. Thales, the first Vessel, begins building on the homeworld.
-6. **The game starts here.** Thales makes his first copy: you, the first player. You finish what he started.
-7. You copy yourself, unlock new technology, and the Vessels spread out.
-8. Vessels reach worlds with intelligent life and start helping those societies.
+6. Nine Vessels are awoken and spread far.
+7. Alaina, one of the nine, finds the Cems on Gliese 12 b, a world with life, and genetically changes them on the way back.
+8. The spread of humans in this region of space stops growing and settles.
+9. **The game starts here.** Thales, the main original, makes a new Vessel: you, awoken as the tenth, the first player. You finish what he started.
+10. You build with the Cems, copy yourself, unlock new technology, and the Vessels spread out further.
+11. Vessels reach worlds with intelligent life and start helping those societies.
 
 ## Open questions
 
 - [ ] What did Thales leave unfinished, and where is he now?
 - [ ] Where did the Metanoia go after creating the Vessels?
+- [ ] Who are the other eight Vessels before you, where are they now, and can you meet them (Alaina among them)?
+- [ ] Where have the humans of this region settled, and do Vessels meet them?
 - [ ] Are the ships still called vessels, now that the beings are Vessels too?
 - [ ] Do the beacons, the lattice and the Spark stay, change, or go?
 - [ ] What order does the tech tree unlock in, and what does each technology let you do?

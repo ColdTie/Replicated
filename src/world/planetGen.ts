@@ -31,8 +31,9 @@ export interface PlanetMap {
   walls: number[][];
   spawn: Point;               // tile coords of the landing site
   nodes: Point[];             // tile coords
-  /** Iron ore and hydrogen vents (items.json), tile coords; their node indexes follow the crystals' */
-  ores: (Point & { kind: 'iron' | 'hydrogen' })[];
+  /** Iron ore and hydrogen vents, then salt blooms, quartz and copper ore (items.json), tile coords; their node indexes
+   * follow the crystals' (iron and hydrogen first, so older saves keep theirs) */
+  ores: (Point & { kind: 'iron' | 'hydrogen' | 'salt' | 'quartz' | 'copper' })[];
   enemies: { type: string; x: number; y: number }[];
   decor: { frame: number; x: number; y: number }[]; // pixel coords (feet)
   glows: { x: number; y: number; kind: 'door' | 'mushroom' | 'machine' }[];
@@ -426,6 +427,32 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
         const x = randInt(r5, 2, w - 3), y = randInt(r5, 2, h - 3);
         if (!free(x, y) || Math.hypot(x - cx, y - cy) < 8) continue;
         if (attempt < total * 80 && !likes[kind](x, y)) continue;
+        ores.push({ x, y, kind }); placed++;
+      }
+    }
+    // 13. Salt blooms where water dried (pond rims; in the open on a dry world), quartz out of rock, copper boulders by
+    // rock or water (items.json salt / quartz / copper, for the Cems' designs): a rng of their own and placed after
+    // iron and hydrogen, so nothing placed before them moves
+    const r6 = mulberry32(seed ^ 0x5a17);
+    const wet = cells.some((c) => c === Cell.Water);
+    const likes2 = {
+      salt: (x: number, y: number) => (wet ? near(x, y, 2, Cell.Water) && !near(x, y, 0, Cell.Water) : !near(x, y, 2, Cell.Rock)),
+      quartz: (x: number, y: number) => near(x, y, 2, Cell.Rock),
+      copper: (x: number, y: number) => near(x, y, 3, Cell.Rock) || near(x, y, 3, Cell.Water),
+    };
+    for (const kind of ['salt', 'quartz', 'copper'] as const) {
+      const item = ITEMS[kind];
+      for (let i = 0, attempt = 0; i < item.starters && attempt < 400 * item.starters; attempt++) {
+        const [qx, qy] = quarters[(i + (kind === 'salt' ? 1 : kind === 'quartz' ? 2 : 0)) % 4];
+        const x = Math.round(cx + qx * (3 + r6() * (b.w / 2 + g + 4))), y = Math.round(cy + qy * (3 + r6() * (b.h / 2 + g + 4)));
+        if (!free(x, y) || (townFar(x, y, keep.crystals + 3) && attempt % 400 < 300)) continue;
+        ores.push({ x, y, kind }); i++;
+      }
+      const total = Math.round(item.perWorld * def.resourceNodes / 30);
+      for (let attempt = 0, placed = 0; attempt < total * 120 && placed < total; attempt++) {
+        const x = randInt(r6, 2, w - 3), y = randInt(r6, 2, h - 3);
+        if (!free(x, y) || Math.hypot(x - cx, y - cy) < 8) continue;
+        if (attempt < total * 80 && !likes2[kind](x, y)) continue;
         ores.push({ x, y, kind }); placed++;
       }
     }

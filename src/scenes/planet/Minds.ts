@@ -209,7 +209,7 @@ export class Minds {
       this.lastMindCallAt.set(npc, Date.now());
       const res = await st.mindTick(npc.data.id, this.mindContext(npc));
       this.lastWake.set(npc, t);
-      if (res?.reason === 'budget') { this.mindsRest(); return; }
+      if (res?.reason === 'budget' || res?.reason === 'paused') { this.mindsRest(); return; }
       if (!res || res.skipped || !this.s.npcs.includes(npc)) return;
       if (res.error) { console.warn('mind:', res.error); return; }
       this.applyMind(npc, res, false);
@@ -247,7 +247,7 @@ export class Minds {
         this.lastMindCallAt.set(npc, Date.now());
         const res = await st.mindTick(npc.data.id, { ...this.mindContext(npc), talk: { said } });
         if (res?.error) console.warn('mind:', res.error);
-        if (res?.reason === 'budget') { this.mindsRest(); return null; }
+        if (res?.reason === 'budget' || res?.reason === 'paused') { this.mindsRest(); return null; }
         if (res?.skipped) continue;
         if (!res || res.error || !this.s.npcs.includes(npc)) return null;
         // it has just spoken: its next ordinary wake waits
@@ -265,7 +265,7 @@ export class Minds {
     }
   }
 
-  /** The day's budget for the minds is spent: no copy asks again for half an hour (the function would only say no). */
+  /** The day's budget for the minds is spent, or the minds are paused: no copy asks again for half an hour (the function would only say no). */
   mindsRest() {
     for (const n of this.s.npcs) this.nextWake.set(n, Math.max(this.nextWake.get(n) ?? 0, this.mindClock + 30 * 60_000));
   }

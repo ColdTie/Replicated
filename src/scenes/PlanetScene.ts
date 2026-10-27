@@ -14,6 +14,7 @@ import { Npc } from '../entities/Npc';
 import { Village } from '../entities/Village';
 import { Warren } from '../entities/Warren';
 import { Buildings } from '../entities/Buildings';
+import { Bioworks } from '../entities/Bioworks';
 import { MannyDock } from '../entities/Manny';
 import { inManny, vesselAway, vesselHere } from '../core/mannies';
 import { demoWarren } from '../world/warren';
@@ -48,6 +49,7 @@ import { Talk } from './planet/Talk';
 import { Town } from './planet/Town';
 import { NO_INPUT, kitLists } from './planet/shared';
 import { PARTS } from '../core/body';
+import HOMEWORLD from '../data/homeworld.json';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
 
@@ -84,6 +86,8 @@ export class PlanetScene extends Phaser.Scene {
   village!: Village;
   warren!: Warren;
   buildings!: Buildings;
+  /** the Cem bed (homeworld): where supplies are shipped and the Cems build from */
+  bioworks?: Bioworks;
   embers = 0;
   /** the planet's materials (src/data/supplies.json); Ember is `embers` */
   supplies: Record<string, number> = {};
@@ -215,6 +219,7 @@ export class PlanetScene extends Phaser.Scene {
     this.trade.reset();
     this.homeworld.reset();
     this.choice = undefined;
+    this.bioworks = undefined;
     this.townState = { lots: {}, civic: {} };
     this.migrated = false;
     this.npcsLoaded = true;
@@ -416,6 +421,7 @@ export class PlanetScene extends Phaser.Scene {
     });
     // the way down to the warren the copies dig (hatch spot kept per planet); it moved on while nobody was here
     this.warren = new Warren(this, save?.data.warren);
+    this.bioworks = new Bioworks(this, save);
     this.buildings = new Buildings(this, save?.data.buildings);
     this.homeworld.placePrinters();
     this.time.delayedCall(2500, () => this.towner.grantGifts(save?.data.gifts));
@@ -764,6 +770,31 @@ export class PlanetScene extends Phaser.Scene {
       this.player.setPosition(this.warren.hatch.x, this.warren.hatch.y + 14);
       this.time.delayedCall(200, () => this.descend(true));
     }
+    // the Cem bed awake (the Printworks finished), the store full; prints under way; the design menu open
+    if (view === 'bioworks' || view === 'printing' || view === 'designs') {
+      const goal = this.buildings.list.find((b) => b.id === HOMEWORLD.goal);
+      if (goal && !goal.built) this.buildings.finishNow(goal.id);
+      this.bioworks?.wake(false);
+      for (const k of ['salt', 'iron', 'quartz', 'copper', 'wood']) this.supplies[k] = 38;
+      this.markSupplies();
+      this.embers = Math.max(this.embers, 40);
+      const bw = this.bioworks;
+      if (bw?.lot) { px = bw.center.x - 30; py = bw.center.y + 34; }
+      if (view === 'printing') {
+        const first = (['house', 'storehouse'] as const).map((id, k) => {
+          const b = this.buildings.print(id);
+          if (b) b.printStart = Date.now() - (b.printMs ?? 0) * (k ? 0.3 : 0.55);
+          return b;
+        })[0];
+        if (first) { px = first.x - 50; py = first.y + 26; }
+      }
+      if (view === 'designs') this.time.delayedCall(300, () => { if (this.bioworks) { this.bioworks.readyAt = 0; this.bioworks.openMenu(); } });
+      this.player.setPosition(px, py);
+      this.cameras.main.centerOn(px, py - 10);
+    }
+    // a wider look for reviewing a layout (?zoom=0.5)
+    const zoom = Number(new URLSearchParams(location.search).get('zoom') ?? 1);
+    if (zoom > 0 && zoom !== 1) this.cameras.main.setZoom(zoom);
     if (view === 'replicate') {
       (this.base as unknown as { placeReplicator(a: boolean): void }).placeReplicator(false);
       this.embers = DRIFT.cost;
@@ -814,6 +845,7 @@ export class PlanetScene extends Phaser.Scene {
     this.homecoming.update(time);
     this.trade.update(dt);
     this.buildings.update(time, dt);
+    this.bioworks?.update(time, dt);
     this.warren.update(dt);
     this.updateHatch(dt);
     this.minds.tickMinds(dt);
@@ -945,6 +977,7 @@ export class PlanetScene extends Phaser.Scene {
 
   /** The action button does something other than attack here (build). Returns true if it did. */
   tryInteract(): boolean {
+    if (this.bioworks?.playerAtDoor()) { this.bioworks.openMenu(); return true; }
     if (this.departure.playerOnBoardSpot()) return this.departure.tryBoard();
     if (this.dock.playerOnPad()) return this.dock.tryBuild();
     if (this.time.now > this.hatchReadyAt && this.warren.playerOnHatch()) { this.descend(); return true; }
@@ -1233,7 +1266,7 @@ export class PlanetScene extends Phaser.Scene {
     for (const n of this.nodes) {
       if (!n.alive || Math.hypot(n.x - hx, n.y - 4 - hy) > radius + 4) continue;
       n.hit(aim);
-      sound.crystal();
+      sound.mineral(n.kind);
       hit = true;
     }
     // nothing alive in reach: the swing works on the village (a tree, rock, a building being raised)
@@ -1344,6 +1377,7 @@ export class PlanetScene extends Phaser.Scene {
     const s = this.surfaceAt(x, y);
     if (s === 'water' || s === 'void') return s;
     if (Math.hypot(x - this.vessel.x, y - this.vessel.y) < 24 || (this.dock && Math.hypot(x - this.dock.x, y - this.dock.y) < 14)) return 'metal';
+    if (this.bioworks?.onFlat(x, y)) return 'salt';
     if (this.buildings?.list.some((b) => b.built && !b.vetoed && Math.abs(x - b.x) < b.w * 8 + 4 && y > b.y - 6 && y < b.y + 12)) return 'printed';
     const sq = this.map.town.square, tx = Math.floor(x / 16), ty = Math.floor(y / 16);
     if (s === 'stone' || (tx >= sq.x && ty >= sq.y && tx < sq.x + sq.w && ty < sq.y + sq.h)) return 'stone';
@@ -1428,7 +1462,7 @@ export class PlanetScene extends Phaser.Scene {
   }
 
   onNodeHit(n: CrystalNode) {
-    this.pending.nodes[n.index] = { hits: n.hits, at: Date.now() };
+    this.pending.nodes[n.key] = { hits: n.hits, at: Date.now() };
   }
 
   spawnShard(x: number, y: number, dir?: Phaser.Math.Vector2, kind: NodeKind = 'ember') {
@@ -1438,7 +1472,8 @@ export class PlanetScene extends Phaser.Scene {
   collectShard(x: number, y: number, kind: NodeKind = 'ember') {
     sound.collect();
     if (kind !== 'ember') {
-      // iron and hydrogen go into this world's store (the materials of a manny)
+      // iron, hydrogen, salt, quartz and copper go into this world's store (husks and the Cems' designs are made of them)
+      sound.pickup(kind);
       this.warren.add(kind, 1);
       this.fx.sparks(x, y - 4, NODE[kind].spark[0], 5);
       this.fx.floatIcon(this.player.x, this.player.y - 22, ITEMS[kind].sprite);

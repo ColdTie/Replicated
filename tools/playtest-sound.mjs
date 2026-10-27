@@ -62,10 +62,13 @@ try {
   // every new sound plays; the cave and the vault have their own beds
   const played = await ev(async () => {
     const s = window.__sound, at = { x: window.__scene.player.x + 60, y: window.__scene.player.y };
-    for (const f of ['grass', 'stone', 'snow', 'ice', 'metal', 'printed', 'sand', 'water']) { s.lastPlay = {}; s.step(f); s.step(f, at); }
+    for (const f of ['grass', 'stone', 'snow', 'ice', 'metal', 'printed', 'sand', 'water', 'salt']) { s.lastPlay = {}; s.step(f); s.step(f, at); }
     s.lastPlay = {};
     s.wake(); s.link(true); s.link(false); s.launch(); s.landing(1); s.birth(); s.scan(); s.printLayer(40, 60); s.printDone(); s.vaultDoor();
     s.choiceOpen(); s.choicePick('wake'); s.menuMove(1); s.menuPick(); s.hit(false, at); s.crystal(at); s.swing(); s.collect();
+    // each resource its own voice (hit and pickup), and the Cem bed's sounds and the design menu's
+    for (const k of ['ember', 'iron', 'hydrogen', 'salt', 'quartz', 'copper']) { s.mineral(k, at); s.pickup(k); }
+    s.cemBreath(at); s.fungusClean(at); s.antPatter(); s.cemsWake(at); s.cemLayer(at); s.cemDone(at); s.designOpen(); s.designMove(3); s.designPrint();
     s.enterPlace('cave'); const cave = s.bed.id; s.enterPlace('vault'); const vault = s.bed.id; s.leavePlace(); s.leavePlace();
     await new Promise((r) => setTimeout(r, 300));
     return { cave, vault, back: s.bed.id };

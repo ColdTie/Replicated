@@ -1,0 +1,192 @@
+{
+  "_doc": "What the Cems can build (story/STORY.md: the 3D printers print with living things; you pick a design and the Cems build it on command). Each design is a small voxel model made of parts (src/world/voxel.ts): box, gable (a pitched roof, ridge along x or y), hip (four sloped sides), dome (half an ellipsoid), cyl (an upright cylinder), cone, carve (takes voxels away) and paint (recolors what is there), each over [x, y, z, w, d, h] in voxels (x to the right, y from the front to the back, z up; a voxel is ppv px wide in the world, 4 tiles = 16 voxels), with a material; repeat n with step [dx, dy, dz] copies a part. Nothing about a design's price is written by hand: volume is how many voxels it has, complexity comes from its parts (costing.weights per part, repeats counted), how many materials it mixes (matWeight) and its fine materials (special per voxel); every material voxel costs what costing.perVoxel says (lignin is Cems, salt and iron layered; glass is quartz; wire is copper; a core is Ember), all of it times 1 + complexity x markup; wood is the ants' and fungus' feed (woodPerComplexity), and the print takes (baseSeconds + volume x secondsPerVoxel) x (1 + complexity x secondsPerComplexity), less nurseryCut for every Cem Nursery standing. tiers name the complexity. needs: designs that must stand on this world first. place post: it stands at a free street lamp spot of the town (town.json posts) instead of taking a lot. gives: what it does once built (house: mood, storehouse: storage, nursery: print speed; the rest open other designs). materials: color ramps (palette indexes: light, mid, dark; alt = the ramp of every other layer, so lignin shows its metal-like laminations), glass is see-through, emissive ones light up at night. view: the in-world camera (pitch in degrees, ppv) and the menu's turntable (pitch, degrees a second).",
+  "view": { "pitch": 32, "yaw": 0.28, "ppv": 4, "turntablePitch": 26, "turntableSpeed": 22, "light": [-0.45, -0.6, 0.75] },
+  "materials": {
+    "lignin": { "ramp": [3, 4, 5], "alt": [30, 31, 4] },
+    "roof": { "ramp": [4, 5, 6], "alt": [31, 5, 6] },
+    "moss": { "ramp": [12, 13, 14] },
+    "cem": { "ramp": [11, 12, 13] },
+    "glass": { "ramp": [19, 18, 17], "glass": true, "emissive": true },
+    "copper": { "ramp": [10, 9, 0] },
+    "ember": { "ramp": [19, 11, 10], "emissive": true },
+    "warm": { "ramp": [11, 10, 9], "emissive": true },
+    "door": { "ramp": [6, 24, 25] },
+    "salt": { "ramp": [2, 30, 31] },
+    "steel": { "ramp": [20, 21, 22] },
+    "dark": { "ramp": [23, 24, 25] }
+  },
+  "costing": {
+    "weights": { "box": 1, "gable": 2, "hip": 2.5, "dome": 3, "cyl": 2, "cone": 2, "carve": 1, "paint": 0.5 },
+    "matWeight": 0.6,
+    "special": { "glass": 0.02, "copper": 0.04, "ember": 0.06, "steel": 0.004 },
+    "perVoxel": {
+      "lignin": { "salt": 0.012, "iron": 0.006 },
+      "roof": { "salt": 0.012, "iron": 0.004 },
+      "moss": { "salt": 0.008 },
+      "cem": { "salt": 0.008 },
+      "salt": { "salt": 0.02 },
+      "door": { "salt": 0.01 },
+      "glass": { "quartz": 0.05 },
+      "copper": { "copper": 0.08 },
+      "steel": { "iron": 0.03 },
+      "dark": { "iron": 0.012 },
+      "ember": { "ember": 0.4 },
+      "warm": { "ember": 0.05 }
+    },
+    "markup": 0.01,
+    "woodPerComplexity": 0.3,
+    "baseSeconds": 10,
+    "secondsPerVoxel": 0.02,
+    "secondsPerComplexity": 0.12,
+    "nurseryCut": 0.25,
+    "tiers": [
+      { "below": 12, "name": "SIMPLE" },
+      { "below": 18, "name": "FINE" },
+      { "below": 27, "name": "INTRICATE" },
+      { "below": 38, "name": "ADVANCED" },
+      { "below": 9999, "name": "MASTERWORK" }
+    ]
+  },
+  "gives": { "houseMood": 0.03, "houseMoodMax": 0.12, "storehouseCap": 20 },
+  "designs": [
+    {
+      "id": "lantern", "name": "Cem Lantern", "gives": "A LIGHT FOR THE STREET", "place": "post",
+      "about": "A post of lignin with an Ember core behind quartz: the first thing every Cem bed learns.",
+      "parts": [
+        { "box": [0, 0, 0, 3, 3, 1], "mat": "salt" },
+        { "box": [1, 1, 1, 1, 1, 6], "mat": "lignin" },
+        { "box": [0, 0, 7, 3, 3, 2], "mat": "glass" },
+        { "box": [1, 1, 7, 1, 1, 2], "mat": "ember" },
+        { "box": [0, 0, 9, 3, 3, 1], "mat": "roof" }
+      ]
+    },
+    {
+      "id": "house", "name": "House", "gives": "A HOME: EVERY VESSEL HERE FEELS IT",
+      "about": "Lignin walls, two warm windows and a living roof of Cems that never stopped growing.",
+      "parts": [
+        { "box": [0, 0, 0, 12, 9, 1], "mat": "salt" },
+        { "box": [1, 1, 1, 10, 7, 5], "mat": "lignin" },
+        { "gable": [0, 0, 6, 12, 9, 5], "ridge": "x", "mat": "moss" },
+        { "box": [9, 6, 7, 1, 1, 4], "mat": "roof" },
+        { "paint": [5, 1, 1, 2, 1, 3], "mat": "door" },
+        { "paint": [2, 1, 3, 2, 1, 2], "mat": "warm" },
+        { "paint": [8, 1, 3, 2, 1, 2], "mat": "warm" }
+      ]
+    },
+    {
+      "id": "storehouse", "name": "Storehouse", "gives": "THE STORE HOLDS 20 MORE OF EACH",
+      "about": "A long low hall with wide doors and a green roof, where the ants stack what you bring.",
+      "parts": [
+        { "box": [0, 0, 0, 16, 10, 1], "mat": "salt" },
+        { "box": [1, 1, 1, 14, 8, 5], "mat": "lignin" },
+        { "box": [0, 0, 6, 16, 10, 1], "mat": "roof" },
+        { "box": [1, 1, 7, 14, 8, 1], "mat": "moss" },
+        { "paint": [5, 1, 1, 6, 1, 4], "mat": "door" },
+        { "paint": [4, 1, 5, 8, 1, 1], "mat": "copper" },
+        { "box": [12, 0, 1, 2, 1, 2], "mat": "roof" },
+        { "box": [2, 0, 1, 1, 1, 1], "mat": "roof" }
+      ]
+    },
+    {
+      "id": "nursery", "name": "Cem Nursery", "gives": "CEMS GROW FASTER: EVERY PRINT A QUARTER QUICKER",
+      "about": "A glasshouse over trays of young Cems, ribbed in copper so it rings a little in the wind.",
+      "needs": ["house"],
+      "parts": [
+        { "box": [0, 0, 0, 16, 10, 1], "mat": "salt" },
+        { "box": [1, 1, 1, 14, 8, 2], "mat": "lignin" },
+        { "box": [2, 2, 2, 12, 6, 1], "mat": "cem" },
+        { "gable": [1, 1, 3, 14, 8, 6], "ridge": "x", "mat": "glass" },
+        { "paint": [1, 1, 3, 1, 8, 6], "mat": "copper", "repeat": 3, "step": [6, 0, 0] },
+        { "paint": [7, 1, 1, 2, 1, 4], "mat": "door" }
+      ]
+    },
+    {
+      "id": "workshop", "name": "Workshop", "gives": "OPENS THE OBSERVATORY AND THE SIGNAL SPIRE",
+      "about": "A tall bay door, a forge glow over it and a copper stack: where the finer prints are worked out.",
+      "needs": ["storehouse"],
+      "parts": [
+        { "box": [0, 0, 0, 16, 11, 1], "mat": "salt" },
+        { "box": [1, 1, 1, 14, 9, 6], "mat": "lignin" },
+        { "gable": [0, 0, 7, 16, 11, 4], "ridge": "x", "mat": "roof" },
+        { "cyl": [11, 6, 7, 3, 3, 6], "mat": "copper" },
+        { "box": [11, 6, 13, 3, 3, 1], "mat": "dark" },
+        { "paint": [2, 1, 1, 5, 1, 4], "mat": "door" },
+        { "paint": [3, 1, 5, 3, 1, 1], "mat": "ember" },
+        { "paint": [10, 1, 3, 3, 1, 2], "mat": "warm" }
+      ]
+    },
+    {
+      "id": "observatory", "name": "Observatory", "gives": "WATCHES THE SKY; OPENS THE BIOLAB",
+      "about": "A round tower under a steel dome, its quartz lens turned to the stars the Vessels went to.",
+      "needs": ["workshop"],
+      "parts": [
+        { "box": [0, 0, 0, 14, 14, 1], "mat": "salt" },
+        { "cyl": [1, 1, 1, 12, 12, 8], "mat": "lignin" },
+        { "dome": [1, 1, 9, 12, 12, 6], "mat": "steel" },
+        { "paint": [6, 1, 10, 2, 6, 6], "mat": "dark" },
+        { "box": [6, 2, 13, 2, 2, 2], "mat": "copper" },
+        { "box": [6, 1, 15, 2, 2, 2], "mat": "copper" },
+        { "box": [6, 0, 16, 2, 1, 1], "mat": "glass" },
+        { "paint": [6, 1, 1, 2, 2, 3], "mat": "door" },
+        { "paint": [2, 2, 5, 1, 3, 2], "mat": "warm" },
+        { "paint": [11, 2, 5, 1, 3, 2], "mat": "warm" }
+      ]
+    },
+    {
+      "id": "spire", "name": "Signal Spire", "gives": "CALLS ACROSS THE STARS; OPENS THE SUPERCOMPUTER",
+      "about": "A needle of lignin wound with copper, an Ember light at its tip that blinks to the nine.",
+      "needs": ["workshop"],
+      "parts": [
+        { "box": [0, 0, 0, 8, 8, 1], "mat": "salt" },
+        { "box": [1, 1, 1, 6, 6, 3], "mat": "lignin" },
+        { "cyl": [2, 2, 4, 4, 4, 14], "mat": "lignin" },
+        { "paint": [2, 2, 6, 4, 4, 1], "mat": "copper", "repeat": 4, "step": [0, 0, 3] },
+        { "paint": [2, 2, 17, 4, 4, 1], "mat": "glass" },
+        { "cone": [2, 2, 18, 4, 4, 5], "mat": "copper" },
+        { "box": [3, 3, 23, 2, 2, 1], "mat": "ember" },
+        { "paint": [3, 1, 1, 2, 1, 3], "mat": "door" }
+      ]
+    },
+    {
+      "id": "biolab", "name": "Biolab", "gives": "STUDIES THE CEMS; OPENS THE SUPERCOMPUTER",
+      "about": "Two glass domes over vats of Cems, joined by copper pipes: where the next strains are grown.",
+      "needs": ["nursery", "observatory"],
+      "parts": [
+        { "box": [0, 0, 0, 20, 12, 1], "mat": "salt" },
+        { "box": [1, 1, 1, 18, 10, 5], "mat": "lignin" },
+        { "box": [0, 0, 6, 20, 12, 1], "mat": "roof" },
+        { "cyl": [4, 4, 7, 3, 3, 3], "mat": "cem" },
+        { "cyl": [13, 4, 7, 3, 3, 3], "mat": "cem" },
+        { "dome": [2, 2, 7, 7, 7, 5], "mat": "glass" },
+        { "dome": [11, 2, 7, 7, 7, 5], "mat": "glass" },
+        { "box": [8, 5, 7, 4, 1, 1], "mat": "copper" },
+        { "paint": [1, 1, 4, 18, 1, 1], "mat": "copper" },
+        { "cyl": [17, 8, 7, 2, 2, 4], "mat": "steel" },
+        { "paint": [9, 1, 1, 2, 1, 3], "mat": "door" },
+        { "paint": [3, 1, 2, 3, 1, 2], "mat": "warm" },
+        { "paint": [14, 1, 2, 3, 1, 2], "mat": "warm" }
+      ]
+    },
+    {
+      "id": "supercomputer", "name": "Supercomputer", "gives": "THE FIRST THINKING MACHINE: WHAT COMES NEXT STARTS HERE",
+      "about": "Racks of dark composite behind steel, copper fins to cool it, and an Ember core under a quartz crown.",
+      "needs": ["biolab", "spire"],
+      "parts": [
+        { "box": [0, 0, 0, 22, 12, 1], "mat": "salt" },
+        { "box": [0, 0, 1, 22, 12, 1], "mat": "steel" },
+        { "box": [2, 2, 2, 18, 8, 9], "mat": "dark" },
+        { "paint": [3, 2, 3, 1, 1, 7], "mat": "steel", "repeat": 6, "step": [3, 0, 0] },
+        { "paint": [5, 2, 4, 1, 1, 1], "mat": "ember", "repeat": 5, "step": [3, 0, 0] },
+        { "paint": [4, 2, 7, 1, 1, 1], "mat": "ember", "repeat": 5, "step": [3, 0, 0] },
+        { "paint": [5, 2, 9, 1, 1, 1], "mat": "warm", "repeat": 5, "step": [3, 0, 0] },
+        { "box": [0, 3, 3, 2, 1, 7], "mat": "copper", "repeat": 3, "step": [0, 2, 0] },
+        { "box": [20, 3, 3, 2, 1, 7], "mat": "copper", "repeat": 3, "step": [0, 2, 0] },
+        { "box": [3, 3, 11, 16, 6, 2], "mat": "glass" },
+        { "box": [8, 5, 11, 6, 2, 2], "mat": "ember" },
+        { "box": [2, 2, 13, 18, 1, 1], "mat": "steel" },
+        { "box": [2, 9, 13, 18, 1, 1], "mat": "steel" },
+        { "paint": [10, 2, 2, 2, 1, 5], "mat": "door" }
+      ]
+    }
+  ]
+}

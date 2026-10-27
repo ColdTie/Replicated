@@ -1,0 +1,13 @@
+{
+  "_doc": "The Cem bed (story/STORY.md; src/entities/Bioworks.ts): where the supplies you gather are shipped and the Cems build from. worlds: the worlds that have one (the homeworld; it lies on the free lot of the town nearest the goal building, homeworld.json goal, saved as planet_states.data.town.civic.cembed). It sleeps until the goal (Thales' Printworks) is finished, then the Cems wake and the Printworks' door opens the design menu (stand in it doorDwellMs, or press attack). flat: the salt flat's half width and height (px). mats: how many Cems lie on it. blooms: salt blooms around its rim (items.json salt; saved as nodes bed0, bed1, ...). ants: perTrail ants walk each line between the store and a print and between the bed and a print, at speed px a second, wiggle px to the side; mound ants mill about the mound, forage ants walk between the mound and the bed. fungus: every cleanSeconds a wave of the fungus' light runs over the bed. maxPrints: how many designs the Cems build at once. alive: how many rows of voxels are still living Cems at the top of a print. hologram: the little turning model over the Printworks' door (px per voxel, how often it is redrawn in ms).",
+  "worlds": ["homeworld"],
+  "flat": { "rx": 42, "ry": 24 },
+  "mats": 12,
+  "blooms": 4,
+  "ants": { "perTrail": 44, "speed": [16, 26], "wiggle": 2.2, "mound": 10, "forage": 8 },
+  "fungus": { "cleanSeconds": 9 },
+  "doorDwellMs": 450,
+  "maxPrints": 2,
+  "alive": 2,
+  "hologram": { "ppv": 1, "redrawMs": 70 }
+}

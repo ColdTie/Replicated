@@ -7,17 +7,26 @@ import { flashWhite } from './Player';
 
 const EMBER = ITEMS.ember;
 
-/** What a node gives: an Ember crystal, iron ore or a hydrogen vent (items.json). */
-export type NodeKind = 'ember' | 'iron' | 'hydrogen';
-/** How hard each kind is to break, what it drops, and how it shines. */
-export const NODE: Record<NodeKind, { hits: number; perHit: number; onBreak: number; glow: number; spark: [number, number]; sprite: string; tinted: boolean }> = {
-  ember: { hits: EMBER.nodeHits, perHit: EMBER.nodeDropsPerHit, onBreak: EMBER.nodeDropsOnBreak, glow: PALETTE[9], spark: [PALETTE[10], PALETTE[11]], sprite: EMBER.nodeSprite, tinted: true },
-  iron: { hits: ITEMS.iron.nodeHits, perHit: ITEMS.iron.nodeDropsPerHit, onBreak: ITEMS.iron.nodeDropsOnBreak, glow: PALETTE[ITEMS.iron.glow], spark: [PALETTE[ITEMS.iron.spark[0]], PALETTE[ITEMS.iron.spark[1]]], sprite: ITEMS.iron.nodeSprite, tinted: false },
-  hydrogen: { hits: ITEMS.hydrogen.nodeHits, perHit: ITEMS.hydrogen.nodeDropsPerHit, onBreak: ITEMS.hydrogen.nodeDropsOnBreak, glow: PALETTE[ITEMS.hydrogen.glow], spark: [PALETTE[ITEMS.hydrogen.spark[0]], PALETTE[ITEMS.hydrogen.spark[1]]], sprite: ITEMS.hydrogen.nodeSprite, tinted: false },
+/** What a node gives: an Ember crystal, iron ore, a hydrogen vent, a salt bloom, quartz or copper ore (items.json). */
+export type NodeKind = 'ember' | 'iron' | 'hydrogen' | 'salt' | 'quartz' | 'copper';
+/** The kinds that go into the world's store (all but Ember, which has its own pool). */
+export type StoreKind = Exclude<NodeKind, 'ember'>;
+type NodeDef = { hits: number; perHit: number; onBreak: number; glow: number; spark: [number, number]; sprite: string; tinted: boolean };
+const fromItems = (k: StoreKind): NodeDef => {
+  const it = ITEMS[k];
+  return { hits: it.nodeHits, perHit: it.nodeDropsPerHit, onBreak: it.nodeDropsOnBreak, glow: PALETTE[it.glow], spark: [PALETTE[it.spark[0]], PALETTE[it.spark[1]]], sprite: it.nodeSprite, tinted: false };
 };
+/** How hard each kind is to break, what it drops, and how it shines. */
+export const NODE: Record<NodeKind, NodeDef> = {
+  ember: { hits: EMBER.nodeHits, perHit: EMBER.nodeDropsPerHit, onBreak: EMBER.nodeDropsOnBreak, glow: PALETTE[9], spark: [PALETTE[10], PALETTE[11]], sprite: EMBER.nodeSprite, tinted: true },
+  iron: fromItems('iron'), hydrogen: fromItems('hydrogen'), salt: fromItems('salt'), quartz: fromItems('quartz'), copper: fromItems('copper'),
+};
+/** Hard ones (metal and stone) shine less and glint now and then; salt and quartz glint and sparkle. */
+const HARD: NodeKind[] = ['iron', 'copper', 'salt', 'quartz'];
 
 /** A resource node. Hit it to chip off pickups; the last hit breaks it. An Ember crystal glows warm; iron ore is dark
- *  rusted metal that glints now and then; a hydrogen vent holds a pink bubble of gas and lets smaller ones rise. */
+ *  rusted metal that glints now and then; a hydrogen vent holds a pink bubble of gas and lets smaller ones rise; a salt
+ *  bloom sparkles white; quartz throws a little rainbow along its prisms; copper ore shows a warm glint in its cracks. */
 export class CrystalNode {
   readonly zone: Phaser.GameObjects.Zone;
   readonly sprite: Phaser.GameObjects.Sprite;
@@ -27,12 +36,16 @@ export class CrystalNode {
   private def: (typeof NODE)[NodeKind];
   hits = 0;
 
-  constructor(private scene: PlanetScene, readonly x: number, readonly y: number, readonly index: number, startHits = 0, readonly kind: NodeKind = 'ember') {
+  /** saved under this key in planet_states.data.nodes (the generated nodes by index; the Cem bed's blooms by name) */
+  readonly key: string;
+
+  constructor(private scene: PlanetScene, readonly x: number, readonly y: number, readonly index: number, startHits = 0, readonly kind: NodeKind = 'ember', key?: string) {
+    this.key = key ?? String(index);
     const d = this.def = NODE[kind];
     this.zone = scene.add.zone(x, y - 2, 12, 7);
     scene.physics.add.existing(this.zone, true);
     this.sprite = scene.add.sprite(x, y + 2, d.tinted ? tex(d.sprite, scene.planet.id) : d.sprite, 0).setOrigin(0.5, 1).setDepth(100 + y);
-    const metal = kind === 'iron';
+    const metal = HARD.includes(kind);
     this.glow = scene.add.image(x, y - 7, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(d.glow).setAlpha(metal ? 0.1 : 0.22).setScale(metal ? 0.5 : 0.7).setDepth(6100);
     this.light = scene.lighting.add({ x, y: y - 6, radius: metal ? 30 : 46, color: d.glow, intensity: metal ? 0.5 : 0.85, flicker: metal ? 0.05 : 0.25 });
     scene.tweens.add({ targets: this.glow, alpha: metal ? 0.04 : 0.12, duration: 1400 + Math.random() * 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -44,11 +57,14 @@ export class CrystalNode {
       }).setDepth(6090);
     }
     if (metal) {
-      // a cold glint runs over the metal every few seconds
-      scene.time.addEvent({ delay: 1800 + Math.random() * 2400, loop: true, callback: () => {
+      // a glint runs over it every few seconds: cold on iron, warm on copper, a white sparkle on salt, a rainbow on quartz
+      scene.time.addEvent({ delay: (kind === 'salt' ? 900 : 1800) + Math.random() * 2400, loop: true, callback: () => {
         const p = scene.player;
         if (!this.alive || !p || Math.hypot(p.x - x, p.y - y) > 260) return;
+        if (kind === 'quartz') { this.rainbow(); return; }
         const g = scene.add.image(x - 3 + Math.round(Math.random() * 6), y - 6 - Math.round(Math.random() * 4), 'px1').setDepth(6150).setBlendMode(Phaser.BlendModes.ADD).setScale(1);
+        if (kind === 'copper') g.setTint(PALETTE[10]);
+        if (kind === 'salt') { g.setScale(1); scene.tweens.add({ targets: g, scale: { from: 2, to: 0.5 }, alpha: { from: 1, to: 0 }, duration: 380, ease: 'Sine.easeOut', onComplete: () => g.destroy() }); return; }
         scene.tweens.add({ targets: g, scaleX: 5, alpha: { from: 1, to: 0 }, duration: 260, ease: 'Quad.easeOut', onComplete: () => g.destroy() });
       } });
     }
@@ -56,11 +72,20 @@ export class CrystalNode {
     if (this.hits) this.applyStage(false);
   }
 
+  /** Light running up a quartz prism: a short stack of rainbow pixels that rises and fades. */
+  private rainbow() {
+    const s = this.scene, x = this.x - 2 + Math.round(Math.random() * 4);
+    [26, 9, 11, 12, 18, 28].forEach((c, k) => {
+      const px = s.add.rectangle(x, this.y - 3 - k, 1, 1, PALETTE[c]).setDepth(6150).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+      s.tweens.add({ targets: px, alpha: { from: 0.9, to: 0 }, y: px.y - 3, delay: k * 45, duration: 420, onComplete: () => px.destroy() });
+    });
+  }
+
   /** Visuals for the current damage stage (used on hit and when restoring a save). */
   private applyStage(animate: boolean) {
     this.sprite.setFrame(Math.min(3, Math.round(this.hits / this.def.hits * 3)));
     const left = 1 - this.hits / this.def.hits;
-    const metal = this.kind === 'iron';
+    const metal = HARD.includes(this.kind);
     this.light.radius = (metal ? 14 : 20) + (metal ? 16 : 26) * left;
     this.light.intensity = (metal ? 0.25 : 0.4) + (metal ? 0.25 : 0.45) * left;
     if (this.alive) this.bubbles?.setFrequency(420 + 700 * (1 - left));
@@ -121,7 +146,7 @@ export class Shard {
   constructor(private scene: PlanetScene, x: number, y: number, dir?: Phaser.Math.Vector2, readonly kind: NodeKind = 'ember') {
     this.x = x; this.y = y;
     const a = (dir ? Math.atan2(dir.y, dir.x) : Math.random() * Math.PI * 2) + (Math.random() - 0.5) * 2.2;
-    const sp = (kind === 'iron' ? 30 : 40) + Math.random() * 45;
+    const sp = (kind === 'iron' || kind === 'copper' ? 30 : 40) + Math.random() * 45;
     this.vx = Math.cos(a) * sp;
     this.vy = Math.sin(a) * sp;
     this.vz = 70 + Math.random() * 40;
@@ -130,10 +155,10 @@ export class Shard {
     const color = NODE[kind].glow;
     this.sprite = scene.add.sprite(x, y, key).setOrigin(0.5, 0.5);
     this.sprite.play({ key: anim(key, 'twinkle'), startFrame: Math.floor(Math.random() * 3) });
-    this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(color).setAlpha(kind === 'iron' ? 0.15 : 0.3).setScale(0.35).setDepth(6100);
+    this.glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(color).setAlpha(kind === 'iron' || kind === 'copper' ? 0.15 : 0.3).setScale(0.35).setDepth(6100);
     // chromatic-split ghosts, only shown during the glitch right before pickup
     this.ghosts = kind === 'ember' ? [0xff3060, 0x30f0ff].map((c) => scene.add.image(x, y, 'shard').setTintFill(c).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(6140)) : [];
-    this.light = scene.lighting.add({ x, y, radius: 16, color, intensity: kind === 'iron' ? 0.4 : 0.7 });
+    this.light = scene.lighting.add({ x, y, radius: 16, color, intensity: kind === 'iron' || kind === 'copper' ? 0.4 : 0.7 });
     this.readyAt = scene.time.now + EMBER.pickupDelayMs;
   }
 
@@ -170,7 +195,7 @@ export class Shard {
 
     // hydrogen hovers higher and sways; iron lies still
     const resting = !this.homing && this.z === 0 && this.vz === 0;
-    const bob = !resting ? 0 : this.kind === 'hydrogen' ? Math.sin(time / 380 + this.x) * 2.5 + 6 : this.kind === 'iron' ? 0 : Math.sin(time / 260 + this.x) * 1.5 + 2;
+    const bob = !resting ? 0 : this.kind === 'hydrogen' ? Math.sin(time / 380 + this.x) * 2.5 + 6 : this.kind === 'iron' || this.kind === 'copper' ? 0 : Math.sin(time / 260 + this.x) * 1.5 + 2;
     let rx = Math.round(this.x + (resting && this.kind === 'hydrogen' ? Math.sin(time / 610 + this.y) * 1.5 : 0)), ry = Math.round(this.y - this.z - bob);
     this.sprite.setDepth(100 + this.y + (this.homing ? 30 : 0));
 

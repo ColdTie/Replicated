@@ -79,6 +79,8 @@ export class Homeworld {
     if (!this.here) return;
     const th = this.thales, post = this.post();
     if (th && post) { th.home = post; if (th.data.pos_x == null) th.setPosition(post.x, post.y); }
+    // the Cems wake once the Printworks stands (src/entities/Bioworks.ts)
+    if (this.s.buildings.list.some((b) => b.id === HOMEWORLD.goal && b.built)) this.s.bioworks?.wake(false);
     const done = (b: Building) => this.onBuilt(b);
     this.s.events.on('building-done', done);
     this.s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.s.events.off('building-done', done));
@@ -101,6 +103,7 @@ export class Homeworld {
     sound.build();
     if (th) { th.home = this.post(); th.thank(); }
     this.s.mindLog.push({ t: this.s.mindClock, text: `${session.replicant?.name ?? 'The new Vessel'} finished Thales' ${b.name}` });
+    this.s.time.delayedCall(1200, () => this.s.bioworks?.wake(true));
   }
 
   /**

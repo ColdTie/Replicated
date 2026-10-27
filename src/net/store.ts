@@ -151,6 +151,9 @@ export interface Building extends Blueprint {
   cost: Record<string, number>; paid: boolean;
   /** a shared building the village started on its own (buildings.json communal): hall, workshop, lookout */
   kind?: string;
+  /** printed by the Cems from a design (src/data/designs.json): which one, when the print began and how long it takes
+   * (ms); it rises with the clock, also while nobody plays */
+  design?: string; printStart?: number; printMs?: number;
 }
 /** Something placed in a room (tile coords); a resting station has `for` = the replicant it belongs to. */
 export interface WarrenItem { id: string; kind: string; room: string; x: number; y: number; by: string; for?: string; note?: string; at: number; /** palette index the copy chose */ tint?: number; placement?: string }
@@ -892,6 +895,8 @@ export class CloudStore implements GameStore {
   }
 
   async mindTick(replicantId: string, ctx: MindContext) {
+    // paused (mind.json paused): no call at all
+    if (MIND.paused) return { skipped: true, reason: 'paused' } as MindResult;
     const { data, error } = await this.sb.functions.invoke('mind', { body: { replicant_id: replicantId, context: ctx } });
     if (error) { console.warn('mind', error); return null; }
     return data as MindResult;

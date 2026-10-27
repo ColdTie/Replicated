@@ -10,11 +10,16 @@ Steve. Played in Chrome on a Windows laptop. Steve directs through chat and does
 
 The story lives in `story/STORY.md` (Steve's story bible, the source of truth; where anything here disagrees, it wins).
 In short: humanity left Earth in many groups. One group, the Metanoia, settled an Earthlike world, LHS 1140 b, and
-scanned their minds into a new life form, the Vessels. The game starts there, on an empty homeworld with a few
-structures, some half built. Thales, the first Vessel, has just copied himself and says "Wake up. It's time." That
-copy is the first player; its first job is to finish what Thales started with the 3D printers. Copying makes new
-Vessels: each is woken (it names itself and follows its own desires) or held asleep for a real player. Being copied
-and handed over is the only way to join. Husks (mannies) are empty Vessels you control, kept in an underground vault.
+scanned their minds into a new life form, the Vessels. The spread of humans in this region has since stopped and
+settled; the Vessels spread far. The game starts on the homeworld, empty but for a few structures, some half built.
+Thales, the first Vessel and the main original, has just made a new Vessel, the tenth (nine went before and spread
+far), and says "Wake up. It's time." That Vessel is the first player; its first job is to finish what Thales started
+with the 3D printers. Alaina, one of the nine, found the Cems on Gliese 12 b and altered them on the way back: algae-like
+microbes that lie in salt beds drinking sunlight and, on command, build structures whose dead lignin is as strong as
+cement and steel; modified Earth ants carry their feed and modified Earth fungus cleans their bed (2026-10-27).
+Copying makes new Vessels: each is woken (it names itself and follows its own desires) or held asleep for a real
+player. Being copied and handed over is the only way to join. Husks (mannies) are empty Vessels you control, kept in
+an underground vault.
 
 Theme: you are never alone, but every version of you is a little different. Lonely galaxy, warm settlements.
 
@@ -56,6 +61,8 @@ other devices. The profile `kid_mode` flag, no counter and no death, still exist
 1. Explore: move around a procedurally generated planet surface (seeded), one biome, with ruins and resource nodes.
 2. Fight: one tap attack with a generous hitbox, two enemy types, enemies drop resources.
 3. Gather and build: resource counter, a base area near the landing site, place the Replicator with one button when you have enough.
+   Since 2026-10-27 (story/STORY.md) building is the Cems': gather salt, iron, quartz, copper, wood and Ember, pick a
+   design at the Printworks, and the ants ship the supplies to the print while the Cems build it.
 4. Replicate: the Replicator creates a copy with drift. Copy becomes an NPC that walks around the base and generates resources while you are away.
 5. Travel: launch the vessel, pick the next planet from a simple star map, land on a new seed and accent hue.
 6. Handoff: a Vessel held asleep at its making is given to another profile, which wakes in it and names itself (since
@@ -98,7 +105,7 @@ Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick ai
 These shape the data model now, even where the feature comes later.
 
 - **Travel runs on real-world time.** (Switched off 2026-10-06 at Steve's request: every trip took 5 seconds via
-  `fixedSeconds` in `src/data/travel.json`. Since 2026-10-25 a trip takes 0.1 seconds per light year, `travel.json
+  `fixedSeconds` in `src/data/travel.json`. Since 2026-10-27 a trip takes 2 seconds per light year, `travel.json
   cruise.secondsPerLy`; `cruise.enabled` false and `fixedSeconds` 0 restore real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
 - **One shared galaxy per login.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
 - **Earth is the start.** (Superseded 2026-10-26 by the story: the game starts on the Metanoia homeworld, LHS 1140 b; Earth stays in the catalog as humanity's origin, a world you can fly to.) Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
@@ -141,7 +148,22 @@ src/scenes/planet/Homeworld.ts the homeworld at runtime: Thales' row (made on th
                          lots, the Replicator, data.founded), printers by unfinished founded work, the opening (playScan)
 src/entities/Printer.ts  the 3D printer beside every building being made (Buildings.printers): the head runs the gantry and
                          lays a layer with every blow, a breathing light and a thread of light call for hands; it folds
-                         away once the building stands (the Metanoia's stay on standby by their work)
+                         away once the building stands (the Metanoia's stay on standby by their work); beside a Cem print
+                         (bio) it only guides, in the Cems' green
+src/data/designs.json    the Cems' designs (lantern, house, storehouse, nursery, workshop, observatory, spire, biolab,
+                         supercomputer) as voxel parts; costing turns volume and complexity into price and print time;
+                         needs (unlock chain), gives (house mood, storehouse storage, nursery speed), materials, cameras
+src/world/voxel.ts       pure: parts -> voxel grid, volume / complexity / tier / cost / seconds, print order; a ray caster
+                         that draws a model (laminated lignin, see-through glass, outline, contours) in the world's 3/4
+                         view (printed voxels solid, the newest still green Cems, the rest a cyan guide lattice) or as a
+                         turntable; tools/design-preview.mjs draws every design into screenshots/designs.png
+src/core/designs.ts      the catalog in the game: models built once, world and turntable views, canvas textures, unlocks
+src/entities/Bioworks.ts the Cem bed (bioworks.json): a salt flat on the town lot nearest the Printworks (data.town.civic
+                         .cembed), breathing Cems, the ants' mound and the fungus, salt blooms (nodes bed0..); asleep until
+                         the Printworks stands; ant columns carry a print's supplies from the hatch and Cems from the bed;
+                         the Printworks' door (a turning hologram over it) opens the design menu
+src/scenes/DesignScene.ts the design menu over the paused planet: rows (READY / NEED / LOCKED / WAIT, built count), the
+                         chosen design turning in 3D (drag to turn), complexity, volume, print time, gives, price vs store
 supabase/manual/         SQL Steve runs by hand (never applied by a session): 2026-10-26_homeworld_fresh_start.sql
 src/data/*.json          palette, planets, player, enemies, items, structures, backend, village, warren (all tunables)
 src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by tools/build-stars.mjs; edit the catalog there)
@@ -150,7 +172,8 @@ src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalSto
 src/world/planetGen.ts   seeded island: floor/rock/water/void (no ruins since 2026-10-26), tiles, nodes, enemies, decor, glows,
                          trees/towers + blockers, fixed base layout (vessel, cradle, build pad, manny dock), the town
                          kept open; iron ore (by rock) and hydrogen vents (by water, or in the open) placed last with
-                         their own rng (`ores`; their node indexes follow the crystals')
+                         their own rng (`ores`; their node indexes follow the crystals'), then salt blooms (pond rims, or
+                         the open on dry worlds), quartz (by rock) and copper (by rock or water) with another rng
 src/world/town.ts        the town (tunables src/data/town.json): a paved square at the base (vessel, Replicator, cradle,
                          the hatch in its corner), streets out from it, home lots along them (named build slots, two
                          lamp posts) and civic lots for buildings; lot assignment (data.town), slotFor(), the one-time
@@ -161,7 +184,8 @@ src/world/groundPaint.ts painted floor: one full-color image per planet (relief-
                          The tilemap now only draws water and walls.
 src/fx/                  Lighting (multiply darkness RT + additive lights), Atmosphere (sky, stars, fog,
                          dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
-src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember, iron, hydrogen by kind),
+src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember, iron, hydrogen, salt,
+                         quartz, copper by kind; each its own glint, hit and pickup sound),
                          Base (pad + Replicator), Manny (the husk vault's bunker in the square: down its steps, a husk
                          left standing on standby)
 src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
@@ -197,7 +221,10 @@ src/data/needs.json      the copies' needs (rest, company, purpose): decay hours
 src/data/buildings.json  surface buildings: footprint limits, cost per tile and material, roofs, doors, approval delay
 src/world/buildingPaint.ts draws a building from its blueprint (planks / blocks / plates, flat / peaked / dome roof, door, window)
 src/entities/Buildings.ts proposals, the original's approve / veto, paying, shared raising, offline progress; the
-                         communal Meeting Hall / Workshop / Lookout the village starts on its own when the store is full
+                         communal Meeting Hall / Workshop / Lookout the village starts on its own when the store is full;
+                         Cem prints (Building.design, printStart, printMs): paid at once, on the free lot nearest the
+                         square (a lantern at a free street lamp spot), risen by the clock (also offline), redrawn as
+                         rows settle, lit and solid when done; whyNot / print / fraction / homeMood / storeBonus
 src/data/supplies.json   materials (stone, soil, wood, scrap, Ember, iron, hydrogen), yields, storage, recipes
 src/data/items.json      Ember, iron and hydrogen: node hits, drops, colors, how many per world
 src/data/manny.json      husks (mannies in code): cost (iron + hydrogen), where the vault stands, the doorway dwell
@@ -313,6 +340,11 @@ structures, Thales by his work, the Printworks printed to the end, Thales never 
 lights its row, L hides it, gone with the map),
 `node tools/playtest-sound.mjs` (the buses, each world's bed and the cave's and vault's, footsteps by ground, the talk
 box ducking, distance and panning, every new sound plays),
+`node tools/playtest-bioworks.mjs` (the bed asleep by the Printworks, salt / quartz / copper into the store, the Cems wake
+when the Printworks stands, its door opens the designs, a House printed by the clock with its ants and lights, the mood,
+the Nursery unlocked, a Storehouse's storage, two prints at once, prints across a reload, one finished while away),
+`node --experimental-strip-types tools/design-preview.mjs [--cut 0.6]` (every design in the world view and from four
+sides, with its volume, complexity, price and time -> `screenshots/designs.png`),
 `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, the vault opens from its doorway, a husk built
 from its menu, linked
@@ -332,7 +364,9 @@ raised (a blow). Walk into a building waiting for what you carry, a copy, or the
 hand the load over. Stand on the open hatch for a moment (a warm ring fills) or press attack on it to go down; walking
 or dashing across it never does. At the Replicator (attack on its ring with enough Ember) two lights open over it: WAKE (left) and HOLD (right);
 Left / Right (or the stick) choose, attack / E or a click on one picks. Standing in the husk vault's doorway a moment (a ring
-fills) or attack there goes down to the vault; Up / Down choose a row, attack / E / Enter pick, Esc goes up. At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
+fills) or attack there goes down to the vault; Up / Down choose a row, attack / E / Enter pick, Esc goes up. Standing in
+the Printworks' doorway a moment (once the Cems are awake; a green ring fills) or attack there opens the designs: Up /
+Down choose, Left / Right or a drag turn the model, attack / E / Enter or a click on PRINT prints, Esc closes. At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
 LINK; at the empty berth (the vessel is elsewhere) it has LINK and TO VESSEL / TO SHIP; in flight a world with your
 manny in the top-left row links you there. Dash Shift/K/X, gamepad
 B/L1/R2, swipe on the right side. Talk to the copy beside you (a speech mark shows over it): E, right click, gamepad Y,
@@ -348,7 +382,9 @@ add `&at=sol&pi=3`), `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?
 bottom left, for 12 s: save, world, ground, rock, rest; also `window.__loadMs`), `?fast` (travel minutes become seconds; a cruise takes a twelfth as long),
 `?shot=1&view=warren&copies=3` (a dug, lived-in warren, you at the foot of the ladder), `?shot=1&star=tau-ceti&pi=2` (preview planet 2 of another star, as a hologram visit), `?shot=1&at=fomalhaut&pi=1`
 (start the replicant on another world for real; `&view=beacon` stands you before the sleeping keeper, `&view=beacon-lit`
-shows the lit monolith).
+shows the lit monolith), `?shot=1&view=bioworks|printing|designs` (the Cem bed awake with a full store; a House and a
+Storehouse being printed; the design menu open), `&zoom=0.5` (a wider look in a screenshot; the lighting covers only the
+middle).
 
 ## Progress
 
@@ -802,3 +838,84 @@ sound that was there still plays).
 5. Story open questions (STORY.md), among them whether the ship keeps the name "vessel" and the future of the
    beacons, the lattice and the Spark.
 6. From session 15, still open: approve migration `0014_mind_runs.sql`, and require the "test" status check on main.
+
+### Session 20 (2026-10-27): the tenth Vessel and the Cems (Steve: "These will be biological organisms that build structures on command ... Lets start building", and the new story)
+**The story.** `story/STORY.md` carries Steve's new words: the spread of humans in this region has stopped and settled;
+the Vessels spread far; you are a new Vessel from the main original himself, awoken as the tenth; one of the nine before
+you found the Cems on a world with life and changed them on the way back; Cems (algae-like, robust in flat saltlands,
+drinking sunlight, leaving lignin like wood but layered like metal) build on command, helped by Earth ants (feed) and
+Earth fungus (cleaning). Two picks wait for his yes (marked in the bible): the Cems' world is Gliese 12 b (the catalog
+now makes it a dry `dune` world, `tools/build-stars.mjs`), and the printer the supplies are shipped to is the Cem bed on
+the homeworld. The first player is called THALES X until it names itself (`homeworld.json playerNumber`). The mind
+function's story and Thales' persona say the same (`STORY`), and away wakes describe Cem prints; **not deployed yet**.
+
+**Salt, quartz, copper** (`items.json`, `supplies.json`, `tools/sprites/saltbloom|salt|quartzspire|quartz|copperore|copper`,
+icons 15 and 16). Salt blooms (rose-white cubes on a pale crust; pond rims, the bed's rim, the open on dry worlds),
+quartz (clear prisms with a violet heart, a rainbow runs up them; by rock), copper (grey boulders crusted with green
+verdigris, copper in the cracks; by rock or water). Placed after iron and hydrogen with their own rng, so older node
+indexes hold; counters beside iron and hydrogen. Every resource has its own hit and pickup sound (`Sound.mineral`,
+`pickup`): salt crunch and rattle, quartz glass harmonica, copper singing bowl, and now an anvil clink for iron and a hiss
+and bloop for hydrogen. Salt underfoot crunches (surface `salt`).
+
+**Designs** (`src/data/designs.json`, `src/world/voxel.ts`, `src/core/designs.ts`). Nine designs as voxel parts: Cem
+Lantern, House, Storehouse, Cem Nursery, Workshop, Observatory, Signal Spire, Biolab, Supercomputer. Volume is voxels,
+complexity comes from parts, mixed materials and fine materials; every material voxel has a recipe (lignin = salt + iron,
+glass = quartz, wire = copper, cores = Ember) marked up by complexity, wood is the ants' feed, time grows with both (a
+House: 760 voxels, complexity 10, 55 s, salt 10 iron 3 ember 1 wood 3; the Supercomputer: 2136, 38, 293 s, iron 35
+ember 19 quartz 12 copper 10 salt 8 wood 12). A ray caster draws them: the world's 3/4 view turned a little (laminated
+lignin, see-through glass, outlines), the menu's turntable, and `tools/design-preview.mjs`. Unlock chain by `needs`;
+gives: House +0.03 mood each (up to 0.12), Storehouse +20 storage, Nursery a quarter quicker per print.
+
+**The Cem bed** (`src/entities/Bioworks.ts`, `bioworks.json`). On the homeworld, on the free lot nearest the Printworks
+(`data.town.civic.cembed`): a cracked salt flat, twelve breathing Cems (light motes by day, a faint glow at night), the
+ants' mound (ants milling, a feed line to the bed) and the fungus (its cyan wave cleans the bed), four salt blooms
+(nodes `bed0..3`). Asleep, grey, until the Printworks is finished; then it wakes with a swell and the Printworks' door
+gets a small turning hologram and opens the design menu (dwell or attack; you step out of the door when it closes and
+it waits for you to leave before opening again). Sounds: the Cems' breath, the fungus' wave, the ants' patter, the bed
+waking, each settled row, the finish (a marimba run on struck lignin), the menu's marimba.
+
+**The design menu** (`src/scenes/DesignScene.ts`): over the paused world, the list (READY / NEED / LOCKED / WAIT, built
+count, five complexity pips), the chosen design turning in 3D (drag or Left / Right), complexity, volume, print time,
+gives, about, cost have/need, PRINT or why not.
+
+**Cem printing** (`Buildings`: `Building.design`, `printStart`, `printMs`; no migration, it lives in
+`planet_states.data.buildings`). Paid at once; the free lot nearest the square (a lantern at a free street lamp spot);
+the camera goes to look; a printer guides in the Cems' green; ant columns carry the supplies from the hatch and the Cems
+from the bed (glowing at night); the drawing rises with the clock (the newest rows green Cems, the rest a cyan lattice)
+and keeps rising while nobody plays; finished: solid, lit windows, the ants go home. Two at once (`maxPrints`). The
+copies' own buildings are untouched (still raised by swings).
+
+- Verified: build, typecheck, Deno check of the function (isolated copy; `npx deno@2.5.6`), `tools/playtest-bioworks.mjs`
+  (new), `playtest-sound` (covers the new sounds), the full `npm test` (17 of 18 at first: `playtest-planetmenu` clicked a
+  row the list had just refilled, a timer on the map's clock that slower headless frames delay; it clicks through a
+  locator now and passes). Screenshots `bio-*.png`, `design-menu.png`,
+  `designs.png`. The report for Steve: "The Tenth Vessel" (story, the game today, the loop, mechanics, ideas, plan).
+- This container's Chromium is newer than the pinned Playwright: `/opt/pw-browsers/chromium_headless_shell-1194` was
+  linked to the installed 1243 build for the tests (container only).
+
+**Waiting for Steve (session 20).** Answered in session 20b below.
+
+### Session 20b (2026-10-27): Alaina; the minds paused; 2 s a light year (Steve: "Alaina", "Go ahead", "lets stop the api waking them up and having them do and think stuff. Lets put a pause on that right now", "Make it 2 seconds for each light year?")
+- **The picks stand.** Gliese 12 b is the Cems' world and the Cem bed on the homeworld is the printer. The Vessel who
+  found the Cems is **Alaina**, one of the nine (`story/STORY.md` premise, characters, timeline; the mind function's
+  `STORY`). The other eight are still unnamed.
+- **The minds are paused** (`src/data/mind.json paused` true). Nothing calls the model, so nothing is spent:
+  - the game's `CloudStore.mindTick` returns `{ skipped, reason: 'paused' }` without a request, and `Minds` rests the
+    minds as it does when the budget is out;
+  - the `mind` function (v20, deployed this session; `kit.json mind.paused`) refuses every wake first;
+  - the pg_cron job `mind-away-wakes` (job 1) is inactive.
+  While paused, a copy born WAKE stays blank, and nobody writes letters, notes, tells or proposals. To resume: set
+  `paused` false, run `node tools/build-mind-kit.mjs`, redeploy `mind`, and run
+  `select cron.alter_job(job_id := 1, active := true)`.
+- **Travel at 2 s a light year** (`travel.json cruise.secondsPerLy` 2, `inSystemSeconds` 3). From the homeworld:
+  TRAPPIST-1 (the nearest star) about 44 s, Gliese 12 about 49 s, Earth about 1 min 38 s, the farthest catalog star
+  about 4 min. Ships already flying land on the new schedule.
+- Merged to main (Steve: "Go ahead"), with session 20.
+- Verified: the live function answers `{"skipped":true,"reason":"paused"}` without calling the model; build;
+  `npm test`.
+
+**Waiting for Steve (session 20b).**
+1. The maker routine (`trig_01W1bBfgciouakZFzLHFK3FE`) still runs daily. With the minds paused no new proposals
+   arrive, so its runs find nothing to build; pause it too if wanted.
+2. Session 19's list still stands (live save fresh start, day and night on LHS 1140 b, the title, open story questions,
+   migration 0014, the required status check).

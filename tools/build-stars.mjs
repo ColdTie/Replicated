@@ -135,7 +135,7 @@ const CATALOG = [
   ['iota-pegasi', 'IOTA PEGASI', [22, 7, 1], 25.35, 38.3, 'F5V'],
   ['gliese-806', 'GLIESE 806', [20, 45, 4], 44.5, 39.0, 'M1.5V', [P('b', 'super', 0.93), P('c', 'super', 6.64)]],
   ['zeta-reticuli', 'ZETA RETICULI', [3, 18, 13], -62.51, 39.3, 'G2V'],
-  ['gliese-12', 'GLIESE 12', [0, 15, 49], 13.56, 39.7, 'M4V', [P('b', 'rock', 12.76, { hz: true })]],
+  ['gliese-12', 'GLIESE 12', [0, 15, 49], 13.56, 39.7, 'M4V', [P('b', 'rock', 12.76, { hz: true, biome: 'dune' })]], // the Cems' world (story/STORY.md): its seas dried to salt flats
   ['trappist-1', 'TRAPPIST-1', [23, 6, 30], -5.04, 40.7, 'M8V', [P('b', 'rock', 1.51), P('c', 'rock', 2.42), P('d', 'rock', 4.05), P('e', 'rock', 6.1, { hz: true }), P('f', 'rock', 9.21, { hz: true }), P('g', 'rock', 12.35, { hz: true }), P('h', 'rock', 18.77)]],
   ['copernicus', 'COPERNICUS', [8, 52, 36], 28.33, 41.0, 'K0V', [P('e', 'super', 0.74, { name: 'JANSSEN' }), P('b', 'giant', 14.65, { name: 'GALILEO' }), P('c', 'neptune', 44.4, { name: 'BRAHE' }), P('f', 'neptune', 260, { name: 'HARRIOT', hz: true }), P('d', 'giant', 4825, { name: 'LIPPERHEY' })]],
   ['gliese-1132', 'GLIESE 1132', [10, 14, 51], -47.16, 41.0, 'M4V', [P('b', 'rock', 1.63), P('c', 'super', 8.93)]],
