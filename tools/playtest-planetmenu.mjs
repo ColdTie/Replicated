@@ -28,6 +28,12 @@ try {
   log('groups', JSON.stringify(groups), 'rows', rows.length, JSON.stringify(rows.slice(0, 4)));
   if (groups.join() !== 'RECENT,CLOSEST') fail('the menu does not have RECENT and CLOSEST');
   if (!rows[0]?.startsWith('LHS 1140 B')) fail('this world does not lead RECENT');
+  // CLOSEST holds other stars only (the planets of this one sit at 0.0 LY on the map), at most three worlds a star
+  const closest = await ev(() => { let on = false; const out = []; for (const el of document.querySelector('.pm .pm-list').children) { if (el.classList.contains('pm-group')) on = el.textContent === 'CLOSEST'; else if (on) out.push(el.querySelector('.s').textContent); } return out; });
+  const perStar = closest.reduce((m, s) => m.set(s.split(' - ')[0], (m.get(s.split(' - ')[0]) ?? 0) + 1), new Map());
+  log('closest', JSON.stringify(closest.slice(0, 6)), JSON.stringify([...perStar]));
+  if (!closest.length || closest.some((s) => s.startsWith('LHS 1140 ') || s.includes(' 0.0 LY'))) fail('CLOSEST lists the planets of the star you are at');
+  if ([...perStar.values()].some((n) => n > 3)) fail('CLOSEST lists more than three worlds of one star');
   await page.screenshot({ path: 'screenshots/planet-menu.png' });
 
   // a click on a CLOSEST row: its details open and the map picks that planet
