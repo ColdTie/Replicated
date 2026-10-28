@@ -1,6 +1,6 @@
 import { sound } from '../../audio/Sound';
 import { PALETTE, PLAYER } from '../../core/data';
-import { HEAR_HINT, journalOpen } from '../../ui/journal';
+import { journalOpen } from '../../ui/journal';
 import { openReplyInput, type TalkBox, type TalkWho } from '../../ui/dialogue';
 import { composeTalk, wrap, type Exchange, type TalkPage } from '../../ui/talk';
 import TALK from '../../data/talk.json';
@@ -186,7 +186,7 @@ export class Talk {
     const told = tell && t.exchanges.some((x) => x.answer && x.answer === tell.text) ? undefined : tell;
     const low = n.lowNeeds();
     return composeTalk({
-      copyId: n.data.id, name: n.data.name, blank: n.blank, canHear: this.s.canHear(), hint: HEAR_HINT, now: Date.now(),
+      copyId: n.data.id, name: n.data.name, blank: n.blank, now: Date.now(),
       playerId: me?.id, tell: told ?? undefined, tellNew: !!t.fresh, composing: t.composing,
       notes: t.journal ? t.journal.notes.filter((x) => x.replicant_id === n.data.id) : null,
       mail: t.journal ? t.journal.mail : null,

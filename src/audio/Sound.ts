@@ -83,7 +83,6 @@ class SoundEngine {
   private reverbSend!: GainNode;
   private noiseBuf!: AudioBuffer;
   private rainGain: GainNode | null = null;
-  private musicTimer: number | null = null;
   private night = 0;        // 0 day .. 1 night, set by the day cycle
   private chordIdx = 0;
   private lastPlay: Record<string, number> = {};
@@ -633,11 +632,6 @@ class SoundEngine {
     [0, 7, 12, 19].forEach((s, i) => this.tone(midi(67 + s), 1.4, { type: 'sine', vol: 0.07, delay: 0.5 + i * 0.1, rev: 0.8 }));
   }
 
-  upgrade() {
-    if (!this.ready('upgrade', 300)) return;
-    [0, 4, 7, 12, 7, 12, 16, 19].forEach((s, i) => this.tone(midi(72 + s), 0.5, { type: i % 2 ? 'sine' : 'triangle', vol: 0.08, delay: i * 0.07, rev: 0.6 }));
-  }
-
   /** A scanner reading a Vessel (the Vessel Printer's, the opening's Replicator): a soft rising and falling sweep. */
   scan() {
     if (!this.ready('scan', 500)) return;
@@ -660,7 +654,7 @@ class SoundEngine {
     [24, 28, 31, 36].forEach((s, i) => this.tone(midi(62 + s), 0.9, { type: 'sine', vol: 0.025, delay: 1.1 + i * 0.12, rev: 0.95 }));
   }
 
-  /** A Vessel wakes (the opening, a held Vessel taken, a cradle): attack, the visor's relay clicks on; body, a hum
+  /** A Vessel wakes (the opening, a held Vessel taken): attack, the visor's relay clicks on; body, a hum
    * rising an octave as it powers up; tail, a soft high chord that hangs in the air. */
   wake() {
     if (!this.ready('wake', 800)) return;
@@ -948,7 +942,7 @@ class SoundEngine {
         const note = chord[Math.floor(Math.random() * chord.length)] + 12 + (Math.random() < 0.4 ? 12 : 0) + root;
         this.musicTone(midi(note), len * (0.15 + Math.random() * 0.7));
       }
-      this.musicTimer = window.setTimeout(tick, len * 1000);
+      window.setTimeout(tick, len * 1000);
     };
     tick();
   }

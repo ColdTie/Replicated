@@ -364,11 +364,11 @@ export class Buildings {
     this.save();
     if (kind) {
       this.scene.mindLog.push({ t: this.scene.mindClock, text: `the store was full, so the copies began raising a ${b.name} for everyone (${Object.entries(cost).map(([m, n]) => `${n} ${m}`).join(', ')}): ${b.purpose}` });
-      if (this.scene.canHear()) this.scene.game.events.emit('notice', `THE COPIES BEGIN A ${b.name.toUpperCase()}`);
+      this.scene.game.events.emit('notice', `THE COPIES BEGIN A ${b.name.toUpperCase()}`);
       return b;
     }
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} proposed a building: ${b.name} (${w}x${h} ${material}, ${b.roof} roof), waiting for the original's word` });
-    if (this.scene.canHear()) this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} PROPOSES ${b.name.toUpperCase()}`);
+    this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} PROPOSES ${b.name.toUpperCase()}`);
     return b;
   }
 
@@ -596,7 +596,7 @@ export class Buildings {
     this.save();
     const helpers = b.helpers.map((id) => this.scene.npcs.find((n) => n.data.id === id)?.data.name ?? (id === session.replicant?.id ? session.replicant.name : 'someone'));
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${b.name} is built (${helpers.join(', ')})` });
-    if (this.scene.canHear()) this.scene.game.events.emit('notice', `${b.name.toUpperCase()} IS BUILT`);
+    this.scene.game.events.emit('notice', `${b.name.toUpperCase()} IS BUILT`);
     for (const n of this.scene.npcs) if (b.helpers.includes(n.data.id)) n.onWorked(n === npc);
   }
 

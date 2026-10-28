@@ -7,5 +7,3 @@ export const session: {
   replicant: ReplicantSave | null;
   planet: PlanetSave | null;
 } = { store: null, profile: null, replicant: null, planet: null };
-
-export const isKid = () => !!session.profile?.kid_mode;

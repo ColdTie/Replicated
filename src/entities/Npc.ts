@@ -590,7 +590,7 @@ export class Npc {
     this.scene.fx.sparks(this.x, this.y - 16, this.trailColor, 4);
     if (Math.random() < NEEDS.seek.humChance) {
       const hums = MIND.hums;
-      this.scene.time.delayedCall(1200 + Math.random() * 2500, () => { if (this.state === 'visit') this.sing(hums[Math.floor(Math.random() * hums.length)], this.scene.canHear(), { harmony: true }); });
+      this.scene.time.delayedCall(1200 + Math.random() * 2500, () => { if (this.state === 'visit') this.sing(hums[Math.floor(Math.random() * hums.length)], { harmony: true }); });
     }
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${this.data.name} felt lonely and went to ${who ? `be with ${who.data.name}` : s.player ? `stand by ${session.replicant?.name ?? 'the original'}` : 'the Meeting Hall'}` });
     this.seek = null;
@@ -740,12 +740,11 @@ export class Npc {
   }
 
   /**
-   * Say something out loud: the song plays and a bubble floats over the head. Readable only once the player can
-   * hear them; before that the words are runes in the copy's trail color. `silent` shows the bubble without the song
-   * (the chorus plays its own sound).
+   * Say something out loud: the song plays and a bubble with the words floats over the head. `silent` shows the
+   * bubble without the song (the chorus plays its own sound).
    */
-  sing(text: string, readable: boolean, opts: { silent?: boolean; harmony?: boolean; notes?: string } = {}) {
-    if (this.state === 'below') { this.scene.warren.view?.sing(this, text, readable, opts); return; } // sung down in the warren
+  sing(text: string, opts: { silent?: boolean; harmony?: boolean; notes?: string } = {}) {
+    if (this.state === 'below') { this.scene.warren.view?.sing(this, text, opts); return; } // sung down in the warren
     const sc = this.scene;
     const p = sc.player;
     const dp = Math.hypot(p.x - this.x, p.y - this.y);
@@ -761,8 +760,8 @@ export class Npc {
       this.hop();
     }
     this.bubble?.destroy();
-    this.bubble = makeBubble(sc, text, readable, this.trailColor, this.voiceSeed);
-    this.bubbleUntil = sc.time.now + MIND.bubbleMs * (readable ? 0.8 + text.length / 90 : 0.7);
+    this.bubble = makeBubble(sc, text, this.trailColor);
+    this.bubbleUntil = sc.time.now + MIND.bubbleMs * (0.8 + text.length / 90);
     this.sync();
   }
 
@@ -807,48 +806,15 @@ export class Npc {
   }
 }
 
-/** A song bubble: readable words in the pixel font, or runes in the singer's color until the replicant can hear. */
-export function makeBubble(sc: Phaser.Scene, text: string, readable: boolean, color: number, seed: number) {
+/** A song bubble: the words in the pixel font, in a box edged in the singer's color. */
+export function makeBubble(sc: Phaser.Scene, text: string, color: number) {
   // bubbleScale shrinks the box (padding, width) rather than the font: the 5x7 font drops rows when scaled
   const k = MIND.bubbleScale;
-  const items: Phaser.GameObjects.GameObject[] = [];
-  let w: number, h: number;
-  if (readable) {
-    const t = sc.add.bitmapText(0, -3 + Math.round((1 - k) * 4), 'pixel', text.toUpperCase()).setMaxWidth(Math.round(118 * k)).setTint(PALETTE[20]).setOrigin(0.5, 1).setCenterAlign();
-    w = t.width + Math.round(8 * k); h = t.height + Math.round(6 * k);
-    items.push(t);
-  } else {
-    const words = text.split(/\s+/).filter(Boolean).length;
-    const n = Math.max(2, Math.min(12, words));
-    const g = sc.add.graphics();
-    g.fillStyle(color, 1);
-    let hh = seed;
-    for (let i = 0; i < n; i++) {
-      hh = (hh * 1103515245 + 12345) >>> 0;
-      const rune = RUNES[hh % RUNES.length];
-      const ox = -Math.floor((n * 6) / 2) + i * 6;
-      rune.forEach((row, ry) => row.split('').forEach((c, rx) => { if (c === '#') g.fillRect(ox + rx, -9 + ry, 1, 1); }));
-    }
-    w = n * 6 + Math.round(6 * k); h = Math.round(12 * k);
-    items.push(g);
-  }
+  const t = sc.add.bitmapText(0, -3 + Math.round((1 - k) * 4), 'pixel', text.toUpperCase()).setMaxWidth(Math.round(118 * k)).setTint(PALETTE[20]).setOrigin(0.5, 1).setCenterAlign();
+  const w = t.width + Math.round(8 * k), h = t.height + Math.round(6 * k);
   const box = sc.add.rectangle(0, 0, w, h, PALETTE[25], 0.88).setOrigin(0.5, 1).setStrokeStyle(1, color, 0.9);
   const tail = sc.add.rectangle(0, 1, 2, 2, color, 0.9).setOrigin(0.5, 0);
-  const bubble = sc.add.container(0, 0, [box, tail, ...items]).setDepth(6200).setAlpha(0);
+  const bubble = sc.add.container(0, 0, [box, tail, t]).setDepth(6200).setAlpha(0);
   sc.tweens.add({ targets: bubble, alpha: 1, duration: 200 });
   return bubble;
 }
-
-/** Little 5x5 runes for songs you cannot read yet. */
-const RUNES = [
-  ['#...#', '.#.#.', '..#..', '.#.#.', '#...#'],
-  ['..#..', '.###.', '#.#.#', '..#..', '..#..'],
-  ['#####', '....#', '..##.', '.#...', '#####'],
-  ['.###.', '#...#', '#...#', '#...#', '.###.'],
-  ['#....', '##...', '#.#..', '#..#.', '#...#'],
-  ['..#..', '..#..', '#####', '..#..', '..#..'],
-  ['#...#', '#...#', '.###.', '..#..', '..#..'],
-  ['.#.#.', '#.#.#', '.#.#.', '#.#.#', '.#.#.'],
-  ['#####', '#...#', '#...#', '#...#', '#####'],
-  ['....#', '...#.', '..#..', '.#...', '#....'],
-];

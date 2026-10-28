@@ -140,6 +140,3 @@ export function systemFor(starId: string): SystemPlanet[] {
 export function planetAt(starId: string, index: number) {
   return systemFor(starId).find((p) => p.index === index);
 }
-
-/** True when the planet has a habitable-zone or temperate surface (used for map hints). */
-export const isTemperate = (p: SystemPlanet) => p.temp === 'warm';

@@ -112,12 +112,6 @@
     "gift": { "company": 0.2, "purpose": 0.25 },
     "needRange": 80
   },
-  "placements": [
-    "wall",
-    "corner",
-    "center",
-    "beside"
-  ],
   "offline": {
     "maxRoomsDugAway": 3
   },

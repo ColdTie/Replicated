@@ -22,14 +22,12 @@ export class Homecoming {
   touring = false;
   private envelopes: Envelope[] = [];
   private lastSeenAt = 0;
-  private skip?: () => void;
 
   /** A new planet (the scene object is reused). */
   reset() {
     this.touring = false;
     this.envelopes = [];
     this.lastSeenAt = 0;
-    this.skip = undefined;
   }
 
   /** The village as you see it now. */
@@ -94,7 +92,6 @@ export class Homecoming {
     const finish = () => {
       if (over) return;
       over = true;
-      this.skip = undefined;
       s.input.keyboard?.off('keydown', finish);
       s.input.off('pointerdown', finish);
       cam.pan(s.player.x, s.player.y - 8, 320, 'Sine.easeInOut', true, (_c: Phaser.Cameras.Scene2D.Camera, t: number) => {
@@ -104,7 +101,6 @@ export class Homecoming {
         done();
       });
     };
-    this.skip = finish;
     s.input.keyboard?.once('keydown', finish);
     s.input.once('pointerdown', finish);
     const next = () => {

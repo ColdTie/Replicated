@@ -36,7 +36,7 @@ export interface WarrenView {
   /** the copy's task changed (work done, now lingering by a bench) */
   onRetask(b: Below): void;
   onLeave(npc: Npc): void;
-  sing(npc: Npc, text: string, readable: boolean, opts: { silent?: boolean; harmony?: boolean; notes?: string }): void;
+  sing(npc: Npc, text: string, opts: { silent?: boolean; harmony?: boolean; notes?: string }): void;
 }
 
 type Recipe = Record<string, number | boolean>;
@@ -168,7 +168,7 @@ export class Warren {
     this.view?.onRoomImproved?.(room);
     if (npc) {
       this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} improved ${room.name}: now ${u.words.slice(1, room.level + 1).join(', ')}` });
-      if (this.scene.canHear()) this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} IMPROVES ${room.name.toUpperCase()}`);
+      this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} IMPROVES ${room.name.toUpperCase()}`);
     }
     return true;
   }
@@ -230,7 +230,7 @@ export class Warren {
     this.save();
     this.refreshHatch();
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} marked out ${room.name} in the warren (${room.size} ${room.kind}, ${room.dir} of ${this.nameOfRoom(room.link)})` });
-    if (this.scene.canHear()) this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} PLANS ${room.name.toUpperCase()}`);
+    this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} PLANS ${room.name.toUpperCase()}`);
     return room;
   }
 
@@ -258,7 +258,7 @@ export class Warren {
     const room = this.nameOfRoom(item.room);
     const who = item.for ? (item.for === npc.data.id ? 'itself' : this.scene.npcs.find((n) => n.data.id === item.for)?.data.name ?? 'someone') : '';
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} put a ${item.kind === 'rest' ? `resting station for ${who}` : item.kind} in ${room}` });
-    if (this.scene.canHear()) this.scene.game.events.emit('notice', item.kind === 'rest' ? `${npc.data.name.toUpperCase()} MAKES A RESTING STATION` : `${npc.data.name.toUpperCase()} ADDS A ${item.kind.toUpperCase()} TO ${room.toUpperCase()}`);
+    this.scene.game.events.emit('notice', item.kind === 'rest' ? `${npc.data.name.toUpperCase()} MAKES A RESTING STATION` : `${npc.data.name.toUpperCase()} ADDS A ${item.kind.toUpperCase()} TO ${room.toUpperCase()}`);
     if (this.data.rooms.find((r) => r.id === item.room)?.dug || item.room === 'entrance') this.view?.onItem(item);
     return item;
   }
@@ -350,7 +350,7 @@ export class Warren {
         this.scene.fx.dust(h.x, h.y + 2, 12);
         sound.build(h);
         this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} dug the way down into the warren, in a corner of the square` });
-        if (this.scene.canHear()) this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} DUG THE WAY DOWN`);
+        this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} DUG THE WAY DOWN`);
       },
     });
     if (!ok) this.entranceDigger = null;
@@ -511,7 +511,7 @@ export class Warren {
     this.view?.onRoomDug(room);
     if (Math.hypot(this.scene.player.x - this.hatch.x, this.scene.player.y - this.hatch.y) < 220 || this.view) sound.build();
     this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} finished digging ${room.name} (${Math.round(room.w * room.h * SUPPLIES.digYield.stonePerTile)} stone won)` });
-    if (this.scene.canHear()) this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} DUG ${room.name.toUpperCase()}`);
+    this.scene.game.events.emit('notice', `${npc.data.name.toUpperCase()} DUG ${room.name.toUpperCase()}`);
   }
 
   save() {

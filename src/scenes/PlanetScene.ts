@@ -33,7 +33,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
 import { Controls } from '../input/Controls';
-import type { AwayItem, SeenState, Building, DoorState, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
+import type { AwayItem, SeenState, Building, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
@@ -122,7 +122,6 @@ export class PlanetScene extends Phaser.Scene {
   private walls!: Phaser.Tilemaps.TilemapLayer;
   private solids!: Phaser.Physics.Arcade.StaticGroup;
   vessel!: Phaser.GameObjects.Sprite;
-  private cradle?: Phaser.GameObjects.Image;
   private vesselCue?: { group: Phaser.GameObjects.Container; icon: Phaser.GameObjects.Image; arrow: Phaser.GameObjects.Graphics; shown: number };
   base!: Base;
   private home = new Phaser.Math.Vector2();
@@ -135,7 +134,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean; cembed?: PlanetData['cembed']; vesselPrint?: PlanetData['vesselPrint'] } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean; cembed?: PlanetData['cembed']; vesselPrint?: PlanetData['vesselPrint'] } = { embers: 0, nodes: {} };
   /** who lives on which lot of the town (planet_states.data.town) */
   townState: TownState = { lots: {}, civic: {} };
   /** this load moved an old save into the town: saved positions of the player and the copies are ignored once */
@@ -220,7 +219,7 @@ export class PlanetScene extends Phaser.Scene {
     this.sparks = []; this.beacon = undefined; this.guardian = undefined; this.litBeacons = [];
     // the scene object is reused between planets: drop the old player so update() waits for the new world
     this.player = undefined as unknown as Player;
-    this.pending = { embers: 0, nodes: {}, doors: {} };
+    this.pending = { embers: 0, nodes: {} };
     this.hands.reset();
     this.hatchRing = undefined;
     this.hatchDwell = 0;
@@ -379,7 +378,7 @@ export class PlanetScene extends Phaser.Scene {
       }
     }
 
-    // Base: vessel (warm, ours), the cradle on Earth, the build pad
+    // Base: vessel (warm, ours), the build pad (a new Vessel stands at the cradle's spot, just below the vessel)
     const b = m.base;
     this.home.set(b.cradle.x, b.cradle.y + 16);
     const vesselShadow = this.add.image(b.vessel.x, b.vessel.y + 2, 'shadow').setTint(PALETTE[25]).setAlpha(0.5).setScale(2.6, 2).setDepth(DEPTH.shadow);
@@ -408,10 +407,6 @@ export class PlanetScene extends Phaser.Scene {
     }
     // a flight that went on without you and has landed since: the star is reached
     if (me && inManny(me) && !this.shot) void vesselAway(me, session.store);
-    if (p.intro === 'wake') {
-      this.cradle = this.add.image(b.cradle.x, b.cradle.y + 6, tex('cradle', p.id), 1).setOrigin(0.5, 1).setDepth(DEPTH.actors + b.cradle.y - 4);
-      this.lighting.add({ x: b.cradle.x, y: b.cradle.y, radius: 30, color: PALETTE[18], intensity: 0.5, flicker: 0.2 });
-    }
     const built = !!save?.data.structures?.some((s) => s.type === 'replicator');
     this.base = new Base(this, b.pad.x, b.pad.y, built);
     this.village = new Village(this, save?.data.structures, save?.data.village?.work);
@@ -459,7 +454,7 @@ export class PlanetScene extends Phaser.Scene {
     }
     session.store?.litBeacons().then((l) => { this.litBeacons = l; }).catch(() => undefined);
 
-    // Player: a returning replicant appears where it was; a new one wakes in the cradle
+    // Player: a returning replicant appears where it was; a new one at the cradle's spot below the vessel
     const r = session.replicant;
     const awake = !!r?.traits.awake;
     const saved = r && r.star_id === p.star && r.planet_index === p.planetIndex && r.pos_x != null && r.pos_y != null
@@ -515,8 +510,6 @@ export class PlanetScene extends Phaser.Scene {
       this.homeworld.playHeldWake();
     } else if (p.intro === 'scan' && !awake) {
       this.homeworld.playScan();
-    } else if (p.intro === 'wake' && !awake) {
-      this.playWake();
     } else if (p.intro === 'land' && !saved && !awake) {
       this.playLanding(vesselShadow, vesselLight, vesselGlow);
     } else {
@@ -612,47 +605,6 @@ export class PlanetScene extends Phaser.Scene {
   }
 
   // --- intros ---
-
-  /** Earth, first time: the cradle glows, opens, and the replicant boots up (visor flickers on). */
-  private playWake() {
-    const pl = this.player;
-    const c = this.cradle!;
-    c.setFrame(0);
-    pl.hide(); // nothing of the replicant shows until the cradle opens
-    this.cameras.main.fadeIn(1400, 24, 20, 37);
-    const lid = this.lighting.add({ x: c.x, y: c.y - 8, radius: 40, color: PALETTE[18], intensity: 0 });
-    this.tweens.add({ targets: lid, intensity: 1, duration: 900, yoyo: true, hold: 500, delay: 600 });
-    this.time.delayedCall(1700, () => {
-      c.setFrame(1);
-      this.fx.sparks(c.x, c.y - 8, PALETTE[18], 12);
-      this.shake(120, 0.004);
-      pl.setPosition(c.x, c.y - 2);
-      pl.show();
-      pl.light.active = false;
-      pl.sprite.setTint(0x404060);
-      // visor flickers on: dark, flash, dark, on
-      sound.wake();
-      const steps = [[0, 0], [140, 0], [260, 1], [360, 0], [520, 1]];
-      for (const [t, v] of steps) this.time.delayedCall(t, () => { pl.light.active = v > 0.5; if (v > 0.5) pl.sprite.clearTint(); });
-    });
-    this.time.delayedCall(2500, () => {
-      const hop = { t: 0 };
-      const sx = c.x, sy = c.y - 2, ex = this.home.x, ey = this.home.y;
-      this.tweens.add({
-        targets: hop, t: 1, duration: 360,
-        onUpdate: () => { pl.setPosition(sx + (ex - sx) * hop.t, sy + (ey - sy) * hop.t); pl.sprite.y -= Math.sin(hop.t * Math.PI) * 10; },
-        onComplete: () => {
-          pl.setPosition(ex, ey);
-          squash(this, pl.sprite, 1.35, 0.7, 120);
-          this.fx.dust(ex, ey + 2, 6);
-          pl.locked = false;
-          this.saver.markAwake();
-          this.homecoming.remember();
-          this.game.events.emit('titlecard', this.planet.name, this.planet.subtitle);
-        },
-      });
-    });
-  }
 
   /** Returning replicant: fades in where it was standing. */
   private playReturn() {
@@ -1178,7 +1130,7 @@ export class PlanetScene extends Phaser.Scene {
       const wants = (elder.data.traits.wants ?? []).filter((w) => !w.done).map((w) => w.text);
       row.traits.inherit = { from: elder.data.id, name: elder.data.name, ...(wants.length ? { wants } : {}) };
       this.mindLog.push({ t: this.mindClock, text: `${me.name} spent a Spark: a new copy was made from ${elder.data.name} and remembers being it` });
-      if (this.canHear()) this.game.events.emit('notice', `A NEW COPY CARRIES ${elder.data.name.toUpperCase()}'S MEMORIES`);
+      this.game.events.emit('notice', `A NEW COPY CARRIES ${elder.data.name.toUpperCase()}'S MEMORIES`);
     }
     // the scan done, the pod takes over and the maker is free
     this.time.delayedCall(VP.scanMs + 100, () => {
@@ -1290,14 +1242,6 @@ export class PlanetScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------------ the copies' minds
-
-  /**
-   * The replicant understands the copies. It used to need the listening module from a ruin; the ruins were taken out
-   * (2026-10-26), so every replicant reads their words from the start.
-   */
-  canHear() {
-    return true;
-  }
 
   /** "EARTH - SOL" or "TITAN - SATURN" */
   get placeLabel() {

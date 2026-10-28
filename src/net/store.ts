@@ -20,10 +20,10 @@ export interface ReplicantSave {
   profile_id: string | null;
   name: string;
   model: string;
-  /** Traits schema v1 (see CLAUDE.md): look (body, feature, gear, trail, look), voice, mind (temperament, wants), state (awake, blank, weary, sleptAt, mods, sparks). */
+  /** Traits schema v1 (see CLAUDE.md): look (body, feature, gear, trail, look), voice, mind (temperament, wants), state (awake, blank, weary, sleptAt, sparks). */
   traits: {
     v?: number;
-    awake?: boolean; feature?: number; mods?: string[]; gear?: number; trail?: number; sparks?: number; look?: string; voice?: Voice;
+    awake?: boolean; feature?: number; gear?: number; trail?: number; sparks?: number; look?: string; voice?: Voice;
     /** handed over: the replicant whose Spark awakened this one as a player of its own */
     handedBy?: string;
     weary?: number; sleptAt?: number;
@@ -81,7 +81,6 @@ export interface ReplicantSave {
 export interface NodeState { hits: number; at: number }
 /** A built thing on a planet: the Replicator, or something a copy raised (by = its replicant id, tint = palette index, variant = sprite frame). */
 export interface StructureSave { type: string; x: number; y: number; at: number; by?: string; tint?: number; variant?: number }
-export interface DoorState { open: boolean; taken?: boolean }
 /** One copy's wake while nobody played (the mind function's away run): queued on its planet for the game. */
 export interface AwayItem { id: string; name: string; at: number; song?: string; actions?: MindAction[]; became?: boolean }
 
@@ -98,8 +97,6 @@ export interface PlanetData {
   /** what the copies did in their away wakes, until the game takes it (take_mind_queue) */
   awayQueue?: AwayItem[];
   nodes?: Record<string, NodeState>;
-  /** Ruin doors by index: opened with a core, reward taken */
-  doors?: Record<string, DoorState>;
   /** When the copies' offline gathering was last counted (ms epoch) */
   npcTick?: number;
   structures?: StructureSave[];
@@ -626,9 +623,8 @@ export class LocalStore implements GameStore {
     if (!cur) return null;
     cur.embers = Math.max(0, cur.embers + emberDelta);
     if (data.nodes) cur.data.nodes = { ...(cur.data.nodes ?? {}), ...data.nodes };
-    if (data.doors) cur.data.doors = { ...(cur.data.doors ?? {}), ...data.doors };
     // every other top-level key replaces the stored value (same as the apply_planet_delta RPC)
-    for (const [k, v] of Object.entries(data)) if (k !== 'nodes' && k !== 'doors' && v !== undefined) (cur.data as Record<string, unknown>)[k] = v;
+    for (const [k, v] of Object.entries(data)) if (k !== 'nodes' && v !== undefined) (cur.data as Record<string, unknown>)[k] = v;
     this.flush();
     return structuredClone(cur);
   }

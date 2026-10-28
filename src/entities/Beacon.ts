@@ -19,7 +19,6 @@ export class Beacon {
   private light: Light;
   private beam?: Phaser.GameObjects.Rectangle;
   private beamWide?: Phaser.GameObjects.Rectangle;
-  private motes?: Phaser.GameObjects.Particles.ParticleEmitter;
   lit: boolean;
 
   constructor(private scene: PlanetScene, readonly x: number, readonly y: number, lit: boolean) {
@@ -51,7 +50,7 @@ export class Beacon {
     const h = ly + 8; // up to the top of the world
     this.beamWide = sc.add.rectangle(lx, ly, 12, h, 0xbff8ff).setOrigin(0.5, 1).setAlpha(0.05).setBlendMode(Phaser.BlendModes.ADD).setDepth(6120);
     this.beam = sc.add.rectangle(lx, ly, 3, h, 0xe8ffff).setOrigin(0.5, 1).setAlpha(0.16).setBlendMode(Phaser.BlendModes.ADD).setDepth(6121);
-    this.motes = sc.add.particles(lx, ly, 'px', {
+    sc.add.particles(lx, ly, 'px', {
       lifespan: { min: 1200, max: 2200 }, speedY: { min: -14, max: -40 }, speedX: { min: -6, max: 6 },
       x: { min: -3, max: 3 }, scale: { start: 1, end: 0 }, alpha: { start: 0.9, end: 0 },
       tint: [PALETTE[19], PALETTE[18], PALETTE[20]], blendMode: Phaser.BlendModes.ADD, frequency: 110,

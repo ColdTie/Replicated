@@ -38,7 +38,7 @@ export interface PlanetDef {
   sporeRate: number;
   trees: number;
   towers: number;
-  intro: 'scan' | 'wake' | 'land';
+  intro: 'scan' | 'land';
   /** multiplies the day cycle's light and sky (hex; a red dwarf's day) */
   sunTint?: string;
   /** surface gravity in Earth g (1 when missing) */
@@ -86,4 +86,3 @@ export const MANNY = mannyJson;
 export type GuardianDef = (typeof beaconJson)['guardian'];
 
 export const hex = (s: string) => parseInt(s, 16);
-export const accentColor = (p: PlanetDef, i: 0 | 1 | 2) => PALETTE[p.accent[i]];

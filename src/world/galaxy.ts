@@ -117,5 +117,3 @@ export function planetFor(starId: string, planetIndex: number): PlanetDef | unde
 export function defaultPlanetIndex(starId: string) {
   return PLANETS.find((p) => p.star === starId)?.planetIndex ?? TRAVEL.landedPlanetIndex;
 }
-
-export const BIOME_LIST = BIOMES.biomes;

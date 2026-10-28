@@ -19,10 +19,10 @@ try {
   await page.waitForTimeout(300);
   const ev=(f,arg)=>page.evaluate(f,arg);
   log('audio', await ev(()=>{const s=window.__scene; return s.sys.game && (window.__sound?.ctx?.state)}));
-  // the ruins are gone (2026-10-26): no ruin walls anywhere, and the original reads the copies from the start
-  const ruins = await ev(()=>{const s=window.__scene; return {walls: s.map.cells.filter(c=>c===3).length, hear: s.canHear()};});
+  // the ruins are gone (2026-10-26): no ruin walls anywhere
+  const ruins = await ev(()=>{const s=window.__scene; return {walls: s.map.cells.filter(c=>c===3).length};});
   log('ruins', JSON.stringify(ruins));
-  if (ruins.walls || !ruins.hear) errors.push('ruins still on the world, or the original cannot read the copies');
+  if (ruins.walls) errors.push('ruins still on the world');
   // keyboard: dash + combo
   await ev(()=>{const s=window.__scene; const c=s.map.base.center; s.player.setPosition(c.x, c.y+40);});
   const x0 = await ev(()=>window.__scene.player.x);
