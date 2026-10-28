@@ -1111,7 +1111,14 @@ export class PlanetScene extends Phaser.Scene {
     pl.locked = true;
     pl.body.setVelocity(0, 0);
     pl.setPosition(this.base.spotX, this.base.spotY);
-    this.choice = new WakeChoice(this, this.base.x, this.base.y - 40, (kind) => { this.choice = undefined; this.replicate(kind); });
+    this.choice = new WakeChoice(this, this.base.x, this.base.y - 40, (kind) => { this.choice = undefined; this.replicate(kind); }, () => {
+      // closed without a copy: you step back off the ring
+      this.choice = undefined;
+      this.replicating = false;
+      pl.locked = false;
+      this.controls.clear();
+      pl.setPosition(this.base.spotX, this.base.spotY + 14);
+    });
     return true;
   }
 

@@ -106,6 +106,21 @@ try {
   if (!row('nursery')?.why?.startsWith('NEEDS')) fail('the Cem Nursery is open before a House stands');
   if (!(row('supercomputer').complexity > row('house').complexity && row('supercomputer').volume > row('house').volume)) fail('a supercomputer is not more complex and larger than a house');
   await shot('bio-menu');
+  // the X closes it (a phone has no Esc); a click on the model only turns it, it prints nothing
+  const before0 = await ev(() => window.__scene.buildings.printing.length);
+  await page.mouse.click(335 * 2, 60 * 2);
+  await page.waitForTimeout(300);
+  if (!(await ev(() => window.__game.scene.isActive('designs'))) || (await ev(() => window.__scene.buildings.printing.length)) !== before0) fail('a click on the model closed the menu or printed');
+  await page.mouse.click(460 * 2, 20 * 2);
+  await page.waitForFunction(() => !window.__game.scene.isActive('designs'), null, { timeout: 3000 }).catch(() => fail('the X did not close the designs'));
+  await page.waitForTimeout(400);
+  if ((await ev(() => window.__scene.buildings.printing.length)) !== before0) fail('closing the menu printed something');
+  // and the door opens it again once you step back into it
+  await ev((goal) => { const s = window.__scene, g = s.buildings.list.find((x) => x.id === goal); s.player.setPosition(g.x, g.y + 40); }, HW.goal);
+  await page.waitForTimeout(300);
+  await ev((goal) => { const s = window.__scene, g = s.buildings.list.find((x) => x.id === goal); s.bioworks.readyAt = 0; s.player.setPosition(g.x, g.y + 6); }, HW.goal);
+  await page.waitForFunction(() => window.__game.scene.isActive('designs') && window.__designs?.rows?.length, null, { timeout: 8000 }).catch(() => fail('the door did not open the designs again'));
+  await page.waitForTimeout(700);
   // walk the rows to the House and print it with Enter
   // (the menu takes a key on its next frame: wait for each step to land before looking again)
   for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) {

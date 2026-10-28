@@ -120,6 +120,14 @@ try {
   // (a Spark in hand and Thales beside the ring: the copy is still yours, never Thales')
   await ev(() => { const s = window.__scene, th = s.npcs.find((n) => n.data.traits.thales); window.__session.replicant.traits.sparks = 1; th.hold = true; th.setPosition(s.base.spotX + 14, s.base.spotY); s.embers = 45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; s.tryReplicate(); });
   await page.waitForFunction(() => !!window.__scene.choice, null, { timeout: 5000 }).catch(() => fail('no wake or hold choice'));
+  // Esc closes it without a copy (a phone steps back with the stick, a mouse clicks away), and it opens again
+  await page.waitForTimeout(400);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !window.__scene.choice && !window.__scene.replicating && !window.__scene.player.locked, null, { timeout: 3000 }).catch(() => fail('Esc did not close the wake or hold choice'));
+  if (await ev(() => window.__scene.npcs.some((n) => n.data.id === 'pending' || n.held || n.blank))) fail('closing the choice made a copy');
+  if ((await ev(() => window.__scene.embers)) !== 45) fail('closing the choice spent Ember');
+  await ev(() => { const s = window.__scene; s.player.setPosition(s.base.spotX, s.base.spotY); s.tryReplicate(); });
+  await page.waitForFunction(() => !!window.__scene.choice, null, { timeout: 5000 }).catch(() => fail('the choice did not open again'));
   await page.waitForTimeout(400);
   await shot(page, 'choice-wake-hold');
   await page.keyboard.press('ArrowRight');
