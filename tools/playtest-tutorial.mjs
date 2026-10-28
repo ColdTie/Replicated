@@ -49,6 +49,16 @@ try {
     await landedOn(to, what);
     await page.waitForTimeout(600);
   };
+  // open ground well away from Thales (where he stands and the post by his printer he walks to), and off the ship's
+  // boarding spot (standing on that opens the star map): there his printer words cannot start before the test asks
+  const stepAway = () => ev(() => {
+    const s = window.__scene, th = s.homeworld.thales, post = s.homeworld.post() ?? th;
+    for (let r = 150; r <= 230; r += 20) for (let k = 0; k < 16; k++) {
+      const x = post.x + Math.cos(k / 16 * Math.PI * 2) * r, y = post.y + Math.sin(k / 16 * Math.PI * 2) * r;
+      if (s.isWalkable(x, y) && Math.hypot(x - th.x, y - th.y) > 130 && Math.hypot(x - s.boardSpot.x, y - s.boardSpot.y) > 40) { s.player.setPosition(x, y); return Math.round(Math.hypot(x - th.x, y - th.y)); }
+    }
+    return -1;
+  });
   await page.goto(URL);
   await page.waitForFunction(() => !!window.__scene?.player, null, { timeout: 30000 });
 
@@ -60,6 +70,7 @@ try {
   await page.type('.ov input', 'Tenth');
   await page.click('.ov button');
   await page.waitForFunction(() => !window.__scene.player.locked, null, { timeout: 10000 });
+  log('stepped away', await stepAway());
   await page.waitForFunction(() => window.__session.replicant.traits.tutorial?.grown === 1, null, { timeout: 8000 }).catch(() => fail('naming did not grow the Vessel'));
   await page.waitForTimeout(450);
   await shot('tutorial-grow');
@@ -79,7 +90,7 @@ try {
   if (world.paid || !world.cost.copper || !world.cost.quartz) fail('the Printworks does not wait for copper and quartz');
 
   // 3. the star map: only Gliese 12 b and home, free; the others wait
-  await ev(() => { const s = window.__scene; s.player.setPosition(s.boardSpot.x, s.boardSpot.y); s.departure.tryBoard(); });
+  await ev(() => window.__scene.departure.tryBoard());
   await page.waitForFunction(() => window.__game.scene.isActive('starmap'), null, { timeout: 5000 }).catch(() => fail('the star map did not open'));
   await page.waitForTimeout(900);
   const gate = await ev(() => {
@@ -103,16 +114,8 @@ try {
 
   // 4. by his printer Thales says what it waits for
   await page.waitForFunction(() => { const s = window.__scene, th = s.homeworld.thales; return th && th.home && !th.hold && Math.hypot(th.x - th.home.x, th.y - th.home.y) < 46; }, null, { timeout: 20000 }).catch(() => fail('Thales did not walk to his printer'));
-  const far = await ev(() => {
-    // open ground well away from Thales, and off the ship's boarding spot (standing on that opens the star map)
-    const s = window.__scene, th = s.homeworld.thales;
-    for (let r = 130; r <= 190; r += 20) for (let k = 0; k < 16; k++) {
-      const x = th.x + Math.cos(k / 16 * Math.PI * 2) * r, y = th.y + Math.sin(k / 16 * Math.PI * 2) * r;
-      if (s.isWalkable(x, y) && Math.hypot(x - s.boardSpot.x, y - s.boardSpot.y) > 40) { s.player.setPosition(x, y); return Math.round(r); }
-    }
-    return -1;
-  });
-  log('from Thales', far);
+  if (await ev(() => window.__session.replicant.traits.tutorial.told.includes('printer'))) fail('Thales spoke his printer words before you came to him');
+  log('from Thales', await stepAway());
   await page.waitForTimeout(1200);
   const wisp = await ev(() => { const w = window.__scene.tutorial.wisp; return w ? { alpha: w.img.alpha, x: Math.round(w.x), y: Math.round(w.y) } : null; });
   log('wisp to Thales', JSON.stringify(wisp));

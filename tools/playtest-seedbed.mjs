@@ -110,7 +110,12 @@ try {
   await page.waitForTimeout(500);
   const house = await ev(() => window.__designs.rows.find((r) => r.id === 'house')?.why ?? null);
   if (house) fail(`the House cannot be printed on the seeded world: ${house}`);
-  for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(80); }
+  // (the menu takes a key on its next frame: wait for each step to land before looking again)
+  for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) {
+    const was = await ev(() => window.__designs.index);
+    await page.keyboard.press('ArrowDown');
+    await page.waitForFunction((was) => window.__designs.index !== was, was, { timeout: 3000 }).catch(() => undefined);
+  }
   await page.keyboard.press('Enter');
   const printed = await page.waitForFunction(() => !window.__game.scene.isActive('designs') && window.__scene.buildings.printing.length === 1, null, { timeout: 8000 }).then(() => true).catch(() => false);
   if (!printed) {

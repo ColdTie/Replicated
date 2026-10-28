@@ -107,7 +107,12 @@ try {
   if (!(row('supercomputer').complexity > row('house').complexity && row('supercomputer').volume > row('house').volume)) fail('a supercomputer is not more complex and larger than a house');
   await shot('bio-menu');
   // walk the rows to the House and print it with Enter
-  for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(80); }
+  // (the menu takes a key on its next frame: wait for each step to land before looking again)
+  for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) {
+    const was = await ev(() => window.__designs.index);
+    await page.keyboard.press('ArrowDown');
+    await page.waitForFunction((was) => window.__designs.index !== was, was, { timeout: 3000 }).catch(() => undefined);
+  }
   const before = await ev(() => ({ ...window.__scene.supplies, ember: window.__scene.embers }));
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => !window.__game.scene.isActive('designs') && window.__scene.buildings.printing.length === 1, null, { timeout: 8000 }).catch(() => fail('Enter did not print the House'));

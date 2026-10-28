@@ -1076,7 +1076,12 @@ copies' own buildings are untouched (still raised by swings).
   replicants, planets, journeys, stars, notes, letters and requests; `backup_20261027` holds 12 replicants, 5
   planets, 4 journeys, 4 notes, 3 letters (RLS on, no API grants); his Steve profile, the other login's galaxy (1
   planet) and all 3 profiles stay. His next load makes a new Vessel on LHS 1140 b for the beginning.
-- Merged to main as PR #68 after CI went green on its third run.
+- Merged to main as PR #68 after CI went green on its third run. The next CI run (a notes-only PR) still caught two
+  test races: `playtest-seedbed` / `-bioworks` walked the design list with ArrowDown faster than the menu takes keys
+  (it reads a key on its next frame), so on a slow runner it overshot House and printed a Storehouse; they now wait
+  for each step to land. `playtest-tutorial` moved the player away from Thales only after he could already have
+  reached his printer and spoken; it now steps away (from his post) as soon as the name is given and fails if he
+  speaks before you come to him. Both pass locally and at 5x CPU throttling.
 - Launching closes a talk box still open (a word of Thales' does not fly along). CI found that his words when the
   Cems wake (a modal box about 4 s later) got in the way of playtests that went on to the Printworks' door or the
   ship: `playtest-bioworks`, `-seedbed` and `-homeworld` now hear him out, and `playtest-tutorial` no longer parks the
