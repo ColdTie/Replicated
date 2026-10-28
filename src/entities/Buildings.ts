@@ -143,6 +143,14 @@ export class Buildings {
     } else this.finishCem(p, animate);
   }
 
+  /** Where a point of a design's model (voxel x, y, z) shows in the world, as it is drawn now (null: not placed). */
+  modelPoint(id: string, vx: number, vy: number, vz: number): { x: number; y: number } | null {
+    const p = this.placed.get(id), r = this.lastDraw.get(id);
+    if (!p || !r) return null;
+    const q = r.toImage(vx, vy, vz);
+    return { x: p.sprite.x - p.sprite.displayOriginX + q.x, y: p.sprite.y - p.sprite.displayOriginY + q.y };
+  }
+
   /** Redraws a print at its current cut. */
   private drawCem(p: Placed) {
     const c = p.cem!;
@@ -237,7 +245,11 @@ export class Buildings {
     const m = designModel(id);
     if (!m) return 'UNKNOWN DESIGN';
     const built = new Set(this.designsBuilt().keys());
+    const only = m.def.only;
+    if (only && !(only === 'homeworld' ? this.scene.homeworld.here : this.scene.planet.id === only)) return only === 'homeworld' ? 'ONLY ON THE HOMEWORLD' : `ONLY ON ${only.toUpperCase()}`;
     if (!designOpen(id, built)) return `NEEDS ${designNeeds(id, built).join(' AND ')}`;
+    const max = m.def.max;
+    if (max && this.list.filter((b) => b.design === id && !b.vetoed).length >= max) return max === 1 ? 'ONE STANDS HERE' : `${max} STAND HERE`;
     if (!this.scene.bioworks?.awake) return 'THE CEMS ARE ASLEEP';
     if (this.printing.length >= BIO.maxPrints) return 'THE CEMS ARE BUSY';
     if (m.def.place === 'post' ? !this.freePost() : this.printLot() < 0) return 'NO ROOM IN THE TOWN';

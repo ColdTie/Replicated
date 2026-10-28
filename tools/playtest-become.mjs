@@ -1,4 +1,4 @@
-// Scripted headless playtest of session 9's births: the Replicator makes a blank copy (grey, still, dim), its first
+// Scripted headless playtest of session 9's births: the Vessel Printer makes a blank copy (grey, still, dim), its first
 // wake (the canned mind here) is the becoming: it chooses a body from the parts kit, a voice, a temperament, wants
 // and a name; the parts snap on and it starts to live. Also checks the player's own composed body and a copy
 // that was born before (inherit-and-drift look) still draws.
@@ -27,13 +27,13 @@ try {
   if (!(await ev(() => window.__scene.player.sprite.texture.key.startsWith('body:')))) fail('player body is not composed');
 
   // 1. a blank birth
-  await ev(() => { const s = window.__scene; s.base.placeReplicator(false); s.embers = 45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; });
+  await ev(() => { const s = window.__scene; s.buildings.standNow('vesselprinter'); s.vesselPrinter.printMs = 1500; s.embers = 45; const d = s.vesselPrinter.door; s.player.setPosition(d.x, d.y); s.player.locked = false; });
   await page.waitForTimeout(300);
   log('replicate', await ev(() => window.__scene.tryReplicate()));
   // wake or hold: WAKE (the first light) with Enter
   await page.waitForFunction(() => !!window.__scene.choice, null, { timeout: 5000 });
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => window.__scene.npcs.length === 1 && !window.__scene.replicating, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.__scene.npcs.length === 1 && !window.__scene.replicating && window.__scene.npcs[0].state !== 'born', null, { timeout: 30000 });
   await page.waitForTimeout(400);
   const born = await ev(() => { const n = window.__scene.npcs[0]; return { name: n.data.name, blank: n.blank, state: n.state, key: n.sprite.texture.key, tinted: n.sprite.isTinted, light: n.light.intensity, traits: n.data.traits, stats: n.data.stats }; });
   log('born', JSON.stringify(born));
@@ -82,22 +82,25 @@ try {
     st.db.notes.unshift({ replicant_id: elder.data.id, body: 'The moss grows back over the east road every spring.', created_at: new Date(Date.now() - 86_400_000).toISOString() });
     const elderNotes = st.db.notes.filter((n) => n.replicant_id === elder.data.id).length;
     me.traits.sparks = 1; s.embers = 45;
-    elder.state = 'idle'; elder.until = s.time.now + 600_000; elder.x = s.base.spotX + 16; elder.y = s.base.spotY;
-    s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; s.shot = false;
+    const d = s.vesselPrinter.door;
+    elder.state = 'idle'; elder.until = s.time.now + 600_000; elder.x = d.x + 16; elder.y = d.y;
+    s.player.setPosition(d.x, d.y); s.player.locked = false; s.shot = false;
     const n0 = s.npcs.length;
     s.tryReplicate();
     s.choice?.route({ x: 0, y: 0, attack: true, dash: false, interact: false, back: false, forward: false, cancel: false, reply: false }, 16);
-    for (let i = 0; i < 300 && (s.npcs.length === n0 || s.replicating || s.npcs.at(-1).data.id === 'pending'); i++) await new Promise((r) => setTimeout(r, 100));
+    for (let i = 0; i < 300 && (s.npcs.length === n0 || s.replicating || s.vesselPrinter.busy || s.npcs.at(-1).data.id === 'pending'); i++) await new Promise((r) => setTimeout(r, 100));
     await new Promise((r) => setTimeout(r, 600));
     s.shot = true;
     const kid = s.npcs.at(-1);
     const j = await st.journal([kid.data.id]);
-    return { elder: elder.data.id, elderName: elder.data.name, elderNotes, sparks: me.traits.sparks, inherit: kid.data.traits.inherit, parent: kid.data.parent_id, gen: [elder.data.generation, kid.data.generation], notes: j.notes.filter((n) => n.replicant_id === kid.data.id).length };
+    // (the elder may have written another note while the pod printed: the newborn takes its newest, up to spark.notes)
+    const elderNow = Math.min(st.db.notes.filter((n) => n.replicant_id === elder.data.id).length, 12);
+    return { elder: elder.data.id, elderName: elder.data.name, elderNotes, elderNow, sparks: me.traits.sparks, inherit: kid.data.traits.inherit, parent: kid.data.parent_id, gen: [elder.data.generation, kid.data.generation], notes: j.notes.filter((n) => n.replicant_id === kid.data.id).length };
   });
   log('spark birth', JSON.stringify(spark));
-  if (spark.inherit?.from !== spark.elder || spark.parent !== spark.elder) fail('the Spark birth did not come from the copy beside the ring');
+  if (spark.inherit?.from !== spark.elder || spark.parent !== spark.elder) fail('the Spark birth did not come from the copy beside the door');
   if (spark.sparks !== 0) fail('the Spark was not spent');
-  if (!spark.notes || spark.notes !== spark.elderNotes) fail(`the newborn did not inherit the notes (${spark.notes} of ${spark.elderNotes})`);
+  if (!spark.notes || spark.notes < spark.elderNotes || spark.notes > spark.elderNow) fail(`the newborn did not inherit the notes (${spark.notes} of ${spark.elderNotes} to ${spark.elderNow})`);
 } finally { await b.close(); try { process.kill(-server.pid); } catch {} }
 console.log('errors', errors);
 process.exit(errors.length ? 1 : 0);

@@ -1,0 +1,11 @@
+{
+  "_doc": "The Vessel Printer (story/STORY.md Copying, Steve 2026-10-28; src/entities/VesselPrinter.ts): the design `design` (designs.json; the Supercomputer is the last thing it needs, homeworld only, one) is where new Vessels are made, in place of the Replicator. Stand at the door of its pod for dwellMs (a ring fills) or press attack there, with drift.json cost Ember in the store: WAKE or HOLD opens over it. The maker is scanned (scanMs) and is free again; the pod prints the body by itself in printMs (by the clock, also while nobody plays: planet_states.data.vesselPrint), the newest rows still green Cems, and the Vessel steps out of the door. The price of a Vessel does not change. pod: the pod's floor and crown in the model's voxels (x, y, z); door: where you stand, from the middle of the printer's front (px; half width, how far behind and in front of its foot). gantryTop: the top of its gantry's front (voxels); choiceDy: how far above it the WAKE / HOLD lights hang (px).",
+  "design": "vesselprinter",
+  "printMs": 40000,
+  "dwellMs": 650,
+  "scanMs": 1600,
+  "pod": { "floor": [11, 4, 2], "crown": [11, 4, 12] },
+  "door": { "halfW": 10, "behind": 2, "front": 14, "standDy": 7 },
+  "gantryTop": [11, 1, 17],
+  "choiceDy": 24
+}

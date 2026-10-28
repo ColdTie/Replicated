@@ -8,7 +8,12 @@ export interface Part {
   box?: Box6; gable?: Box6; hip?: Box6; dome?: Box6; cyl?: Box6; cone?: Box6; carve?: Box6; paint?: Box6;
   mat?: string; ridge?: 'x' | 'y'; repeat?: number; step?: [number, number, number];
 }
-export interface DesignDef { id: string; name: string; gives: string; about: string; needs?: string[]; parts: Part[]; /** 'post': stands at a free street lamp spot instead of taking a lot */ place?: 'post' }
+export interface DesignDef {
+  id: string; name: string; gives: string; about: string; needs?: string[]; parts: Part[];
+  /** 'post': stands at a free street lamp spot instead of taking a lot */ place?: 'post';
+  /** printed only on this world (a planets.json id) */ only?: string;
+  /** at most this many on a world (standing or being printed) */ max?: number;
+}
 export interface MaterialDef { ramp: number[]; alt?: number[]; glass?: boolean; emissive?: boolean }
 export interface Costing {
   weights: Record<string, number>; matWeight: number; special: Record<string, number>;

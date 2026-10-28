@@ -20,7 +20,10 @@ run in order; each ships on its own, verified (build, `npm test`, a playtest of 
 - A Vessel menu on Tab (and a small button): how many Vessels you have and where, your name, chat with other Vessels.
 - Everyone can see each other. Later: more bases on the homeworld, because there will be too many people for one.
 
-## Step 1: the Vessel Printer (no database change)
+## Step 1: the Vessel Printer (no database change) — built 2026-10-28 (CLAUDE.md session 24)
+
+Also done with it: Thales no longer counts toward a world's six copies, and `travel.json needCopy` is off (copies are
+made only at home, so the old rule would have kept you on any other world).
 
 - A tenth design, `vesselprinter`, in `designs.json`: needs the Supercomputer, homeworld only, one. Its price comes from
   its voxel model like every design (the top of the chain). The Supercomputer's line becomes "OPENS THE VESSEL

@@ -15,6 +15,8 @@ import { Village } from '../entities/Village';
 import { Warren } from '../entities/Warren';
 import { Buildings } from '../entities/Buildings';
 import { Bioworks } from '../entities/Bioworks';
+import { VesselPrinter } from '../entities/VesselPrinter';
+import VP from '../data/vesselprinter.json';
 import { WildCems } from '../entities/WildCems';
 import { MannyDock } from '../entities/Manny';
 import { inManny, vesselAway, vesselHere } from '../core/mannies';
@@ -88,6 +90,8 @@ export class PlanetScene extends Phaser.Scene {
   village!: Village;
   warren!: Warren;
   buildings!: Buildings;
+  /** where new Vessels are made, once it stands (src/entities/VesselPrinter.ts) */
+  vesselPrinter!: VesselPrinter;
   /** the Cem bed (homeworld): where supplies are shipped and the Cems build from */
   bioworks?: Bioworks;
   /** the Cems' world's wild fields (planets.json wildCems) */
@@ -131,7 +135,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean; cembed?: PlanetData['cembed'] } = { embers: 0, nodes: {}, doors: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; doors: Record<string, DoorState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean; cembed?: PlanetData['cembed']; vesselPrint?: PlanetData['vesselPrint'] } = { embers: 0, nodes: {}, doors: {} };
   /** who lives on which lot of the town (planet_states.data.town) */
   townState: TownState = { lots: {}, civic: {} };
   /** this load moved an old save into the town: saved positions of the player and the copies are ignored once */
@@ -170,7 +174,7 @@ export class PlanetScene extends Phaser.Scene {
   readonly linker = new Link(this);
   readonly homeworld = new Homeworld(this);
   readonly tutorial = new Tutorial(this);
-  /** the maker's choice over the Replicator (wake or hold) while it is open */
+  /** the maker's choice over the Vessel Printer (wake or hold) while it is open */
   choice?: WakeChoice;
 
   constructor() { super('planet'); }
@@ -431,6 +435,7 @@ export class PlanetScene extends Phaser.Scene {
     this.bioworks = new Bioworks(this, save);
     if (p.wildCems) this.wild = new WildCems(this, save, p.wildCems);
     this.buildings = new Buildings(this, save?.data.buildings);
+    this.vesselPrinter = new VesselPrinter(this, save);
     this.homeworld.placePrinters();
     this.time.delayedCall(2500, () => this.towner.grantGifts(save?.data.gifts));
     if (!this.shot && !this.visit) { this.warren.applyOffline(this.awayHours); this.buildings.applyOffline(this.awayHours); this.trade.accrueAway(this.awayHours); }
@@ -838,12 +843,24 @@ export class PlanetScene extends Phaser.Scene {
     // a wider look for reviewing a layout (?zoom=0.5)
     const zoom = Number(new URLSearchParams(location.search).get('zoom') ?? 1);
     if (zoom > 0 && zoom !== 1) this.cameras.main.setZoom(zoom);
-    if (view === 'replicate') {
-      (this.base as unknown as { placeReplicator(a: boolean): void }).placeReplicator(false);
-      this.embers = DRIFT.cost;
-      this.player.setPosition(this.base.spotX, this.base.spotY);
-      this.cameras.main.centerOn(this.base.x, this.base.y + 10);
-      this.time.delayedCall(300, () => this.tryReplicate());
+    // the Vessel Printer standing ready (replicate: its choice open; vesselprint: a Vessel half printed in its pod)
+    if (view === 'replicate' || view === 'vesselprinter' || view === 'vesselprint') {
+      const vp = this.buildings.standNow(VP.design), me = session.replicant;
+      this.embers = Math.max(this.embers, DRIFT.cost);
+      this.game.events.emit('embers', this.embers, true);
+      if (vp) {
+        px = vp.x + 34; py = vp.y + 20;
+        this.player.setPosition(px, py);
+        this.cameras.main.centerOn(vp.x, vp.y - 20);
+        if (view === 'replicate') this.time.delayedCall(300, () => { const d = this.vesselPrinter.door!; this.player.setPosition(d.x, d.y); this.tryReplicate(); });
+        if (view === 'vesselprint' && me) {
+          const d = this.vesselPrinter.door!;
+          // held at 60% for the picture
+          this.vesselPrinter.printMs = 3_600_000;
+          this.vesselPrinter.start('wake', { ...replicate(me, this.planet.star, this.planet.planetIndex, d.x, d.y + 2), id: 'shot' });
+          this.vesselPrinter.state!.start = Date.now() - this.vesselPrinter.printMs * 0.6;
+        }
+      }
     }
   }
 
@@ -852,7 +869,7 @@ export class PlanetScene extends Phaser.Scene {
     sound.listen(this.player.x, this.player.y);
     dt = Math.min(dt, 50) * this.slow;
     let input = this.talker.routeTalk(time, this.controls.read());
-    // wake or hold: the choice over the Replicator has the buttons
+    // wake or hold: the choice over the Vessel Printer has the buttons
     if (this.choice) { this.choice.route(input, dt); input = NO_INPUT; }
     if (!this.stopped) {
       this.player.update(time, dt, input);
@@ -871,8 +888,7 @@ export class PlanetScene extends Phaser.Scene {
     this.updateBendables(time);
     this.updateWater();
     this.updateCamera();
-    this.base.update(time, this.embers);
-    this.base.updateSpot(time, this.canReplicate());
+    this.vesselPrinter.update(time, dt);
     this.dock.update(time, dt);
     if (this.boardRing) {
       const ready = this.departure.boardReady();
@@ -1029,21 +1045,8 @@ export class PlanetScene extends Phaser.Scene {
     if (this.departure.playerOnBoardSpot()) return this.departure.tryBoard();
     if (this.dock.playerOnPad()) return this.dock.tryBuild();
     if (this.time.now > this.hatchReadyAt && this.warren.playerOnHatch()) { this.descend(); return true; }
-    if (this.base.playerOnSpot()) return this.tryReplicate();
-    if (!this.base.playerOnPad() || !this.base.canBuild(this.embers)) return false;
-    const cost = STRUCTURES.replicator.cost;
-    this.embers -= cost;
-    this.pending.embers -= cost;
-    this.game.events.emit('embers', this.embers);
-    this.player.locked = true;
-    this.player.body.setVelocity(0, 0);
-    sound.build();
-    this.base.build(this.player.x, this.player.y, () => {
-      this.player.locked = false;
-      this.village.addStructure({ type: 'replicator', x: this.base.x, y: this.base.y, at: Date.now() });
-      void this.saver.flushPlanet();
-    });
-    return true;
+    if (this.vesselPrinter.playerAtDoor()) return this.tryReplicate();
+    return false;
   }
 
   // --- the warren ---
@@ -1094,38 +1097,52 @@ export class PlanetScene extends Phaser.Scene {
 
   // --- leaving the planet ---
 
+  /**
+   * A Vessel can be made: the Vessel Printer stands here with its pod empty, the store has the Ember (drift.json cost)
+   * and the world has room for another copy (Thales is not one).
+   */
   canReplicate() {
-    return this.base.built && !this.replicating && !!session.replicant && this.embers >= DRIFT.cost && this.npcs.length < DRIFT.maxPerPlanet;
+    const vp = this.vesselPrinter;
+    return !!vp?.building && !vp.busy && !this.replicating && !this.visit && !!session.replicant && this.embers >= DRIFT.cost
+      && this.npcs.filter((n) => !n.data.traits.thales).length < DRIFT.maxPerPlanet;
   }
 
-  private tryReplicate(): boolean {
+  /** At the Vessel Printer's door: the maker chooses, or the printer says it cannot. */
+  tryReplicate(): boolean {
+    const vp = this.vesselPrinter, b = vp?.building, door = vp?.door;
+    if (!b || !door) return false;
     if (!this.canReplicate()) {
       if (this.replicating) return true;
-      this.base.hungry();
+      vp.hungry();
       sound.denied();
-      return true; // standing on the spot: never swing at the Replicator
+      return true; // standing at the door: never swing at the printer
     }
     // the maker chooses first: wake the copy now, or hold it asleep for a new player (src/ui/wakeChoice.ts)
     this.replicating = true;
     const pl = this.player;
     pl.locked = true;
     pl.body.setVelocity(0, 0);
-    pl.setPosition(this.base.spotX, this.base.spotY);
-    this.choice = new WakeChoice(this, this.base.x, this.base.y - 40, (kind) => { this.choice = undefined; this.replicate(kind); }, () => {
-      // closed without a copy: you step back off the ring
+    pl.setPosition(door.x, door.y);
+    const at = vp.choiceAt() ?? { x: door.x, y: b.y - 60 };
+    this.choice = new WakeChoice(this, at.x, at.y, (kind) => { this.choice = undefined; this.replicate(kind); }, () => {
+      // closed without a copy: you step back out of the doorway
       this.choice = undefined;
       this.replicating = false;
       pl.locked = false;
       this.controls.clear();
-      pl.setPosition(this.base.spotX, this.base.spotY + 14);
+      vp.closed();
+      pl.setPosition(door.x, door.y + 14);
     });
     return true;
   }
 
-  /** The Replicator makes the copy: woken (born blank; its first wake makes it itself) or held (asleep in its maker's likeness). */
+  /**
+   * The Vessel Printer takes the maker's choice: woken (born blank; its first wake makes it itself) or held (asleep in
+   * its maker's likeness). The maker is scanned and is free again; the pod prints the body by itself (VesselPrinter).
+   */
   private replicate(kind: WakeOrHold) {
-    const me = session.replicant!;
-    // with a Spark and a copy standing by the ring, the newborn comes from that copy and carries its memories
+    const me = session.replicant!, vp = this.vesselPrinter, door = vp.door!;
+    // with a Spark and a copy standing by the door, the newborn comes from that copy and carries its memories
     const elder = (me.traits.sparks ?? 0) > 0 && !this.visit ? this.sparkElder() : undefined;
     const parent = elder?.data ?? me;
     this.embers -= DRIFT.cost;
@@ -1135,71 +1152,77 @@ export class PlanetScene extends Phaser.Scene {
     pl.locked = true;
     pl.body.setVelocity(0, 0);
     pl.facing = 1;
-    pl.setPosition(this.base.spotX, this.base.spotY);
+    pl.setPosition(door.x, door.y);
     sound.scan();
-    this.base.scan(pl.sprite, pl.featureColor, 1600);
+    vp.scan(pl.sprite, pl.featureColor);
     if (elder) {
       me.traits.sparks = (me.traits.sparks ?? 1) - 1;
       this.game.events.emit('sparks', me.traits.sparks);
       void this.saver.saveReplicant();
       elder.thank();
-      this.base.scan(elder.sprite, elder.trailColor, 1600);
-      // the Spark leaves the original and goes into the machine
+      vp.scan(elder.sprite, elder.trailColor);
+      // the Spark leaves the original and goes into the pod
+      const to = vp.pod()?.floor ?? door;
       const spark = this.add.image(pl.x, pl.y - 16, BEACON.spark.sprite).setDepth(6300).setBlendMode(Phaser.BlendModes.ADD);
-      this.tweens.add({ targets: spark, x: this.base.x, y: this.base.y - 12, duration: 700, ease: 'Quad.easeIn', onComplete: () => { spark.destroy(); this.fx.sparks(this.base.x, this.base.y - 12, PALETTE[19], 14); sound.spark(); } });
+      this.tweens.add({ targets: spark, x: to.x, y: to.y - 8, duration: 700, ease: 'Quad.easeIn', onComplete: () => { spark.destroy(); this.fx.sparks(to.x, to.y - 8, PALETTE[19], 14); sound.spark(); } });
     }
-    // the copy appears beside the Replicator, on whichever side is open
-    const side = this.isWalkable(this.base.x + 24, this.base.y + 8) ? 24 : -24;
-    const bx = this.base.x + side, by = this.base.y + 8;
-    const row = replicate(parent, this.planet.star, this.planet.planetIndex, bx, by);
+    // its id is chosen now, so the row is made once whoever is here when it steps out
+    const row: ReplicantSave = { ...replicate(parent, this.planet.star, this.planet.planetIndex, door.x, door.y + 2), id: crypto.randomUUID() };
     if (kind === 'hold') {
       // asleep in its maker's likeness until a new player takes it (the journal gives it away)
       const t = parent.traits;
       row.traits = { v: 1, awake: true, held: true, body: structuredClone(t.body ?? PARTS.defaults), feature: t.feature, trail: t.trail, gear: t.gear ?? 0 };
-      this.mindLog.push({ t: this.mindClock, text: `${me.name} made a copy and held it asleep for a new player` });
-    }
+      this.mindLog.push({ t: this.mindClock, text: `${me.name} began a copy in the Vessel Printer and will hold it asleep for a new player` });
+    } else this.mindLog.push({ t: this.mindClock, text: `${me.name} began a new Vessel in the Vessel Printer` });
     if (elder) {
       const wants = (elder.data.traits.wants ?? []).filter((w) => !w.done).map((w) => w.text);
       row.traits.inherit = { from: elder.data.id, name: elder.data.name, ...(wants.length ? { wants } : {}) };
       this.mindLog.push({ t: this.mindClock, text: `${me.name} spent a Spark: a new copy was made from ${elder.data.name} and remembers being it` });
       if (this.canHear()) this.game.events.emit('notice', `A NEW COPY CARRIES ${elder.data.name.toUpperCase()}'S MEMORIES`);
     }
-    this.time.delayedCall(1700, () => {
-      const npc = new Npc(this, { ...row, id: 'pending' }, bx, by);
-      // its home: the next free lot, recorded under its id once the row is saved
-      const lotIndex = nextFreeLot(this.map.town, this.townState, 'home');
-      const lot = lotIndex >= 0 ? this.map.town.lots[lotIndex] : undefined;
-      npc.home = lot ? { ...lot.yard } : undefined;
-      // held under a key of its own until the row is saved (never written as 'pending')
-      const lotKey = `pending:${Date.now()}`;
-      if (lot) this.townState.lots[lotKey] = lotIndex;
-      this.npcs.push(npc);
-      this.announceLocation();
-      this.warren.refreshHatch();
-      sound.birth();
-      npc.playBirth(() => {
-        this.player.locked = false;
-        this.replicating = false;
-        this.floatName(npc);
-      });
-      const st = session.store;
-      if (st && !this.shot) {
-        st.createReplicant(row).then((saved) => {
-          const lotIndex = this.townState.lots[lotKey];
-          Object.assign(npc.data, saved);
-          if (elder) st.inheritNotes(elder.data.id, saved.id, DRIFT.spark.notes).catch((e) => console.warn('inherit notes failed', e));
-          if (lotIndex !== undefined) { delete this.townState.lots[lotKey]; this.townState.lots[saved.id] = lotIndex; this.towner.markTown(); }
-        })
-          .catch((e) => { console.warn('copy save failed', e); delete this.townState.lots[lotKey]; });
-        this.pending.npcTick ??= Date.now();
-      }
+    // the scan done, the pod takes over and the maker is free
+    this.time.delayedCall(VP.scanMs + 100, () => {
+      vp.start(kind, row, elder?.data.id);
+      vp.closed();
+      pl.locked = false;
+      this.replicating = false;
+      this.controls.clear();
     });
     return true;
   }
 
-  /** A copy (not blank, up here) standing close to the Replicator's ring: a Spark birth would come from it. */
+  /** A Vessel steps out of the Vessel Printer's door: it takes the next free lot, and its row is made (once). */
+  bornAt(row: ReplicantSave, x: number, y: number, elderId?: string) {
+    const npc = new Npc(this, { ...structuredClone(row), id: 'pending' }, x, y);
+    // its home: the next free lot, recorded under its id once the row is saved
+    const lotIndex = nextFreeLot(this.map.town, this.townState, 'home');
+    const lot = lotIndex >= 0 ? this.map.town.lots[lotIndex] : undefined;
+    npc.home = lot ? { ...lot.yard } : undefined;
+    // held under a key of its own until the row is saved (never written as 'pending')
+    const lotKey = `pending:${Date.now()}`;
+    if (lot) this.townState.lots[lotKey] = lotIndex;
+    this.npcs.push(npc);
+    this.announceLocation();
+    this.warren.refreshHatch();
+    sound.birth();
+    npc.playBirth(() => this.floatName(npc));
+    const st = session.store;
+    if (!st || this.shot) { npc.data.id = row.id; return npc; }
+    const { id, ...fresh } = row;
+    st.createReplicant(fresh, id).then((saved) => {
+      const lotIndex = this.townState.lots[lotKey];
+      Object.assign(npc.data, saved);
+      if (elderId) st.inheritNotes(elderId, saved.id, DRIFT.spark.notes).catch((e) => console.warn('inherit notes failed', e));
+      if (lotIndex !== undefined) { delete this.townState.lots[lotKey]; this.townState.lots[saved.id] = lotIndex; this.towner.markTown(); }
+    })
+      .catch((e) => { console.warn('copy save failed', e); delete this.townState.lots[lotKey]; });
+    this.pending.npcTick ??= Date.now();
+    return npc;
+  }
+
+  /** A copy (not blank, up here) standing close to the Vessel Printer's door: a Spark birth would come from it. */
   private sparkElder() {
-    const sx = this.base.spotX, sy = this.base.spotY;
+    const d = this.vesselPrinter.door, sx = d?.x ?? 0, sy = d?.y ?? 0;
     return this.npcs.filter((n) => !n.blank && !n.below && n.state !== 'born' && !n.data.traits.thales && !n.data.id.startsWith('pending') && Math.hypot(n.x - sx, n.y - sy) < DRIFT.spark.range)
       .sort((a, b) => Math.hypot(a.x - sx, a.y - sy) - Math.hypot(b.x - sx, b.y - sy))[0];
   }

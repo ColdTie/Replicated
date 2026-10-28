@@ -15,6 +15,8 @@ import type { PlanetScene } from './PlanetScene';
 
 const ICON: Record<string, number> = { salt: 8, iron: 13, quartz: 15, copper: 16, wood: 2, ember: 6, hydrogen: 14 };
 const LIST_X = 14, LIST_Y = 38, ROW_H = 24, INFO_X = 200, INFO_W = 270, PREV_Y = 14;
+/** rows shown at once; a longer list scrolls to keep the chosen row in view, with a mark at the end that goes on */
+const LIST_ROWS = 9;
 /** the price row and the PRINT button sit at the foot of the panel; the words end just above them */
 const PRICE_Y = 226, PRINT_Y = 242, TEXT_END = PRICE_Y - 4, MIN_PREVIEW = 64;
 const TIERS = CAT.costing.tiers.map((t) => t.name);
@@ -73,12 +75,14 @@ export class DesignScene extends Phaser.Scene {
     this.controls.modal = true;
     this.buildRows();
     const ready = this.rows.findIndex((r) => !r.why);
-    this.index = ready >= 0 ? ready : Math.max(0, this.rows.findIndex((r) => !r.why?.startsWith('NEEDS')));
+    this.index = ready >= 0 ? ready : Math.max(0, this.rows.findIndex((r) => !r.why?.startsWith('NEEDS') && !r.why?.startsWith('ONLY')));
     this.drawList();
     this.drawInfo();
     // a key moves one row on its press; the held key also reads as the stick, so that counts as held (no second row)
     for (const [key, d] of [['UP', -1], ['W', -1], ['DOWN', 1], ['S', 1]] as const) onPress(this, [key], () => { this.move(d); this.stickHeld = true; });
     for (const [key, d] of [['LEFT', -1], ['A', -1], ['RIGHT', 1], ['D', 1]] as const) onPress(this, [key], () => { this.yaw += d * 0.6; });
+    // the wheel walks the list
+    this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => { if (dy) this.move(Math.sign(dy)); });
     // drag the model to turn it
     const zone = this.add.zone(INFO_X, PREV_Y, INFO_W, TEXT_END - 60 - PREV_Y).setOrigin(0).setInteractive({ useHandCursor: true });
     zone.on('pointerdown', (p: Phaser.Input.Pointer) => { this.drag = { x: p.x, yaw: this.yaw }; });
@@ -101,9 +105,14 @@ export class DesignScene extends Phaser.Scene {
   private drawList() {
     this.list.removeAll(true);
     const add = <T extends Phaser.GameObjects.GameObject>(o: T) => { this.list.add(o); return o; };
+    const top = Phaser.Math.Clamp(this.index - Math.floor(LIST_ROWS / 2), 0, Math.max(0, this.rows.length - LIST_ROWS));
+    // more above or below: a small arrow at that end of the list
+    if (top > 0) add(this.add.triangle(LIST_X + 166, LIST_Y - 7, 0, 3, 3, 0, 6, 3, PALETTE[22]));
+    if (top + LIST_ROWS < this.rows.length) add(this.add.triangle(LIST_X + 166, LIST_Y + LIST_ROWS * ROW_H - 2, 0, 0, 6, 0, 3, 3, PALETTE[22]));
     this.rows.forEach((r, i) => {
-      const y = LIST_Y + i * ROW_H, on = i === this.index;
-      const locked = !!r.why?.startsWith('NEEDS');
+      if (i < top || i >= top + LIST_ROWS) return;
+      const y = LIST_Y + (i - top) * ROW_H, on = i === this.index;
+      const locked = !!r.why?.startsWith('NEEDS') || !!r.why?.startsWith('ONLY');
       const bg = add(this.add.rectangle(LIST_X - 4, y - 3, 176, ROW_H - 2, on ? PALETTE[23] : PALETTE[24], on ? 1 : 0.5).setOrigin(0, 0).setStrokeStyle(1, on ? PALETTE[12] : PALETTE[23], on ? 1 : 0.5));
       bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => { if (this.busy) return; if (this.index === i) this.print(); else { this.index = i; sound.designMove(i); this.refresh(); } });
       add(this.add.bitmapText(LIST_X, y, 'pixel', r.m.def.name.toUpperCase()).setTint(locked ? PALETTE[22] : on ? PALETTE[19] : PALETTE[20]));
@@ -111,7 +120,8 @@ export class DesignScene extends Phaser.Scene {
       const tier = TIERS.indexOf(r.m.tier);
       for (let k = 0; k < TIERS.length; k++) add(this.add.rectangle(LIST_X + k * 5, y + 12, 3, 3, k <= tier ? (locked ? PALETTE[22] : PALETTE[12]) : on ? PALETTE[22] : PALETTE[23]).setOrigin(0));
       add(this.add.bitmapText(LIST_X + 28, y + 10, 'pixel', r.m.tier).setTint(PALETTE[22]));
-      const [word, tint] = locked ? ['LOCKED', 22] : !r.why ? ['READY', 12] : r.why.startsWith('NEED MORE') ? ['NEED', 29] : ['WAIT', 21];
+      const [word, tint] = r.why?.startsWith('ONLY') ? ['HOMEWORLD', 22] : locked ? ['LOCKED', 22] : !r.why ? ['READY', 12]
+        : r.why.startsWith('NEED MORE') ? ['NEED', 29] : r.why.startsWith('ONE ') ? ['BUILT', 10] : ['WAIT', 21];
       add(this.add.bitmapText(LIST_X + 168, y, 'pixel', word).setOrigin(1, 0).setTint(PALETTE[tint]));
       if (r.built) add(this.add.bitmapText(LIST_X + 168, y + 10, 'pixel', `x${r.built}`).setOrigin(1, 0).setTint(PALETTE[10]));
     });

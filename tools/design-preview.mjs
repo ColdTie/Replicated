@@ -1,6 +1,7 @@
 // Draws every Cem design (src/data/designs.json) as the world shows it and from four sides of the menu's turntable,
 // with its volume, complexity, tier, price and print time, into screenshots/designs.png, so the designs can be judged
 // in chat without starting the game. Usage: node --experimental-strip-types tools/design-preview.mjs [--cut 0.6]
+// [--only vesselprinter] (one design, into screenshots/design-<id>.png)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,10 +14,12 @@ const palette = JSON.parse(fs.readFileSync(path.join(root, 'src/data/palette.jso
   .map((h) => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]);
 const ci = process.argv.indexOf('--cut');
 const cutShare = ci > 0 ? Number(process.argv[ci + 1]) : null;
+const oi = process.argv.indexOf('--only');
+const only = oi > 0 ? process.argv[oi + 1] : null;
 
 const scale = 3, gap = 8;
 const rows = [];
-for (const def of cat.designs) {
+for (const def of cat.designs.filter((d) => !only || d.id === only)) {
   const m = buildModel(def, cat);
   const cut = cutShare == null ? undefined : Math.round(m.volume * cutShare);
   const world = renderModel(m, cat, { yaw: cat.view.yaw ?? 0, pitch: cat.view.pitch, ppv: cat.view.ppv, cut, alive: cut ? Math.max(4, m.w * 2) : 0, palette, light: cat.view.light });
@@ -47,4 +50,4 @@ for (const r of rows) {
   y += rowH + gap;
 }
 fs.mkdirSync(path.join(root, 'screenshots'), { recursive: true });
-fs.writeFileSync(path.join(root, 'screenshots', cutShare == null ? 'designs.png' : 'designs-printing.png'), PNG.sync.write(png));
+fs.writeFileSync(path.join(root, 'screenshots', only ? `design-${only}.png` : cutShare == null ? 'designs.png' : 'designs-printing.png'), PNG.sync.write(png));
