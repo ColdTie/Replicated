@@ -100,9 +100,16 @@ try {
   if (!printed.built) fail('the Printworks could not be finished');
   if (!printed.pulses) fail('the printer did not move with the blows');
   if (!printed.done) fail('the printer did not power down once the work was done');
-  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out
-  await page.waitForFunction(() => !!window.__scene.talker.talk?.script, null, { timeout: 9000 }).catch(() => fail('Thales did not speak when the Cems woke'));
-  for (let i = 0; i < 16 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
+  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out. He may say
+  // his printer words first, if he stood at his post as the Printworks was finished: Enter through whatever he says
+  // until the awake words have been said and the box is shut
+  for (let i = 0; i < 60; i++) {
+    const t = await ev(() => ({ talk: !!window.__scene.talker.talk, told: !!window.__session.replicant.traits.tutorial?.told.includes('awake') }));
+    if (t.told && !t.talk) break;
+    if (t.talk) await page.keyboard.press('Enter');
+    await page.waitForTimeout(350);
+  }
+  if (!(await ev(() => window.__session.replicant.traits.tutorial?.told.includes('awake')))) fail('Thales did not speak when the Cems woke');
   await page.waitForTimeout(1200);
   await shot(page, 'opening-printed');
 

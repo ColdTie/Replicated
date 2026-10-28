@@ -192,7 +192,9 @@ try {
   if ((await box()).open) fail('the last page did not close the box');
   if (await ev(() => window.__count.attack + window.__count.interact)) fail('closing the box with Space swung');
 
-  // 5. right click opens it too, Tab closes it without opening the journal
+  // 5. right click opens it too, Tab closes it without opening the journal. (A click on the copy itself this soon after
+  // its box closed is ignored, talk.json clickReopenMs, and the player may stand right on Glint: wait that out)
+  await page.waitForTimeout(400);
   await page.mouse.click(480, 270, { button: 'right' });
   await page.waitForTimeout(300);
   if (!(await box()).open) fail('right click did not open the talk box');
@@ -200,7 +202,8 @@ try {
   await page.waitForTimeout(400);
   if ((await box()).open) fail('Tab did not close the box');
   if (await ev(() => !!document.querySelector('.jn'))) fail('Tab opened the journal while closing the box');
-  await ev(() => document.querySelector('.jn')?.remove());
+  // (shut it the game's way if it opened, so the steps after this one still talk)
+  await ev(() => { if (document.querySelector('.jn')) window.__scene.toggleJournal(); });
 
   // 6. right click no longer dashes; Shift still does
   await ev((sp) => window.__scene.player.setPosition(sp.x - 70, sp.y), spot);
