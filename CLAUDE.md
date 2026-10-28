@@ -188,7 +188,7 @@ src/entities/WildCems.ts the Cems' world's wild fields (planets.json cemworld wi
 src/scenes/DesignScene.ts the design menu over the paused planet: rows (READY / NEED / LOCKED / WAIT, built count), the
                          chosen design turning in 3D (drag to turn), complexity, volume, print time, gives, price vs store
 supabase/manual/         SQL run by hand, only when Steve asks: 2026-10-27_tutorial_fresh_start.sql (backs up and erases his
-                         galaxy only; run 2026-10-27)
+                         galaxy only; run 2026-10-28)
 src/data/*.json          palette, planets, player, enemies, items, structures, backend, village, warren (all tunables)
 src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by tools/build-stars.mjs; edit the catalog there)
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
@@ -1071,7 +1071,12 @@ copies' own buildings are untouched (still raised by swings).
 - A Vessel without `traits.tutorial` (older ones, handed-over ones) has no gate and nothing grown.
 - **The fresh start** (Steve: "Yes lets back up and erase"): `supabase/manual/2026-10-27_tutorial_fresh_start.sql`,
   scoped to Steve's galaxy only. The old 2026-10-26 script erased every galaxy (a second login with the profiles Linda
-  and Freya and one planet row exists); it was never run and is deleted.
+  and Freya and one planet row exists); it was never run and is deleted. **Done 2026-10-28** by Steve in the Supabase
+  SQL Editor (the connector's approval prompt timed out three times, as in session 17). Verified: his galaxy has 0
+  replicants, planets, journeys, stars, notes, letters and requests; `backup_20261027` holds 12 replicants, 5
+  planets, 4 journeys, 4 notes, 3 letters (RLS on, no API grants); his Steve profile, the other login's galaxy (1
+  planet) and all 3 profiles stay. His next load makes a new Vessel on LHS 1140 b for the beginning.
+- Merged to main as PR #68 after CI went green on its third run.
 - Launching closes a talk box still open (a word of Thales' does not fly along). CI found that his words when the
   Cems wake (a modal box about 4 s later) got in the way of playtests that went on to the Printworks' door or the
   ship: `playtest-bioworks`, `-seedbed` and `-homeworld` now hear him out, and `playtest-tutorial` no longer parks the
