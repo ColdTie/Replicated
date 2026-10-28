@@ -54,9 +54,16 @@ try {
     for (let i = 0; i < 80 && !bl.built; i++) { s.resolveAttack(bl.x - bl.w * 8 + 4, bl.y - 4, 14, aim); await new Promise((r) => setTimeout(r, 40)); }
   }, HW.goal);
   await page.waitForFunction(() => window.__scene.bioworks.awake, null, { timeout: 8000 }).catch(() => fail('the Cems did not wake when the Printworks was finished'));
-  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out
-  await page.waitForFunction(() => !!window.__scene.talker.talk?.script, null, { timeout: 9000 }).catch(() => fail('Thales did not speak when the Cems woke'));
-  for (let i = 0; i < 16 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
+  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out. He may say
+  // his printer words first, if he stood at his post as the Printworks was finished: Enter through whatever he says
+  // until the awake words have been said and the box is shut
+  for (let i = 0; i < 60; i++) {
+    const t = await ev(() => ({ talk: !!window.__scene.talker.talk, told: !!window.__session.replicant.traits.tutorial?.told.includes('awake') }));
+    if (t.told && !t.talk) break;
+    if (t.talk) await page.keyboard.press('Enter');
+    await page.waitForTimeout(350);
+  }
+  if (!(await ev(() => window.__session.replicant.traits.tutorial?.told.includes('awake')))) fail('Thales did not speak when the Cems woke');
   await page.waitForTimeout(1200);
 
   // 3. launch: the hold takes a culture of the awake Cems
@@ -110,7 +117,12 @@ try {
   await page.waitForTimeout(500);
   const house = await ev(() => window.__designs.rows.find((r) => r.id === 'house')?.why ?? null);
   if (house) fail(`the House cannot be printed on the seeded world: ${house}`);
-  for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(80); }
+  // (the menu takes a key on its next frame: wait for each step to land before looking again)
+  for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) {
+    const was = await ev(() => window.__designs.index);
+    await page.keyboard.press('ArrowDown');
+    await page.waitForFunction((was) => window.__designs.index !== was, was, { timeout: 3000 }).catch(() => undefined);
+  }
   await page.keyboard.press('Enter');
   const printed = await page.waitForFunction(() => !window.__game.scene.isActive('designs') && window.__scene.buildings.printing.length === 1, null, { timeout: 8000 }).then(() => true).catch(() => false);
   if (!printed) {

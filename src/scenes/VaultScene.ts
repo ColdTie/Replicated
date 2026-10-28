@@ -13,7 +13,7 @@ import { session } from '../core/session';
 import { COST, STANDBY } from '../entities/Manny';
 import { Lighting, type Light } from '../fx/Lighting';
 import { makeVignette } from '../fx/textures';
-import { Controls } from '../input/Controls';
+import { Controls, onPress } from '../input/Controls';
 import { distanceLy, planetFor, starById } from '../world/galaxy';
 import { DEPTH, type PlanetScene } from './PlanetScene';
 
@@ -51,7 +51,8 @@ export class VaultScene extends Phaser.Scene {
     this.drawPods();
     this.menu = this.add.container(MENU_X, 0).setDepth(DEPTH.ui);
     this.drawMenu();
-    for (const [key, d] of [['UP', -1], ['W', -1], ['DOWN', 1], ['S', 1]] as const) this.input.keyboard?.on(`keydown-${key}`, () => this.move(d));
+    // a key moves one row on its press; the held key also reads as the stick, so that counts as held (no second row)
+    for (const [key, d] of [['UP', -1], ['W', -1], ['DOWN', 1], ['S', 1]] as const) onPress(this, [key], () => { this.move(d); this.stickHeld = true; });
     if (!this.textures.exists('vignette')) makeVignette(this, w, h);
     this.add.image(0, 0, 'vignette').setOrigin(0).setDepth(DEPTH.vignette);
     this.cameras.main.fadeIn(400, 11, 10, 22);

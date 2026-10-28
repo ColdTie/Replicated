@@ -10,6 +10,7 @@ import { Spark } from '../../entities/Resources';
 import type { AwayItem, MindContext, MindResult, ReplicantSummary } from '../../net/store';
 import { mailSeconds } from '../../world/galaxy';
 import type { PlanetScene } from '../PlanetScene';
+import { onPress } from '../../input/Controls';
 import { TALK_GAP_MS, kitLists, quietMinds } from './shared';
 
 /**
@@ -40,9 +41,7 @@ export class Minds {
     const kb = this.s.input.keyboard;
     if (kb) {
       kb.addCapture('TAB');
-      const toggle = () => void this.toggleJournal();
-      kb.on('keydown-TAB', toggle);
-      kb.on('keydown-I', toggle);
+      onPress(this.s, ['TAB', 'I'], () => void this.toggleJournal());
     }
     const onJournal = () => void this.toggleJournal();
     this.s.game.events.on('journal', onJournal);

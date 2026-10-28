@@ -82,9 +82,16 @@ try {
     for (let i = 0; i < 80 && !bl.built; i++) { s.resolveAttack(bl.x - bl.w * 8 + 4, bl.y - 4, 14, aim); await new Promise((r) => setTimeout(r, 40)); }
   }, HW.goal);
   await page.waitForFunction(() => window.__scene.bioworks.awake, null, { timeout: 8000 }).catch(() => fail('the Cems did not wake when the Printworks was finished'));
-  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out
-  await page.waitForFunction(() => !!window.__scene.talker.talk?.script, null, { timeout: 9000 }).catch(() => fail('Thales did not speak when the Cems woke'));
-  for (let i = 0; i < 16 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
+  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out. He may say
+  // his printer words first, if he stood at his post as the Printworks was finished: Enter through whatever he says
+  // until the awake words have been said and the box is shut
+  for (let i = 0; i < 60; i++) {
+    const t = await ev(() => ({ talk: !!window.__scene.talker.talk, told: !!window.__session.replicant.traits.tutorial?.told.includes('awake') }));
+    if (t.told && !t.talk) break;
+    if (t.talk) await page.keyboard.press('Enter');
+    await page.waitForTimeout(350);
+  }
+  if (!(await ev(() => window.__session.replicant.traits.tutorial?.told.includes('awake')))) fail('Thales did not speak when the Cems woke');
   await page.waitForTimeout(1500);
   const awake = await ev(() => { const bw = window.__scene.bioworks; return { trails: bw.trails.map((t) => t.id), ants: bw.trails.reduce((a, t) => a + t.ants.length, 0) + bw.loiter.length }; });
   log('awake', JSON.stringify(awake));
@@ -106,8 +113,44 @@ try {
   if (!row('nursery')?.why?.startsWith('NEEDS')) fail('the Cem Nursery is open before a House stands');
   if (!(row('supercomputer').complexity > row('house').complexity && row('supercomputer').volume > row('house').volume)) fail('a supercomputer is not more complex and larger than a house');
   await shot('bio-menu');
-  // walk the rows to the House and print it with Enter
-  for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) { await page.keyboard.press('ArrowDown'); await page.waitForTimeout(80); }
+  // the X closes it (a phone has no Esc); a click on the model only turns it, it prints nothing
+  const before0 = await ev(() => window.__scene.buildings.printing.length);
+  await page.mouse.click(335 * 2, 60 * 2);
+  await page.waitForTimeout(300);
+  if (!(await ev(() => window.__game.scene.isActive('designs'))) || (await ev(() => window.__scene.buildings.printing.length)) !== before0) fail('a click on the model closed the menu or printed');
+  await page.mouse.click(460 * 2, 20 * 2);
+  await page.waitForFunction(() => !window.__game.scene.isActive('designs'), null, { timeout: 3000 }).catch(() => fail('the X did not close the designs'));
+  await page.waitForTimeout(400);
+  if ((await ev(() => window.__scene.buildings.printing.length)) !== before0) fail('closing the menu printed something');
+  // and the door opens it again once you step back into it
+  await ev((goal) => { const s = window.__scene, g = s.buildings.list.find((x) => x.id === goal); s.player.setPosition(g.x, g.y + 40); }, HW.goal);
+  await page.waitForTimeout(300);
+  await ev((goal) => { const s = window.__scene, g = s.buildings.list.find((x) => x.id === goal); s.bioworks.readyAt = 0; s.player.setPosition(g.x, g.y + 6); }, HW.goal);
+  await page.waitForFunction(() => window.__game.scene.isActive('designs') && window.__designs?.rows?.length, null, { timeout: 8000 }).catch(() => fail('the door did not open the designs again'));
+  await page.waitForTimeout(700);
+  // a press with another key in the same frame (a slow frame, a quick hand) still moves one row: Phaser hands a
+  // frame's earlier key events to the scene again whenever another one arrives
+  for (const [code, keyCode, d] of [['ArrowDown', 40, 1], ['ArrowUp', 38, -1]]) {
+    const same = await ev(([code, keyCode]) => {
+      const was = window.__designs.index, key = (type, c, k) => window.dispatchEvent(new KeyboardEvent(type, { code: c, key: c, keyCode: k, bubbles: true }));
+      key('keydown', code, keyCode); key('keyup', code, keyCode); key('keydown', 'KeyQ', 81); key('keyup', 'KeyQ', 81);
+      return [was, window.__designs.index];
+    }, [code, keyCode]);
+    if (same[1] !== (same[0] + d + menu.length) % menu.length) fail(`${code} with another key in the same frame moved the designs from row ${same[0]} to ${same[1]}`);
+    await page.waitForTimeout(150);
+  }
+  // walk the rows to the House and print it with Enter; a press held as a hand holds it moves one row, never two
+  // (the menu takes a key on its next frame: wait for each step to land before looking again)
+  for (let i = 0; i < 12 && (await ev(() => window.__designs.rows[window.__designs.index].id)) !== 'house'; i++) {
+    const was = await ev(() => window.__designs.index);
+    await page.keyboard.down('ArrowDown');
+    await page.waitForTimeout(80);
+    await page.keyboard.up('ArrowDown');
+    await page.waitForFunction((was) => window.__designs.index !== was, was, { timeout: 3000 }).catch(() => undefined);
+    await page.waitForTimeout(150);
+    const now = await ev(() => window.__designs.index);
+    if (now !== (was + 1) % menu.length) fail(`one Down press moved the designs from row ${was} to ${now}`);
+  }
   const before = await ev(() => ({ ...window.__scene.supplies, ember: window.__scene.embers }));
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => !window.__game.scene.isActive('designs') && window.__scene.buildings.printing.length === 1, null, { timeout: 8000 }).catch(() => fail('Enter did not print the House'));

@@ -186,9 +186,13 @@ src/entities/WildCems.ts the Cems' world's wild fields (planets.json cemworld wi
                          on their rims (nodes wild0..); walking among them with the ship here puts a jar of them in the
                          hold (traits.wild) for a Biolab to change
 src/scenes/DesignScene.ts the design menu over the paused planet: rows (READY / NEED / LOCKED / WAIT, built count), the
-                         chosen design turning in 3D (drag to turn), complexity, volume, print time, gives, price vs store
+                         chosen design turning in 3D (drag to turn), complexity, volume, print time, gives, price vs store;
+                         the words laid out from the foot of the panel up (measured once wrapped), the model in the room
+                         left above them; an X in the corner closes it
+src/core/viewport.ts     keeps the game inside what a phone shows: the game's box follows the visual viewport less the
+                         safe-area insets (the browser's bars, the notch), and Phaser refits on every change
 supabase/manual/         SQL run by hand, only when Steve asks: 2026-10-27_tutorial_fresh_start.sql (backs up and erases his
-                         galaxy only; run 2026-10-27)
+                         galaxy only; run 2026-10-28)
 src/data/*.json          palette, planets, player, enemies, items, structures, backend, village, warren (all tunables)
 src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by tools/build-stars.mjs; edit the catalog there)
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
@@ -405,11 +409,14 @@ reach, a swing works on the village: a tree (6 swings fell it), rock (4 break of
 raised (a blow). Walk into a building waiting for what you carry, a copy, or the hatch to
 hand the load over. Stand on the open hatch for a moment (a warm ring fills) or press attack on it to go down; walking
 or dashing across it never does. At the Replicator (attack on its ring with enough Ember) two lights open over it: WAKE (left) and HOLD (right);
-Left / Right (or the stick) choose, attack / E or a click on one picks. Standing in the husk vault's doorway a moment (a ring
+Left / Right (or the stick) choose, attack / E or a click on one picks; Esc (gamepad B), Down (stepping back off the ring)
+or a click away from both closes it without a copy. Standing in the husk vault's doorway a moment (a ring
 fills) or attack there goes down to the vault; Up / Down choose a row, attack / E / Enter pick, Esc goes up. Standing in
 the Printworks' doorway (or before a seeded bed's design stone) a moment (once the Cems are awake; a green ring fills) or
 attack there opens the designs; standing on a bed's ghost with the salt for it (a green ring fills) or attack there seeds it: Up /
-Down choose, Left / Right or a drag turn the model, attack / E / Enter or a click on PRINT prints, Esc closes. At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
+Down choose, Left / Right or a drag turn the model, attack / E / Enter or a click on PRINT prints, Esc or the X (top right) closes.
+A tap or click inside a menu (the star map, the designs, the husk vault) belongs to the menu: it never also swings in the
+world (UIScene MENUS). At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
 LINK; at the empty berth (the vessel is elsewhere) it has LINK and TO VESSEL / TO SHIP; in flight a world with your
 manny in the top-left row links you there. Dash Shift/K/X, gamepad
 B/L1/R2, swipe on the right side. Talk to the copy beside you (a speech mark shows over it): E, right click, gamepad Y,
@@ -1071,7 +1078,17 @@ copies' own buildings are untouched (still raised by swings).
 - A Vessel without `traits.tutorial` (older ones, handed-over ones) has no gate and nothing grown.
 - **The fresh start** (Steve: "Yes lets back up and erase"): `supabase/manual/2026-10-27_tutorial_fresh_start.sql`,
   scoped to Steve's galaxy only. The old 2026-10-26 script erased every galaxy (a second login with the profiles Linda
-  and Freya and one planet row exists); it was never run and is deleted.
+  and Freya and one planet row exists); it was never run and is deleted. **Done 2026-10-28** by Steve in the Supabase
+  SQL Editor (the connector's approval prompt timed out three times, as in session 17). Verified: his galaxy has 0
+  replicants, planets, journeys, stars, notes, letters and requests; `backup_20261027` holds 12 replicants, 5
+  planets, 4 journeys, 4 notes, 3 letters (RLS on, no API grants); his Steve profile, the other login's galaxy (1
+  planet) and all 3 profiles stay. His next load makes a new Vessel on LHS 1140 b for the beginning.
+- Merged to main as PR #68 after CI went green on its third run. The next CI run (a notes-only PR) still caught two
+  test races: `playtest-seedbed` / `-bioworks` walked the design list with ArrowDown faster than the menu takes keys
+  (it reads a key on its next frame), so on a slow runner it overshot House and printed a Storehouse; they now wait
+  for each step to land. `playtest-tutorial` moved the player away from Thales only after he could already have
+  reached his printer and spoken; it now steps away (from his post) as soon as the name is given and fails if he
+  speaks before you come to him. Both pass locally and at 5x CPU throttling.
 - Launching closes a talk box still open (a word of Thales' does not fly along). CI found that his words when the
   Cems wake (a modal box about 4 s later) got in the way of playtests that went on to the Printworks' door or the
   ship: `playtest-bioworks`, `-seedbed` and `-homeworld` now hear him out, and `playtest-tutorial` no longer parks the
@@ -1084,3 +1101,25 @@ copies' own buildings are untouched (still raised by swings).
   in the full run and passed alone, the timing flake of earlier sessions; then all of those pass). Screenshots
   `tutorial-grow.png`, `tutorial-map.png`, `tutorial-printer.png`, `tutorial-cemworld.png`, `tutorial-printing.png`,
   `tutorial-awake.png`, `tutorial-open.png`.
+
+### Session 23b (2026-10-28): the design menu on a phone; a longer dash (Steve, playing on an iPhone: "Text is overlapping. There isn't an X to click on to escape in the Cem menu. Make the base player dash 20% further.")
+- **The design menu's words no longer overlap.** The model was anchored at the foot of its room and wide designs reached
+  down over the name and tier line, and a long "gives" line (the Supercomputer's) wrapped into the description below it.
+  Now the words are measured once wrapped and laid out from the price row up, the model turns centered in the room left
+  above them (scaled to fit it whole), and its ring of light sits under its floor wherever that is. A check over all
+  nine designs (no text on text, no model on text, nothing into the price row) passes.
+- **An X closes the design menu** (top right, as on the star map); Esc still does.
+- **Taps in a menu stay in the menu.** On a touch screen every tap on the right half also counted as a swing: turning the
+  model by dragging it could print the chosen design, and closing a menu could swing (or reopen the star map at the
+  boarding spot) the moment it was gone. The UI scene now ignores taps while the star map, the designs or the husk vault
+  is open, and closing the designs clears any press still waiting.
+- **WAKE or HOLD can be closed** without a copy: Esc, gamepad B, Down (stepping back off the ring; the stick too, once it
+  was let go) or a click away from both.
+- **The game fits a phone's screen** (`src/core/viewport.ts`): on the iPhone the canvas was cut at the top and bottom
+  (the design list's header and last row); the game's box now follows the visual viewport less the safe-area insets.
+- **Dash 20% further:** `player.json dash.speed` 290 -> 348 px/s over the same 120 ms (about 35 -> 42 px), so the time
+  you are invulnerable is unchanged.
+- Verified: build, typecheck, the menu check over every design, a phone-landscape browser (the canvas fits; a tap on
+  the model prints nothing; the X closes the menu and nothing reopens), `playtest-bioworks` (the X, a click on the model)
+  and `playtest-homeworld` (Esc closes WAKE / HOLD without a copy or spent Ember, and it opens again).
+

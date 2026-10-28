@@ -2,9 +2,12 @@
 import Phaser from 'phaser';
 import { PALETTE } from '../core/data';
 import { isKid, session } from '../core/session';
-import { touch } from '../input/Controls';
+import { onPress, touch } from '../input/Controls';
 import { sound } from '../audio/Sound';
 import { TalkBox } from '../ui/dialogue';
+
+/** scenes that open over the world with their own buttons */
+const MENUS = ['starmap', 'designs', 'vault'];
 
 const STICK_RADIUS = 26;
 
@@ -115,7 +118,7 @@ export class UIScene extends Phaser.Scene {
     };
     drawSpeaker();
     const toggleSound = () => { sound.start(); sound.setMuted(!sound.muted); drawSpeaker(); };
-    this.input.keyboard?.on('keydown-M', toggleSound);
+    onPress(this, ['M'], toggleSound);
     const onSpeaker = (p: Phaser.Input.Pointer) => p.x > width - 26 && p.y < 22;
 
     if (new URLSearchParams(location.search).has('fps')) {
@@ -125,6 +128,9 @@ export class UIScene extends Phaser.Scene {
 
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       if (onSpeaker(p)) { toggleSound(); return; }
+      // a menu over the world (the star map, the designs, the husk vault) takes its own taps and clicks: they must not
+      // also swing or interact in the world once it closes
+      if (MENUS.some((k) => this.scene.isActive(k))) return;
       // the talk box is open: a tap or a click turns the page (or taps REPLY), nothing else
       if (this.talking) {
         if (this.talkBox.hitReply(p.x, p.y)) touch.replyQueued = true;

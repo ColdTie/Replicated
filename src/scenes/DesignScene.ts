@@ -3,17 +3,20 @@
 // whether it can be printed now (READY), wants more of something (NEED), waits for another building (LOCKED), or how
 // many stand here. Right: the chosen design turning in 3D (drag it to turn it yourself), its complexity, volume and
 // print time, what it gives, and its price, each material with what the store holds. Up / Down (W / S, the stick)
-// choose, attack / E / Enter prints, Esc closes; a click on a row chooses it and a click on PRINT prints.
+// choose, attack / E / Enter prints, Esc or the X in the corner closes; a click or tap on a row chooses it and on PRINT
+// prints. The words are laid out from the foot of the panel up, and the model fills the room left above them.
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { PALETTE } from '../core/data';
 import { CAT, DESIGNS, designModel, paintTexture, turntableView } from '../core/designs';
-import { Controls } from '../input/Controls';
+import { Controls, onPress } from '../input/Controls';
 import { turntableSize, type Model } from '../world/voxel';
 import type { PlanetScene } from './PlanetScene';
 
 const ICON: Record<string, number> = { salt: 8, iron: 13, quartz: 15, copper: 16, wood: 2, ember: 6, hydrogen: 14 };
-const LIST_X = 14, LIST_Y = 38, ROW_H = 24, INFO_X = 200, INFO_W = 270, PREV_Y = 14, PREV_H = 124;
+const LIST_X = 14, LIST_Y = 38, ROW_H = 24, INFO_X = 200, INFO_W = 270, PREV_Y = 14;
+/** the price row and the PRINT button sit at the foot of the panel; the words end just above them */
+const PRICE_Y = 226, PRINT_Y = 242, TEXT_END = PRICE_Y - 4, MIN_PREVIEW = 64;
 const TIERS = CAT.costing.tiers.map((t) => t.name);
 
 type Row = { id: string; m: Model; why: string | null; built: number };
@@ -33,7 +36,11 @@ export class DesignScene extends Phaser.Scene {
   private info!: Phaser.GameObjects.Container;
   private preview!: Phaser.GameObjects.Image;
   private yaw = 0.6;
-  private spin = 0;
+  /** the room the model turns in (above the words), and what the stage under it was last drawn for */
+  private box = { top: PREV_Y, height: 120 };
+  private stage!: Phaser.GameObjects.Graphics;
+  private stageGlow!: Phaser.GameObjects.Image;
+  private stageFor = '';
   private drag: { x: number; yaw: number } | null = null;
   private frame = 0;
   private busy = false;
@@ -44,7 +51,7 @@ export class DesignScene extends Phaser.Scene {
 
   init(d: { host: PlanetScene }) {
     this.host = d.host;
-    this.rows = []; this.index = 0; this.busy = false; this.stickHeld = false; this.drag = null; this.yaw = 0.6; this.spin = 0;
+    this.rows = []; this.index = 0; this.busy = false; this.stickHeld = false; this.drag = null; this.yaw = 0.6; this.stageFor = '';
   }
 
   create() {
@@ -54,13 +61,10 @@ export class DesignScene extends Phaser.Scene {
     const g = this.add.graphics();
     g.fillStyle(PALETTE[24], 0.92).fillRect(8, 8, 184, h - 16).lineStyle(1, PALETTE[23], 1).strokeRect(8.5, 8.5, 184, h - 17);
     g.fillStyle(PALETTE[24], 0.92).fillRect(INFO_X - 4, 8, INFO_W + 6, h - 16).lineStyle(1, PALETTE[23], 1).strokeRect(INFO_X - 3.5, 8.5, INFO_W + 6, h - 17);
-    // the platform the design turns on: a ring of the Cems' light, faint lines rising
-    const cx = INFO_X + INFO_W / 2, base = PREV_Y + PREV_H - 6;
-    g.lineStyle(1, PALETTE[13], 0.8).strokeEllipse(cx, base, 150, 22).lineStyle(1, PALETTE[12], 0.35).strokeEllipse(cx, base, 120, 16);
-    g.fillStyle(PALETTE[14], 0.35).fillEllipse(cx, base, 116, 14);
-    for (let i = 0; i < 9; i++) g.lineStyle(1, PALETTE[15], 0.5).lineBetween(INFO_X + 6, PREV_Y + 8 + i * 14, INFO_X + INFO_W - 6, PREV_Y + 8 + i * 14);
-    this.add.image(cx, base, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[12]).setAlpha(0.25).setScale(1.6, 0.35);
-    this.preview = this.add.image(cx, base + 2, '__WHITE').setOrigin(0.5, 1);
+    // the stage the design turns on (a ring of the Cems' light under its floor, faint lines rising), drawn per design
+    this.stage = this.add.graphics();
+    this.stageGlow = this.add.image(INFO_X + INFO_W / 2, 0, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[12]).setAlpha(0.25);
+    this.preview = this.add.image(INFO_X + INFO_W / 2, PREV_Y, '__WHITE');
     this.add.bitmapText(LIST_X, 16, 'pixel', 'DESIGNS').setTint(PALETTE[12]);
     this.add.bitmapText(LIST_X, 26, 'pixel', 'YOU CHOOSE, THE CEMS BUILD').setTint(PALETTE[22]);
     this.list = this.add.container(0, 0);
@@ -72,13 +76,19 @@ export class DesignScene extends Phaser.Scene {
     this.index = ready >= 0 ? ready : Math.max(0, this.rows.findIndex((r) => !r.why?.startsWith('NEEDS')));
     this.drawList();
     this.drawInfo();
-    for (const [key, d] of [['UP', -1], ['W', -1], ['DOWN', 1], ['S', 1]] as const) this.input.keyboard?.on(`keydown-${key}`, () => this.move(d));
-    for (const [key, d] of [['LEFT', -1], ['A', -1], ['RIGHT', 1], ['D', 1]] as const) this.input.keyboard?.on(`keydown-${key}`, () => { this.yaw += d * 0.6; });
+    // a key moves one row on its press; the held key also reads as the stick, so that counts as held (no second row)
+    for (const [key, d] of [['UP', -1], ['W', -1], ['DOWN', 1], ['S', 1]] as const) onPress(this, [key], () => { this.move(d); this.stickHeld = true; });
+    for (const [key, d] of [['LEFT', -1], ['A', -1], ['RIGHT', 1], ['D', 1]] as const) onPress(this, [key], () => { this.yaw += d * 0.6; });
     // drag the model to turn it
-    const zone = this.add.zone(INFO_X, PREV_Y, INFO_W, PREV_H).setOrigin(0).setInteractive({ useHandCursor: true });
+    const zone = this.add.zone(INFO_X, PREV_Y, INFO_W, TEXT_END - 60 - PREV_Y).setOrigin(0).setInteractive({ useHandCursor: true });
     zone.on('pointerdown', (p: Phaser.Input.Pointer) => { this.drag = { x: p.x, yaw: this.yaw }; });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => { if (this.drag && p.isDown) this.yaw = this.drag.yaw + (p.x - this.drag.x) * 0.03; });
     this.input.on('pointerup', () => { this.drag = null; });
+    // close (X), top right, the same as the star map's (a phone has no Esc)
+    const xg = this.add.graphics();
+    xg.lineStyle(2, PALETTE[20], 0.9).lineBetween(-4, -4, 4, 4).lineBetween(-4, 4, 4, -4);
+    this.add.container(INFO_X + INFO_W - 10, PREV_Y + 6, [this.add.circle(0, 0, 9, PALETTE[24], 0.85).setStrokeStyle(1, PALETTE[22]), xg])
+      .setSize(22, 22).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.close());
     this.cameras.main.fadeIn(220, 11, 10, 22);
     (window as unknown as { __designs: DesignScene }).__designs = this;
   }
@@ -112,19 +122,22 @@ export class DesignScene extends Phaser.Scene {
     const r = this.rows[this.index];
     if (!r) return;
     const add = <T extends Phaser.GameObjects.GameObject>(o: T) => { this.info.add(o); return o; };
-    const m = r.m, x = INFO_X + 4;
-    let y = PREV_Y + PREV_H + 6;
-    add(this.add.bitmapText(x, y, 'pixel', m.def.name.toUpperCase()).setTint(PALETTE[19]));
-    add(this.add.bitmapText(INFO_X + INFO_W - 4, y, 'pixel', `${m.tier}  COMPLEXITY ${m.complexity}`).setOrigin(1, 0).setTint(PALETTE[12]));
-    y += 12;
-    add(this.add.bitmapText(x, y, 'pixel', `VOLUME ${m.volume}`).setTint(PALETTE[21]));
-    add(this.add.bitmapText(INFO_X + INFO_W - 4, y, 'pixel', `PRINT ${printTime(this.host.buildings.printMsFor(r.id))}`).setOrigin(1, 0).setTint(PALETTE[21]));
-    y += 12;
-    add(this.add.bitmapText(x, y, 'pixel', m.def.gives).setTint(PALETTE[11]).setMaxWidth(INFO_W - 8));
-    y += 12;
-    add(this.add.bitmapText(x, y, 'prose', m.def.about).setTint(PALETTE[20]).setMaxWidth(INFO_W - 8));
+    const m = r.m, x = INFO_X + 4, right = INFO_X + INFO_W - 4;
+    // the words, measured once wrapped, end just above the price; the model gets the room above them
+    const name = add(this.add.bitmapText(x, 0, 'pixel', m.def.name.toUpperCase()).setTint(PALETTE[19]));
+    const tier = add(this.add.bitmapText(right, 0, 'pixel', `${m.tier}  COMPLEXITY ${m.complexity}`).setOrigin(1, 0).setTint(PALETTE[12]));
+    const volume = add(this.add.bitmapText(x, 0, 'pixel', `VOLUME ${m.volume}`).setTint(PALETTE[21]));
+    const time = add(this.add.bitmapText(right, 0, 'pixel', `PRINT ${printTime(this.host.buildings.printMsFor(r.id))}`).setOrigin(1, 0).setTint(PALETTE[21]));
+    const gives = add(this.add.bitmapText(x, 0, 'pixel', m.def.gives).setTint(PALETTE[11]).setMaxWidth(INFO_W - 8));
+    const about = add(this.add.bitmapText(x, 0, 'prose', m.def.about).setTint(PALETTE[20]).setMaxWidth(INFO_W - 8));
+    let y = Math.max(PREV_Y + MIN_PREVIEW + 4, TEXT_END - (12 + 12 + gives.height + 4 + about.height));
+    this.box = { top: PREV_Y, height: y - 4 - PREV_Y };
+    name.setY(y); tier.setY(y); y += 12;
+    volume.setY(y); time.setY(y); y += 12;
+    gives.setY(y); y += gives.height + 4;
+    about.setY(y);
     // the price: each material, what the store holds of what it needs
-    y = 226;
+    y = PRICE_Y;
     const entries = Object.entries(m.cost);
     const step = Math.min(46, (INFO_W - 4) / Math.max(1, entries.length));
     entries.forEach(([k, n], i) => {
@@ -134,7 +147,7 @@ export class DesignScene extends Phaser.Scene {
       add(this.add.bitmapText(ex + 10, y, 'pixel', `${Math.min(have, n)}/${n}`).setTint(PALETTE[have >= n ? 12 : 29]));
     });
     // print, or why not
-    y = 242;
+    y = PRINT_Y;
     if (!r.why) {
       const btn = add(this.add.rectangle(INFO_X + INFO_W / 2, y + 4, 90, 14, PALETTE[14], 1).setStrokeStyle(1, PALETTE[12], 1));
       btn.setInteractive({ useHandCursor: true }).on('pointerdown', () => this.print());
@@ -169,6 +182,7 @@ export class DesignScene extends Phaser.Scene {
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       const s = this.host;
       this.scene.stop();
+      s.controls.clear();
       s.bioworks?.closed();
       const b = s.buildings.print(r.id);
       if (b) s.bioworks?.showPrint(b);
@@ -180,7 +194,8 @@ export class DesignScene extends Phaser.Scene {
     this.busy = true;
     sound.menuMove(0);
     this.cameras.main.fadeOut(200, 11, 10, 22);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => { const s = this.host; this.scene.stop(); s.bioworks?.closed(); });
+    // (a press still waiting must not swing in the world the moment the menu is gone)
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => { const s = this.host; this.scene.stop(); s.controls.clear(); s.bioworks?.closed(); });
   }
 
   update(_time: number, dt: number) {
@@ -195,11 +210,25 @@ export class DesignScene extends Phaser.Scene {
     if (this.frame++ % 2) return;
     const r = this.rows[this.index];
     if (!r) return;
-    const R = Math.hypot(r.m.w, r.m.d), p = (CAT.view.turntablePitch * Math.PI) / 180;
-    const ppv = Math.min(6, (INFO_W - 24) / R, (PREV_H - 16) / (R * Math.sin(p) + r.m.h * Math.cos(p)));
+    const R = Math.hypot(r.m.w, r.m.d), p = (CAT.view.turntablePitch * Math.PI) / 180, box = this.box;
+    const ppv = Math.min(6, (INFO_W - 24) / R, (box.height - 8) / (R * Math.sin(p) + r.m.h * Math.cos(p)));
     const img = turntableView(r.m, this.yaw, ppv, turntableSize(r.m, CAT.view.turntablePitch, ppv));
-    this.preview.setTexture(paintTexture(this, `design-preview:${r.id}`, img));
-    // the platform's ellipse is the model's floor: its center sits on the platform
-    this.preview.setOrigin(0.5, img.toImage(r.m.w / 2, r.m.d / 2, 0).y / img.height);
+    // the whole turning model stays inside its room, centered in it
+    const cx = INFO_X + INFO_W / 2, cy = box.top + box.height / 2;
+    this.preview.setTexture(paintTexture(this, `design-preview:${r.id}`, img)).setPosition(cx, Math.round(cy));
+    const floor = Math.round(cy - img.height / 2 + img.toImage(r.m.w / 2, r.m.d / 2, 0).y);
+    this.drawStage(`${r.id}:${ppv}:${box.height}`, cx, floor, R * ppv);
+  }
+
+  /** The stage under the model: faint lines rising in its room, and a ring of the Cems' light where its floor is. */
+  private drawStage(key: string, cx: number, floor: number, span: number) {
+    if (key === this.stageFor) return;
+    this.stageFor = key;
+    const g = this.stage.clear(), box = this.box;
+    for (let y = box.top + 8; y < box.top + box.height - 2; y += 14) g.lineStyle(1, PALETTE[15], 0.5).lineBetween(INFO_X + 6, y, INFO_X + INFO_W - 6, y);
+    const w = Math.min(INFO_W - 16, span + 36), h = w * 0.15;
+    g.lineStyle(1, PALETTE[13], 0.8).strokeEllipse(cx, floor, w, h).lineStyle(1, PALETTE[12], 0.35).strokeEllipse(cx, floor, w * 0.8, h * 0.72);
+    g.fillStyle(PALETTE[14], 0.35).fillEllipse(cx, floor, w * 0.77, h * 0.64);
+    this.stageGlow.setPosition(cx, floor).setScale(w / 94, h / 63);
   }
 }

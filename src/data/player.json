@@ -35,12 +35,12 @@
     }
   },
   "dash": {
-    "speed": 290,
+    "speed": 348,
     "ms": 120,
     "cooldownMs": 420,
     "afterimageEveryMs": 22
   },
-  "_dashDoc": "Dash: Shift/K/X, right mouse button, gamepad B/L1, or swipe on the right half of a touch screen. Invulnerable while dashing.",
+  "_dashDoc": "Dash: Shift/K/X, gamepad B/L1/R2, or swipe on the right half of a touch screen. Invulnerable while dashing. A dash covers speed x ms (348 px/s for 120 ms, about 42 px; 2026-10-28: 20% further than 290 px/s, the time and so the invulnerability unchanged), shortened on heavy worlds (planets.json gravity).",
   "lightRadius": 1.0,
   "shake": 1.0,
   "_shakeDoc": "Camera shake multiplier for every shake in the game (0 = none). Normal hits never shake; the heavy finisher, taking damage, landings and the keeper do.",

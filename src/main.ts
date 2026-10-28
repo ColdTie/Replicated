@@ -8,6 +8,7 @@ import { UIScene } from './scenes/UIScene';
 import { WarrenScene } from './scenes/WarrenScene';
 import { VaultScene } from './scenes/VaultScene';
 import { DesignScene } from './scenes/DesignScene';
+import { fitToVisibleScreen } from './core/viewport';
 
 const game = new Phaser.Game({
   type: Phaser.WEBGL,
@@ -25,6 +26,8 @@ const game = new Phaser.Game({
 });
 
 (window as unknown as { __game: Phaser.Game }).__game = game;
+// on a phone: only the part of the screen that shows (not under the browser's bars or the notch)
+fitToVisibleScreen(game, document.getElementById('game')!);
 
 // Handles for headless tests and debugging
 import { sound } from './audio/Sound';

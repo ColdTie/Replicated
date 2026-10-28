@@ -100,9 +100,16 @@ try {
   if (!printed.built) fail('the Printworks could not be finished');
   if (!printed.pulses) fail('the printer did not move with the blows');
   if (!printed.done) fail('the printer did not power down once the work was done');
-  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out
-  await page.waitForFunction(() => !!window.__scene.talker.talk?.script, null, { timeout: 9000 }).catch(() => fail('Thales did not speak when the Cems woke'));
-  for (let i = 0; i < 16 && (await ev(() => !!window.__scene.talker.talk)); i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(350); }
+  // Thales speaks a few seconds after the Cems wake (the beginning, tutorial.json lines.awake): hear him out. He may say
+  // his printer words first, if he stood at his post as the Printworks was finished: Enter through whatever he says
+  // until the awake words have been said and the box is shut
+  for (let i = 0; i < 60; i++) {
+    const t = await ev(() => ({ talk: !!window.__scene.talker.talk, told: !!window.__session.replicant.traits.tutorial?.told.includes('awake') }));
+    if (t.told && !t.talk) break;
+    if (t.talk) await page.keyboard.press('Enter');
+    await page.waitForTimeout(350);
+  }
+  if (!(await ev(() => window.__session.replicant.traits.tutorial?.told.includes('awake')))) fail('Thales did not speak when the Cems woke');
   await page.waitForTimeout(1200);
   await shot(page, 'opening-printed');
 
@@ -120,6 +127,14 @@ try {
   // (a Spark in hand and Thales beside the ring: the copy is still yours, never Thales')
   await ev(() => { const s = window.__scene, th = s.npcs.find((n) => n.data.traits.thales); window.__session.replicant.traits.sparks = 1; th.hold = true; th.setPosition(s.base.spotX + 14, s.base.spotY); s.embers = 45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; s.tryReplicate(); });
   await page.waitForFunction(() => !!window.__scene.choice, null, { timeout: 5000 }).catch(() => fail('no wake or hold choice'));
+  // Esc closes it without a copy (a phone steps back with the stick, a mouse clicks away), and it opens again
+  await page.waitForTimeout(400);
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !window.__scene.choice && !window.__scene.replicating && !window.__scene.player.locked, null, { timeout: 3000 }).catch(() => fail('Esc did not close the wake or hold choice'));
+  if (await ev(() => window.__scene.npcs.some((n) => n.data.id === 'pending' || n.held || n.blank))) fail('closing the choice made a copy');
+  if ((await ev(() => window.__scene.embers)) !== 45) fail('closing the choice spent Ember');
+  await ev(() => { const s = window.__scene; s.player.setPosition(s.base.spotX, s.base.spotY); s.tryReplicate(); });
+  await page.waitForFunction(() => !!window.__scene.choice, null, { timeout: 5000 }).catch(() => fail('the choice did not open again'));
   await page.waitForTimeout(400);
   await shot(page, 'choice-wake-hold');
   await page.keyboard.press('ArrowRight');
