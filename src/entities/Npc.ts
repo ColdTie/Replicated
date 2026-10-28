@@ -222,7 +222,7 @@ export class Npc {
 
   get weariness(): 'rested' | 'tired' | 'weary' { return this.weary < 0.35 ? 'rested' : this.weary < 0.8 ? 'tired' : 'weary'; }
 
-  /** Building-up effect when the Replicator makes this copy. Calls done() when it can walk. */
+  /** Building-up effect as this copy steps out of the Replicator, its body whole. Calls done() when it can walk. */
   playBirth(done: () => void) {
     this.state = 'born';
     const s = this.sprite;

@@ -27,13 +27,14 @@ try {
   if (!(await ev(() => window.__scene.player.sprite.texture.key.startsWith('body:')))) fail('player body is not composed');
 
   // 1. a blank birth
-  await ev(() => { const s = window.__scene; s.base.placeReplicator(false); s.embers = 45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; });
+  // (a Vessel takes a Nous Chip besides the Ember; the body prints by the clock, shortened here)
+  await ev(() => { const s = window.__scene; s.base.placeReplicator(false); s.embers = 45; window.__session.replicant.traits.chips = 1; s.replication.testMs = 1500; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; });
   await page.waitForTimeout(300);
   log('replicate', await ev(() => window.__scene.tryReplicate()));
   // wake or hold: WAKE (the first light) with Enter
   await page.waitForFunction(() => !!window.__scene.choice, null, { timeout: 5000 });
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => window.__scene.npcs.length === 1 && !window.__scene.replicating, null, { timeout: 30000 });
+  await page.waitForFunction(() => window.__scene.npcs.length === 1 && !window.__scene.replicating && window.__scene.npcs[0].state !== 'born', null, { timeout: 30000 });
   await page.waitForTimeout(400);
   const born = await ev(() => { const n = window.__scene.npcs[0]; return { name: n.data.name, blank: n.blank, state: n.state, key: n.sprite.texture.key, tinted: n.sprite.isTinted, light: n.light.intensity, traits: n.data.traits, stats: n.data.stats }; });
   log('born', JSON.stringify(born));
@@ -81,23 +82,25 @@ try {
     const s = window.__scene, st = window.__session.store, me = window.__session.replicant, elder = s.npcs[0];
     st.db.notes.unshift({ replicant_id: elder.data.id, body: 'The moss grows back over the east road every spring.', created_at: new Date(Date.now() - 86_400_000).toISOString() });
     const elderNotes = st.db.notes.filter((n) => n.replicant_id === elder.data.id).length;
-    me.traits.sparks = 1; s.embers = 45;
+    me.traits.sparks = 1; me.traits.chips = 1; s.embers = 45;
     elder.state = 'idle'; elder.until = s.time.now + 600_000; elder.x = s.base.spotX + 16; elder.y = s.base.spotY;
     s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; s.shot = false;
     const n0 = s.npcs.length;
     s.tryReplicate();
     s.choice?.route({ x: 0, y: 0, attack: true, dash: false, interact: false, back: false, forward: false, cancel: false, reply: false }, 16);
-    for (let i = 0; i < 300 && (s.npcs.length === n0 || s.replicating || s.npcs.at(-1).data.id === 'pending'); i++) await new Promise((r) => setTimeout(r, 100));
+    for (let i = 0; i < 300 && (s.npcs.length === n0 || s.replicating || s.replication.busy || s.npcs.at(-1).data.id === 'pending'); i++) await new Promise((r) => setTimeout(r, 100));
     await new Promise((r) => setTimeout(r, 600));
     s.shot = true;
     const kid = s.npcs.at(-1);
     const j = await st.journal([kid.data.id]);
-    return { elder: elder.data.id, elderName: elder.data.name, elderNotes, sparks: me.traits.sparks, inherit: kid.data.traits.inherit, parent: kid.data.parent_id, gen: [elder.data.generation, kid.data.generation], notes: j.notes.filter((n) => n.replicant_id === kid.data.id).length };
+    // (the elder may have written another note while the body printed: the newborn takes its newest, up to spark.notes)
+    const elderNow = Math.min(st.db.notes.filter((n) => n.replicant_id === elder.data.id).length, 12);
+    return { elder: elder.data.id, elderName: elder.data.name, elderNotes, elderNow, sparks: me.traits.sparks, inherit: kid.data.traits.inherit, parent: kid.data.parent_id, gen: [elder.data.generation, kid.data.generation], notes: j.notes.filter((n) => n.replicant_id === kid.data.id).length };
   });
   log('spark birth', JSON.stringify(spark));
   if (spark.inherit?.from !== spark.elder || spark.parent !== spark.elder) fail('the Spark birth did not come from the copy beside the ring');
   if (spark.sparks !== 0) fail('the Spark was not spent');
-  if (!spark.notes || spark.notes !== spark.elderNotes) fail(`the newborn did not inherit the notes (${spark.notes} of ${spark.elderNotes})`);
+  if (!spark.notes || spark.notes < spark.elderNotes || spark.notes > spark.elderNow) fail(`the newborn did not inherit the notes (${spark.notes} of ${spark.elderNotes} to ${spark.elderNow})`);
 } finally { await b.close(); try { process.kill(-server.pid); } catch {} }
 console.log('errors', errors);
 process.exit(errors.length ? 1 : 0);

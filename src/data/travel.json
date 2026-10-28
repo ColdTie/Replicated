@@ -1,5 +1,5 @@
 {
-  "_doc": "Real-time travel. Trip minutes = minutesAtRef * (lightYears / refLy) ^ exponent: Alpha Centauri about 45 minutes, 12 ly about 10 hours, a beacon (25-43 ly) about 3 to 10 days. fuel (Embers from the planet you leave) = fuelBase + fuelPerLy * lightYears. needCopy: someone has to stay behind, so you can only launch from a planet that has at least one copy. ?fast in the URL turns minutes into seconds for testing. inSystemMinutes: real-time length of a hop between two planets of the same star. fixedSeconds: when above 0, every trip takes exactly that many seconds (Steve asked for 5 s trips on 2026-10-06); set it to 0 to bring back real-time travel. cruise (below) is used when fixedSeconds is 0.",
+  "_doc": "Real-time travel. Trip minutes = minutesAtRef * (lightYears / refLy) ^ exponent: Alpha Centauri about 45 minutes, 12 ly about 10 hours, a beacon (25-43 ly) about 3 to 10 days. fuel (Embers from the planet you leave) = fuelBase + fuelPerLy * lightYears. needCopy: someone has to stay behind, so you can only launch from a planet that has at least one copy (off since 2026-10-28: every copy now needs a Nous Chip, so most worlds have no copy to leave). ?fast in the URL turns minutes into seconds for testing. inSystemMinutes: real-time length of a hop between two planets of the same star. fixedSeconds: when above 0, every trip takes exactly that many seconds (Steve asked for 5 s trips on 2026-10-06); set it to 0 to bring back real-time travel. cruise (below) is used when fixedSeconds is 0.",
   "fixedSeconds": 0,
   "cruise": {
     "_doc": "A trip takes secondsPerLy for every light year (Steve, 2026-10-27: 2 seconds a light year, after 0.1 and 15 on 2026-10-25; from the homeworld the nearest star, TRAPPIST-1, about 44 s, Gliese 12 about 49 s, Earth about 1 min 38 s, the farthest catalog star about 4 min); a hop between planets of the same star takes inSystemSeconds. Used while enabled; set enabled false (and fixedSeconds 0) for real-time travel, or fixedSeconds above 0 for a fixed trip.",
@@ -12,7 +12,7 @@
   "exponent": 2.5,
   "fuelBase": 10,
   "fuelPerLy": 2,
-  "needCopy": true,
+  "needCopy": false,
   "landedPlanetIndex": 1,
   "inSystemMinutes": 5,
   "starLight": {

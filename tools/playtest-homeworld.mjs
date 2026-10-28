@@ -125,7 +125,8 @@ try {
 
   // 8. a copy made at the Replicator: the choice opens; HOLD keeps it asleep in your likeness, with no mind
   // (a Spark in hand and Thales beside the ring: the copy is still yours, never Thales')
-  await ev(() => { const s = window.__scene, th = s.npcs.find((n) => n.data.traits.thales); window.__session.replicant.traits.sparks = 1; th.hold = true; th.setPosition(s.base.spotX + 14, s.base.spotY); s.embers = 45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; s.tryReplicate(); });
+  // (a Vessel takes a Nous Chip besides the Ember; the body prints by the clock, shortened here)
+  await ev(() => { const s = window.__scene, th = s.npcs.find((n) => n.data.traits.thales); window.__session.replicant.traits.sparks = 1; window.__session.replicant.traits.chips = 1; s.replication.testMs = 1500; th.hold = true; th.setPosition(s.base.spotX + 14, s.base.spotY); s.embers = 45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked = false; s.tryReplicate(); });
   await page.waitForFunction(() => !!window.__scene.choice, null, { timeout: 5000 }).catch(() => fail('no wake or hold choice'));
   // Esc closes it without a copy (a phone steps back with the stick, a mouse clicks away), and it opens again
   await page.waitForTimeout(400);

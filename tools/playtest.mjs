@@ -50,13 +50,14 @@ try {
   }
   await ev(()=>{ window.__scene.planet.shy = true; });
   // replicate: build the Replicator, stand on the glowing spot, press action
-  await ev(()=>{const s=window.__scene; s.base.placeReplicator(false); s.embers=45; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked=false;});
+  // (a Vessel takes a Nous Chip besides the Ember; the body prints by the clock, shortened here)
+  await ev(()=>{const s=window.__scene; s.base.placeReplicator(false); s.embers=45; window.__session.replicant.traits.chips=1; s.replication.testMs=1500; s.player.setPosition(s.base.spotX, s.base.spotY); s.player.locked=false;});
   await page.keyboard.press('Space');
   // wake or hold: the choice opens over the Replicator; Space again wakes it
   await page.waitForFunction(()=>!!window.__scene.choice,null,{timeout:5000}).catch(()=>{ errors.push('no wake or hold choice'); });
   await page.waitForTimeout(200);
   await page.keyboard.press('Space');
-  await page.waitForFunction(()=>window.__scene.npcs.length===1 && !window.__scene.replicating,null,{timeout:30000});
+  await page.waitForFunction(()=>window.__scene.npcs.length===1 && !window.__scene.replicating && !window.__scene.replication.busy,null,{timeout:30000});
   log('copy', await ev(()=>{const s=window.__scene; const n=s.npcs[0]; return JSON.stringify({name:n.data.name, gen:n.data.generation, traits:n.data.traits, stats:n.data.stats, embers:s.embers, unlocked:!s.player.locked});}));
   await page.keyboard.press('Space'); await page.waitForTimeout(300);
   log('second copy without embers', await ev(()=>window.__scene.npcs.length));

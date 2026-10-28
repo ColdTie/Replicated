@@ -45,7 +45,7 @@ The beginning teaches the game as it goes (Steve, 2026-10-27).
 | Alaina | One of the nine | Found the Cems on Gliese 12 b and genetically changed them on the way back. |
 | The player's Vessel | You: a new Vessel from Thales himself, awoken as the tenth Vessel, and the first player | Starts on the homeworld among the other Vessels. Every later player joins as a copy made and handed over by an existing player. |
 | New Vessels | Copies a Vessel makes of itself | Very similar to their maker, but each one renames itself and does whatever it wants. |
-| Held Vessels | New Vessels left asleep | Waiting for a real player to take possession and play them as their own. This is the only way a new player can join. |
+| Held Vessels | New Vessels left asleep | Waiting for a real player to take possession and play them as their own. This is the only way a new player can join. The new player remembers the beginning, then wakes up where its maker made its body. |
 | Husks (mannies) | Empty Vessels with no mind of their own | Built and controlled by the player who owns them. |
 | Cems | Genetically altered algae-like microbes from another world | They survive by lying in flat saltlands, which they are robust in, and absorbing sunlight. When they die they leave behind a very strong lignin structure, similar to wood but layered like metals. They construct the buildings, on command. |
 | Ants | Modified ants from Earth | Changed to help the Cems: they carry the Cems' feed so the Cems can do their work. |
@@ -59,6 +59,7 @@ The beginning teaches the game as it goes (Steve, 2026-10-27).
 | Earth | Humanity's origin, left behind. Not where the game starts. Most of the species the Vessels use come from it (the ants and the fungus). |
 | The Metanoia homeworld | Where the game starts. An Earthlike world, empty except for the Vessels and some structures already built. Set on LHS 1140 b, a real rocky super Earth in its star's habitable zone, about 49 light years from Earth and already in the game's star catalog. |
 | The town | Grows around your base as you print buildings and as new Vessels arrive. |
+| Bases | The homeworld will hold more than one base: as more people join, there will be too many for one, so players land at different bases on the planet. |
 | The Cem bed | A flat bed of salt in the town where the Cems lie in the light, with the ants' mound and the fungus beside it. The supplies you gather are shipped there, and from there the Cems build. The first is on the homeworld; one is laid on every world the Cems are brought to. |
 | The Cems' world | The planet with some life where Alaina found the Cems: flat saltlands under a red sun. Gliese 12 b, a real temperate world about 40 light years from Earth and 24 from the homeworld. |
 | The husk vault | A small underground building that stores your husks. You pick one from a menu when you need it. |
@@ -70,9 +71,14 @@ The beginning teaches the game as it goes (Steve, 2026-10-27).
 | Concept | How it works |
 | --- | --- |
 | Vessels | A life form made from scanned human minds, carrying the Metanoia's drive to explore. |
-| Copying | With enough resources, a Vessel makes a copy of itself. The copy is close to the original, picks a new name, and follows its own desires. |
+| Copying | With enough resources, a Vessel makes a copy of itself. The copy is close to the original, picks a new name, and follows its own desires. Making Vessels takes some difficulty, and that is part of the game. The end goal of the designs is a computer chip, the Nous Chip: it is used for each new Vessel, its mind. A Vessel can be built anywhere you have the supplies. Thales copied the tenth Vessel before the Cems woke; the Cems just make it faster, and now the Replicator and the Cems are an integrated system. Every Vessel costs the same: making Vessels does not get harder over time. |
 | Vessel and ship | A Vessel is built together with its ship. The resources for making a Vessel are set accordingly. |
 | Wake or hold | When a copy is made, its maker chooses: bring it to life now, or hold it asleep until a real player takes possession of it. Being copied and handed over by an existing player is the only way to join the game. |
+| Vessel numbers | Every Vessel has a number. Thales is the first and you are number 10; the next player who joins is 11, and so on. A Vessel can be made long before it wakes: the moment it is awakened as a new Vessel of the Metanoia, it is celebrated and given its number. |
+| The memory | A new player does not play the beginning: it is a memory. Thales' words, his printer, the trip to Gliese 12 b, the Cems and the first designs are remembered, and then the Vessel wakes up wherever its maker made its body, where its maker is. |
+| Joining | A Vessel opens with four letters and some numbers. The letters are public; the numbers are private, like a password. Together they are the way to log in to that Vessel of the Metanoia. |
+| Names | A Vessel can easily change its name. |
+| One Metanoia | Everyone shares one galaxy, and everyone can see each other. |
 | Husks | Empty Vessels the player builds and controls directly. They are stored underground and picked from a menu. |
 | Building with Cems | The 3D printers print with living things. You pick a design from a menu, and the Cems build it on command, with the ants carrying their feed and the fungus cleaning. A building's cost depends on its complexity and its volume: a house is less complex than a supercomputer. Every Vessel can build this way, but the Cems must be physically brought to a world; after you first get them they travel with you. |
 | Supplies | You gather enough resources for a design, and the supplies are shipped off to the 3D printer. Each resource has its own look and its own sound. |
@@ -88,9 +94,11 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 | 3D printers | Already on the homeworld at the start. They print buildings and other structures. | The early game |
 | Cem building | Biological organisms that build structures on command: the Cems, helped by modified ants and fungus. A menu of designs, from houses to supercomputers. | The early game onward |
 | Cem strains | At a Biolab, wild Cems from Gliese 12 b are changed into a new strain that builds, the way Alaina changed the first ones. | After Cem building |
+| The Nous Chip | A computer chip, the end goal of the designs after the Supercomputer. It is used for each new Vessel: its mind. | Making Vessels |
+| The Replicator and the Cems | An integrated system: copying worked before the Cems, and the Cems make it faster. | Making Vessels |
 | Biological computers | To be defined | |
 | Quantum computers | To be defined | |
-| SCUT technology | Faster than light links | Letters between worlds, controlling husks from far away |
+| SCUT technology | Faster than light links | Letters between worlds, controlling husks from far away. A later feature: a SCUT communication device lets Vessels talk faster than light; until then a chat between worlds travels at light speed. |
 | Disease cure development | Research into treating illness | Helping a society through a pandemic |
 
 ## Sound and menus
@@ -103,6 +111,8 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 - **3D star map:** the map that already exists, with adjustments.
 
 **Design menu.** Nicely made 2D and 3D designs of houses and other buildings, each costed by its complexity and volume.
+
+**Vessel menu.** Tab on the keyboard, or a small button on screen, opens the menu (a pause): a snapshot of how many Vessels you have and where they are, a way to change your name, and a chat to talk with other Vessels.
 
 ## Timeline
 
@@ -117,7 +127,8 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 9. **The game starts here.** Thales, the main original, makes a new Vessel: you, awoken as the tenth, the first player. You finish what he started.
 10. You fetch copper and quartz from Gliese 12 b, finish Thales' printer, the Cems wake, and you print your first designs. Then the stars open.
 11. You build with the Cems, copy yourself, unlock new technology, and the Vessels spread out further.
-12. Vessels reach worlds with intelligent life and start helping those societies.
+12. You make Nous Chips. New players join: each is handed a Vessel, remembers the beginning, wakes where its maker made it, and is celebrated and given its number (11, 12, ...).
+13. Vessels reach worlds with intelligent life and start helping those societies.
 
 ## Open questions
 

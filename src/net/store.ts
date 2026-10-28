@@ -24,6 +24,8 @@ export interface ReplicantSave {
   traits: {
     v?: number;
     awake?: boolean; feature?: number; gear?: number; trail?: number; sparks?: number; look?: string; voice?: Voice;
+    /** Nous Chips carried (designs.json nouschip): the Replicator spends one on every new Vessel's mind */
+    chips?: number;
     /** handed over: the replicant whose Spark awakened this one as a player of its own */
     handedBy?: string;
     weary?: number; sleptAt?: number;
@@ -89,6 +91,8 @@ export interface AwayItem { id: string; name: string; at: number; song?: string;
  * ring of radius `ring` px when given; `request` is the requests row it answers. */
 export interface Gift { id: string; type: string; by: string; count?: number; near?: string; ring?: number; request?: string; why?: string }
 
+export interface Replicating { start: number; ms: number; kind: 'wake' | 'hold'; row: ReplicantSave; by: string; elder?: string; cems?: boolean }
+
 export interface PlanetData {
   /** "EARTH - SOL" and the biome's words, kept for the minds' away wakes */
   label?: string; biome?: string;
@@ -114,6 +118,10 @@ export interface PlanetData {
   founded?: boolean;
   /** a Cem bed seeded here from a culture the ship brought (src/entities/Bioworks.ts): when, by whom, from where */
   cembed?: { at: number; by?: string; from?: string; strain?: string };
+  /** a Vessel being made at the Replicator (src/entities/Replication.ts): when it began, how long it takes, wake or
+   * hold, the row it becomes (its id chosen up front, so it is only made once), who made it, the copy a Spark took it
+   * from, whether the Cems print it; null once it has stepped out */
+  replication?: Replicating | null;
   /** Layout version of the surface: 2 = the town (src/world/town.ts); missing = the old ring around the base, moved
    * into the town once on load (migrateToTown) */
   layout?: number;
@@ -326,7 +334,8 @@ export interface GameStore {
   loadPlanet(star: string, planetIndex: number, seed: number): Promise<PlanetSave>;
   /** Copies (NPC replicants) living on a planet. */
   listNpcs(star: string, planetIndex: number): Promise<ReplicantSave[]>;
-  createReplicant(r: Omit<ReplicantSave, 'id'>): Promise<ReplicantSave>;
+  /** A new replicant row; `id` when it was chosen up front (a Vessel printing at the Replicator), so it is made only once. */
+  createReplicant(r: Omit<ReplicantSave, 'id'>, id?: string): Promise<ReplicantSave>;
   /** Launch: records the journey and marks the replicant in transit. */
   startJourney(r: ReplicantSave, toStar: string, toPlanet: number, arrivesAt: Date): Promise<Journey>;
   /** The replicant's current journey, if it is in transit. */
@@ -581,8 +590,9 @@ export class LocalStore implements GameStore {
       .map((r) => structuredClone(r));
   }
 
-  async createReplicant(r: Omit<ReplicantSave, 'id'>) {
-    const row = { ...structuredClone(r), id: uuid() };
+  async createReplicant(r: Omit<ReplicantSave, 'id'>, id?: string) {
+    if (id && this.db.replicants.some((x) => x.id === id)) throw new Error(`replicant ${id} exists`);
+    const row = { ...structuredClone(r), id: id ?? uuid() };
     this.db.replicants.push(row);
     this.flush();
     return structuredClone(row);
@@ -748,8 +758,8 @@ export class CloudStore implements GameStore {
     return data as ReplicantSave[];
   }
 
-  async createReplicant(r: Omit<ReplicantSave, 'id'>) {
-    const { data, error } = await this.sb.from('replicants').insert({ ...r, galaxy_id: this.galaxyId }).select(REPLICANT_COLS).single();
+  async createReplicant(r: Omit<ReplicantSave, 'id'>, id?: string) {
+    const { data, error } = await this.sb.from('replicants').insert({ ...r, ...(id ? { id } : {}), galaxy_id: this.galaxyId }).select(REPLICANT_COLS).single();
     if (error) throw error;
     return data as ReplicantSave;
   }

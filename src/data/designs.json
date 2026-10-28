@@ -1,5 +1,5 @@
 {
-  "_doc": "What the Cems can build (story/STORY.md: the 3D printers print with living things; you pick a design and the Cems build it on command). Each design is a small voxel model made of parts (src/world/voxel.ts): box, gable (a pitched roof, ridge along x or y), hip (four sloped sides), dome (half an ellipsoid), cyl (an upright cylinder), cone, carve (takes voxels away) and paint (recolors what is there), each over [x, y, z, w, d, h] in voxels (x to the right, y from the front to the back, z up; a voxel is ppv px wide in the world, 4 tiles = 16 voxels), with a material; repeat n with step [dx, dy, dz] copies a part. Nothing about a design's price is written by hand: volume is how many voxels it has, complexity comes from its parts (costing.weights per part, repeats counted), how many materials it mixes (matWeight) and its fine materials (special per voxel); every material voxel costs what costing.perVoxel says (lignin is Cems, salt and iron layered; glass is quartz; wire is copper; a core is Ember), all of it times 1 + complexity x markup; wood is the ants' and fungus' feed (woodPerComplexity), and the print takes (baseSeconds + volume x secondsPerVoxel) x (1 + complexity x secondsPerComplexity), less nurseryCut for every Cem Nursery standing. tiers name the complexity. needs: designs that must stand on this world first. place post: it stands at a free street lamp spot of the town (town.json posts) instead of taking a lot. gives: what it does once built (house: mood, storehouse: storage, nursery: print speed; the rest open other designs). materials: color ramps (palette indexes: light, mid, dark; alt = the ramp of every other layer, so lignin shows its metal-like laminations), glass is see-through, emissive ones light up at night. view: the in-world camera (pitch in degrees, ppv) and the menu's turntable (pitch, degrees a second).",
+  "_doc": "What the Cems can build (story/STORY.md: the 3D printers print with living things; you pick a design and the Cems build it on command). Each design is a small voxel model made of parts (src/world/voxel.ts): box, gable (a pitched roof, ridge along x or y), hip (four sloped sides), dome (half an ellipsoid), cyl (an upright cylinder), cone, carve (takes voxels away) and paint (recolors what is there), each over [x, y, z, w, d, h] in voxels (x to the right, y from the front to the back, z up; a voxel is ppv px wide in the world, 4 tiles = 16 voxels), with a material; repeat n with step [dx, dy, dz] copies a part. Nothing about a design's price is written by hand: volume is how many voxels it has, complexity comes from its parts (costing.weights per part, repeats counted), how many materials it mixes (matWeight) and its fine materials (special per voxel); every material voxel costs what costing.perVoxel says (lignin is Cems, salt and iron layered; glass is quartz; wire is copper; a core is Ember), all of it times 1 + complexity x markup; wood is the ants' and fungus' feed (woodPerComplexity), and the print takes (baseSeconds + volume x secondsPerVoxel) x (1 + complexity x secondsPerComplexity), less nurseryCut for every Cem Nursery standing. tiers name the complexity. needs: designs that must stand on this world first. place post: it stands at a free street lamp spot of the town (town.json posts) instead of taking a lot. place bed: printed on the Cem bed itself, a thing you carry rather than a building (the Nous Chip: it lies on the bed until you walk onto it, src/entities/Chips.ts). gives: what it does once built (house: mood, storehouse: storage, nursery: print speed; nouschip: the mind every new Vessel needs at the Replicator; the rest open other designs). materials: color ramps (palette indexes: light, mid, dark; alt = the ramp of every other layer, so lignin shows its metal-like laminations), glass is see-through, emissive ones light up at night. view: the in-world camera (pitch in degrees, ppv) and the menu's turntable (pitch, degrees a second).",
   "view": { "pitch": 32, "yaw": 0.28, "ppv": 4, "turntablePitch": 26, "turntableSpeed": 22, "light": [-0.45, -0.6, 0.75] },
   "materials": {
     "lignin": { "ramp": [3, 4, 5], "alt": [30, 31, 4] },
@@ -168,7 +168,7 @@
       ]
     },
     {
-      "id": "supercomputer", "name": "Supercomputer", "gives": "THE FIRST THINKING MACHINE: WHAT COMES NEXT STARTS HERE",
+      "id": "supercomputer", "name": "Supercomputer", "gives": "THE FIRST THINKING MACHINE: OPENS THE NOUS CHIP",
       "about": "Racks of dark composite behind steel, copper fins to cool it, and an Ember core under a quartz crown.",
       "needs": ["biolab", "spire"],
       "parts": [
@@ -186,6 +186,24 @@
         { "box": [2, 2, 13, 18, 1, 1], "mat": "steel" },
         { "box": [2, 9, 13, 18, 1, 1], "mat": "steel" },
         { "paint": [10, 2, 2, 2, 1, 5], "mat": "door" }
+      ]
+    },
+    {
+      "id": "nouschip", "name": "Nous Chip", "gives": "A VESSEL'S MIND: EVERY NEW VESSEL NEEDS ONE", "place": "bed",
+      "about": "Quartz grown over a core of Ember, wired in copper: the mind the Replicator gives each new Vessel. You carry it.",
+      "needs": ["supercomputer"],
+      "parts": [
+        { "box": [1, 1, 0, 12, 12, 1], "mat": "dark" },
+        { "box": [0, 2, 0, 1, 1, 1], "mat": "copper", "repeat": 5, "step": [0, 2, 0] },
+        { "box": [13, 2, 0, 1, 1, 1], "mat": "copper", "repeat": 5, "step": [0, 2, 0] },
+        { "box": [2, 0, 0, 1, 1, 1], "mat": "copper", "repeat": 5, "step": [2, 0, 0] },
+        { "box": [2, 13, 0, 1, 1, 1], "mat": "copper", "repeat": 5, "step": [2, 0, 0] },
+        { "paint": [1, 2, 0, 12, 1, 1], "mat": "copper", "repeat": 5, "step": [0, 2, 0] },
+        { "box": [2, 2, 1, 10, 10, 1], "mat": "steel" },
+        { "box": [3, 3, 2, 8, 8, 2], "mat": "glass" },
+        { "box": [5, 5, 2, 4, 4, 1], "mat": "ember" },
+        { "box": [4, 4, 4, 6, 6, 1], "mat": "glass" },
+        { "box": [6, 6, 4, 2, 2, 1], "mat": "ember" }
       ]
     }
   ]

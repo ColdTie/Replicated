@@ -15,6 +15,10 @@ import type { PlanetScene } from './PlanetScene';
 
 const ICON: Record<string, number> = { salt: 8, iron: 13, quartz: 15, copper: 16, wood: 2, ember: 6, hydrogen: 14 };
 const LIST_X = 14, LIST_Y = 38, ROW_H = 24, INFO_X = 200, INFO_W = 270, PREV_Y = 14;
+/** rows shown at once; a longer list scrolls to keep the chosen row in view, with a mark at the end that goes on */
+const LIST_ROWS = 9;
+/** the wheel's travel for one row (a mouse notch is about 100) */
+const WHEEL_STEP = 100;
 /** the price row and the PRINT button sit at the foot of the panel; the words end just above them */
 const PRICE_Y = 226, PRINT_Y = 242, TEXT_END = PRICE_Y - 4, MIN_PREVIEW = 64;
 const TIERS = CAT.costing.tiers.map((t) => t.name);
@@ -32,6 +36,10 @@ export class DesignScene extends Phaser.Scene {
   private controls!: Controls;
   private rows: Row[] = [];
   private index = 0;
+  /** the first row shown: the list moves only when the chosen row would leave it, so a row never shifts under a tap */
+  private top = 0;
+  /** the wheel's travel not yet turned into a row (a touchpad sends many small steps) */
+  private wheel = 0;
   private list!: Phaser.GameObjects.Container;
   private info!: Phaser.GameObjects.Container;
   private preview!: Phaser.GameObjects.Image;
@@ -51,7 +59,7 @@ export class DesignScene extends Phaser.Scene {
 
   init(d: { host: PlanetScene }) {
     this.host = d.host;
-    this.rows = []; this.index = 0; this.busy = false; this.stickHeld = false; this.drag = null; this.yaw = 0.6; this.stageFor = '';
+    this.rows = []; this.index = 0; this.top = 0; this.wheel = 0; this.busy = false; this.stickHeld = false; this.drag = null; this.yaw = 0.6; this.stageFor = '';
   }
 
   create() {
@@ -79,6 +87,15 @@ export class DesignScene extends Phaser.Scene {
     // a key moves one row on its press; the held key also reads as the stick, so that counts as held (no second row)
     for (const [key, d] of [['UP', -1], ['W', -1], ['DOWN', 1], ['S', 1]] as const) onPress(this, [key], () => { this.move(d); this.stickHeld = true; });
     for (const [key, d] of [['LEFT', -1], ['A', -1], ['RIGHT', 1], ['D', 1]] as const) onPress(this, [key], () => { this.yaw += d * 0.6; });
+    // the wheel walks the list a row for every notch's worth of travel, and stops at either end
+    this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => {
+      this.wheel += dy;
+      while (Math.abs(this.wheel) >= WHEEL_STEP) {
+        const d = Math.sign(this.wheel);
+        this.wheel -= d * WHEEL_STEP;
+        if (this.index + d >= 0 && this.index + d < this.rows.length) this.move(d);
+      }
+    });
     // drag the model to turn it
     const zone = this.add.zone(INFO_X, PREV_Y, INFO_W, TEXT_END - 60 - PREV_Y).setOrigin(0).setInteractive({ useHandCursor: true });
     zone.on('pointerdown', (p: Phaser.Input.Pointer) => { this.drag = { x: p.x, yaw: this.yaw }; });
@@ -101,8 +118,15 @@ export class DesignScene extends Phaser.Scene {
   private drawList() {
     this.list.removeAll(true);
     const add = <T extends Phaser.GameObjects.GameObject>(o: T) => { this.list.add(o); return o; };
+    if (this.index < this.top) this.top = this.index;
+    else if (this.index >= this.top + LIST_ROWS) this.top = this.index - LIST_ROWS + 1;
+    const top = this.top = Phaser.Math.Clamp(this.top, 0, Math.max(0, this.rows.length - LIST_ROWS));
+    // more above or below: a small arrow at that end of the list
+    if (top > 0) add(this.add.triangle(LIST_X + 166, LIST_Y - 7, 0, 3, 3, 0, 6, 3, PALETTE[22]));
+    if (top + LIST_ROWS < this.rows.length) add(this.add.triangle(LIST_X + 166, LIST_Y + LIST_ROWS * ROW_H - 2, 0, 0, 6, 0, 3, 3, PALETTE[22]));
     this.rows.forEach((r, i) => {
-      const y = LIST_Y + i * ROW_H, on = i === this.index;
+      if (i < top || i >= top + LIST_ROWS) return;
+      const y = LIST_Y + (i - top) * ROW_H, on = i === this.index;
       const locked = !!r.why?.startsWith('NEEDS');
       const bg = add(this.add.rectangle(LIST_X - 4, y - 3, 176, ROW_H - 2, on ? PALETTE[23] : PALETTE[24], on ? 1 : 0.5).setOrigin(0, 0).setStrokeStyle(1, on ? PALETTE[12] : PALETTE[23], on ? 1 : 0.5));
       bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => { if (this.busy) return; if (this.index === i) this.print(); else { this.index = i; sound.designMove(i); this.refresh(); } });

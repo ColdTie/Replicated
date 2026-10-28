@@ -20,7 +20,11 @@ microbes that lie in salt beds drinking sunlight and, on command, build structur
 cement and steel; modified Earth ants carry their feed and modified Earth fungus cleans their bed (2026-10-27).
 Copying makes new Vessels: each is woken (it names itself and follows its own desires) or held asleep for a real
 player. Being copied and handed over is the only way to join. Husks (mannies) are empty Vessels you control, kept in
-an underground vault.
+an underground vault. Since 2026-10-28 (the plan: `docs/plan-metanoia.md`): every new Vessel needs a Nous Chip, its
+mind, the last of the Cems' designs after the Supercomputer; it is made at the Replicator on any world, and the Cems
+make it faster (the Replicator and the Cems are one system); a new player logs in with its four
+public letters and private numbers, remembers the beginning, wakes where its maker made it, and is celebrated and given
+its number (Thales 1, Steve 10, the next 11). Everyone shares one galaxy and sees each other.
 
 Theme: you are never alone, but every version of you is a little different. Lonely galaxy, warm settlements.
 
@@ -54,9 +58,11 @@ No final art yet. Generate placeholder sprites with a Node script that writes pi
 
 ## Profiles
 
-One player, Steve, with the full game. (Pivot, 2026-10-08: the game is no longer being built or tuned for other players or
-other devices. Kid mode, no counter and no death, was taken out on 2026-10-28; the profiles table keeps its `kid_mode`
-column, always false.)
+Many players again (Steve, 2026-10-28; this replaces the 2026-10-08 pivot to Steve alone): everyone shares one galaxy,
+and every new player joins by being handed a Vessel by a current player. A login is a Vessel's four letters (public) and
+its numbers (private, like a password) instead of an email and password; Steve's email sign-in stays as a backup. One
+login, one Vessel. Steve (Vessel 10) still directs the game. Kid mode (no counter, no death) was taken out on
+2026-10-28; the profiles table keeps its `kid_mode` column, always false. The plan: `docs/plan-metanoia.md`.
 
 ## Core loop (build in this order)
 
@@ -68,9 +74,13 @@ column, always false.)
    ship carries a culture from every awake bed and seeds one on any world; where a bed is awake the Cems print the
    copies' buildings too (one building system).
 4. Replicate: the Replicator creates a copy with drift. Copy becomes an NPC that walks around the base and generates resources while you are away.
+   Since 2026-10-28 (plan step 1): a copy takes a Nous Chip (the Cems print it on their bed once the Supercomputer
+   stands) as well as its Ember; the Replicator prints the body by the clock, quickly where the Cems are awake, slowly
+   without them; a Vessel's price stays what it is (Steve: "the scarcity should not change").
 5. Travel: launch the vessel, pick the next planet from a simple star map, land on a new seed and accent hue.
 6. Handoff: a Vessel held asleep at its making is given to another profile, which wakes in it and names itself (since
-   2026-10-26 no Spark is needed; the story: being copied and handed over is the only way to join).
+   2026-10-26 no Spark is needed; the story: being copied and handed over is the only way to join). Since 2026-10-28
+   (plan steps 2 and 3): the maker gives its four letters and numbers to a new person, whose own login it becomes.
 
 ## Phase plan
 
@@ -78,10 +88,14 @@ column, always false.)
 - **Phase 1:** full loop steps 1 to 3 plus Supabase profiles and saves. Start on Earth (hand-tuned, peaceful and overgrown) instead of a random planet. Design the Supabase schema for the shared galaxy from day one (see Long-term decisions), even though travel comes in Phase 2.
 - **Phase 2:** steps 4 and 5. Travel uses real-world time; the star map shows real nearby stars.
 - **Phase 3:** step 6, sound, playtest fixes.
+- **Phase 4, one Metanoia (2026-10-28):** the Nous Chip and the Replicator with the Cems, letters-and-numbers login with Vessel numbers, the
+  memory and the awakening, the Vessel menu (Tab) with chat, seeing each other, later more bases on the homeworld.
+  Steps, data model and open questions: `docs/plan-metanoia.md`.
 
 ## Out of scope
 
-Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick aiming, final hand drawn art.
+Realtime multiplayer (except, since 2026-10-28, seeing each other on a world and chat: `docs/plan-metanoia.md`), LLM
+driven NPC dialogue, 3D, crafting menus, twin stick aiming, final hand drawn art.
 
 ## Working rules
 
@@ -111,7 +125,8 @@ These shape the data model now, even where the feature comes later.
 - **Travel runs on real-world time.** (Switched off 2026-10-06 at Steve's request: every trip took 5 seconds via
   `fixedSeconds` in `src/data/travel.json`. Since 2026-10-27 a trip takes 2 seconds per light year, `travel.json
   cruise.secondsPerLy`; `cruise.enabled` false and `fixedSeconds` 0 restore real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
-- **One shared galaxy per login.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
+- **One shared galaxy per login.** (Superseded 2026-10-28: one galaxy for everyone, the Metanoia; every login that
+  joins by a handed-over Vessel is a member of it. Nobody is a stranger: each player was let in by another.) Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
 - **Earth is the start.** (Superseded 2026-10-26 by the story: the game starts on the Metanoia homeworld, LHS 1140 b; Earth stays in the catalog as humanity's origin, a world you can fly to.) Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
 - **Messages travel at light speed until FTL comms exist.** A message between replicants in different systems arrives after a delay based on distance (scaled like travel). Building or finding the FTL comms device makes messages from that system instant.
 - **Stars are real.** The galaxy is real nearby stars (positions relative to the Sun). Each star's planets are generated from a seed derived from the star's id. Beacon systems sit at fixed, symmetrical points around the Sun, snapped to the nearest real star.
@@ -164,12 +179,20 @@ src/entities/Printer.ts  the 3D printer beside every building being made (Buildi
                          away once the building stands (the Metanoia's stay on standby by their work); beside a Cem print
                          (bio) it only guides, in the Cems' green
 src/data/designs.json    the Cems' designs (lantern, house, storehouse, nursery, workshop, observatory, spire, biolab,
-                         supercomputer) as voxel parts; costing turns volume and complexity into price and print time;
-                         needs (unlock chain), gives (house mood, storehouse storage, nursery speed), materials, cameras
+                         supercomputer, nouschip) as voxel parts; costing turns volume and complexity into price and
+                         print time; needs (unlock chain), place (post: a street lamp spot; bed: on the Cem bed, a thing
+                         you carry), gives (house mood, storehouse storage, nursery speed), materials, cameras
+src/entities/Chips.ts    the Nous Chips (since 2026-10-28): printed by the Cems on their bed, a finished one lies glowing
+                         there until someone walks onto it, then it is carried (traits.chips) until a Replicator spends it
+src/entities/Replication.ts a Vessel being made at the Replicator: one chip and drift.json cost Ember; the maker is scanned
+                         and free, the body rises beside the Replicator by the clock (also offline: planet_states.data
+                         .replication, the row's id chosen up front so it is made once), printMs with the world's Cems
+                         awake (they walk to it from their bed; their strain is quicker), printMsAlone without, then the
+                         Vessel steps out (PlanetScene.bornAt)
 src/world/voxel.ts       pure: parts -> voxel grid, volume / complexity / tier / cost / seconds, print order; a ray caster
                          that draws a model (laminated lignin, see-through glass, outline, contours) in the world's 3/4
                          view (printed voxels solid, the newest still green Cems, the rest a cyan guide lattice) or as a
-                         turntable; tools/design-preview.mjs draws every design into screenshots/designs.png
+                         turntable; tools/design-preview.mjs draws every design into screenshots/designs.png (--only id)
 src/core/designs.ts      the catalog in the game: models built once, world and turntable views, canvas textures, unlocks;
                          blueprintModel: a copy's blueprint (footprint, walls, roof, door) as a voxel model the Cems print
 src/entities/Bioworks.ts the Cem bed (bioworks.json): a salt flat on the town lot nearest the Printworks (data.town.civic
@@ -186,7 +209,8 @@ src/entities/WildCems.ts the Cems' world's wild fields (planets.json cemworld wi
                          with wild Cems that breathe, drink the red light, glow at night and stir as you pass; salt blooms
                          on their rims (nodes wild0..); walking among them with the ship here puts a jar of them in the
                          hold (traits.wild) for a Biolab to change
-src/scenes/DesignScene.ts the design menu over the paused planet: rows (READY / NEED / LOCKED / WAIT, built count), the
+src/scenes/DesignScene.ts the design menu over the paused planet: rows (READY / NEED / LOCKED / WAIT, built count; nine
+                         at a time, moving only when the chosen row would leave them; the wheel steps by its travel), the
                          chosen design turning in 3D (drag to turn), complexity, volume, print time, gives, price vs store;
                          the words laid out from the foot of the panel up (measured once wrapped), the model in the room
                          left above them; an X in the corner closes it
@@ -215,8 +239,9 @@ src/fx/                  Lighting (multiply darkness RT + additive lights), Atmo
                          dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
 src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember, iron, hydrogen, salt,
                          quartz, copper by kind; each its own glint, hit and pickup sound),
-                         Base (pad + Replicator), Manny (the husk vault's bunker in the square: down its steps, a husk
-                         left standing on standby)
+                         Base (pad + Replicator: since 2026-10-28 a copy takes a Nous Chip and its Ember, and the body
+                         prints by the clock, src/entities/Replication.ts), Manny (the husk vault's bunker in the square:
+                         down its steps, a husk left standing on standby)
 src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
 src/audio/Sound.ts       procedural WebAudio: every sound effect, the generative music, each world's ambience bed (no audio
                          files); buses sfx / music / ambience / ui / voice, ducking under voices, distance and panning
@@ -306,6 +331,10 @@ Saving: the shared Ember pool, node damage, structures (Replicator and the copie
 building work live in `planet_states` and are written as atomic deltas
 (`apply_planet_delta` RPC) every 4s and when the page is hidden; the server value wins so every profile shares one
 pool. The replicant row stores position, planet and `traits.awake` (the opening plays once per replicant).
+`data.replication` is the Vessel being made at the Replicator (when it began, how long, wake or hold, the row it becomes
+with its id, its maker, a Spark's elder, whether the Cems print it), null once it has stepped out; whoever has the world
+open when its time is up makes its row (the id makes it once). A finished Nous Chip waits in `data.buildings` (design
+`nouschip`) until it is taken.
 `data.seen` is the village as the original last saw it (builds, buildings' progress, dug rooms, copies' names and
 bodies), written after the landing, every minute while you play and when you leave; the next landing tours what changed.
 A planet saved before the town (no `data.layout`, or below `town.json layout`) moves into it once on load: builds go to
@@ -336,6 +365,7 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | state | `awake`, `sparks` | intro played; Sparks held |
 | state | `thales` | Thales, the first Vessel (`src/data/homeworld.json`): fixed by his work, never handed over or held |
 | state | `held` | held asleep at its making for a new player (WAKE or HOLD at the Replicator): its maker's body, dimmed, no mind |
+| state | `chips` | Nous Chips carried (designs.json nouschip): the Replicator spends one on every new Vessel |
 | state | `unnamed` | a player's Vessel that has not named itself yet: it is asked at its first wake |
 | state | `handedBy` | the replicant that awakened this one with a Spark (it was a copy) |
 | state | `cargo` | `{ material, n, from }` what the vessel's hold carries between worlds (supplies.json signature), or null |
@@ -387,8 +417,12 @@ nearer; it stands solid and lit and still gathers them; your own design is tende
 `node tools/playtest-strain.mjs` (a Biolab by the awake bed; SKIP lands a trip to Gliese 12 b at once; wild Cems go
 aboard among a field; Space skips the trip home; the Biolab's door changes them: the bed prints a House in 0.6 of the
 time, the hold's culture carries the strain; all of it after a reload),
-`node --experimental-strip-types tools/design-preview.mjs [--cut 0.6]` (every design in the world view and from four
-sides, with its volume, complexity, price and time -> `screenshots/designs.png`),
+`node --experimental-strip-types tools/design-preview.mjs [--cut 0.6] [--only id]` (every design in the world view and
+from four sides, with its volume, complexity, price and time -> `screenshots/designs.png`; one: `design-<id>.png`),
+`node tools/playtest-replicate.mjs` (no chip, no copy; the Nous Chip waits for the Supercomputer, is printed on the Cem
+bed and taken by walking onto it; with a chip WAKE or HOLD opens, Esc spends nothing, WAKE spends the chip and the Ember,
+the maker is free while the body prints with the Cems, nothing more begins meanwhile, the Vessel steps out once; a HOLD
+steps out after a reload; on Earth, without Cems, the Replicator is built on its pad and prints the slow way),
 `node tools/playtest-tutorial.mjs` (the beginning: Thales' two lines, the name and the first growing, no copper or quartz at
 home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wisp, the printer's readout, the trip there
 (growing, copper and quartz, the readout over the ship), the hold brings them home, the printer is fed and lays the rest
@@ -410,9 +444,10 @@ side (three quick attacks = heavy combo finisher; presses during the cooldown ar
 reach, a swing works on the village: a tree (6 swings fell it), rock (4 break off stone), a building being
 raised (a blow). Walk into a building waiting for what you carry, a copy, or the hatch to
 hand the load over. Stand on the open hatch for a moment (a warm ring fills) or press attack on it to go down; walking
-or dashing across it never does. At the Replicator (attack on its ring with enough Ember) two lights open over it: WAKE (left) and HOLD (right);
+or dashing across it never does. At the Replicator (attack on its ring with a Nous Chip and enough Ember; without them
+what is missing rises from it) two lights open over it: WAKE (left) and HOLD (right);
 Left / Right (or the stick) choose, attack / E or a click on one picks; Esc (gamepad B), Down (stepping back off the ring)
-or a click away from both closes it without a copy. Standing in the husk vault's doorway a moment (a ring
+or a click away from both closes it without a copy. Walk onto a finished Nous Chip on the Cem bed to take it. Standing in the husk vault's doorway a moment (a ring
 fills) or attack there goes down to the vault; Up / Down choose a row, attack / E / Enter pick, Esc goes up. Standing in
 the Printworks' doorway (or before a seeded bed's design stone) a moment (once the Cems are awake; a green ring fills) or
 attack there opens the designs; standing on a bed's ghost with the salt for it (a green ring fills) or attack there seeds it: Up /
@@ -438,16 +473,18 @@ shows the lit monolith), `?shot=1&view=bioworks|printing|designs` (the Cem bed a
 Storehouse being printed; the design menu open), `?shot=1&at=sol&pi=3&view=seed|seeded` (a culture aboard on a world
 without a bed: its ghost with the salt for it; seeded a moment later), `?shot=1&at=gliese-12&pi=1&view=wild` (the Cems'
 world beside its nearest wild field), `?shot=1&view=biolab|strain` (a Biolab by the awake bed, wild Cems aboard, you
-at its door; strain: the Biolab changing them), `&zoom=0.5` (a wider look in a screenshot; the lighting covers only the
-middle).
+at its door; strain: the Biolab changing them), `?shot=1&view=replicate|replicating` (the Replicator
+with a chip in hand: its WAKE or HOLD open; a Vessel held at 60% beside it, `&cems=1` with the Cems awake),
+`?shot=1&view=chip` (a Nous Chip lying on the awake bed), `&zoom=0.5` (a wider look in a screenshot; the
+lighting covers only the middle).
 
 ## Progress
 
 Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `docs/history.md`.
 
 **Open for Steve** (gathered from those sessions):
-1. A Vessel is built together with its ship (story/STORY.md): what making one costs now (Ember for the body plus iron,
-   hydrogen or other materials for its ship?), and whether every copy gets a ship or only players' Vessels.
+1. A Vessel is built together with its ship (story/STORY.md). Answered in part (2026-10-28): its price stays what it is,
+   a Nous Chip and 30 Ember. Still open: whether every copy gets a ship or only players' Vessels.
 2. Day and night on LHS 1140 b: keep the device-clock day tinted red, or a fixed light for a tidally locked world?
 3. Other Vessels at the start: how many, and who?
 4. The home screen still reads "VESSEL METANOIA / REPLICANTS": keep it, or rename?
@@ -565,3 +602,45 @@ holds changes, every world generates as before, and the mind function and its ki
   the mind kit regenerates unchanged, the full `npm test` (22 of 22). `screenshots/font-prose.png` and
   `sprite-sheet.png` redrawn without the runes and the four sprites.
 
+### Session 24 (2026-10-28): the plan for one Metanoia (Steve: "To make another Vessel the player must go through all these steps to create a fully automatic half biological AI 3d printer", "everyone will share a galaxy", "only need four letters and the right amount of numbers", "the tutorial will actually just be a memory", "Tab ... to show a snapshot of how many vessels you have")
+- Planning only; no code changed. Steve's decisions are in `story/STORY.md` (his words: Copying, Vessel numbers, The
+  memory, Joining, Names, One Metanoia, Bases, the Vessel menu, the Nous Chip in the tech tree, the timeline) and
+  the plan in `docs/plan-metanoia.md` (five steps, the data model, security, tests, his questions).
+- Not taken (Steve): a Vessel's price rising with each one made, and every Vessel needing materials from two worlds.
+- Measured for the plan: the nine designs cost salt 108, iron 86, wood 53, quartz 51, copper 37, Ember 27 in all
+  (Supercomputer 96, 293 s); totals already climb from the Lantern to the Supercomputer.
+- Steve's answers: the memory is the whole beginning with a skip; the name comes at the real waking with the number;
+  chat travels at light speed (a SCUT communication device later); his letters are COLD, a giver picks a new player's;
+  Linda and Freya's galaxy is retired and they are handed Vessels. In the plan and, his words, the bible.
+
+**Step 1, the Nous Chip** (Steve, after a first try at a homeworld-only "Vessel Printer" building he did not want:
+"the end goal is to build a well named thing like a chip ... used for the vessel Metanoia", "anywhere where you have the
+supplies", "Maybe they just make it faster and now it's an integrated system"; no database change).
+- **The Nous Chip** (`designs.json nouschip`, `place: "bed"`, `src/entities/Chips.ts`, sprite `nouschip`): the last of
+  the Cems' designs, opened by the Supercomputer (its line says so now). A small, dense chip: copper pins, a steel
+  package, a quartz die over an Ember core (14x14x5 voxels, complexity 39, MASTERWORK; copper 9, iron 6, quartz 11,
+  Ember 12, wood 12; 1 min 45 s, less with a Nursery). The Cems print it on their bed itself (four places on the
+  salt), not on a lot; finished, it lies glowing there until someone walks onto it, then that Vessel carries it
+  (`traits.chips`, saved with `patchTraits`; a counter by the Sparks at the top) wherever it goes.
+- **The Replicator, any world** (as before: built on its pad for 25 Ember): a copy takes one chip besides its 30 Ember
+  (`drift.json cost`, unchanged). Without them the Replicator buzzes and what is missing (a chip, an Ember) rises from
+  it. The chip flies into it with the scan; the maker is free again and the body rises beside it by the clock
+  (`src/entities/Replication.ts`, `planet_states.data.replication`, also while nobody plays): 40 s where the world's
+  Cems are awake (`printMs`; they walk to it from their bed in a green line, and their strain makes it quicker), 10
+  minutes without them (`printMsAlone`, the slow way Thales made the tenth Vessel). A pale body, the newest rows the
+  Cems' green (or the Replicator's warm light, alone); then the copy steps out and takes a home lot. Its row's id is
+  chosen when it begins, so it is made once whoever has the world open when it is done. One at a time.
+- Kept from the first try: Thales no longer counts toward `maxPerPlanet`; `travel.json needCopy` is off (every copy
+  needs a chip now, so most worlds would have none to leave behind); the design list scrolls (nine rows at a time, the
+  wheel too).
+- A review of the change (four reviewers, a skeptic each) confirmed and this fixed: the print left the save before the
+  Vessel's row existed, so one failed save (a phone back from the background) lost the Vessel, its chip and its Ember;
+  now the print stays saved until the row exists, a failed save is tried again, and a row already there counts. The
+  print is saved the moment the chip is spent (the body starts rising once the scan is done). The design list no
+  longer moves under a tap (it moves only when the chosen row would leave it), and the wheel steps a row per notch of
+  travel without wrapping (a touchpad spun it).
+- CI's first run of `playtest-replicate` failed on Earth: the game's timers run on smoothed frame time, so on Earth's
+  slow frames the Replicator's 1.1 s build outlasted a 5 s wait. The test acts directly and allows 20 s.
+- Verified: build, typecheck, `tools/playtest-replicate.mjs` (new; also a first save that fails), `playtest`, `-become`,
+  `-homeworld` (each with a chip and a short print), a menu check (taps and wheel), the full `npm test`. Screenshots `design-nouschip.png`, `chip-on-bed.png`,
+  `replicating-cems.png`, `replicating-alone.png`, `replicate-*.png`.

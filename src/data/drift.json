@@ -1,6 +1,10 @@
 {
-  "_doc": "Replication. cost = Embers from the planet pool per copy; maxPerPlanet copies can live on one planet. A copy is born blank and chooses its own look; it inherits its parent's stats with small nudges (multipliers, clamped): each stat drifts up to drift times blankDrift. gatherPerHour = Embers one copy adds to the pool per real hour (times its gather stat), counted while nobody is playing up to offlineCapHours. tripMs = how often a copy brings back an Ember while you watch.",
+  "_doc": "Replication (story/STORY.md Copying, Steve 2026-10-28): a copy is made at the Replicator on any world for cost Embers from the planet pool and one chip (a Nous Chip, designs.json chip, carried in replicants.traits.chips). Its maker is scanned (scanMs) and free again; the Replicator prints the body by the clock, also while nobody plays (planet_states.data.replication; src/entities/Replication.ts): printMs where the world's Cems are awake (the Cems and the Replicator are one system; their strain makes it quicker still), printMsAlone without them, the slow way Thales made the tenth Vessel. maxPerPlanet copies can live on one planet (Thales does not count). A copy is born blank and chooses its own look; it inherits its parent's stats with small nudges (multipliers, clamped): each stat drifts up to drift times blankDrift. gatherPerHour = Embers one copy adds to the pool per real hour (times its gather stat), counted while nobody is playing up to offlineCapHours. tripMs = how often a copy brings back an Ember while you watch.",
   "cost": 30,
+  "chip": "nouschip",
+  "scanMs": 1600,
+  "printMs": 40000,
+  "printMsAlone": 600000,
   "spark": {
     "_doc": "A Spark spent at the Replicator while a copy (not blank) stands within range px of the ring: the newborn comes from that copy instead of the original (its stats drift from it, it is its child), inherits its newest notes notes and its open wants, and its mind is told it remembers being that copy, a little differently.",
     "range": 36,

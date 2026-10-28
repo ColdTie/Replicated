@@ -15,6 +15,8 @@ import { Village } from '../entities/Village';
 import { Warren } from '../entities/Warren';
 import { Buildings } from '../entities/Buildings';
 import { Bioworks } from '../entities/Bioworks';
+import { Chips } from '../entities/Chips';
+import { Replication } from '../entities/Replication';
 import { WildCems } from '../entities/WildCems';
 import { MannyDock } from '../entities/Manny';
 import { inManny, vesselAway, vesselHere } from '../core/mannies';
@@ -88,6 +90,10 @@ export class PlanetScene extends Phaser.Scene {
   village!: Village;
   warren!: Warren;
   buildings!: Buildings;
+  /** a Vessel being made at the Replicator (src/entities/Replication.ts) */
+  replication!: Replication;
+  /** Nous Chips the Cems printed, waiting on their bed to be taken (src/entities/Chips.ts) */
+  chips!: Chips;
   /** the Cem bed (homeworld): where supplies are shipped and the Cems build from */
   bioworks?: Bioworks;
   /** the Cems' world's wild fields (planets.json wildCems) */
@@ -130,7 +136,7 @@ export class PlanetScene extends Phaser.Scene {
   private frozen = false;
 
   // pending changes not yet written to the store
-  pending: { embers: number; nodes: Record<string, NodeState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean; cembed?: PlanetData['cembed'] } = { embers: 0, nodes: {} };
+  pending: { embers: number; nodes: Record<string, NodeState>; structures?: PlanetData['structures']; npcTick?: number; village?: PlanetData['village']; beacon?: PlanetData['beacon']; felled?: number[]; warren?: WarrenData; supplies?: Record<string, number>; buildings?: Building[]; label?: string; biome?: string; layout?: number; town?: TownState; gifts?: Gift[]; seen?: SeenState; founded?: boolean; cembed?: PlanetData['cembed']; replication?: PlanetData['replication'] } = { embers: 0, nodes: {} };
   /** who lives on which lot of the town (planet_states.data.town) */
   townState: TownState = { lots: {}, civic: {} };
   /** this load moved an old save into the town: saved positions of the player and the copies are ignored once */
@@ -426,6 +432,8 @@ export class PlanetScene extends Phaser.Scene {
     this.bioworks = new Bioworks(this, save);
     if (p.wildCems) this.wild = new WildCems(this, save, p.wildCems);
     this.buildings = new Buildings(this, save?.data.buildings);
+    this.replication = new Replication(this, save);
+    this.chips = new Chips(this);
     this.homeworld.placePrinters();
     this.time.delayedCall(2500, () => this.towner.grantGifts(save?.data.gifts));
     if (!this.shot && !this.visit) { this.warren.applyOffline(this.awayHours); this.buildings.applyOffline(this.awayHours); this.trade.accrueAway(this.awayHours); }
@@ -790,12 +798,37 @@ export class PlanetScene extends Phaser.Scene {
     // a wider look for reviewing a layout (?zoom=0.5)
     const zoom = Number(new URLSearchParams(location.search).get('zoom') ?? 1);
     if (zoom > 0 && zoom !== 1) this.cameras.main.setZoom(zoom);
-    if (view === 'replicate') {
+    // the Replicator with a Nous Chip in hand (replicate: its choice open; replicating: a Vessel 60% printed, &cems=1
+    // with the world's Cems awake); a chip lying on the awake bed (chip)
+    const me = session.replicant;
+    if (view === 'replicate' || view === 'replicating') {
       (this.base as unknown as { placeReplicator(a: boolean): void }).placeReplicator(false);
-      this.embers = DRIFT.cost;
+      this.embers = Math.max(this.embers, DRIFT.cost);
+      this.game.events.emit('embers', this.embers, true);
+      if (me) { me.traits.chips = 1; this.game.events.emit('chips', 1); }
       this.player.setPosition(this.base.spotX, this.base.spotY);
       this.cameras.main.centerOn(this.base.x, this.base.y + 10);
-      this.time.delayedCall(300, () => this.tryReplicate());
+      if (view === 'replicate') this.time.delayedCall(300, () => this.tryReplicate());
+      if (view === 'replicating' && me) {
+        if (new URLSearchParams(location.search).get('cems')) this.bioworks?.wake(false);
+        this.replication.testMs = 3_600_000;
+        this.replication.start('wake', { ...replicate(me, this.planet.star, this.planet.planetIndex, this.base.x + 24, this.base.y + 8), id: 'shot' });
+        this.replication.state!.start = Date.now() - this.replication.state!.ms * 0.6;
+        this.player.setPosition(this.base.x - 30, this.base.y + 26);
+      }
+    }
+    if (view === 'chip' && this.bioworks?.lot) {
+      const goal = this.buildings.list.find((b) => b.id === HOMEWORLD.goal);
+      if (goal && !goal.built) this.buildings.finishNow(goal.id);
+      this.bioworks.wake(false);
+      this.buildings.standNow('supercomputer');
+      for (const k of ['salt', 'iron', 'quartz', 'copper', 'wood']) this.supplies[k] = 38;
+      this.embers = Math.max(this.embers, 40);
+      const b = this.buildings.print(DRIFT.chip);
+      if (b) { b.printStart = Date.now() - (b.printMs ?? 0) * 2; this.buildings.update(this.time.now, 0); }
+      const bw = this.bioworks;
+      this.player.setPosition(bw.center.x - 50, bw.center.y + 34);
+      this.cameras.main.centerOn(bw.center.x, bw.center.y);
     }
   }
 
@@ -825,6 +858,8 @@ export class PlanetScene extends Phaser.Scene {
     this.updateCamera();
     this.base.update(time, this.embers);
     this.base.updateSpot(time, this.canReplicate());
+    this.replication.update(time);
+    this.chips.update(time);
     this.dock.update(time, dt);
     if (this.boardRing) {
       const ready = this.departure.boardReady();
@@ -1046,8 +1081,14 @@ export class PlanetScene extends Phaser.Scene {
 
   // --- leaving the planet ---
 
+  /**
+   * A copy can be made here: the Replicator stands and is not making one already, the store has the Ember, the maker
+   * carries a Nous Chip (drift.json chip) and the world has room for another copy (Thales is not one).
+   */
   canReplicate() {
-    return this.base.built && !this.replicating && !!session.replicant && this.embers >= DRIFT.cost && this.npcs.length < DRIFT.maxPerPlanet;
+    const me = session.replicant;
+    return this.base.built && !this.replicating && !this.replication.busy && !this.visit && !!me && this.embers >= DRIFT.cost && (me.traits.chips ?? 0) > 0
+      && this.npcs.filter((n) => !n.data.traits.thales).length < DRIFT.maxPerPlanet;
   }
 
   private tryReplicate(): boolean {
@@ -1055,6 +1096,10 @@ export class PlanetScene extends Phaser.Scene {
       if (this.replicating) return true;
       this.base.hungry();
       sound.denied();
+      // without words: what is missing rises from the Replicator (a Nous Chip, Ember)
+      const me = session.replicant;
+      if (!this.replication.busy && me && !(me.traits.chips ?? 0)) this.fx.floatIcon(this.base.x - 6, this.base.y - 26, 'nouschip', 0);
+      if (!this.replication.busy && this.embers < DRIFT.cost) this.fx.floatIcon(this.base.x + 6, this.base.y - 26, 'shard', 0);
       return true; // standing on the spot: never swing at the Replicator
     }
     // the maker chooses first: wake the copy now, or hold it asleep for a new player (src/ui/wakeChoice.ts)
@@ -1074,7 +1119,11 @@ export class PlanetScene extends Phaser.Scene {
     return true;
   }
 
-  /** The Replicator makes the copy: woken (born blank; its first wake makes it itself) or held (asleep in its maker's likeness). */
+  /**
+   * The Replicator takes a Nous Chip and the Ember and scans its maker, who is free again; then it prints the body
+   * itself (src/entities/Replication.ts): woken (born blank; its first wake makes it itself) or held (asleep in its
+   * maker's likeness).
+   */
   private replicate(kind: WakeOrHold) {
     const me = session.replicant!;
     // with a Spark and a copy standing by the ring, the newborn comes from that copy and carries its memories
@@ -1083,70 +1132,95 @@ export class PlanetScene extends Phaser.Scene {
     this.embers -= DRIFT.cost;
     this.pending.embers -= DRIFT.cost;
     this.game.events.emit('embers', this.embers);
+    // the chip: its mind
+    me.traits.chips = Math.max(0, (me.traits.chips ?? 1) - 1);
+    this.game.events.emit('chips', me.traits.chips);
+    if (session.store && !this.shot) session.store.patchTraits(me.id, { chips: me.traits.chips }).catch((e) => console.warn('chip save failed', e));
     const pl = this.player;
     pl.locked = true;
     pl.body.setVelocity(0, 0);
     pl.facing = 1;
     pl.setPosition(this.base.spotX, this.base.spotY);
     sound.scan();
-    this.base.scan(pl.sprite, pl.featureColor, 1600);
+    this.base.scan(pl.sprite, pl.featureColor, DRIFT.scanMs);
+    const chip = this.add.sprite(pl.x, pl.y - 16, 'nouschip', 1).setOrigin(0.5, 1).setDepth(6300).setScale(0.6);
+    this.tweens.add({ targets: chip, x: this.base.x, y: this.base.y - 10, duration: 600, ease: 'Quad.easeIn', onComplete: () => { chip.destroy(); this.fx.sparks(this.base.x, this.base.y - 12, PALETTE[18], 12); } });
     if (elder) {
       me.traits.sparks = (me.traits.sparks ?? 1) - 1;
       this.game.events.emit('sparks', me.traits.sparks);
       void this.saver.saveReplicant();
       elder.thank();
-      this.base.scan(elder.sprite, elder.trailColor, 1600);
+      this.base.scan(elder.sprite, elder.trailColor, DRIFT.scanMs);
       // the Spark leaves the original and goes into the machine
       const spark = this.add.image(pl.x, pl.y - 16, BEACON.spark.sprite).setDepth(6300).setBlendMode(Phaser.BlendModes.ADD);
       this.tweens.add({ targets: spark, x: this.base.x, y: this.base.y - 12, duration: 700, ease: 'Quad.easeIn', onComplete: () => { spark.destroy(); this.fx.sparks(this.base.x, this.base.y - 12, PALETTE[19], 14); sound.spark(); } });
     }
-    // the copy appears beside the Replicator, on whichever side is open
+    // the copy rises beside the Replicator, on whichever side is open; its id is chosen now, so its row is made once
     const side = this.isWalkable(this.base.x + 24, this.base.y + 8) ? 24 : -24;
     const bx = this.base.x + side, by = this.base.y + 8;
-    const row = replicate(parent, this.planet.star, this.planet.planetIndex, bx, by);
+    const row: ReplicantSave = { ...replicate(parent, this.planet.star, this.planet.planetIndex, bx, by), id: crypto.randomUUID() };
     if (kind === 'hold') {
       // asleep in its maker's likeness until a new player takes it (the journal gives it away)
       const t = parent.traits;
       row.traits = { v: 1, awake: true, held: true, body: structuredClone(t.body ?? PARTS.defaults), feature: t.feature, trail: t.trail, gear: t.gear ?? 0 };
-      this.mindLog.push({ t: this.mindClock, text: `${me.name} made a copy and held it asleep for a new player` });
-    }
+      this.mindLog.push({ t: this.mindClock, text: `${me.name} began a copy at the Replicator and will hold it asleep for a new player` });
+    } else this.mindLog.push({ t: this.mindClock, text: `${me.name} began a new Vessel at the Replicator` });
     if (elder) {
       const wants = (elder.data.traits.wants ?? []).filter((w) => !w.done).map((w) => w.text);
       row.traits.inherit = { from: elder.data.id, name: elder.data.name, ...(wants.length ? { wants } : {}) };
       this.mindLog.push({ t: this.mindClock, text: `${me.name} spent a Spark: a new copy was made from ${elder.data.name} and remembers being it` });
       this.game.events.emit('notice', `A NEW COPY CARRIES ${elder.data.name.toUpperCase()}'S MEMORIES`);
     }
-    this.time.delayedCall(1700, () => {
-      const npc = new Npc(this, { ...row, id: 'pending' }, bx, by);
-      // its home: the next free lot, recorded under its id once the row is saved
-      const lotIndex = nextFreeLot(this.map.town, this.townState, 'home');
-      const lot = lotIndex >= 0 ? this.map.town.lots[lotIndex] : undefined;
-      npc.home = lot ? { ...lot.yard } : undefined;
-      // held under a key of its own until the row is saved (never written as 'pending')
-      const lotKey = `pending:${Date.now()}`;
-      if (lot) this.townState.lots[lotKey] = lotIndex;
-      this.npcs.push(npc);
-      this.announceLocation();
-      this.warren.refreshHatch();
-      sound.birth();
-      npc.playBirth(() => {
-        this.player.locked = false;
-        this.replicating = false;
-        this.floatName(npc);
-      });
-      const st = session.store;
-      if (st && !this.shot) {
-        st.createReplicant(row).then((saved) => {
-          const lotIndex = this.townState.lots[lotKey];
-          Object.assign(npc.data, saved);
-          if (elder) st.inheritNotes(elder.data.id, saved.id, DRIFT.spark.notes).catch((e) => console.warn('inherit notes failed', e));
-          if (lotIndex !== undefined) { delete this.townState.lots[lotKey]; this.townState.lots[saved.id] = lotIndex; this.towner.markTown(); }
-        })
-          .catch((e) => { console.warn('copy save failed', e); delete this.townState.lots[lotKey]; });
-        this.pending.npcTick ??= Date.now();
-      }
+    // the scan done, the maker is free; the Replicator (and the Cems, where they are awake) print the body
+    // the print begins (and is saved) with the chip and the Ember; the body starts to rise once the scan is done
+    this.replication.start(kind, row, elder?.data.id, DRIFT.scanMs);
+    this.time.delayedCall(DRIFT.scanMs + 100, () => {
+      pl.locked = false;
+      this.replicating = false;
+      this.controls.clear();
     });
     return true;
+  }
+
+  /**
+   * A copy steps out of the Replicator, its body whole: it takes the next free lot, and its row is made, once (the id
+   * was chosen when it began). A failed save is tried again a few times; `saved` runs once the row exists (a row with
+   * that id already there counts: another device made it), and until then the Replicator keeps the print in the save.
+   */
+  bornAt(row: ReplicantSave, x: number, y: number, elderId?: string, saved?: () => void) {
+    const npc = new Npc(this, { ...structuredClone(row), id: 'pending' }, x, y);
+    // its home: the next free lot, recorded under its id once the row is saved
+    const lotIndex = nextFreeLot(this.map.town, this.townState, 'home');
+    const lot = lotIndex >= 0 ? this.map.town.lots[lotIndex] : undefined;
+    npc.home = lot ? { ...lot.yard } : undefined;
+    // held under a key of its own until the row is saved (never written as 'pending')
+    const lotKey = `pending:${Date.now()}`;
+    if (lot) this.townState.lots[lotKey] = lotIndex;
+    this.npcs.push(npc);
+    this.announceLocation();
+    this.warren.refreshHatch();
+    sound.birth();
+    npc.playBirth(() => this.floatName(npc));
+    const st = session.store;
+    if (!st || this.shot) { npc.data.id = row.id; saved?.(); return npc; }
+    const { id, ...fresh } = row;
+    const done = (r: ReplicantSave, mine: boolean) => {
+      const lotIndex = this.townState.lots[lotKey];
+      Object.assign(npc.data, r);
+      if (elderId && mine) st.inheritNotes(elderId, r.id, DRIFT.spark.notes).catch((e) => console.warn('inherit notes failed', e));
+      if (lotIndex !== undefined) { delete this.townState.lots[lotKey]; this.townState.lots[r.id] = lotIndex; this.towner.markTown(); }
+      saved?.();
+    };
+    const attempt = (n: number) => st.createReplicant(fresh, id).then((r) => done(r, true), (e: { code?: string; message?: string }) => {
+      // already made, by another device or by a save whose answer never came back: the same Vessel
+      if (e?.code === '23505' || /exists|duplicate/i.test(e?.message ?? '')) { done({ ...row }, false); return; }
+      console.warn('copy save failed', e);
+      if (n < 4) this.time.delayedCall(2000 * 2 ** n, () => attempt(n + 1));
+      else delete this.townState.lots[lotKey]; // the print stays in the save: the next load tries again
+    });
+    void attempt(0);
+    this.pending.npcTick ??= Date.now();
+    return npc;
   }
 
   /** A copy (not blank, up here) standing close to the Replicator's ring: a Spark birth would come from it. */

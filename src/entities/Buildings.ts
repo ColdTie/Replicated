@@ -29,6 +29,8 @@ interface Placed {
   /** a Cem print: its model, how many voxels the drawing shows, when it was last drawn, its lit windows */
   cem?: { m: Model; cut: number; drawnAt: number; lights: Light[]; glows: Phaser.GameObjects.Image[] };
 }
+/** where things are printed on the Cem bed (px from its middle): two side by side, two more in front */
+const BED_SPOTS = [[-30, -4], [30, -4], [-30, 16], [30, 16]];
 const CARGO_COLORS: Record<string, number> = { salt: 19, iron: 20, quartz: 28, copper: 9, ember: 10, wood: 4, stone: 21, scrap: 22 };
 
 export class Buildings {
@@ -143,6 +145,14 @@ export class Buildings {
     } else this.finishCem(p, animate);
   }
 
+  /** Where a point of a design's model (voxel x, y, z) shows in the world, as it is drawn now (null: not placed). */
+  modelPoint(id: string, vx: number, vy: number, vz: number): { x: number; y: number } | null {
+    const p = this.placed.get(id), r = this.lastDraw.get(id);
+    if (!p || !r) return null;
+    const q = r.toImage(vx, vy, vz);
+    return { x: p.sprite.x - p.sprite.displayOriginX + q.x, y: p.sprite.y - p.sprite.displayOriginY + q.y };
+  }
+
   /** Redraws a print at its current cut. */
   private drawCem(p: Placed) {
     const c = p.cem!;
@@ -156,6 +166,12 @@ export class Buildings {
   private finishCem(p: Placed, animate: boolean) {
     const s = this.scene, c = p.cem!, b = p.b;
     if (c.cut < c.m.volume) { c.cut = c.m.volume; this.drawCem(p); }
+    // a thing printed on the bed (a Nous Chip) is no building: it waits on the salt to be taken (src/entities/Chips.ts)
+    if (c.m.def.place === 'bed') {
+      p.sprite.setVisible(false);
+      if (animate) { s.fx.sparks(b.x, b.y - 6, PALETTE[12], 14); s.fx.sparks(b.x, b.y - 6, PALETTE[19], 6); sound.cemDone({ x: b.x, y: b.y }); }
+      return;
+    }
     const depth = footprintDepthPx(c.m, CAT.view.pitch, CAT.view.ppv);
     if (!p.solid) p.solid = s.addSolid(b.x, b.y - depth / 2, c.m.w * CAT.view.ppv * 0.9, Math.max(8, depth * 0.85));
     const r = this.lastDraw.get(b.id);
@@ -224,6 +240,14 @@ export class Buildings {
     return free[0]?.index ?? -1;
   }
 
+  /** A place on the Cem bed for a thing printed there (a Nous Chip), free of the others printing or waiting there. */
+  private bedSpot(): { x: number; y: number } | null {
+    const bw = this.scene.bioworks;
+    if (!bw?.active) return null;
+    const taken = this.list.filter((b) => !b.vetoed && b.design && designModel(b.design)?.def.place === 'bed');
+    return BED_SPOTS.map(([dx, dy]) => ({ x: bw.center.x + dx, y: bw.center.y + dy })).find((p) => taken.every((b) => Math.hypot(b.x - p.x, b.y - p.y) > 6)) ?? null;
+  }
+
   /** A street lamp spot nobody has used (a lamp a copy raised, or another design standing there), nearest the square. */
   private freePost(): { x: number; y: number } | null {
     const s = this.scene, town = s.map.town, sq = town.square, cx = (sq.x + sq.w / 2) * 16, cy = (sq.y + sq.h / 2) * 16;
@@ -240,7 +264,8 @@ export class Buildings {
     if (!designOpen(id, built)) return `NEEDS ${designNeeds(id, built).join(' AND ')}`;
     if (!this.scene.bioworks?.awake) return 'THE CEMS ARE ASLEEP';
     if (this.printing.length >= BIO.maxPrints) return 'THE CEMS ARE BUSY';
-    if (m.def.place === 'post' ? !this.freePost() : this.printLot() < 0) return 'NO ROOM IN THE TOWN';
+    const place = m.def.place;
+    if (place === 'bed' ? !this.bedSpot() : place === 'post' ? !this.freePost() : this.printLot() < 0) return place === 'bed' ? 'NO ROOM ON THE BED' : 'NO ROOM IN THE TOWN';
     const short = Object.entries(m.cost).find(([k, n]) => (k === 'ember' ? this.scene.embers : Math.floor(this.scene.supplies[k] ?? 0)) < n);
     if (short) return `NEED MORE ${short[0].toUpperCase()}`;
     return null;
@@ -250,9 +275,9 @@ export class Buildings {
   print(id: string): Building | null {
     const m = designModel(id), s = this.scene, me = session.replicant;
     if (!m || this.whyNot(id)) return null;
-    const post = m.def.place === 'post';
-    const lotIndex = post ? -1 : this.printLot();
-    const spot = post ? this.freePost()! : buildingSpot(s.map.town.lots[lotIndex]);
+    const post = m.def.place === 'post', bed = m.def.place === 'bed';
+    const lotIndex = post || bed ? -1 : this.printLot();
+    const spot = bed ? this.bedSpot()! : post ? this.freePost()! : buildingSpot(s.map.town.lots[lotIndex]);
     s.warren.pay(m.cost);
     const depth = footprintDepthPx(m, CAT.view.pitch, CAT.view.ppv);
     const b: Building = {
@@ -267,6 +292,23 @@ export class Buildings {
     this.save();
     s.mindLog.push({ t: s.mindClock, text: `${me?.name ?? 'the original'} chose a design for the Cems: a ${b.name} (${m.tier.toLowerCase()}, ${Object.entries(m.cost).map(([k, n]) => `${n} ${k}`).join(', ')}); the ants carry its supplies and the Cems build it` });
     return b;
+  }
+
+  /** A finished thing carried off the bed (a Nous Chip taken): gone from the world and from the save. */
+  take(id: string) {
+    const i = this.list.findIndex((b) => b.id === id);
+    if (i < 0) return;
+    const p = this.placed.get(id);
+    if (p) {
+      p.sprite.destroy();
+      for (const l of p.cem?.lights ?? []) this.scene.lighting.remove(l);
+      for (const g of p.cem?.glows ?? []) g.destroy();
+      this.placed.delete(id);
+    }
+    this.printers.get(id)?.fold();
+    this.printers.delete(id);
+    this.list.splice(i, 1);
+    this.save();
   }
 
   /** A design standing finished at once, free (screenshots and playtests stage the later designs with it). */
