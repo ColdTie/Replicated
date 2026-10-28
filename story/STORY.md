@@ -97,7 +97,7 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 | The Vessel Printer (name not final) | A fully automatic, half biological AI 3D printer that builds new Vessels on your own planet. The Supercomputer is the last thing needed to build it. | Making Vessels |
 | Biological computers | To be defined | |
 | Quantum computers | To be defined | |
-| SCUT technology | Faster than light links | Letters between worlds, controlling husks from far away |
+| SCUT technology | Faster than light links | Letters between worlds, controlling husks from far away. A later feature: a SCUT communication device lets Vessels talk faster than light; until then a chat between worlds travels at light speed. |
 | Disease cure development | Research into treating illness | Helping a society through a pandemic |
 
 ## Sound and menus

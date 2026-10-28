@@ -41,7 +41,8 @@ run in order; each ships on its own, verified (build, `npm test`, a playtest of 
   `replicants.callsign` (four letters A to Z; unique), the galaxy's next number (11). Numbers 1 to 9 stay with Thales
   and the eight before you. Steve's Vessel gets 10.
 - An edge function, `vessels`, run with the service key:
-  - `give`: the maker gives a held Vessel. Four letters (see the questions) and 8 random digits; it makes the login
+  - `give`: the maker gives a held Vessel. Four letters the giver picks (the game offers a random set) and 8 random
+    digits; it makes the login
     (the letters as a hidden internal address, the digits as its password), adds it to the galaxy and makes the
     profile that owns the Vessel. The digits are shown to the maker once.
   - `rekey`: a player changes their digits; a maker can issue new ones for a Vessel that has not woken yet.
@@ -52,17 +53,18 @@ run in order; each ships on its own, verified (build, `npm test`, a playtest of 
   today any member can change any row; after this a player changes only their own Vessel and profile, and shared
   things (planets, buildings) only through the existing database functions.
 - The second login's galaxy (profiles Linda and Freya) is backed up and retired; they join by being handed Vessels.
-- Steve's part: approve the migration, switch off new sign-ups (one setting), pick his four letters.
+- Steve's part: approve the migration, switch off new sign-ups (one setting). His letters: COLD.
 
 ## Step 3: the memory and the awakening
 
 - A new player's first login plays the memory: the beginning (`Tutorial.ts`, as it is) on a private copy of the
   homeworld at its founding and on Gliese 12 b, saved only on that device (the `?local` store), so nothing in the
-  shared galaxy moves. It looks and sounds remembered: a soft gold wash, softer edges, quieter sound.
+  shared galaxy moves. It can be skipped. It looks and sounds remembered: a soft gold wash, softer edges, quieter sound.
 - When the stars open in the memory, it fades, and the Vessel wakes for real where its maker made its body, beside
   its maker if they are there, grown, with the stars open.
 - The awakening: the next number is taken in one database call. A title card ("VESSEL 11"), the town lights up, the
-  copies gather, a chord; every other player is told ("VESSEL 11 HAS WOKEN") in the menu's chat.
+  copies gather, a chord; then the new player names itself ("WHO ARE YOU?"); every other player is told ("VESSEL 11
+  HAS WOKEN") in the menu's chat.
 - A woken copy is awakened too: it takes the next number at its birth, with a smaller celebration in its town.
 - Tests: a new `playtest-memory` (the memory writes nothing to the galaxy, the waking where the maker is, the number,
   the celebration, a reload).
@@ -74,7 +76,9 @@ run in order; each ships on its own, verified (build, `npm test`, a playtest of 
 - VESSELS: how many you have (the Vessels you made: woken, held, and those awakened by a player) and where each is;
   then every Vessel of the Metanoia by number, with its name, letters and world, and who is playing now.
 - NAME: change your name at any time (`GameStore.renameSelf`); your number and letters stay.
-- CHAT: write to any Vessel. Built on the `messages` table (since migration 0001: `sent_at`, `arrives_at`), with new
+- CHAT: write to any Vessel. A message travels at light speed on the travel scale (2 s per light year; instant on the
+  same world); talking faster than light comes later with a SCUT communication device. Built on the `messages` table
+  (since migration 0001: `sent_at`, `arrives_at`), with new
   messages shown live through a Supabase live channel (part of supabase-js: no new dependency). Players only for now:
   the copies have their talk box and letters, and their minds are paused.
 - JOURNAL: what the copies here remember, as today.
@@ -96,12 +100,11 @@ run in order; each ships on its own, verified (build, `npm test`, a playtest of 
 
 A landing picks a base; a new base opens when one fills. Planned when the player count calls for it.
 
-## Questions for Steve
+## Steve's answers (2026-10-28)
 
-1. The memory: the whole beginning (the printer, the trip to Gliese 12 b, the Cems, three designs) or a short one?
-   Can it be skipped?
-2. The name: chosen in the memory (Thales: "You may name yourself") or at the real waking, with the number?
-3. Chat between worlds: instant, or at light speed on the travel scale (2 s per light year, instant on the same
-   world), as the long-term decision on messages says?
-4. Letters: which four are yours? For a new player, does the giver pick them, or the game?
-5. Linda and Freya: retire their separate galaxy (backed up) and hand them Vessels once the printer stands?
+1. The memory is the whole beginning (the printer, the trip to Gliese 12 b, the Cems, three designs), with a skip.
+2. The name is chosen at the real waking, with the number (not in the memory).
+3. Chat travels at light speed on the travel scale (instant on the same world). Talking faster than light comes later:
+   a SCUT communication device.
+4. Steve's letters are COLD. A new player's letters are picked by the giver, with the game offering a random set.
+5. Linda and Freya's galaxy is backed up and retired; Steve hands them Vessels once his printer stands.
