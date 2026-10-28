@@ -2,7 +2,7 @@
 import Phaser from 'phaser';
 import { PALETTE } from '../core/data';
 import { isKid, session } from '../core/session';
-import { touch } from '../input/Controls';
+import { onPress, touch } from '../input/Controls';
 import { sound } from '../audio/Sound';
 import { TalkBox } from '../ui/dialogue';
 
@@ -118,7 +118,7 @@ export class UIScene extends Phaser.Scene {
     };
     drawSpeaker();
     const toggleSound = () => { sound.start(); sound.setMuted(!sound.muted); drawSpeaker(); };
-    this.input.keyboard?.on('keydown-M', toggleSound);
+    onPress(this, ['M'], toggleSound);
     const onSpeaker = (p: Phaser.Input.Pointer) => p.x > width - 26 && p.y < 22;
 
     if (new URLSearchParams(location.search).has('fps')) {

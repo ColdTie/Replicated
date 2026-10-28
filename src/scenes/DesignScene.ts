@@ -9,7 +9,7 @@ import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { PALETTE } from '../core/data';
 import { CAT, DESIGNS, designModel, paintTexture, turntableView } from '../core/designs';
-import { Controls } from '../input/Controls';
+import { Controls, onPress } from '../input/Controls';
 import { turntableSize, type Model } from '../world/voxel';
 import type { PlanetScene } from './PlanetScene';
 
@@ -76,8 +76,9 @@ export class DesignScene extends Phaser.Scene {
     this.index = ready >= 0 ? ready : Math.max(0, this.rows.findIndex((r) => !r.why?.startsWith('NEEDS')));
     this.drawList();
     this.drawInfo();
-    for (const [key, d] of [['UP', -1], ['W', -1], ['DOWN', 1], ['S', 1]] as const) this.input.keyboard?.on(`keydown-${key}`, () => this.move(d));
-    for (const [key, d] of [['LEFT', -1], ['A', -1], ['RIGHT', 1], ['D', 1]] as const) this.input.keyboard?.on(`keydown-${key}`, () => { this.yaw += d * 0.6; });
+    // a key moves one row on its press; the held key also reads as the stick, so that counts as held (no second row)
+    for (const [key, d] of [['UP', -1], ['W', -1], ['DOWN', 1], ['S', 1]] as const) onPress(this, [key], () => { this.move(d); this.stickHeld = true; });
+    for (const [key, d] of [['LEFT', -1], ['A', -1], ['RIGHT', 1], ['D', 1]] as const) onPress(this, [key], () => { this.yaw += d * 0.6; });
     // drag the model to turn it
     const zone = this.add.zone(INFO_X, PREV_Y, INFO_W, TEXT_END - 60 - PREV_Y).setOrigin(0).setInteractive({ useHandCursor: true });
     zone.on('pointerdown', (p: Phaser.Input.Pointer) => { this.drag = { x: p.x, yaw: this.yaw }; });

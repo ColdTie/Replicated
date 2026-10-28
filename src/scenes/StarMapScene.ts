@@ -12,6 +12,7 @@ import { BEACONS, STAR_LIST, defaultPlanetIndex, distanceLy, formatDuration, fue
 import { systemFor, type SystemPlanet } from '../world/system';
 import { shipFlying } from '../core/mannies';
 import { PlanetMenu, type PlanetEntry } from '../ui/planetMenu';
+import { onPress } from '../input/Controls';
 
 export interface StarMapData {
   /** launch: at the vessel; view: from the ship in flight; link: at the empty berth while the vessel is elsewhere */
@@ -216,7 +217,7 @@ export class StarMapScene extends Phaser.Scene {
       this.zoom = Phaser.Math.Clamp(this.zoom * (dy > 0 ? 0.9 : 1.1), 0.25, 6);
       this.lastInputAt = this.time.now;
     });
-    this.input.keyboard?.on('keydown-ESC', () => (this.view === 'system' ? this.closeSystem() : this.close()));
+    onPress(this, ['ESC'], () => (this.view === 'system' ? this.closeSystem() : this.close()));
 
     // Who is where, what has been found, who is flying (best effort; the map works without it)
     const st = session.store;

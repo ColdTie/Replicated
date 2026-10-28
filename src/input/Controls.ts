@@ -33,6 +33,16 @@ const KEYS = {
   reply: ['KeyR'],
 };
 
+/**
+ * Runs fn once for each press of these keys (Phaser key names: 'DOWN', 'S', 'ESC'). Phaser hands every key event of a
+ * frame to the scene again whenever another one arrives in that same frame, so a handler that counts presses (a menu
+ * row, a toggle) would count an old press again on a slow frame or a quick hand: each event is taken once.
+ */
+export function onPress(scene: Phaser.Scene, keys: readonly string[], fn: () => void) {
+  const seen = new WeakSet<KeyboardEvent>();
+  for (const k of keys) scene.input.keyboard?.on(`keydown-${k}`, (e: KeyboardEvent) => { if (seen.has(e)) return; seen.add(e); fn(); });
+}
+
 export class Controls {
   private keys: Record<string, Phaser.Input.Keyboard.Key> = {};
   private padWasDown = false;

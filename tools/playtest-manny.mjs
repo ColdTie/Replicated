@@ -67,6 +67,16 @@ try {
   log('vault menu', JSON.stringify(menu));
   const build = menu.find((r) => r.kind === 'build');
   if (!build || build.enabled) fail('the vault offers to build a husk without enough iron and hydrogen');
+  // a key held as a hand holds it moves one row, never two (the held key also reads as the stick)
+  for (const [key, d] of [['ArrowDown', 1], ['ArrowUp', -1]]) {
+    const was = await ev(() => window.__vault.index);
+    await page.keyboard.down(key);
+    await page.waitForTimeout(80);
+    await page.keyboard.up(key);
+    await page.waitForTimeout(250);
+    const now = await ev(() => window.__vault.index);
+    if (now !== (was + d + menu.length) % menu.length) fail(`one ${key} press moved the vault menu from row ${was} to ${now}`);
+  }
   await page.keyboard.press('Enter');
   await page.waitForTimeout(400);
   if (await ev(() => !!window.__session.replicant.traits.mannies)) fail('a husk was built without enough iron and hydrogen');
