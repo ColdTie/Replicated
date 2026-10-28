@@ -136,9 +136,20 @@ try {
   await ev(() => { const s = window.__scene; s.player.setPosition(s.base.x - 40, s.base.y + 34); });
   await page.waitForTimeout(1500);
   await shot('replicate-printing');
-  // its time runs out: it steps out where it rose, once
-  await ev(() => { const st = window.__scene.replication.state; st.start = Date.now() - st.ms + 1200; });
-  await page.waitForFunction((id) => window.__scene.npcs.some((n) => n.data.id === id) && !window.__scene.replication.busy, begun.id, { timeout: T }).catch(() => fail('the woken Vessel never stepped out'));
+  // its time runs out: it steps out where it rose, once. Its first save fails (a phone just back from the background):
+  // the print stays in the planet's save until a retry makes the row
+  await ev(() => {
+    const st = window.__session.store, orig = st.createReplicant.bind(st);
+    let fails = 1;
+    st.createReplicant = (r, id) => (fails-- > 0 ? Promise.reject(new Error('Load failed')) : orig(r, id));
+    const p = window.__scene.replication.state; p.start = Date.now() - p.ms + 1200;
+  });
+  await page.waitForFunction((id) => window.__scene.npcs.some((n) => n.data.id === 'pending' || n.data.id === id), begun.id, { timeout: T }).catch(() => fail('the woken Vessel never stepped out'));
+  await ev(() => window.__scene.flushPlanet());
+  const failed = await saved(begun.id);
+  log('first save failed', JSON.stringify({ rows: failed.rows, kept: failed.replication?.row?.id === begun.id }));
+  if (failed.rows === 0 && failed.replication?.row?.id !== begun.id) fail('a failed save let the print leave the planet\'s save (the Vessel would be lost)');
+  await page.waitForFunction((id) => window.__scene.npcs.some((n) => n.data.id === id) && !window.__scene.replication.busy, begun.id, { timeout: T }).catch(() => fail('the woken Vessel\'s row was never made after its save failed'));
   await page.waitForTimeout(1600);
   await shot('replicate-born');
   await ev(() => window.__scene.flushPlanet());

@@ -1171,9 +1171,10 @@ export class PlanetScene extends Phaser.Scene {
       this.mindLog.push({ t: this.mindClock, text: `${me.name} spent a Spark: a new copy was made from ${elder.data.name} and remembers being it` });
       this.game.events.emit('notice', `A NEW COPY CARRIES ${elder.data.name.toUpperCase()}'S MEMORIES`);
     }
-    // the scan done, the Replicator (and the Cems, where they are awake) print the body; the maker is free
+    // the scan done, the maker is free; the Replicator (and the Cems, where they are awake) print the body
+    // the print begins (and is saved) with the chip and the Ember; the body starts to rise once the scan is done
+    this.replication.start(kind, row, elder?.data.id, DRIFT.scanMs);
     this.time.delayedCall(DRIFT.scanMs + 100, () => {
-      this.replication.start(kind, row, elder?.data.id);
       pl.locked = false;
       this.replicating = false;
       this.controls.clear();
@@ -1181,8 +1182,12 @@ export class PlanetScene extends Phaser.Scene {
     return true;
   }
 
-  /** A copy steps out of the Replicator, its body whole: it takes the next free lot, and its row is made (once). */
-  bornAt(row: ReplicantSave, x: number, y: number, elderId?: string) {
+  /**
+   * A copy steps out of the Replicator, its body whole: it takes the next free lot, and its row is made, once (the id
+   * was chosen when it began). A failed save is tried again a few times; `saved` runs once the row exists (a row with
+   * that id already there counts: another device made it), and until then the Replicator keeps the print in the save.
+   */
+  bornAt(row: ReplicantSave, x: number, y: number, elderId?: string, saved?: () => void) {
     const npc = new Npc(this, { ...structuredClone(row), id: 'pending' }, x, y);
     // its home: the next free lot, recorded under its id once the row is saved
     const lotIndex = nextFreeLot(this.map.town, this.townState, 'home');
@@ -1197,15 +1202,23 @@ export class PlanetScene extends Phaser.Scene {
     sound.birth();
     npc.playBirth(() => this.floatName(npc));
     const st = session.store;
-    if (!st || this.shot) { npc.data.id = row.id; return npc; }
+    if (!st || this.shot) { npc.data.id = row.id; saved?.(); return npc; }
     const { id, ...fresh } = row;
-    st.createReplicant(fresh, id).then((saved) => {
+    const done = (r: ReplicantSave, mine: boolean) => {
       const lotIndex = this.townState.lots[lotKey];
-      Object.assign(npc.data, saved);
-      if (elderId) st.inheritNotes(elderId, saved.id, DRIFT.spark.notes).catch((e) => console.warn('inherit notes failed', e));
-      if (lotIndex !== undefined) { delete this.townState.lots[lotKey]; this.townState.lots[saved.id] = lotIndex; this.towner.markTown(); }
-    })
-      .catch((e) => { console.warn('copy save failed', e); delete this.townState.lots[lotKey]; });
+      Object.assign(npc.data, r);
+      if (elderId && mine) st.inheritNotes(elderId, r.id, DRIFT.spark.notes).catch((e) => console.warn('inherit notes failed', e));
+      if (lotIndex !== undefined) { delete this.townState.lots[lotKey]; this.townState.lots[r.id] = lotIndex; this.towner.markTown(); }
+      saved?.();
+    };
+    const attempt = (n: number) => st.createReplicant(fresh, id).then((r) => done(r, true), (e: { code?: string; message?: string }) => {
+      // already made, by another device or by a save whose answer never came back: the same Vessel
+      if (e?.code === '23505' || /exists|duplicate/i.test(e?.message ?? '')) { done({ ...row }, false); return; }
+      console.warn('copy save failed', e);
+      if (n < 4) this.time.delayedCall(2000 * 2 ** n, () => attempt(n + 1));
+      else delete this.townState.lots[lotKey]; // the print stays in the save: the next load tries again
+    });
+    void attempt(0);
     this.pending.npcTick ??= Date.now();
     return npc;
   }

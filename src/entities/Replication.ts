@@ -27,6 +27,8 @@ export class Replication {
   private light?: Light;
   private forming?: { body: Phaser.GameObjects.Image; sheen: Phaser.GameObjects.Image; band: Phaser.GameObjects.Image; line: Phaser.GameObjects.Rectangle; glow: Phaser.GameObjects.Image; rows: number };
   private flowing = false;
+  /** the body is whole and the Vessel has stepped out; its row is being saved (the print stays in the save until then) */
+  private finishing = false;
 
   constructor(private scene: PlanetScene, save: PlanetSave | null) {
     this.state = save?.data.replication ?? null;
@@ -47,10 +49,10 @@ export class Replication {
     return this.withCems ? Math.round(DRIFT.printMs * (this.scene.bioworks?.speed ?? 1)) : DRIFT.printMsAlone;
   }
 
-  /** The maker's choice is made: the body starts to print where the Vessel will stand. */
-  start(kind: Replicating['kind'], row: ReplicantSave, elder?: string) {
+  /** The maker's choice is made: the body starts to print where the Vessel will stand (after `delay` ms: the scan). */
+  start(kind: Replicating['kind'], row: ReplicantSave, elder?: string, delay = 0) {
     const cems = this.withCems;
-    this.state = { start: Date.now(), ms: this.printMsHere(), kind, row, by: session.replicant?.id ?? '', cems, ...(elder ? { elder } : {}) };
+    this.state = { start: Date.now() + delay, ms: this.printMsHere(), kind, row, by: session.replicant?.id ?? '', cems, ...(elder ? { elder } : {}) };
     this.save();
     const at = this.spot;
     this.scene.fx.sparks(at.x, at.y - 6, cems ? PALETTE[12] : PALETTE[10], 10);
@@ -74,7 +76,7 @@ export class Replication {
   }
 
   update(time: number) {
-    if (!this.state) return;
+    if (!this.state || this.finishing) return;
     const s = this.scene, st = this.state, at = this.spot;
     // the Cems carry themselves from their bed while they print it (an awake bed on this world)
     if (st.cems && !this.flowing && s.bioworks?.awake) { this.flowing = true; s.bioworks.startFlow(FLOW, { x: at.x, y: at.y + 2 }, [PALETTE[12], PALETTE[11]], Date.now() - st.start < 3000); }
@@ -112,17 +114,20 @@ export class Replication {
     if (this.fraction >= 1 && !s.visit) this.finish();
   }
 
-  /** The Vessel steps out where it rose; the light goes, the Cems go home. */
+  /**
+   * The Vessel steps out where it rose; the light goes, the Cems go home. The print leaves the save only once the
+   * Vessel's row exists, so a save that fails is tried again (here, or on the next load) with the same id.
+   */
   private finish() {
     const st = this.state, at = this.spot;
-    if (!st) return;
-    this.state = null;
-    this.save();
+    if (!st || this.finishing) return;
+    this.finishing = true;
     this.clearForming();
     if (this.light) { const l = this.light; this.light = undefined; this.scene.tweens.add({ targets: l, intensity: 0, duration: 900, onComplete: () => this.scene.lighting.remove(l) }); }
     if (this.flowing) { this.flowing = false; this.scene.bioworks?.stopFlow(FLOW); }
-    // (already among the copies here: someone else had it step out, only the empty Replicator was not saved)
-    if (this.scene.npcs.some((n) => n.data.id === st.row.id)) return;
-    this.scene.bornAt(st.row, at.x, at.y, st.elder);
+    const cleared = () => { if (this.state === st) { this.state = null; this.save(); } this.finishing = false; };
+    // (already among the copies here: it stepped out before, only the empty Replicator was not saved)
+    if (this.scene.npcs.some((n) => n.data.id === st.row.id)) { cleared(); return; }
+    this.scene.bornAt(st.row, at.x, at.y, st.elder, cleared);
   }
 }

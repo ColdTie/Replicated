@@ -209,8 +209,8 @@ src/entities/WildCems.ts the Cems' world's wild fields (planets.json cemworld wi
                          with wild Cems that breathe, drink the red light, glow at night and stir as you pass; salt blooms
                          on their rims (nodes wild0..); walking among them with the ship here puts a jar of them in the
                          hold (traits.wild) for a Biolab to change
-src/scenes/DesignScene.ts the design menu over the paused planet: rows (READY / NEED / LOCKED / WAIT / BUILT / HOMEWORLD,
-                         built count; nine at a time, scrolling with the chosen row and the wheel), the
+src/scenes/DesignScene.ts the design menu over the paused planet: rows (READY / NEED / LOCKED / WAIT, built count; nine
+                         at a time, moving only when the chosen row would leave them; the wheel steps by its travel), the
                          chosen design turning in 3D (drag to turn), complexity, volume, print time, gives, price vs store;
                          the words laid out from the foot of the panel up (measured once wrapped), the model in the room
                          left above them; an X in the corner closes it
@@ -239,8 +239,9 @@ src/fx/                  Lighting (multiply darkness RT + additive lights), Atmo
                          dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
 src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember, iron, hydrogen, salt,
                          quartz, copper by kind; each its own glint, hit and pickup sound),
-                         Base (the Replicator where one stands; it makes no copies since 2026-10-28), Manny (the husk vault's bunker in the square: down its steps, a husk
-                         left standing on standby)
+                         Base (pad + Replicator: since 2026-10-28 a copy takes a Nous Chip and its Ember, and the body
+                         prints by the clock, src/entities/Replication.ts), Manny (the husk vault's bunker in the square:
+                         down its steps, a husk left standing on standby)
 src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
 src/audio/Sound.ts       procedural WebAudio: every sound effect, the generative music, each world's ambience bed (no audio
                          files); buses sfx / music / ambience / ui / voice, ducking under voices, distance and panning
@@ -632,6 +633,14 @@ supplies", "Maybe they just make it faster and now it's an integrated system"; n
 - Kept from the first try: Thales no longer counts toward `maxPerPlanet`; `travel.json needCopy` is off (every copy
   needs a chip now, so most worlds would have none to leave behind); the design list scrolls (nine rows at a time, the
   wheel too).
-- Verified: build, typecheck, `tools/playtest-replicate.mjs` (new), `playtest`, `-become`, `-homeworld` (each with a
-  chip and a short print), the full `npm test`. Screenshots `design-nouschip.png`, `chip-on-bed.png`,
+- A review of the change (four reviewers, a skeptic each) confirmed and this fixed: the print left the save before the
+  Vessel's row existed, so one failed save (a phone back from the background) lost the Vessel, its chip and its Ember;
+  now the print stays saved until the row exists, a failed save is tried again, and a row already there counts. The
+  print is saved the moment the chip is spent (the body starts rising once the scan is done). The design list no
+  longer moves under a tap (it moves only when the chosen row would leave it), and the wheel steps a row per notch of
+  travel without wrapping (a touchpad spun it).
+- CI's first run of `playtest-replicate` failed on Earth: the game's timers run on smoothed frame time, so on Earth's
+  slow frames the Replicator's 1.1 s build outlasted a 5 s wait. The test acts directly and allows 20 s.
+- Verified: build, typecheck, `tools/playtest-replicate.mjs` (new; also a first save that fails), `playtest`, `-become`,
+  `-homeworld` (each with a chip and a short print), a menu check (taps and wheel), the full `npm test`. Screenshots `design-nouschip.png`, `chip-on-bed.png`,
   `replicating-cems.png`, `replicating-alone.png`, `replicate-*.png`.
