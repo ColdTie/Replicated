@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
 import { PALETTE, type GuardianDef } from '../core/data';
-import { isKid } from '../core/session';
 import type { Light } from '../fx/Lighting';
 import type { PlanetScene } from '../scenes/PlanetScene';
 import type { Enemy } from './Enemy';
@@ -50,7 +49,7 @@ export class Guardian implements Enemy {
     this.sprite = scene.add.sprite(homeX, homeY, this.texKey).setOrigin(0.5, 1);
     this.sprite.play(anim(this.texKey, 'sleep'));
     this.eye = scene.lighting.add({ x: homeX, y: homeY - 14, radius: 26, color: PALETTE[8], intensity: 0 });
-    this.maxHp = isKid() ? def.kidHp : def.hp;
+    this.maxHp = def.hp;
     this.hp = this.maxHp;
   }
 
@@ -107,7 +106,7 @@ export class Guardian implements Enemy {
         v.set(this.chargeDir.x * d.chargeSpeed, this.chargeDir.y * d.chargeSpeed);
         if (!this.hasHit && p.alive && dist < 17) {
           this.hasHit = true;
-          p.hurt(this.x, this.y, isKid() ? d.kidDamage : d.chargeDamage);
+          p.hurt(this.x, this.y, d.chargeDamage);
           v.scale(-0.2);
           this.rest(time, d.restMs);
           break;
@@ -224,7 +223,7 @@ export class Guardian implements Enemy {
     const ring = this.scene.add.image(this.x, this.y + 3, 'ring').setDepth(56).setAlpha(0.9).setScale(0.4);
     this.scene.tweens.add({ targets: ring, scaleX: d.slamRadius / 8, scaleY: d.slamRadius / 18, alpha: 0, duration: 420, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
     const p = this.scene.player;
-    if (p.alive && Math.hypot(p.x - this.x, p.y - this.y) < d.slamRadius) p.hurt(this.x, this.y, isKid() ? d.kidDamage : d.contactDamage);
+    if (p.alive && Math.hypot(p.x - this.x, p.y - this.y) < d.slamRadius) p.hurt(this.x, this.y, d.contactDamage);
   }
 
   hit(damage: number, dir: Phaser.Math.Vector2, knockback: number) {

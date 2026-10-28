@@ -5,7 +5,7 @@ import Phaser from 'phaser';
 import { HOME, KNOWN_STARS } from '../core/home';
 import { sound } from '../audio/Sound';
 import { PALETTE, SUPPLIES } from '../core/data';
-import { isKid, session } from '../core/session';
+import { session } from '../core/session';
 import { Globe } from '../fx/Globe';
 import type { Journey, ReplicantSummary } from '../net/store';
 import { BEACONS, STAR_LIST, defaultPlanetIndex, distanceLy, formatDuration, fuelFor, planetFor, starById, travelMs, type Star } from '../world/galaxy';
@@ -441,33 +441,27 @@ export class StarMapScene extends Phaser.Scene {
     const planets = systemFor(s.id);
     if (this.view === 'galaxy') {
       lines.push(s.name + (s.beacon ? (this.d.lit?.includes(s.id) ? '  - BEACON LIT' : '  - BEACON') : s.id === this.d.from ? '  - YOU ARE HERE' : ''));
-      if (!isKid()) {
-        if (s.id !== this.d.from) lines.push(`${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
-        const known = planets.some((p) => p.real);
-        lines.push(`${planets.length} ${planets.length === 1 ? 'WORLD' : 'WORLDS'}${known ? ' KNOWN TO ASTRONOMERS' : ''}  - TAP FOR PLANETS`);
-        if (this.d.mode === 'launch' && s.id !== this.d.from) lines.push(this.fuelLine(s.id, defaultPlanetIndex(s.id), fuel));
-        const mp = this.mannyAt(s.id);
-        if (mp !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, mp) ? 'YOU DRIVE YOUR HUSK HERE' : `YOUR HUSK WAITS ON ${planetFor(s.id, mp)?.name ?? 'A WORLD'} - LINK`);
-        if (this.d.vessel?.star === s.id) lines.push(shipFlying(this.d.vessel) ? 'YOUR SHIP IS ON ITS WAY HERE' : 'YOUR SHIP WAITS HERE');
-      } else {
-        lines.push(s.id !== this.d.from ? formatDuration(travelMs(ly)) : 'HOME STAR');
-      }
+      if (s.id !== this.d.from) lines.push(`${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
+      const known = planets.some((p) => p.real);
+      lines.push(`${planets.length} ${planets.length === 1 ? 'WORLD' : 'WORLDS'}${known ? ' KNOWN TO ASTRONOMERS' : ''}  - TAP FOR PLANETS`);
+      if (this.d.mode === 'launch' && s.id !== this.d.from) lines.push(this.fuelLine(s.id, defaultPlanetIndex(s.id), fuel));
+      const mp = this.mannyAt(s.id);
+      if (mp !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, mp) ? 'YOU DRIVE YOUR HUSK HERE' : `YOUR HUSK WAITS ON ${planetFor(s.id, mp)?.name ?? 'A WORLD'} - LINK`);
+      if (this.d.vessel?.star === s.id) lines.push(shipFlying(this.d.vessel) ? 'YOUR SHIP IS ON ITS WAY HERE' : 'YOUR SHIP WAITS HERE');
     } else if (this.selPlanet) {
       const p = this.selPlanet;
       lines.push(p.name + (this.isHere(s.id, p.index) ? '  - YOU ARE HERE' : ''));
-      if (!isKid()) {
-        lines.push(`${KIND_WORDS[p.kind]}${p.moon ? ` - LAND ON ${p.moon}` : ''}${p.hz ? ' - HABITABLE ZONE' : ''}`);
-        lines.push(p.real ? 'CONFIRMED BY ASTRONOMERS' : 'UNCHARTED');
-        if (!this.isHere(s.id, p.index)) {
-          lines.push(ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
-          if (this.d.mode === 'launch') lines.push(this.fuelLine(s.id, p.index, fuel));
-        }
-        if (this.mannyAt(s.id, p.index) !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, p.index) ? 'YOU DRIVE YOUR HUSK HERE' : 'YOUR HUSK WAITS HERE - LINK');
-        if (this.d.vessel?.star === s.id && this.d.vessel.planet === p.index) lines.push(shipFlying(this.d.vessel) ? 'YOUR SHIP IS ON ITS WAY HERE' : 'YOUR SHIP WAITS HERE');
-      } else if (!this.isHere(s.id, p.index)) lines.push(formatDuration(travelMs(ly)));
+      lines.push(`${KIND_WORDS[p.kind]}${p.moon ? ` - LAND ON ${p.moon}` : ''}${p.hz ? ' - HABITABLE ZONE' : ''}`);
+      lines.push(p.real ? 'CONFIRMED BY ASTRONOMERS' : 'UNCHARTED');
+      if (!this.isHere(s.id, p.index)) {
+        lines.push(ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
+        if (this.d.mode === 'launch') lines.push(this.fuelLine(s.id, p.index, fuel));
+      }
+      if (this.mannyAt(s.id, p.index) !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, p.index) ? 'YOU DRIVE YOUR HUSK HERE' : 'YOUR HUSK WAITS HERE - LINK');
+      if (this.d.vessel?.star === s.id && this.d.vessel.planet === p.index) lines.push(shipFlying(this.d.vessel) ? 'YOUR SHIP IS ON ITS WAY HERE' : 'YOUR SHIP WAITS HERE');
     } else {
       lines.push(s.name);
-      if (!isKid()) lines.push('TAP A PLANET');
+      lines.push('TAP A PLANET');
     }
     this.infoText.setText(lines.join('\n'));
     const canGo = !!dest && this.d.mode === 'launch' && !this.isHere(dest.star.id, dest.planet);

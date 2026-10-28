@@ -1,4 +1,4 @@
-// The town at the landing site: a paved square around the vessel, the Replicator pad and the cradle, streets running
+// The town at the landing site: a paved square around the vessel and the Replicator pad, streets running
 // out from it, and lots along the streets: a home lot for every copy (named build slots: the house at the back, a
 // shed, gardens, a flag by the path, a sign at the corner, two lamp posts at the frontage) and larger civic lots for
 // the buildings at the square's north edge and the street ends. Lamp spots stand along the streets, and the way down
@@ -249,12 +249,6 @@ export function townMask(town: Town, w: number, h: number) {
 }
 
 export const inRect = contains;
-
-/** Which lot (index) contains this pixel, or -1. */
-export function lotAt(town: Town, x: number, y: number) {
-  const tx = Math.floor(x / T), ty = Math.floor(y / T);
-  return town.lots.findIndex((l) => contains(l.rect, tx, ty));
-}
 
 /**
  * Lot assignment: every copy without a lot gets the next free home lot, in birth order (as listed). A lot is taken

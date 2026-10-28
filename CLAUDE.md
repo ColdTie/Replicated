@@ -55,7 +55,8 @@ No final art yet. Generate placeholder sprites with a Node script that writes pi
 ## Profiles
 
 One player, Steve, with the full game. (Pivot, 2026-10-08: the game is no longer being built or tuned for other players or
-other devices. The profile `kid_mode` flag, no counter and no death, still exists in the code but is not a priority.)
+other devices. Kid mode, no counter and no death, was taken out on 2026-10-28; the profiles table keeps its `kid_mode`
+column, always false.)
 
 ## Core loop (build in this order)
 
@@ -202,8 +203,8 @@ src/world/planetGen.ts   seeded island: floor/rock/water/void (no ruins since 20
                          kept open; iron ore (by rock) and hydrogen vents (by water, or in the open) placed last with
                          their own rng (`ores`; their node indexes follow the crystals'), then salt blooms (pond rims, or
                          the open on dry worlds), quartz (by rock) and copper (by rock or water) with another rng
-src/world/town.ts        the town (tunables src/data/town.json): a paved square at the base (vessel, Replicator, cradle,
-                         the hatch in its corner), streets out from it, home lots along them (named build slots, two
+src/world/town.ts        the town (tunables src/data/town.json): a paved square at the base (vessel, Replicator, husk
+                         vault, the hatch in its corner), streets out from it, home lots along them (named build slots, two
                          lamp posts) and civic lots for buildings; lot assignment (data.town), slotFor(), the one-time
                          migration of older saves (migrateToTown) and surfaceRoute() for copies walking round things
 src/world/groundPaint.ts painted floor: one full-color image per planet (relief-shaded noise, soil/cover blend,
@@ -233,7 +234,7 @@ src/entities/Guardian.ts the beacon keeper (Enemy): sleeps by the monolith, wake
                          (stuns itself on walls: wide open) and slams (ring telegraph); dies into the Spark
 src/entities/Beacon.ts   the monolith: dormant, or lit for good (lens, seams, sky beam, motes) once its keeper falls
 src/entities/Resources.ts ... Spark: the rare white pickup a lit beacon leaves (replicants.traits.sparks)
-src/data/beacon.json     keeper stats (kid mode: kidHp/kidDamage), spark pickup, plaza size and distance
+src/data/beacon.json     keeper stats, spark pickup, plaza size and distance
 src/entities/Village.ts  what copies build around the base (lamps, signs, flags, gardens, huts, totems): shared work
                          pool, taste per copy, free-spot search, ghost + hammering, saved in planet_states structures
 src/world/warren.ts      the warren's layout engine: rooms the copies ask for (kind, size, beside which room, which side)
@@ -269,7 +270,8 @@ src/scenes/StarMapScene  3D star map (drag/pinch/wheel, tap a star, tap again fo
 src/scenes/TravelScene   departure orbit (globe, giant behind a moon), warp, real-time cruise + ETA, visits, arrival;
                          SKIP (top right, Space or Enter) lands at once from any part of it
 src/input/Controls.ts    keyboard + gamepad + touch state merged into one input frame (attack, dash, interact; the talk
-                         box's next/back/close/reply while it is open)
+                         box's next/back/close/reply while it is open); onPress: a key handler that takes each press once
+                         (Phaser hands a frame's key events to the scene again whenever another one arrives in it)
 src/ui/overlay.ts        HTML forms over the canvas (sign-in; askName: a Vessel names itself at its first wake)
 src/ui/planetMenu.ts     the planet menu beside the star map (HTML): RECENT and CLOSEST worlds, each row's details; a row
                          picks its planet on the map and a pick on the map lights its row
@@ -303,7 +305,7 @@ NEEDS.md                 the maker's procedure: what the copies asked for, how p
 Saving: the shared Ember pool, node damage, structures (Replicator and the copies' builds) and the copies' banked
 building work live in `planet_states` and are written as atomic deltas
 (`apply_planet_delta` RPC) every 4s and when the page is hidden; the server value wins so every profile shares one
-pool. The replicant row stores position, planet and `traits.awake` (Earth's wake-up intro plays once per replicant).
+pool. The replicant row stores position, planet and `traits.awake` (the opening plays once per replicant).
 `data.seen` is the village as the original last saw it (builds, buildings' progress, dug rooms, copies' names and
 bodies), written after the landing, every minute while you play and when you leave; the next landing tours what changed.
 A planet saved before the town (no `data.layout`, or below `town.json layout`) moves into it once on load: builds go to
@@ -331,11 +333,11 @@ One JSON object per replicant, read by the game and the mind alike. Every key is
 | mind | `temperament` | `{ pace, sociability, work, bedtime, risk }` (`set_temperament`): walking pace, greeting range, build vs wander, when it turns in, how far it ranges |
 | mind | `wants` | `[{ text, category, done, at }]` 1 to 3 goals in its own words (`set_wants` / `finish_want`) |
 | state | `blank` | born and not yet itself (grey, still; the first wake is the becoming) |
-| state | `awake`, `mods`, `sparks` | intro played; ruin modules from before 2026-10-26 (light, dash, swing still count); Sparks held |
+| state | `awake`, `sparks` | intro played; Sparks held |
 | state | `thales` | Thales, the first Vessel (`src/data/homeworld.json`): fixed by his work, never handed over or held |
 | state | `held` | held asleep at its making for a new player (WAKE or HOLD at the Replicator): its maker's body, dimmed, no mind |
 | state | `unnamed` | a player's Vessel that has not named itself yet: it is asked at its first wake |
-| state | `handedBy` | the replicant that awakened this one with a Spark (it was a copy, so it reads the copies without `listen`) |
+| state | `handedBy` | the replicant that awakened this one with a Spark (it was a copy) |
 | state | `cargo` | `{ material, n, from }` what the vessel's hold carries between worlds (supplies.json signature), or null |
 | state | `goods` | `{ from, to, items }` what the hold carries to a world that lacks it (planets.json lacks: the homeworld's copper and quartz, up to signature.lacksHold each), unloaded there; or null |
 | state | `tutorial` | `{ step, grown, printed, told, landed }` the beginning (Tutorial.ts): step wake / printer / designs / open, grown 0..5, the ids of designs printed toward opening the stars, Thales' words already said. Missing: no gate, nothing grown |
@@ -365,7 +367,7 @@ it, swings raise it, a load handed to a copy, stone from rock, a load stowed whe
 room is improved, an away wake plays out, a Spark awakens a copy as a player),
 `node tools/playtest-town.mjs [seed.json] [--port n] [--shots]` (an old save moves into the town once, nothing lost; the
 world is open; copies reach what they need; with a snapshot of the live data it checks the real planet),
-`node tools/playtest-talk.mjs` (the talk hint, E / right click open the box, pages, back, close, the reply line, words read without a module,
+`node tools/playtest-talk.mjs` (the talk hint, E / right click open the box, pages, back, close, the reply line, another copy's box,
 a blank copy, dash still on Shift, the real talk wake with the canned mind),
 `node tools/playtest-homeworld.mjs` (a new player on LHS 1140 b: the scan, Thales' word, the visor, the founded
 structures, Thales by his work, the Printworks printed to the end, Thales never handed over),
@@ -425,7 +427,7 @@ within `talk.json clickRange` (96 px, six tiles) to talk to that one; in the box
 R = reply (a letter it answers at once). M or the speaker icon (top right) mutes.
 
 URL params: `?local` plays from this device's storage (no sign-in), `?shot=1` skips sign-in and intros and stages a
-screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond` for other spots, `&kid` for kid mode),
+screenshot pose (enemies frozen, 9pm, dry; add `&view=base|pond` for other spots),
 `?planet=solace`, `?seed=123` (the default world is the first in planets.json: LHS 1140 b; the playtests that test Earth
 add `&at=sol&pi=3`), `?model=drone`, `?hour=13.5` (time of day), `?rain=1|0`, `?fps` (frame counter),
 `?low` (force low-detail mode; also switches on by itself under 40 fps), `?perf` (the planet's load phases in seconds,
@@ -1115,6 +1117,12 @@ copies' own buildings are untouched (still raised by swings).
   is open, and closing the designs clears any press still waiting.
 - **WAKE or HOLD can be closed** without a copy: Esc, gamepad B, Down (stepping back off the ring; the stick too, once it
   was let go) or a click away from both.
+- **One key press, one row.** On a real keyboard one Down press moved the design menu and the husk vault two rows (the
+  key's own press, then the held key read as the stick). Phaser also hands every key event of a frame to the scene again
+  whenever another arrives in that frame, so on a slow frame Down then Enter moved two more rows instead of printing (the
+  CI failures in `playtest-seedbed` / `-bioworks`). `onPress` (`Controls.ts`) takes each press once; the menus, the
+  journal's Tab / I, M and the star map's Esc use it. `playtest-bioworks` checks a held press and two keys in one frame
+  (the old code moved 0 -> 3), `playtest-manny` the vault.
 - **The game fits a phone's screen** (`src/core/viewport.ts`): on the iPhone the canvas was cut at the top and bottom
   (the design list's header and last row); the game's box now follows the visual viewport less the safe-area insets.
 - **Dash 20% further:** `player.json dash.speed` 290 -> 348 px/s over the same 120 ms (about 35 -> 42 px), so the time
@@ -1122,4 +1130,24 @@ copies' own buildings are untouched (still raised by swings).
 - Verified: build, typecheck, the menu check over every design, a phone-landscape browser (the canvas fits; a tap on
   the model prints nothing; the X closes the menu and nothing reopens), `playtest-bioworks` (the X, a click on the model)
   and `playtest-homeworld` (Esc closes WAKE / HOLD without a copy or spent Ember, and it opens again).
+
+### Session 23c (2026-10-28): the clean-up (Steve: "scrub through this game and clean it up. There are many things unused")
+Checked against the live data first: no Vessel holds a ruin module or a Spark, and no profile uses kid mode. Nothing a save
+holds changes, every world generates as before, and the mind function and its kit are untouched (no redeploy).
+- **Gone, because nothing could reach them any more:** the runes (a copy's words were unreadable until the listening
+  module from a ruin; always readable since the ruins went): `canHear`, the rune text in the talk box, the journal and
+  the song bubbles, and the ten rune glyphs of the prose font. The ruin modules' bonuses (`traits.mods`). The ruin doors'
+  save fields. The cradle wake (no world has used intro `wake` since the homeworld opening) and its sprite.
+- **Kid mode** (no counter, no death, a gentler keeper, a deer that follows you): no profile used it.
+- **Unused code and data:** the sprites `cradle`, `mannydock` (the dock before the husk vault), `module` and `core` (the
+  ruin doors' key); the `upgrade` sound; `accentColor`, `BIOME_LIST`, `isTemperate`, `lotAt` and `rng.pick`; seven
+  fields and imports nothing read; the look-drift tunables in `drift.json` (copies are born blank since session 9),
+  `warren.json` digWork / furnishWork, `supplies.json` placements, `beacon.json` kidHp / kidDamage; four screenshots of
+  things no longer in the game (the old manny dock, a ruin floor, runes).
+- Kept on purpose: `migrateToTown` (the other login still has an Earth save from before the town), the ruin footprints
+  `planetGen` still works out (they keep every world's trees, crystals and ponds where its saves expect them), the
+  beacons, the Spark and the lattice.
+- Verified: build and typecheck (also with unused locals and parameters reported: none left), no export without a user,
+  the mind kit regenerates unchanged, the full `npm test` (22 of 22). `screenshots/font-prose.png` and
+  `sprite-sheet.png` redrawn without the runes and the four sprites.
 

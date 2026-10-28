@@ -53,12 +53,11 @@ export class Saving {
     // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
     if (this.s.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
     if (p.npcTick !== undefined) this.npcTickAt = Date.now();
-    if (!p.embers && !Object.keys(p.nodes).length && !Object.keys(p.doors).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && !p.town && !p.layout && !p.gifts && !p.seen && !p.founded && !p.cembed && p.npcTick === undefined) return;
-    this.s.pending = { embers: 0, nodes: {}, doors: {} };
+    if (!p.embers && !Object.keys(p.nodes).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && !p.town && !p.layout && !p.gifts && !p.seen && !p.founded && !p.cembed && p.npcTick === undefined) return;
+    this.s.pending = { embers: 0, nodes: {} };
     this.saving = true;
     try {
       const data: PlanetData = { nodes: p.nodes };
-      if (Object.keys(p.doors).length) data.doors = p.doors;
       if (p.npcTick !== undefined) data.npcTick = p.npcTick;
       if (p.structures) data.structures = p.structures;
       if (p.village) data.village = p.village;
@@ -84,7 +83,6 @@ export class Saving {
       console.warn('planet save failed, will retry', e);
       this.s.pending.embers += p.embers;
       this.s.pending.nodes = { ...p.nodes, ...this.s.pending.nodes };
-      this.s.pending.doors = { ...p.doors, ...this.s.pending.doors };
       this.s.pending.npcTick ??= p.npcTick;
       this.s.pending.structures ??= p.structures;
       this.s.pending.village ??= p.village;

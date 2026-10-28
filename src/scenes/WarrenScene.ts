@@ -100,7 +100,6 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
   private solid = new Set<string>();
   private poolLights: Light[] = [];
   private ladder = { x: 0, y: 0 };
-  private ladderLight!: Light;
   private leaving = false;
 
   constructor() { super('warren'); }
@@ -125,7 +124,7 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
     this.ladder = { x: lt.x * 16 + 8, y: lt.y * 16 };
     this.add.sprite(this.ladder.x, this.ladder.y, tex('hatch', p.id), 3).setOrigin(0.5, 1).setDepth(DEPTH.walls);
     const day = 1 - this.host.env.night * 0.75;
-    this.ladderLight = this.lighting.add({ x: this.ladder.x, y: this.ladder.y + 4, radius: 44, color: 0xb8c8ff, intensity: 0.5 + 0.5 * day });
+    this.lighting.add({ x: this.ladder.x, y: this.ladder.y + 4, radius: 44, color: 0xb8c8ff, intensity: 0.5 + 0.5 * day });
     this.add.image(this.ladder.x, this.ladder.y + 6, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(PALETTE[20]).setAlpha(0.08 + 0.1 * day).setScale(0.8, 0.5).setDepth(DEPTH.glow);
 
     for (const it of this.warren.data.items) this.addItem(it, false);
@@ -345,7 +344,7 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
   }
 
   /** A copy sings down here: its bubble over its head, its voice panned to where it stands. */
-  sing(npc: Npc, text: string, readable: boolean, opts: { silent?: boolean; harmony?: boolean; notes?: string }) {
+  sing(npc: Npc, text: string, opts: { silent?: boolean; harmony?: boolean; notes?: string }) {
     const v = this.copies.get(npc);
     if (!v) return;
     const w = v.w;
@@ -357,8 +356,8 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
     });
     if (v.b.task !== 'rest') { w.sprite.setFlipX(this.me.x < w.x); this.hop(w); }
     v.bubble?.destroy();
-    v.bubble = makeBubble(this, text, readable, npc.trailColor, npc.voiceSeed);
-    v.bubbleUntil = this.time.now + MIND.bubbleMs * (readable ? 0.8 + text.length / 90 : 0.7);
+    v.bubble = makeBubble(this, text, npc.trailColor);
+    v.bubbleUntil = this.time.now + MIND.bubbleMs * (0.8 + text.length / 90);
   }
 
   private hop(w: Walker) {

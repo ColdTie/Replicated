@@ -3,14 +3,13 @@ import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
 import { PALETTE } from '../core/data';
-import { isKid } from '../core/session';
 import type { Light } from '../fx/Lighting';
 import type { PlanetScene } from '../scenes/PlanetScene';
 import { squash } from './Player';
 
 type Pt = { x: number; y: number };
 
-/** Moss deer. Walk into it to pet it: it hops, hearts float up. In kid mode it then follows you around. */
+/** Moss deer. Walk into it to pet it: it hops, hearts float up. */
 export class Grazer {
   readonly sprite: Phaser.GameObjects.Sprite;
   private shadow: Phaser.GameObjects.Image;
@@ -19,7 +18,6 @@ export class Grazer {
   private target: Pt | null = null;
   private nextThink = 0;
   private petReadyAt = 0;
-  private followUntil = 0;
   private happyUntil = 0;
   private z = 0;
   x: number; y: number;
@@ -42,18 +40,16 @@ export class Grazer {
 
     if (time > this.nextThink && time > this.happyUntil) {
       this.nextThink = time + 1500 + Math.random() * 3000;
-      if (time < this.followUntil && dp > 26) this.target = { x: p.x - p.facing * 16, y: p.y + 4 };
-      else if (Math.random() < 0.45) {
+      if (Math.random() < 0.45) {
         const a = Math.random() * Math.PI * 2, r = 20 + Math.random() * 30;
         this.target = { x: this.x + Math.cos(a) * r, y: this.y + Math.sin(a) * r * 0.6 };
       } else this.target = null;
     }
-    if (time < this.followUntil && dp > 40) this.target = { x: p.x - p.facing * 16, y: p.y + 4 };
 
     let moving = false;
     if (this.target && time > this.happyUntil) {
       const dx = this.target.x - this.x, dy = this.target.y - this.y, d = Math.hypot(dx, dy);
-      const speed = time < this.followUntil && dp > 40 ? 70 : 22;
+      const speed = 22;
       if (d < 2) this.target = null;
       else {
         const nx = this.x + (dx / d) * speed * dt / 1000, ny = this.y + (dy / d) * speed * dt / 1000;
@@ -77,7 +73,6 @@ export class Grazer {
   private pet(time: number) {
     this.petReadyAt = time + 1800;
     this.happyUntil = time + 700;
-    if (isKid()) this.followUntil = time + 25_000;
     this.target = null;
     this.sprite.play(anim(this.texKey, 'happy'));
     squash(this.scene, this.sprite, 0.8, 1.25, 140);

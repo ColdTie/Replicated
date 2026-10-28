@@ -202,11 +202,10 @@ function previewProse(font) {
     if (cur) out.push(cur);
     return out;
   };
-  const runes = Array.from({ length: 10 }, (_, i) => String.fromCharCode(0xe000 + i)).join(' ');
   const rows = [
     [20, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'], [20, 'abcdefghijklmnopqrstuvwxyz'],
     [20, '0123456789 . , ! ? - : ; \' " ( ) [ ] / \\ | % + = & * # < > ^ ~ _ @'],
-    [18, `${runes}    `], [null, ''],
+    [18, ` `], [null, ''],
     [21, 'Glint, to Lumen at Alderamin, 2 days ago:'],
     ...wrap('Hello Lumen. Rain on our roof is soft ticking at first, then a hush like many small hands. Below in the Rain Hall it is a far murmur that makes sleep come easy. I hope your white star sets gently tonight.').map((t) => [2, t]),
     [null, ''], [21, 'Last night'],

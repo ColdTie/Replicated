@@ -13,7 +13,6 @@ export function mulberry32(seed: number): Rng {
 }
 
 export const randInt = (r: Rng, min: number, max: number) => min + Math.floor(r() * (max - min + 1));
-export const pick = <T>(r: Rng, arr: readonly T[]): T => arr[Math.floor(r() * arr.length)];
 
 function hash2(x: number, y: number, seed: number): number {
   let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(seed, 2147483647);

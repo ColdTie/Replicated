@@ -49,7 +49,7 @@ export class HomeScene extends Phaser.Scene {
         if (p) return this.play(store, p);
       }
       if (params.has('shot')) {
-        const p = (await store.listProfiles())[0] ?? await store.createProfile({ name: 'STEVE', kid_mode: params.has('kid'), feature_color: 10, sort: 0 });
+        const p = (await store.listProfiles())[0] ?? await store.createProfile({ name: 'STEVE', kid_mode: false, feature_color: 10, sort: 0 });
         return this.play(store, p);
       }
       return this.showProfiles(store);
@@ -153,7 +153,6 @@ export class HomeScene extends Phaser.Scene {
     body.play(anim(key, 'idle'));
     const name = this.add.bitmapText(0, CARD_H / 2 - 16, 'pixel', p.name.toUpperCase().slice(0, 10)).setOrigin(0.5);
     c.add([body, name]);
-    if (p.kid_mode) c.add(this.add.image(CARD_W / 2 - 10, -CARD_H / 2 + 10, 'shard'));
     c.on('pointerdown', () => {
       if (overlayBusy() || this.picking) return;
       this.picking = true;

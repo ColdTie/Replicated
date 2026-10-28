@@ -9,5 +9,6 @@ A 2D top-down sci-fi game for the browser (Chrome on a laptop). Phaser 3 + TypeS
 npm install
 npm run dev        # local server
 npm run build      # sprites + typecheck + production build
+npm test           # after a build: the mind tool check and every playtest
 node tools/screenshot.mjs --name latest   # headless screenshot into screenshots/
 ```
