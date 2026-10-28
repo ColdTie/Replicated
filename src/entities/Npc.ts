@@ -163,9 +163,9 @@ export class Npc {
     st.patchTraits(this.data.id, { needs: this.data.traits.needs, weary: this.data.traits.weary }, this.below ? undefined : { x: this.x, y: this.y }).catch(() => undefined);
   }
 
-  /** Born blank: grey, dim and still until its first wake makes it itself. */
+  /** Born blank: grey, dim and still by the Replicator until its first wake makes it itself. */
   get blank() { return this.state === 'blank' || this.state === 'held'; }
-  /** Held asleep for a new player (wake or hold at the Vessel Printer): dim, still, its visor dark, no mind. */
+  /** Held asleep for a new player (wake or hold at the Replicator): dim, still, its visor dark, no mind. */
   get held() { return this.state === 'held'; }
   private setHeld() {
     this.state = 'held';
@@ -222,7 +222,7 @@ export class Npc {
 
   get weariness(): 'rested' | 'tired' | 'weary' { return this.weary < 0.35 ? 'rested' : this.weary < 0.8 ? 'tired' : 'weary'; }
 
-  /** Building-up effect as this copy steps out of the Vessel Printer. Calls done() when it can walk. */
+  /** Building-up effect as this copy steps out of the Replicator, its body whole. Calls done() when it can walk. */
   playBirth(done: () => void) {
     this.state = 'born';
     const s = this.sprite;

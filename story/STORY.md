@@ -71,7 +71,7 @@ The beginning teaches the game as it goes (Steve, 2026-10-27).
 | Concept | How it works |
 | --- | --- |
 | Vessels | A life form made from scanned human minds, carrying the Metanoia's drive to explore. |
-| Copying | With enough resources, a Vessel makes a copy of itself. The copy is close to the original, picks a new name, and follows its own desires. Making Vessels takes some difficulty, and that is part of the game: to make one you first go through the designs and build a fully automatic, half biological AI 3D printer (called the Vessel Printer for now) on your own planet. The Supercomputer is the last thing it needs. Once it stands, every Vessel costs the same: making Vessels does not get harder over time. |
+| Copying | With enough resources, a Vessel makes a copy of itself. The copy is close to the original, picks a new name, and follows its own desires. Making Vessels takes some difficulty, and that is part of the game. The end goal of the designs is a computer chip, the Nous Chip: it is used for each new Vessel, its mind. A Vessel can be built anywhere you have the supplies. Thales copied the tenth Vessel before the Cems woke; the Cems just make it faster, and now the Replicator and the Cems are an integrated system. Every Vessel costs the same: making Vessels does not get harder over time. |
 | Vessel and ship | A Vessel is built together with its ship. The resources for making a Vessel are set accordingly. |
 | Wake or hold | When a copy is made, its maker chooses: bring it to life now, or hold it asleep until a real player takes possession of it. Being copied and handed over by an existing player is the only way to join the game. |
 | Vessel numbers | Every Vessel has a number. Thales is the first and you are number 10; the next player who joins is 11, and so on. A Vessel can be made long before it wakes: the moment it is awakened as a new Vessel of the Metanoia, it is celebrated and given its number. |
@@ -94,7 +94,8 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 | 3D printers | Already on the homeworld at the start. They print buildings and other structures. | The early game |
 | Cem building | Biological organisms that build structures on command: the Cems, helped by modified ants and fungus. A menu of designs, from houses to supercomputers. | The early game onward |
 | Cem strains | At a Biolab, wild Cems from Gliese 12 b are changed into a new strain that builds, the way Alaina changed the first ones. | After Cem building |
-| The Vessel Printer (name not final) | A fully automatic, half biological AI 3D printer that builds new Vessels on your own planet. The Supercomputer is the last thing needed to build it. | Making Vessels |
+| The Nous Chip | A computer chip, the end goal of the designs after the Supercomputer. It is used for each new Vessel: its mind. | Making Vessels |
+| The Replicator and the Cems | An integrated system: copying worked before the Cems, and the Cems make it faster. | Making Vessels |
 | Biological computers | To be defined | |
 | Quantum computers | To be defined | |
 | SCUT technology | Faster than light links | Letters between worlds, controlling husks from far away. A later feature: a SCUT communication device lets Vessels talk faster than light; until then a chat between worlds travels at light speed. |
@@ -126,7 +127,7 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 9. **The game starts here.** Thales, the main original, makes a new Vessel: you, awoken as the tenth, the first player. You finish what he started.
 10. You fetch copper and quartz from Gliese 12 b, finish Thales' printer, the Cems wake, and you print your first designs. Then the stars open.
 11. You build with the Cems, copy yourself, unlock new technology, and the Vessels spread out further.
-12. You build the Vessel Printer. New players join: each is handed a Vessel, remembers the beginning, wakes where its maker made it, and is celebrated and given its number (11, 12, ...).
+12. You make Nous Chips. New players join: each is handed a Vessel, remembers the beginning, wakes where its maker made it, and is celebrated and given its number (11, 12, ...).
 13. Vessels reach worlds with intelligent life and start helping those societies.
 
 ## Open questions

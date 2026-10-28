@@ -19,6 +19,8 @@ export class UIScene extends Phaser.Scene {
   /** the store's counters (n: the count shown) */
   private stock: Record<string, { c: Phaser.GameObjects.Container; text: Phaser.GameObjects.BitmapText; n: number }> = {};
   private sparkText!: Phaser.GameObjects.BitmapText;
+  private chipCounter!: Phaser.GameObjects.Container;
+  private chipText!: Phaser.GameObjects.BitmapText;
   private location?: Phaser.GameObjects.Container;
   private stickBase!: Phaser.GameObjects.Arc;
   private stickKnob!: Phaser.GameObjects.Arc;
@@ -63,6 +65,13 @@ export class UIScene extends Phaser.Scene {
     this.onSparks(session.replicant?.traits.sparks ?? 0, true);
     this.game.events.on('sparks', this.onSparks, this);
 
+    // Nous Chips carried (designs.json nouschip): the mind of the next Vessel, shown once you hold one
+    const chipIcon = this.add.sprite(0, 0, 'nouschip', 0).setOrigin(0, 0).setScale(0.75);
+    this.chipText = this.add.bitmapText(14, 5, 'pixel', '0').setTint(PALETTE[18]);
+    this.chipCounter = this.add.container(234, 3, [chipIcon, this.chipText]).setAlpha(0.6).setVisible(false);
+    this.onChips(session.replicant?.traits.chips ?? 0, true);
+    this.game.events.on('chips', this.onChips, this);
+
     this.game.events.on('embers', this.onEmbers, this);
     this.counterText.setText(String((this.scene.get('planet') as unknown as { embers: number }).embers ?? 0));
     this.game.events.on('titlecard', this.titleCard, this);
@@ -74,6 +83,7 @@ export class UIScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.game.events.off('embers', this.onEmbers, this);
       this.game.events.off('sparks', this.onSparks, this);
+      this.game.events.off('chips', this.onChips, this);
       this.game.events.off('supplies', this.onSupplies, this);
       this.game.events.off('titlecard', this.titleCard, this);
       this.game.events.off('location', this.showLocation, this);
@@ -260,9 +270,20 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
+  /** Chips beside the Sparks (in the Sparks' place while there are none). */
+  private onChips(n: number, quiet = false) {
+    this.chipText.setText(String(n));
+    this.chipCounter.setVisible(n > 0).setX(this.sparkCounter.visible ? 262 : 234);
+    if (quiet) return;
+    this.chipCounter.setAlpha(1);
+    this.tweens.add({ targets: this.chipCounter, scale: { from: 1.4, to: 1 }, duration: 220, ease: 'Back.easeOut' });
+    this.time.delayedCall(3000, () => this.tweens.add({ targets: this.chipCounter, alpha: 0.6, duration: 600 }));
+  }
+
   private onSparks(n: number, quiet = false) {
     this.sparkText.setText(String(n));
     this.sparkCounter.setVisible(n > 0);
+    this.chipCounter?.setX(n > 0 ? 262 : 234);
     if (quiet) return;
     this.sparkCounter.setAlpha(1);
     this.tweens.add({ targets: this.sparkCounter, scale: { from: 1.4, to: 1 }, duration: 220, ease: 'Back.easeOut' });

@@ -1,7 +1,7 @@
 // Draws every Cem design (src/data/designs.json) as the world shows it and from four sides of the menu's turntable,
 // with its volume, complexity, tier, price and print time, into screenshots/designs.png, so the designs can be judged
 // in chat without starting the game. Usage: node --experimental-strip-types tools/design-preview.mjs [--cut 0.6]
-// [--only vesselprinter] (one design, into screenshots/design-<id>.png)
+// [--only nouschip] (one design, into screenshots/design-<id>.png)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

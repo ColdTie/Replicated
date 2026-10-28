@@ -1,5 +1,5 @@
-// WAKE or HOLD (story/STORY.md): before the Vessel Printer makes a copy, its maker chooses. Two lights hang over the
-// printer: an open eye (wake it now: it names itself and follows its own desires) and a closed one (hold it asleep
+// WAKE or HOLD (story/STORY.md): before the Replicator makes a copy, its maker chooses. Two lights hang over the
+// Replicator: an open eye (wake it now: it names itself and follows its own desires) and a closed one (hold it asleep
 // for a new player). Left / Right (or the stick) moves between them, attack or E confirms, a click or tap on one picks
 // it. Esc (gamepad B), Down (stepping back off the ring, the stick too) or a click away from both closes it without a
 // copy. Drawn in the world, in the warm and cold of the brief.

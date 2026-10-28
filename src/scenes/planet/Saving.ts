@@ -53,7 +53,7 @@ export class Saving {
     // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
     if (this.s.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
     if (p.npcTick !== undefined) this.npcTickAt = Date.now();
-    if (!p.embers && !Object.keys(p.nodes).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && !p.town && !p.layout && !p.gifts && !p.seen && !p.founded && !p.cembed && p.vesselPrint === undefined && p.npcTick === undefined) return;
+    if (!p.embers && !Object.keys(p.nodes).length && !p.structures && !p.village && !p.beacon && !p.felled && !p.warren && !p.supplies && !p.buildings && !p.label && !p.town && !p.layout && !p.gifts && !p.seen && !p.founded && !p.cembed && p.replication === undefined && p.npcTick === undefined) return;
     this.s.pending = { embers: 0, nodes: {} };
     this.saving = true;
     try {
@@ -73,7 +73,7 @@ export class Saving {
       if (p.seen) data.seen = p.seen;
       if (p.founded) data.founded = true;
       if (p.cembed) data.cembed = p.cembed;
-      if (p.vesselPrint !== undefined) data.vesselPrint = p.vesselPrint;
+      if (p.replication !== undefined) data.replication = p.replication;
       const row = await st.applyPlanetDelta(this.s.planet.star, this.s.planet.planetIndex, p.embers, data);
       if (row) {
         this.s.embers = row.embers + this.s.pending.embers;
@@ -97,7 +97,7 @@ export class Saving {
       this.s.pending.seen ??= p.seen;
       this.s.pending.founded ??= p.founded;
       this.s.pending.cembed ??= p.cembed;
-      if (this.s.pending.vesselPrint === undefined) this.s.pending.vesselPrint = p.vesselPrint;
+      if (this.s.pending.replication === undefined) this.s.pending.replication = p.replication;
     } finally {
       this.saving = false;
     }

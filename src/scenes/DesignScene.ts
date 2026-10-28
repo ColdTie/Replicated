@@ -75,7 +75,7 @@ export class DesignScene extends Phaser.Scene {
     this.controls.modal = true;
     this.buildRows();
     const ready = this.rows.findIndex((r) => !r.why);
-    this.index = ready >= 0 ? ready : Math.max(0, this.rows.findIndex((r) => !r.why?.startsWith('NEEDS') && !r.why?.startsWith('ONLY')));
+    this.index = ready >= 0 ? ready : Math.max(0, this.rows.findIndex((r) => !r.why?.startsWith('NEEDS')));
     this.drawList();
     this.drawInfo();
     // a key moves one row on its press; the held key also reads as the stick, so that counts as held (no second row)
@@ -112,7 +112,7 @@ export class DesignScene extends Phaser.Scene {
     this.rows.forEach((r, i) => {
       if (i < top || i >= top + LIST_ROWS) return;
       const y = LIST_Y + (i - top) * ROW_H, on = i === this.index;
-      const locked = !!r.why?.startsWith('NEEDS') || !!r.why?.startsWith('ONLY');
+      const locked = !!r.why?.startsWith('NEEDS');
       const bg = add(this.add.rectangle(LIST_X - 4, y - 3, 176, ROW_H - 2, on ? PALETTE[23] : PALETTE[24], on ? 1 : 0.5).setOrigin(0, 0).setStrokeStyle(1, on ? PALETTE[12] : PALETTE[23], on ? 1 : 0.5));
       bg.setInteractive({ useHandCursor: true }).on('pointerdown', () => { if (this.busy) return; if (this.index === i) this.print(); else { this.index = i; sound.designMove(i); this.refresh(); } });
       add(this.add.bitmapText(LIST_X, y, 'pixel', r.m.def.name.toUpperCase()).setTint(locked ? PALETTE[22] : on ? PALETTE[19] : PALETTE[20]));
@@ -120,8 +120,7 @@ export class DesignScene extends Phaser.Scene {
       const tier = TIERS.indexOf(r.m.tier);
       for (let k = 0; k < TIERS.length; k++) add(this.add.rectangle(LIST_X + k * 5, y + 12, 3, 3, k <= tier ? (locked ? PALETTE[22] : PALETTE[12]) : on ? PALETTE[22] : PALETTE[23]).setOrigin(0));
       add(this.add.bitmapText(LIST_X + 28, y + 10, 'pixel', r.m.tier).setTint(PALETTE[22]));
-      const [word, tint] = r.why?.startsWith('ONLY') ? ['HOMEWORLD', 22] : locked ? ['LOCKED', 22] : !r.why ? ['READY', 12]
-        : r.why.startsWith('NEED MORE') ? ['NEED', 29] : r.why.startsWith('ONE ') ? ['BUILT', 10] : ['WAIT', 21];
+      const [word, tint] = locked ? ['LOCKED', 22] : !r.why ? ['READY', 12] : r.why.startsWith('NEED MORE') ? ['NEED', 29] : ['WAIT', 21];
       add(this.add.bitmapText(LIST_X + 168, y, 'pixel', word).setOrigin(1, 0).setTint(PALETTE[tint]));
       if (r.built) add(this.add.bitmapText(LIST_X + 168, y + 10, 'pixel', `x${r.built}`).setOrigin(1, 0).setTint(PALETTE[10]));
     });

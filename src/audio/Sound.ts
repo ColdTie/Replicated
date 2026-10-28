@@ -632,7 +632,7 @@ class SoundEngine {
     [0, 7, 12, 19].forEach((s, i) => this.tone(midi(67 + s), 1.4, { type: 'sine', vol: 0.07, delay: 0.5 + i * 0.1, rev: 0.8 }));
   }
 
-  /** A scanner reading a Vessel (the Vessel Printer's, the opening's Replicator): a soft rising and falling sweep. */
+  /** Replicator scanning the player: a soft rising and falling sweep. */
   scan() {
     if (!this.ready('scan', 500)) return;
     // attack: the scanner's relay clicks in
@@ -715,7 +715,7 @@ class SoundEngine {
     this.noise(1.4, { type: 'highpass', freq: 3000, vol: 0.04, delay: seconds + 0.15, attack: 0.2 });
   }
 
-  /** Wake or hold: the two lights open over the Vessel Printer (a held breath), move between them, and the pick: a
+  /** Wake or hold: the two lights open over the Replicator (a held breath), move between them, and the pick: a
    * rising open fifth for a waking, a low falling lullaby for one held asleep. */
   choiceOpen() { if (this.ready('choice', 300)) [0, 7].forEach((s, i) => this.tone(midi(69 + s), 0.6, { type: 'sine', vol: 0.05, delay: i * 0.12, attack: 0.08, rev: 0.7, bus: 'ui' })); }
   choiceMove(i: number) { if (this.ready('choiceMove', 60)) this.tone(midi(i ? 76 : 81), 0.12, { type: 'triangle', vol: 0.05, rev: 0.3, bus: 'ui' }); }

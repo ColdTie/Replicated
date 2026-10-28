@@ -1,15 +1,17 @@
 # One Metanoia: the plan (2026-10-28)
 
 Steve's direction for making Vessels, joining and playing together. The story side is in `story/STORY.md` (Copying,
-Vessel numbers, The memory, Joining, Names, One Metanoia, Bases, the Vessel menu). Nothing here is built yet. Steps
-run in order; each ships on its own, verified (build, `npm test`, a playtest of its own, screenshots).
+Vessel numbers, The memory, Joining, Names, One Metanoia, Bases, the Vessel menu). Step 1 is built; the rest is not.
+Steps run in order; each ships on its own, verified (build, `npm test`, a playtest of its own, screenshots).
 
 ## Decided (Steve, 2026-10-28)
 
-- Making a Vessel is hard once: go through the designs, then build the Vessel Printer (name not final), a fully
-  automatic, half biological AI 3D printer, on the homeworld. The Supercomputer is the last thing it needs.
-- After that, a Vessel's price stays what it is today (30 Ember, `drift.json cost`). It never rises, and no trips are
-  needed for it ("the scarcity should not change").
+- Making a Vessel takes some difficulty: the end goal of the designs is a computer chip, the Nous Chip (after the
+  Supercomputer), and every new Vessel needs one, its mind. Vessels can be built anywhere you have the supplies; the
+  Cems make it faster, and the Replicator and the Cems are one system (Thales copied the tenth Vessel before the Cems
+  woke). A first try, a homeworld-only "Vessel Printer" building, was not what Steve meant and was replaced.
+- A Vessel's price is fixed: a Nous Chip and 30 Ember (`drift.json cost`). It never rises ("the scarcity should not
+  change").
 - Everyone shares one galaxy. Every new player is handed a Vessel by a current player.
 - A login is four letters (public) and private numbers (8 digits), in place of email and password.
 - Vessel numbers: Thales is 1, Steve 10, the next 11 and so on. A Vessel can be made long before it wakes; its number
@@ -20,23 +22,18 @@ run in order; each ships on its own, verified (build, `npm test`, a playtest of 
 - A Vessel menu on Tab (and a small button): how many Vessels you have and where, your name, chat with other Vessels.
 - Everyone can see each other. Later: more bases on the homeworld, because there will be too many people for one.
 
-## Step 1: the Vessel Printer (no database change) — built 2026-10-28 (CLAUDE.md session 24)
+## Step 1: the Nous Chip and the Replicator with the Cems (no database change) — built 2026-10-28 (CLAUDE.md session 24)
 
-Also done with it: Thales no longer counts toward a world's six copies, and `travel.json needCopy` is off (copies are
-made only at home, so the old rule would have kept you on any other world).
-
-- A tenth design, `vesselprinter`, in `designs.json`: needs the Supercomputer, homeworld only, one. Its price comes from
-  its voxel model like every design (the top of the chain). The Supercomputer's line becomes "OPENS THE VESSEL
-  PRINTER".
-- Its look: a gantry over a bed of live Cems, a dark AI core wired in copper, the pod where a Vessel forms.
-- Its door (a ring fills, or attack) opens WAKE or HOLD (`src/ui/wakeChoice.ts`, unchanged). Paid with 30 Ember, it
-  prints the body by itself, by the clock (also while nobody plays); the new Vessel steps out of the pod. The birth
-  code moves from the Replicator (`PlanetScene`, `Base.ts`) to the printer.
-- The Replicator stops making copies: no build pad on other worlds; on the homeworld it stays as the ring where Thales
-  woke you. Vessels already made are unchanged. `drift.json maxPerPlanet` stays.
-- Nobody can join until the first Vessel Printer stands.
-- Tests: the playtests that make copies at the Replicator (`playtest`, `-homeworld`, `-together`, `-become`, `-town`)
-  make them at a staged printer; a new `playtest-vesselprinter`.
+- `designs.json nouschip` (`place: "bed"`): the last of the Cems' designs, opened by the Supercomputer. The Cems print
+  it on their bed; finished, it lies there until someone walks onto it, then it is carried (`traits.chips`;
+  `src/entities/Chips.ts`, a counter at the top).
+- The Replicator, on any world (its pad as before): a copy takes one chip and 30 Ember. WAKE or HOLD as before; the
+  maker is scanned and free; the body prints beside the Replicator by the clock, also while nobody plays
+  (`src/entities/Replication.ts`, `planet_states.data.replication`): 40 s with the world's Cems awake (quicker with
+  their strain), 10 minutes without them. Its row's id is chosen when it begins, so it is made once.
+- Thales no longer counts toward a world's six copies; `travel.json needCopy` is off (every copy needs a chip, so most
+  worlds would have none to leave behind).
+- Tests: the new `playtest-replicate`; `playtest`, `-become`, `-homeworld` copy with a chip and a short print.
 
 ## Step 2: letters, numbers and one galaxy (database change: Steve approves first)
 

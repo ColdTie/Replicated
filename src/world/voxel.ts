@@ -10,9 +10,8 @@ export interface Part {
 }
 export interface DesignDef {
   id: string; name: string; gives: string; about: string; needs?: string[]; parts: Part[];
-  /** 'post': stands at a free street lamp spot instead of taking a lot */ place?: 'post';
-  /** printed only on this world (a planets.json id) */ only?: string;
-  /** at most this many on a world (standing or being printed) */ max?: number;
+  /** 'post': stands at a free street lamp spot instead of taking a lot; 'bed': printed on the Cem bed itself, a thing
+   * you carry (the Nous Chip), not a building */ place?: 'post' | 'bed';
 }
 export interface MaterialDef { ramp: number[]; alt?: number[]; glass?: boolean; emissive?: boolean }
 export interface Costing {
