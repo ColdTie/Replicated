@@ -6,7 +6,6 @@ import TALK from '../../data/talk.json';
 import { session } from '../../core/session';
 import { Npc } from '../../entities/Npc';
 import { allRooms, describeWarren, restOf } from '../../world/warren';
-import { Spark } from '../../entities/Resources';
 import type { AwayItem, MindContext, MindResult, ReplicantSummary } from '../../net/store';
 import { mailSeconds } from '../../world/galaxy';
 import type { PlanetScene } from '../PlanetScene';
@@ -47,7 +46,7 @@ export class Minds {
     this.s.game.events.on('journal', onJournal);
     this.s.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.s.game.events.off('journal', onJournal); closeJournal(); });
     if (params.has('chorus')) this.s.time.delayedCall(2500, () => this.chorus(true));
-    if (params.has('sing')) this.s.time.delayedCall(1500, () => this.s.npcs[0]?.sing(MIND.canned.songs[0], this.s.canHear()));
+    if (params.has('sing')) this.s.time.delayedCall(1500, () => this.s.npcs[0]?.sing(MIND.canned.songs[0]));
     if (this.s.shot || this.s.visit) return;
     const me = session.replicant;
     this.mindLog.push({ t: this.mindClock, text: `${me?.name ?? 'the original'} ${this.s.arrival ? 'landed here in the vessel' : 'is here'}` });
@@ -64,7 +63,6 @@ export class Minds {
   /** What the copies did in their away wakes (the mind function, while nobody played), played out now. */
   replayAway(items: AwayItem[]) {
     if (!items?.length || this.s.stopped) return;
-    const hear = this.s.canHear();
     let k = 0, proposals = 0;
     for (const it of [...items].sort((a, b) => a.at - b.at)) {
       const npc = this.s.npcs.find((n) => n.data.id === it.id);
@@ -93,7 +91,7 @@ export class Minds {
         else if (a.type === 'propose') {
           log(`${name} read the code of the world and proposed a change to it: ${a.detail ?? 'something'}`);
           // after the "while you were away" notice, one at a time
-          if (hear) this.s.time.delayedCall(4000 * ++proposals, () => this.s.game.events.emit('notice', `${name.toUpperCase()} PROPOSES A CHANGE TO THE GAME`));
+          this.s.time.delayedCall(4000 * ++proposals, () => this.s.game.events.emit('notice', `${name.toUpperCase()} PROPOSES A CHANGE TO THE GAME`));
         }
         else if (a.type === 'melody') log(`${name} found its voice on the ${a.instrument}`);
         else if (a.type === 'tell' && a.body) npc.data.traits.tell = { text: a.body, at: a.at ?? it.at };
@@ -103,7 +101,7 @@ export class Minds {
         const song = it.song, sing = (tries: number) => {
           if (!this.s.npcs.includes(npc)) return;
           if (npc.below && tries > 0) { this.s.time.delayedCall(3000, () => sing(tries - 1)); return; }
-          if (!npc.below) npc.sing(song, hear);
+          if (!npc.below) npc.sing(song);
         };
         this.s.time.delayedCall(8000 + k * 7000, () => sing(40));
       }
@@ -272,14 +270,13 @@ export class Minds {
   /** What a wake brought: letters, a voice, its song (not for a talk: the tell is the answer), and its deeds. */
   applyMind(npc: Npc, res: MindResult, talk: boolean) {
     const st = session.store!;
-    const hear = this.s.canHear();
     if (res.received?.length && !talk) npc.receiveLetter();
     const melody = res.actions?.find((a) => a.type === 'melody');
     if (melody) {
       npc.data.traits.voice = { instrument: melody.instrument ?? 'hum', mood: melody.mood ?? 'bright', tempo: melody.tempo ?? 'walking' };
-      if (hear) this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} SINGS ON THE ${String(melody.instrument).toUpperCase()}`);
+      this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} SINGS ON THE ${String(melody.instrument).toUpperCase()}`);
     }
-    if (res.song && !talk) { const say = () => { if (this.s.npcs.includes(npc)) npc.sing(res.song!, hear, { notes: melody?.notes || undefined }); }; if (res.received?.length) setTimeout(say, 900); else say(); }
+    if (res.song && !talk) { const say = () => { if (this.s.npcs.includes(npc)) npc.sing(res.song!, { notes: melody?.notes || undefined }); }; if (res.received?.length) setTimeout(say, 900); else say(); }
     for (const a of res.actions ?? []) {
       if (a.type === 'mail') {
         const to = this.s.npcs.find((n) => n.data.id === a.toId);
@@ -288,7 +285,7 @@ export class Minds {
         const was = npc.data.name.toUpperCase();
         npc.data.name = a.name;
         this.s.announceLocation();
-        this.s.game.events.emit('notice', hear ? `${was} IS NOW ${a.name.toUpperCase()}` : `${was} HAS A NEW NAME`);
+        this.s.game.events.emit('notice', `${was} IS NOW ${a.name.toUpperCase()}`);
       } else if (a.type === 'cut' || a.type === 'demolish') {
         const chore = a.type === 'cut' ? () => this.cutTree(npc) : () => this.demolish(npc, a.kind ?? 'any');
         if (this.s.talker.talk?.npc === npc) this.s.talker.afterTalk.set(npc, [...(this.s.talker.afterTalk.get(npc) ?? []), chore]);
@@ -300,7 +297,7 @@ export class Minds {
         this.s.announceLocation();
         this.s.time.delayedCall(900, () => this.s.floatName(npc));
         this.mindLog.push({ t: this.mindClock, text: `${was} became itself: it is ${npc.data.name} now` });
-        this.s.game.events.emit('notice', hear ? `${was.toUpperCase()} IS ${npc.data.name.toUpperCase()} NOW` : `${was.toUpperCase()} HAS BECOME ITSELF`);
+        this.s.game.events.emit('notice', `${was.toUpperCase()} IS ${npc.data.name.toUpperCase()} NOW`);
       } else if (a.type === 'wants' && a.wants) {
         const before = (npc.data.traits.wants ?? []).filter((w) => w.done).length;
         npc.data.traits.wants = a.wants;
@@ -311,11 +308,11 @@ export class Minds {
         this.s.warren.dig(npc, a);
       } else if (a.type === 'furnish') {
         this.s.warren.furnish(npc, a);
-      } else if (a.type === 'look' && hear) {
+      } else if (a.type === 'look') {
         this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} DESCRIBES A NEW BODY`);
-      } else if (a.type === 'request' && hear) {
+      } else if (a.type === 'request') {
         this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} ASKS FOR ${String(a.kind ?? '').toUpperCase()}`);
-      } else if (a.type === 'propose' && hear) {
+      } else if (a.type === 'propose') {
         this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} PROPOSES A CHANGE TO THE GAME`);
       } else if (a.type === 'tell' && a.body) {
         // what it would tell you when you come over (the talk box shows it)
@@ -367,7 +364,7 @@ export class Minds {
         this.s.hands.fell(tree, npc.x);
         this.s.time.delayedCall(1500, () => this.s.flyMaterial('wood', { x: tree.x, y: tree.y }, this.s.warren.hatch, SUPPLIES.treeWood));
         this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} cut down a tree near the base (${SUPPLIES.treeWood} wood)` });
-        if (this.s.canHear()) this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} CUT DOWN A TREE`);
+        this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} CUT DOWN A TREE`);
       },
     });
   }
@@ -386,7 +383,7 @@ export class Minds {
         if (!this.s.village.remove(s)) return;
         sound.pop(s);
         this.mindLog.push({ t: this.mindClock, text: `${npc.data.name} took down its ${s.type}` });
-        if (this.s.canHear()) this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} TOOK DOWN A ${s.type.toUpperCase()}`);
+        this.s.game.events.emit('notice', `${npc.data.name.toUpperCase()} TOOK DOWN A ${s.type.toUpperCase()}`);
       },
     });
   }
@@ -397,11 +394,10 @@ export class Minds {
     if (singers.length < (force ? 1 : 2)) return;
     const lines = MIND.chorusLines;
     const line = lines[Math.floor(Math.random() * lines.length)];
-    const hear = this.s.canHear();
     sound.chorus(singers.map((n) => n.voiceSeed), line);
     singers.forEach((n, i) => this.s.time.delayedCall(i * 500, () => {
       if (!this.s.npcs.includes(n)) return;
-      n.sing(line, hear, { silent: true });
+      n.sing(line, { silent: true });
       this.s.fx.sparks(n.x, n.y - 12, n.trailColor, 5);
     }));
   }
@@ -426,7 +422,7 @@ export class Minds {
       awaken: (id: string) => void this.awakenCopy(id),
       vetoChange: (id: string) => { void st.vetoRequest(id).catch((e) => console.warn('veto', e)).then(() => { closeJournal(); return this.toggleJournal(); }); },
     };
-    openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.s.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.s.placeLabel, canHear: this.s.canHear(), copies: this.s.npcs.map((n) => n.data), names, journal: j, feelings, actions,
+    openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.s.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.s.placeLabel, copies: this.s.npcs.map((n) => n.data), names, journal: j, feelings, actions,
       buildings: this.s.buildings.describe(nameOf), pending: this.s.buildings.list.filter((b) => !b.vetoed && !b.approved && !b.built).map((b) => ({ id: b.id, name: b.name })), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
   }
 

@@ -1,5 +1,5 @@
 {
-  "_doc": "Replication. cost = Embers from the planet pool per copy; maxPerPlanet copies can live on one planet. Each copy inherits its parent's look and stats, then drifts: chances to change visor color, headgear (gear.json frame 1..6) and trail color (palette index), plus small stat nudges (multipliers, clamped). gatherPerHour = Embers one copy adds to the pool per real hour (times its gather stat), counted while nobody is playing up to offlineCapHours. tripMs = how often a copy brings back an Ember while you watch. blankDrift: since session 9 copies are born blank and choose their own look; their stats drift this fraction of the old amount.",
+  "_doc": "Replication. cost = Embers from the planet pool per copy; maxPerPlanet copies can live on one planet. A copy is born blank and chooses its own look; it inherits its parent's stats with small nudges (multipliers, clamped): each stat drifts up to drift times blankDrift. gatherPerHour = Embers one copy adds to the pool per real hour (times its gather stat), counted while nobody is playing up to offlineCapHours. tripMs = how often a copy brings back an Ember while you watch.",
   "cost": 30,
   "spark": {
     "_doc": "A Spark spent at the Replicator while a copy (not blank) stands within range px of the ring: the newborn comes from that copy instead of the original (its stats drift from it, it is its child), inherits its newest notes notes and its open wants, and its mind is told it remembers being that copy, a little differently.",
@@ -7,28 +7,6 @@
     "notes": 12
   },
   "maxPerPlanet": 6,
-  "visorChance": 0.6,
-  "gearChance": 0.75,
-  "trailChance": 0.8,
-  "gears": [
-    1,
-    2,
-    3,
-    4,
-    5,
-    6
-  ],
-  "trails": [
-    9,
-    10,
-    11,
-    12,
-    17,
-    18,
-    26,
-    28,
-    29
-  ],
   "stats": {
     "speed": {
       "drift": 0.06,

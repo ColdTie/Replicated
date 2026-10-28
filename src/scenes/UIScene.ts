@@ -1,7 +1,7 @@
 // Screen-space layer: the Ember counter and the store's (iron, hydrogen, salt, quartz, copper), landing title card, the talk box, and touch controls.
 import Phaser from 'phaser';
 import { PALETTE } from '../core/data';
-import { isKid, session } from '../core/session';
+import { session } from '../core/session';
 import { onPress, touch } from '../input/Controls';
 import { sound } from '../audio/Sound';
 import { TalkBox } from '../ui/dialogue';
@@ -44,15 +44,13 @@ export class UIScene extends Phaser.Scene {
     const icon = this.add.image(0, 0, 'shard').setOrigin(0, 0);
     this.counterText = this.add.bitmapText(15, 5, 'pixel', '0');
     this.counter = this.add.container(6, 4, [icon, this.counterText]).setAlpha(0.35);
-    // Kid mode: no numbers on screen; collected embers still float up and fill the shared base
-    this.counter.setVisible(!isKid());
 
     // Iron and hydrogen (the materials of a husk), salt, quartz and copper (the Cems' designs) in this world's store,
     // beside the Embers
     const tints: Record<string, number> = { iron: 20, hydrogen: 29, salt: 2, quartz: 28, copper: 9 };
     for (const [i, kind] of (['iron', 'hydrogen', 'salt', 'quartz', 'copper'] as const).entries()) {
       const text = this.add.bitmapText(15, 5, 'pixel', '0').setTint(PALETTE[tints[kind]]);
-      const c = this.add.container(44 + i * 38, 4, [this.add.image(0, 0, kind).setOrigin(0, 0), text]).setAlpha(0.35).setVisible(!isKid());
+      const c = this.add.container(44 + i * 38, 4, [this.add.image(0, 0, kind).setOrigin(0, 0), text]).setAlpha(0.35);
       this.stock[kind] = { c, text, n: -1 };
     }
     this.onSupplies((this.scene.get('planet') as unknown as { supplies?: Record<string, number> }).supplies ?? {}, true);
@@ -264,7 +262,7 @@ export class UIScene extends Phaser.Scene {
 
   private onSparks(n: number, quiet = false) {
     this.sparkText.setText(String(n));
-    this.sparkCounter.setVisible(n > 0 && !isKid());
+    this.sparkCounter.setVisible(n > 0);
     if (quiet) return;
     this.sparkCounter.setAlpha(1);
     this.tweens.add({ targets: this.sparkCounter, scale: { from: 1.4, to: 1 }, duration: 220, ease: 'Back.easeOut' });
@@ -274,14 +272,13 @@ export class UIScene extends Phaser.Scene {
   /** Top left, under the counter: "MARS - SOL" and the replicants living here, each in its visor color. */
   private showLocation(place: string, who: { name: string; color: number }[]) {
     this.location?.destroy();
-    const y0 = isKid() ? 5 : 19;
     const items: Phaser.GameObjects.GameObject[] = [this.add.bitmapText(0, 0, 'pixel', place).setTint(PALETTE[20])];
     who.slice(0, 7).forEach((w, i) => {
       items.push(this.add.rectangle(1, 11 + i * 9 + 3, 3, 3, w.color).setOrigin(0, 0.5));
       items.push(this.add.bitmapText(7, 11 + i * 9, 'pixel', w.name).setTint(w.color).setAlpha(0.85));
     });
     if (who.length > 7) items.push(this.add.bitmapText(7, 11 + 7 * 9, 'pixel', `+${who.length - 7}`).setTint(PALETTE[21]));
-    this.location = this.add.container(7, y0, items).setAlpha(0.6).setDepth(10);
+    this.location = this.add.container(7, 19, items).setAlpha(0.6).setDepth(10);
   }
 
   /** ?perf: where the planet's load went, bottom left, for a while. */

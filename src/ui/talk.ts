@@ -3,8 +3,8 @@
 // runs in Node too (the box passes a measure for its prose font).
 import type { Letter, Note, Want } from '../net/store';
 
-/** How a run of text is drawn: its own words (body), framing (lead, meta), your words (you), wants (mark, done), runes. */
-export type Tone = 'body' | 'lead' | 'meta' | 'you' | 'mark' | 'done' | 'rune';
+/** How a run of text is drawn: its own words (body), framing (lead, meta), your words (you), wants (mark, done). */
+export type Tone = 'body' | 'lead' | 'meta' | 'you' | 'mark' | 'done';
 export interface Seg { text: string; tone: Tone }
 export type Line = Seg[];
 export type Section = 'SAYS' | 'THOUGHTS' | 'WANTS' | 'LETTERS' | '';
@@ -25,9 +25,6 @@ export interface TalkInput {
   copyId: string;
   name: string;
   blank: boolean;
-  canHear: boolean;
-  /** the plain line shown above the runes until you can hear them */
-  hint?: string;
   now: number;
   playerId?: string;
   /** what the copy wants to tell you (traits.tell, written by its mind) */
@@ -92,15 +89,6 @@ export function relTime(at: number | string, now: number) {
   return `${Math.round(days / 7)} weeks ago`;
 }
 
-/** The ten rune glyphs of the prose font (the same ten as the song bubbles). */
-const RUNE0 = 0xe000;
-/** Same word, same runes: a line looks like one fixed thing you cannot read yet. */
-export function runeText(text: string) {
-  return text.split(' ').map((w) => {
-    let h = 7;
-    return [...w].map((c) => { h = (h * 31 + c.charCodeAt(0)) >>> 0; return String.fromCharCode(RUNE0 + (h % 10)); }).join('');
-  }).join(' ');
-}
 export const MARK_OPEN = '', MARK_DONE = '';
 
 // ---------------------------------------------------------------- layout
@@ -177,11 +165,10 @@ function paginate(section: Section, keyBase: string, blocks: Block[], l: TalkLay
 export function composeTalk(t: TalkInput, l: TalkLayout): TalkPage[] {
   const name = normalize(t.name) || 'It';
   if (t.blank) return [{ key: 'blank:0', section: '', lines: [[{ text: '.   .   .', tone: 'meta' }]] }];
-  // its words become runes until you can hear them; the framing stays plain (when, who)
-  const own = (text: string, tone: Tone = 'body'): Seg => (t.canHear ? { text: normalize(text), tone } : { text: runeText(normalize(text)), tone: 'rune' });
+  // its own words, and the framing (when, who)
+  const own = (text: string, tone: Tone = 'body'): Seg => ({ text: normalize(text), tone });
   const plain = (text: string, tone: Tone = 'meta'): Seg => ({ text, tone });
   const pages: TalkPage[] = [];
-  const hint: Block | null = !t.canHear && t.hint ? [{ segs: [plain(t.hint)] }] : null;
 
   // SAYS: what you said this visit and its answers (newest first), then what it wanted to tell you
   t.exchanges.forEach((x, i) => {
@@ -193,7 +180,7 @@ export function composeTalk(t: TalkInput, l: TalkLayout): TalkPage[] {
   });
   const notes = [...(t.notes ?? [])].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   let usedNote: Note | undefined;
-  const says: Block[] = hint ? [hint] : [];
+  const says: Block[] = [];
   const staleMs = l.staleMs ?? 30 * 60_000;
   const tell = t.tell && normalize(t.tell.text) ? t.tell : undefined;
   if (tell) {

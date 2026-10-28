@@ -2,7 +2,7 @@
 // notes and letters): walk up to a copy and its talk hint shows; E opens the talk box (SAYS, THOUGHTS, WANTS,
 // LETTERS), E / Space turn the pages, Left goes back, Esc closes and the copy goes back to what it was doing;
 // right click opens it too and no longer dashes (Shift still does); a left click on a copy a few steps away talks to
-// it; a blank copy has one wordless page; words readable without any module; R sends a reply as a
+// it; a blank copy has one wordless page; another copy's box opens on its words; R sends a reply as a
 // letter and the copy's answer comes as a new page.
 // Usage: npm run build && node tools/playtest-talk.mjs [seed.json] [journal.json]
 // (without arguments it seeds a small made-up Earth of its own)
@@ -55,7 +55,7 @@ const npcs = world.npcs.map((n) => (n.id === glintId ? { ...n, traits: { ...n.tr
 const db = {
   profiles: [{ id: 'p1', name: 'STEVE', kid_mode: false, feature_color: 10, sort: 0 }],
   replicants: [
-    { id: PLAYER_ID, profile_id: 'p1', name: 'Steve', model: 'replicant', traits: { awake: true, feature: 10, mods: ['listen'] }, status: 'active', star_id: world.planet.star, planet_index: world.planet.pi, pos_x: null, pos_y: null },
+    { id: PLAYER_ID, profile_id: 'p1', name: 'Steve', model: 'replicant', traits: { awake: true, feature: 10 }, status: 'active', star_id: world.planet.star, planet_index: world.planet.pi, pos_x: null, pos_y: null },
     ...npcs,
     ...world.journal.others.map((o) => ({ id: o.id, profile_id: null, name: o.name, model: 'replicant', status: o.status, star_id: o.star_id, planet_index: o.planet_index, pos_x: null, pos_y: null, traits: { v: 1 } })),
   ],
@@ -298,10 +298,9 @@ try {
   await page.waitForTimeout(300);
   await ev((id) => { const n = window.__scene.npcs.find((q) => q.data.id === id); n.x += 300; n.sync(); }, kilnId);
 
-  // 8. no module needed to understand them (the ruins that held it are gone): Prism's words read plainly
+  // 8. Prism's box opens on its words
   await ev(({ id, sp }) => {
     const s = window.__scene, n = s.npcs.find((q) => q.data.id === id);
-    window.__session.replicant.traits.mods = [];
     s.player.setPosition(sp.x - 64, sp.y);
     // Prism stays put while it is talked to (a copy left to itself may stroll off before E)
     n.hold = true; n.setPosition(sp.x - 46, sp.y);
@@ -310,15 +309,14 @@ try {
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(500);
   await typed();
-  const heard = await ev(() => { const t = window.__game.scene.getScene('ui').talkBox; return { tones: t.page.lines.flat().map((s) => s.tone), text: t.page.lines.map((l) => l.map((s) => s.text).join('')).join(' ') }; });
-  log('hears without modules', heard.text.slice(0, 90));
-  if (heard.tones.includes('rune') || heard.text.includes('cannot read them yet')) fail('runes without the listening module');
+  const heard = await ev(() => { const t = window.__game.scene.getScene('ui').talkBox; return { open: t.isOpen, text: t.page.lines.map((l) => l.map((s) => s.text).join('')).join(' ') }; });
+  log('prism says', heard.text.slice(0, 90));
+  if (!heard.open || !heard.text.trim()) fail('Prism\'s box did not open on its words');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
 
   // 9. R: a reply goes as a letter (no quick wake), the mind's talk wake answers as a new SAYS page
   await ev(() => {
-    window.__session.replicant.traits.mods = ['listen'];
     const s = window.__scene;
     window.__talkCalls = [];
     // stands in for the mind's PlanetScene.requestTalk (built in parallel): a talk wake that answers

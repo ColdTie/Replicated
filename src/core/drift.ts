@@ -1,17 +1,11 @@
-// Replication drift: a copy inherits its parent's look and stats, then changes a little.
+// Replication drift: a copy inherits its parent's stats, changed a little (its look it chooses itself).
 import DRIFT from '../data/drift.json';
-import { PLAYER } from './data';
 import { PARTS } from './body';
 import type { ReplicantSave } from '../net/store';
 
 export { DRIFT };
 export type StatKey = keyof typeof DRIFT.stats;
 export type Stats = Partial<Record<StatKey, number>>;
-
-const pick = <T>(arr: readonly T[], not?: T) => {
-  const options = arr.filter((v) => v !== not);
-  return options[Math.floor(Math.random() * options.length)] ?? arr[0];
-};
 
 /** Stat multiplier for a replicant (1 when unset). */
 export const stat = (r: { stats?: Stats } | null | undefined, k: StatKey) => r?.stats?.[k] ?? 1;
@@ -26,8 +20,7 @@ export function copyName(base: string, generation: number) {
 /**
  * Make the copy's row (not yet saved). Since session 9 a copy is born blank: a grey android with no visor color,
  * headgear, trail, voice or name of its own, and only a small stat drift. It chooses all of that on its first wake
- * (the becoming); until then it stands dim and still by the Replicator. (The old inherit-and-drift look is still
- * what the first copies on Earth have.)
+ * (the becoming); until then it stands dim and still by the Replicator.
  */
 export function replicate(parent: ReplicantSave, star: string, planetIndex: number, x: number, y: number): Omit<ReplicantSave, 'id'> {
   const stats: Stats = {};

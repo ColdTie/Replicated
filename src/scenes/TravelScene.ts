@@ -5,7 +5,7 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { PALETTE, type PlanetDef } from '../core/data';
-import { isKid, session } from '../core/session';
+import { session } from '../core/session';
 import { Globe } from '../fx/Globe';
 import type { Journey } from '../net/store';
 import { formatDuration, planetFor, starById } from '../world/galaxy';
@@ -280,7 +280,7 @@ export class TravelScene extends Phaser.Scene {
     const t0 = Date.parse(this.j.departs_at), t1 = Date.parse(this.j.arrives_at);
     const f = Phaser.Math.Clamp((now - t0) / Math.max(1, t1 - t0), 0, 1);
     const left = t1 - now;
-    this.eta.setText(left > 0 ? (isKid() ? '' : `ARRIVES IN ${formatDuration(left)}`) : 'ARRIVING');
+    this.eta.setText(left > 0 ? `ARRIVES IN ${formatDuration(left)}` : 'ARRIVING');
     // route bar
     const bx = 14, bw = w - 28, by = h - 22;
     g.lineStyle(1, PALETTE[23], this.ui.alpha).lineBetween(bx, by, bx + bw, by);

@@ -1,5 +1,5 @@
 {
-  "_doc": "Beacon worlds (planet 1 of Fomalhaut, Pollux, Arcturus, Capella) hold a dormant monolith on a stone plaza, guarded by a sleeping keeper. Wake it, beat it, and the beacon lights for good (planet_states.data.beacon) and drops the family's first Spark. guardian: hp (kidHp in kid mode), walking speeds, wakeRange = how close you must come to wake it, senseRange = how far it chases, charge = a telegraphed rush that stuns it against a wall (stunDamageScale = damage multiplier while stunned), slam = a jump whose landing hurts within slamRadius. knockbackScale: how much your hits push it (it is heavy). spark: pickup timing. beacon: plaza size in tiles and how far from the base it is placed.",
+  "_doc": "Beacon worlds (planet 1 of Fomalhaut, Pollux, Arcturus, Capella) hold a dormant monolith on a stone plaza, guarded by a sleeping keeper. Wake it, beat it, and the beacon lights for good (planet_states.data.beacon) and drops the family's first Spark. guardian: hp, walking speeds, wakeRange = how close you must come to wake it, senseRange = how far it chases, charge = a telegraphed rush that stuns it against a wall (stunDamageScale = damage multiplier while stunned), slam = a jump whose landing hurts within slamRadius. knockbackScale: how much your hits push it (it is heavy). spark: pickup timing. beacon: plaza size in tiles and how far from the base it is placed.",
   "lattice": {
     "_doc": "The beacons were placed along four symmetric directions around the Sun. Each lit one joins a lattice drawn on the star map (lines to the Sun and between lit beacons); letters between two settled systems that are both within radius light years of a lit beacon (or of the Sun, once any beacon is lit) arrive at once; with all four lit every letter does (the FTL comms of the backlog, earned instead of built).",
     "radius": 12
@@ -7,7 +7,6 @@
   "guardian": {
     "sprite": "guardian",
     "hp": 14,
-    "kidHp": 8,
     "speed": 34,
     "chaseSpeed": 58,
     "wakeRange": 66,
@@ -25,7 +24,6 @@
     "slamRadius": 36,
     "contactDamage": 1,
     "chargeDamage": 2,
-    "kidDamage": 1,
     "restMs": 700,
     "knockbackScale": 0.15
   },

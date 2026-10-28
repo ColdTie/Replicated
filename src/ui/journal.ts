@@ -1,6 +1,5 @@
 // The journal: what the copies on this planet remember, write to each other and ask for, and the changes to the game
-// they proposed (with the maker's answer). An HTML panel over the canvas (Tab / I, or tap the corner label). Until
-// the replicant can hear them, every line is runes.
+// they proposed (with the maker's answer). An HTML panel over the canvas (Tab / I, or tap the corner label).
 import { PALETTE } from '../core/data';
 import type { Journal, ReplicantSave } from '../net/store';
 import { paletteCss as css } from './overlay';
@@ -29,7 +28,6 @@ function ensureStyle() {
   .jn small { color: ${css(PALETTE[22])}; font-size: 11px; margin-left: 6px; }
   .jn .mute { color: ${css(PALETTE[21])}; font-style: italic; }
   .jn .warn { color: ${css(PALETTE[10])}; }
-  .jn .rune { color: ${css(PALETTE[18])}; letter-spacing: 1px; }
   .jn .act { display: flex; gap: 6px; margin: 6px 0 2px 10px; align-items: center; }
   .jn .act input { flex: 1; font: inherit; background: ${css(PALETTE[25])}; color: ${css(PALETTE[20])}; border: 1px solid ${css(PALETTE[22])}; padding: 3px 6px; }
   .jn .act button, .jn p button { font: inherit; font-size: 11px; letter-spacing: 1px; background: ${css(PALETTE[23])}; color: ${css(PALETTE[2])}; border: 1px solid ${css(PALETTE[22])}; padding: 3px 8px; cursor: pointer; }
@@ -41,17 +39,6 @@ function ensureStyle() {
   .jn p.made { color: ${css(PALETTE[12])}; }
   `;
   document.head.appendChild(s);
-}
-
-const RUNES = '/\\|-+=<>^~:';
-/** Same text always scrambles the same way, so a line looks like one fixed thing you cannot read yet. */
-function runes(text: string) {
-  let h = 7;
-  return text.split('').map((c) => {
-    if (c === ' ') return ' ';
-    h = (h * 31 + c.charCodeAt(0)) >>> 0;
-    return RUNES[h % RUNES.length];
-  }).join('');
 }
 
 function ago(iso: string) {
@@ -72,7 +59,6 @@ const esc = (t: string) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt
 
 export interface JournalView {
   place: string;
-  canHear: boolean;
   copies: ReplicantSave[];
   /** names of replicants that are not on this planet, by id */
   names: Record<string, string>;
@@ -98,9 +84,6 @@ export interface JournalView {
   quiet?: { since: string; error: string };
 }
 
-/** What the journal (and the talk box) says while the copies' words are still runes. */
-export const HEAR_HINT = 'They sing, but you cannot read them yet.';
-
 let open: HTMLElement | null = null;
 export const journalOpen = () => !!open;
 
@@ -112,11 +95,9 @@ export function closeJournal() {
 export function openJournal(v: JournalView) {
   ensureStyle();
   closeJournal();
-  const show = (t: string) => (v.canHear ? esc(t) : `<span class="rune">${esc(runes(t))}</span>`);
   const name = (id: string | null) => (id && (v.copies.find((c) => c.id === id)?.name ?? v.names[id])) ?? 'someone';
   const color = (c: ReplicantSave) => css(PALETTE[c.traits.feature ?? 10]);
   const parts: string[] = [];
-  if (!v.canHear) parts.push(`<p class="mute">${HEAR_HINT}</p>`);
   if (v.quiet) parts.push(`<p class="warn">The minds have been quiet since ${esc(v.quiet.since)}: ${esc(v.quiet.error)}</p>`);
   if (v.spend) parts.push(`<p class="mute">${v.spend.usd >= v.spend.cap ? `The minds have spent today's $${v.spend.cap.toFixed(2)} and rest until tomorrow.` : `The minds today: $${v.spend.usd.toFixed(2)} of $${v.spend.cap.toFixed(2)}.`}</p>`);
   if (!v.copies.length) parts.push(`<p class="mute">Nobody lives here yet.</p>`);
@@ -129,20 +110,20 @@ export function openJournal(v: JournalView) {
     const changes = v.journal.requests.filter((r) => r.replicant_id === c.id && r.kind === 'change' && !(r.status === 'dropped' && /^Replaced by/.test(r.reply ?? ''))).slice(0, 3);
     const t = c.traits.temperament;
     if (c.traits.held) parts.push(`<p class="mute">Held asleep for a new player.</p>`);
-    else if (c.traits.blank) parts.push(`<p class="mute">${v.canHear ? 'Not yet itself. It has not chosen.' : runes('not yet itself')}</p>`);
-    else if (t) parts.push(`<p class="mute">${show(`${t.pace}, ${t.sociability}, ${t.work === 'balanced' ? 'works and wanders' : t.work}, ${t.bedtime} to bed, ${t.risk}`)}</p>`);
-    if (v.feelings?.[c.id]) parts.push(`<p class="mute">${show(v.feelings[c.id])}</p>`);
+    else if (c.traits.blank) parts.push(`<p class="mute">Not yet itself. It has not chosen.</p>`);
+    else if (t) parts.push(`<p class="mute">${esc(`${t.pace}, ${t.sociability}, ${t.work === 'balanced' ? 'works and wanders' : t.work}, ${t.bedtime} to bed, ${t.risk}`)}</p>`);
+    if (v.feelings?.[c.id]) parts.push(`<p class="mute">${esc(v.feelings[c.id])}</p>`);
     if (v.actions && c.traits.held) parts.push(`<div class="act"><button type="button" class="spark" data-awaken="${esc(c.id)}">GIVE TO A NEW PLAYER</button></div>`);
     else if (v.actions && !c.traits.blank) parts.push(`<div class="act"><input type="text" maxlength="200" placeholder="say something to ${esc(c.name)}" data-talk="${esc(c.id)}"><button type="button" data-send="${esc(c.id)}">TALK</button><button type="button" data-give="${esc(c.id)}">GIVE 5 EMBER</button></div>`);
     const wants = c.traits.wants ?? [];
     if (wants.length) {
       parts.push(`<div class="k">WANTS</div>`);
-      for (const w of wants) parts.push(`<p class="${w.done ? 'done' : ''}">${show(w.text)}<small>${v.canHear ? esc(w.category) : runes(w.category)}</small></p>`);
+      for (const w of wants) parts.push(`<p class="${w.done ? 'done' : ''}">${esc(w.text)}<small>${esc(w.category)}</small></p>`);
     }
-    if (!notes.length && !mail.length && !asks.length && !wants.length && !changes.length) parts.push(`<p class="mute">${v.canHear ? 'Nothing written yet.' : runes('nothing written yet')}</p>`);
+    if (!notes.length && !mail.length && !asks.length && !wants.length && !changes.length) parts.push(`<p class="mute">Nothing written yet.</p>`);
     if (notes.length) {
       parts.push(`<div class="k">NOTES</div>`);
-      for (const n of notes) parts.push(`<p>${show(n.body)}<small>${ago(n.created_at)}</small></p>`);
+      for (const n of notes) parts.push(`<p>${esc(n.body)}<small>${ago(n.created_at)}</small></p>`);
     }
     if (mail.length) {
       parts.push(`<div class="k">LETTERS</div>`);
@@ -150,14 +131,14 @@ export function openJournal(v: JournalView) {
         const mine = m.from_replicant === c.id;
         const flight = inFlight(m.arrives_at);
         const head = mine ? `to ${esc(name(m.to_replicant))}` : `from ${esc(name(m.from_replicant))}`;
-        parts.push(`<p class="${mine ? '' : 'in'}">${v.canHear ? esc(head) : runes(head)}: ${show(m.body)}<small>${flight || ago(m.sent_at)}</small></p>`);
+        parts.push(`<p class="${mine ? '' : 'in'}">${esc(head)}: ${esc(m.body)}<small>${flight || ago(m.sent_at)}</small></p>`);
       }
     }
     if (asks.length) {
       parts.push(`<div class="k">ASKS FOR</div>`);
       for (const r of asks) {
         const label = r.kind === 'skin' ? 'A NEW BODY' : r.kind === 'name' ? 'A NAME' : r.kind.toUpperCase();
-        parts.push(`<p class="${r.status === 'open' ? 'ask' : 'done'}">${v.canHear ? esc(label) : runes(label)}: ${show(r.detail)}<small>${ago(r.created_at)}</small></p>`);
+        parts.push(`<p class="${r.status === 'open' ? 'ask' : 'done'}">${esc(label)}: ${esc(r.detail)}<small>${ago(r.created_at)}</small></p>`);
       }
     }
     if (changes.length) {
@@ -168,24 +149,24 @@ export function openJournal(v: JournalView) {
         const state = r.status === 'open' ? 'the maker reads it within a day' : r.status === 'done' ? 'in the game' : r.status === 'vetoed' ? 'you said no' : 'not made';
         const cls = r.status === 'open' ? 'ask' : r.status === 'done' ? 'made' : 'done';
         const no = r.status === 'open' && r.id && v.actions ? ` <button type="button" data-nochange="${esc(r.id)}">SAY NO</button>` : '';
-        parts.push(`<p class="${cls}">${show(r.detail)}${why ? ` - ${show(why)}` : ''}<small>${v.canHear ? esc(state) : runes(state)}, ${ago(r.created_at)}</small>${no}</p>`);
-        if (r.reply && r.status !== 'open') parts.push(`<p class="mute">${v.canHear ? 'the maker: ' : ''}${show(r.reply)}</p>`);
-        if (v.canHear && rest.join('').trim()) parts.push(`<details><summary>what it asks for</summary><div>${esc(rest.join('\n\n').trim())}</div></details>`);
+        parts.push(`<p class="${cls}">${esc(r.detail)}${why ? ` - ${esc(why)}` : ''}<small>${esc(state)}, ${ago(r.created_at)}</small>${no}</p>`);
+        if (r.reply && r.status !== 'open') parts.push(`<p class="mute">the maker: ${esc(r.reply)}</p>`);
+        if (rest.join('').trim()) parts.push(`<details><summary>what it asks for</summary><div>${esc(rest.join('\n\n').trim())}</div></details>`);
       }
     }
   }
   if (v.warren?.length) {
     parts.push(`<h3 style="color:${css(PALETTE[2])}">THE WARREN</h3>`);
-    for (const line of v.warren) parts.push(`<p>${show(line.replace(/^- /, ''))}</p>`);
+    for (const line of v.warren) parts.push(`<p>${esc(line.replace(/^- /, ''))}</p>`);
   }
   if (v.buildings?.length) {
     parts.push(`<h3 style="color:${css(PALETTE[2])}">BUILDINGS</h3>`);
-    for (const line of v.buildings) parts.push(`<p>${show(line.replace(/^- /, ''))}</p>`);
+    for (const line of v.buildings) parts.push(`<p>${esc(line.replace(/^- /, ''))}</p>`);
     for (const b of v.pending ?? []) parts.push(`<p class="ask">${esc(b.name)}: <button type="button" data-approve="${esc(b.id)}">APPROVE</button> <button type="button" data-veto="${esc(b.id)}">VETO</button></p>`);
   }
   if (v.supplies) {
     parts.push(`<h3 style="color:${css(PALETTE[2])}">SUPPLIES</h3><p>${esc(v.supplies)}</p>`);
-    for (const line of v.shortages ?? []) parts.push(`<p class="ask">${show(line)}</p>`);
+    for (const line of v.shortages ?? []) parts.push(`<p class="ask">${esc(line)}</p>`);
   }
   const el = document.createElement('div');
   el.className = 'jn';

@@ -180,8 +180,8 @@ export class Tutorial {
     const th = s.homeworld.thales;
     const atPost = !!th?.home && Math.hypot(th.x - th.home.x, th.y - th.home.y) < HOMEWORLD.thales.keepPx + 12;
     if (st.step === 'printer' && home && th && atPost && !st.told.includes('printer') && !th.hold && Math.hypot(th.x - s.player.x, th.y - s.player.y) < TUT.talkPx) this.say('printer');
-    this.updateWisp(time, dt, this.target());
-    this.updateReadout(time);
+    this.updateWisp(dt, this.target());
+    this.updateReadout();
   }
 
   /** What the step wants next, as a place (null: nothing to point at right now). */
@@ -244,7 +244,7 @@ export class Tutorial {
     w.img.setAlpha(0); w.core.setAlpha(0); w.light.intensity = 0; w.trail.stop();
   }
 
-  private updateWisp(time: number, dt: number, to: Pt | null) {
+  private updateWisp(dt: number, to: Pt | null) {
     const s = this.s, p = s.player;
     const d = to ? Math.hypot(to.x - p.x, to.y - p.y) : 0;
     const show = !!to && d > TUT.wisp.showPx;
@@ -266,13 +266,12 @@ export class Tutorial {
     w.core.setPosition(Math.round(w.x), Math.round(w.y)).setAlpha(a);
     w.trail.setPosition(w.x, w.y);
     w.light.x = w.x; w.light.y = w.y; w.light.intensity = 0.55 * a;
-    void time;
   }
 
   // ------------------------------------------------------------ what the printer still waits for
 
   /** Near the printer (or, on the Cems' world, the ship): an icon and have/need for each material it waits for. */
-  private updateReadout(time: number) {
+  private updateReadout() {
     const s = this.s, st = this.state!, p = s.player;
     let at: Pt | null = null, mats: string[] = [], need = GOAL_COST;
     const home = isHome(s.planet.star, s.planet.planetIndex);
@@ -302,7 +301,6 @@ export class Tutorial {
       box.add(s.add.bitmapText(x + 1, y - 3, 'pixel', `${have}/${need[m]}`).setTint(done ? PALETTE[12] : PALETTE[21]));
     });
     this.readout = { box, at: at!, key };
-    void time;
   }
 
   private showReadout(v: null) {

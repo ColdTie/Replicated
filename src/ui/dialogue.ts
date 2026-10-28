@@ -21,7 +21,7 @@ export interface TalkWho {
 }
 
 const TONES: Record<Tone, number> = {
-  body: PALETTE[2], lead: PALETTE[21], meta: PALETTE[21], you: PALETTE[20], mark: PALETTE[2], done: PALETTE[22], rune: PALETTE[18],
+  body: PALETTE[2], lead: PALETTE[21], meta: PALETTE[21], you: PALETTE[20], mark: PALETTE[2], done: PALETTE[22],
 };
 const LABEL: Record<Section, string> = { SAYS: 'SAYS', THOUGHTS: 'THOUGHTS', WANTS: 'WANTS', LETTERS: 'LETTERS', '': '' };
 const GAP_PX = 6;
@@ -200,7 +200,7 @@ export class TalkBox {
       if (!line.length) { y += GAP_PX; start += 1; return; }
       let x = 0;
       for (const s of line) {
-        const obj = this.scene.add.bitmapText(x, y, 'prose', '').setTint(s.tone === 'rune' ? this.who?.color() ?? TONES.rune : TONES[s.tone]);
+        const obj = this.scene.add.bitmapText(x, y, 'prose', '').setTint(TONES[s.tone]);
         this.textLayer.add(obj);
         this.segs.push({ obj, text: s.text, start });
         start += s.text.length;

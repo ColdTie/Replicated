@@ -4,7 +4,7 @@ import { anim } from '../core/assets';
 import { bodyFor } from '../core/body';
 import type { ReplicantSave } from '../net/store';
 import { PALETTE, PLAYER } from '../core/data';
-import { isKid, session } from '../core/session';
+import { session } from '../core/session';
 import { sound } from '../audio/Sound';
 import { stat } from '../core/drift';
 import { Gear } from './Gear';
@@ -170,7 +170,7 @@ export class Player {
     const v = this.body.velocity;
     const dashing = time < this.dashUntil;
     if (dashing) {
-      const sp = PLAYER.dash.speed * this.mod('dash');
+      const sp = PLAYER.dash.speed;
       v.set(this.dashDir.x * sp, this.dashDir.y * sp);
       if (time > this.nextAfterimage) {
         this.nextAfterimage = time + PLAYER.dash.afterimageEveryMs;
@@ -230,7 +230,7 @@ export class Player {
     // only shrinks a little, and a hurt body sheds sparks and smoke (faster the worse it is) with a red flicker.
     const frac = this.hp / PLAYER.maxHp;
     const hurt = 1 - frac;
-    this.light.radius = (80 + 20 * frac) * PLAYER.lightRadius * this.mod('light') * stat(session.replicant, 'light') * (1 + GROW.lightPerLevel * this.grown);
+    this.light.radius = (80 + 20 * frac) * PLAYER.lightRadius * stat(session.replicant, 'light') * (1 + GROW.lightPerLevel * this.grown);
     this.light.intensity = 1;
     const col = Phaser.Display.Color.Interpolate.ColorWithColor(WARM_RGB, HURT_RGB, 100, Math.round(hurt * 100));
     const colNum = Phaser.Display.Color.GetColor(col.r, col.g, col.b);
@@ -291,12 +291,6 @@ export class Player {
     }
   }
 
-  /** Multiplier from collected modules (ruins): light, dash, swing. */
-  mod(kind: 'light' | 'dash' | 'swing') {
-    const mods = session.replicant?.traits.mods ?? [];
-    return 1 + mods.filter((m) => m === kind).length * 0.2;
-  }
-
   private attack(time: number) {
     // Combo: attacks in quick succession chain up to a heavy third swing
     this.combo = time - this.lastAttackAt < PLAYER.attack.comboWindowMs && this.combo < 3 ? this.combo + 1 : 1;
@@ -316,7 +310,7 @@ export class Player {
     this.body.velocity.x += this.aim.x * lunge;
     this.body.velocity.y += this.aim.y * lunge;
     const { reach } = PLAYER.attack;
-    const radius = PLAYER.attack.radius * this.mod('swing') * (heavy ? PLAYER.attack.heavy.radiusScale : 1);
+    const radius = PLAYER.attack.radius * (heavy ? PLAYER.attack.heavy.radiusScale : 1);
     const r = reach * (heavy ? 1.2 : 1);
     const hx = this.x + this.aim.x * r, hy = this.y - 5 + this.aim.y * r;
     this.scene.fx.slash(hx, hy, this.aim, heavy ? 1.45 : 1, this.combo === 2);
@@ -363,7 +357,7 @@ export class Player {
     this.hidden = true;
   }
 
-  /** Back out of the vessel or the cradle: light, glow and shadow return (the caller unlocks when its intro ends). */
+  /** Back out of the vessel: light, glow and shadow return (the caller unlocks when its intro ends). */
   show() {
     this.hidden = false;
     this.light.active = true;
@@ -376,7 +370,7 @@ export class Player {
   }
 
   get dashing() { return this.scene.time.now < this.dashUntil; }
-  /** Inside the vessel or the cradle (nothing of the body is drawn). */
+  /** Inside the vessel (nothing of the body is drawn). */
   get isHidden() { return this.hidden; }
 
   private afterimage() {
@@ -410,13 +404,6 @@ export class Player {
     this.dead = true;
     this.body.setVelocity(0, 0);
     this.body.enable = false;
-    if (isKid()) {
-      // Kid mode never shows dying: a sparkle, then home to the base
-      this.scene.fx.sparks(this.x, this.y - 8, PALETTE[18], 14);
-      this.scene.tweens.add({ targets: this.sprite, alpha: 0, duration: 300 });
-      this.scene.time.delayedCall(450, () => this.scene.respawnPlayer());
-      return;
-    }
     this.scene.fx.sparks(this.x, this.y - 6, PALETTE[10], 18);
     this.scene.tweens.add({ targets: this.sprite, alpha: 0, scaleY: 1.6, scaleX: 0.3, duration: 450, ease: 'Quad.easeIn' });
     this.scene.tweens.add({ targets: this.light, intensity: 0, duration: 600 });
