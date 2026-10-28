@@ -20,7 +20,10 @@ microbes that lie in salt beds drinking sunlight and, on command, build structur
 cement and steel; modified Earth ants carry their feed and modified Earth fungus cleans their bed (2026-10-27).
 Copying makes new Vessels: each is woken (it names itself and follows its own desires) or held asleep for a real
 player. Being copied and handed over is the only way to join. Husks (mannies) are empty Vessels you control, kept in
-an underground vault.
+an underground vault. Since 2026-10-28 (the plan: `docs/plan-metanoia.md`): a Vessel is made at the Vessel Printer
+(name not final), the last design after the Supercomputer, built on the homeworld; a new player logs in with its four
+public letters and private numbers, remembers the beginning, wakes where its maker made it, and is celebrated and given
+its number (Thales 1, Steve 10, the next 11). Everyone shares one galaxy and sees each other.
 
 Theme: you are never alone, but every version of you is a little different. Lonely galaxy, warm settlements.
 
@@ -54,8 +57,11 @@ No final art yet. Generate placeholder sprites with a Node script that writes pi
 
 ## Profiles
 
-One player, Steve, with the full game. (Pivot, 2026-10-08: the game is no longer being built or tuned for other players or
-other devices. The profile `kid_mode` flag, no counter and no death, still exists in the code but is not a priority.)
+Many players again (Steve, 2026-10-28; this replaces the 2026-10-08 pivot to Steve alone): everyone shares one galaxy,
+and every new player joins by being handed a Vessel by a current player. A login is a Vessel's four letters (public) and
+its numbers (private, like a password) instead of an email and password; Steve's email sign-in stays as a backup. One
+login, one Vessel. Steve (Vessel 10) still directs the game. The profile `kid_mode` flag, no counter and no death, still
+exists in the code but is not a priority. The plan: `docs/plan-metanoia.md`.
 
 ## Core loop (build in this order)
 
@@ -67,9 +73,12 @@ other devices. The profile `kid_mode` flag, no counter and no death, still exist
    ship carries a culture from every awake bed and seeds one on any world; where a bed is awake the Cems print the
    copies' buildings too (one building system).
 4. Replicate: the Replicator creates a copy with drift. Copy becomes an NPC that walks around the base and generates resources while you are away.
+   Since 2026-10-28 (plan step 1): copies are made at the Vessel Printer, a design that needs the Supercomputer and
+   stands only on the homeworld; a Vessel's price stays what it is (Steve: "the scarcity should not change").
 5. Travel: launch the vessel, pick the next planet from a simple star map, land on a new seed and accent hue.
 6. Handoff: a Vessel held asleep at its making is given to another profile, which wakes in it and names itself (since
-   2026-10-26 no Spark is needed; the story: being copied and handed over is the only way to join).
+   2026-10-26 no Spark is needed; the story: being copied and handed over is the only way to join). Since 2026-10-28
+   (plan steps 2 and 3): the maker gives its four letters and numbers to a new person, whose own login it becomes.
 
 ## Phase plan
 
@@ -77,10 +86,14 @@ other devices. The profile `kid_mode` flag, no counter and no death, still exist
 - **Phase 1:** full loop steps 1 to 3 plus Supabase profiles and saves. Start on Earth (hand-tuned, peaceful and overgrown) instead of a random planet. Design the Supabase schema for the shared galaxy from day one (see Long-term decisions), even though travel comes in Phase 2.
 - **Phase 2:** steps 4 and 5. Travel uses real-world time; the star map shows real nearby stars.
 - **Phase 3:** step 6, sound, playtest fixes.
+- **Phase 4, one Metanoia (2026-10-28):** the Vessel Printer, letters-and-numbers login with Vessel numbers, the
+  memory and the awakening, the Vessel menu (Tab) with chat, seeing each other, later more bases on the homeworld.
+  Steps, data model and open questions: `docs/plan-metanoia.md`.
 
 ## Out of scope
 
-Realtime multiplayer, LLM driven NPC dialogue, 3D, crafting menus, twin stick aiming, final hand drawn art.
+Realtime multiplayer (except, since 2026-10-28, seeing each other on a world and chat: `docs/plan-metanoia.md`), LLM
+driven NPC dialogue, 3D, crafting menus, twin stick aiming, final hand drawn art.
 
 ## Working rules
 
@@ -110,7 +123,8 @@ These shape the data model now, even where the feature comes later.
 - **Travel runs on real-world time.** (Switched off 2026-10-06 at Steve's request: every trip took 5 seconds via
   `fixedSeconds` in `src/data/travel.json`. Since 2026-10-27 a trip takes 2 seconds per light year, `travel.json
   cruise.secondsPerLy`; `cruise.enabled` false and `fixedSeconds` 0 restore real time.) Launching the vessel to another star starts a journey that completes at a wall-clock time (stored as `departs_at` / `arrives_at`), whether or not anyone is playing. While a ship is in transit, players keep playing on planets they have already settled. A trip to a beacon system should take roughly a week of real time; nearer stars take minutes to hours. Exact time per light year is a tunable in `src/data/`.
-- **One shared galaxy per login.** Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
+- **One shared galaxy per login.** (Superseded 2026-10-28: one galaxy for everyone, the Metanoia; every login that
+  joins by a handed-over Vessel is a member of it. Nobody is a stranger: each player was let in by another.) Everything (stars discovered, planets, replicants, resources, messages) belongs to a galaxy row that every profile of the login shares. Store a `galaxy_id` on everything so other logins could get their own galaxy later. No strangers, no public play.
 - **Earth is the start.** (Superseded 2026-10-26 by the story: the game starts on the Metanoia homeworld, LHS 1140 b; Earth stays in the catalog as humanity's origin, a world you can fly to.) Peaceful and overgrown: humanity is long gone, nature has taken back the ruins, quiet and lonely but friendly. Hand-tuned rather than random (fixed seed plus authored landmarks such as overgrown towers and the replicant's waking spot).
 - **Messages travel at light speed until FTL comms exist.** A message between replicants in different systems arrives after a delay based on distance (scaled like travel). Building or finding the FTL comms device makes messages from that system instant.
 - **Stars are real.** The galaxy is real nearby stars (positions relative to the Sun). Each star's planets are generated from a seed derived from the star's id. Beacon systems sit at fixed, symmetrical points around the Sun, snapped to the nearest real star.
@@ -1123,3 +1137,11 @@ copies' own buildings are untouched (still raised by swings).
   the model prints nothing; the X closes the menu and nothing reopens), `playtest-bioworks` (the X, a click on the model)
   and `playtest-homeworld` (Esc closes WAKE / HOLD without a copy or spent Ember, and it opens again).
 
+
+### Session 24 (2026-10-28): the plan for one Metanoia (Steve: "To make another Vessel the player must go through all these steps to create a fully automatic half biological AI 3d printer", "everyone will share a galaxy", "only need four letters and the right amount of numbers", "the tutorial will actually just be a memory", "Tab ... to show a snapshot of how many vessels you have")
+- Planning only; no code changed. Steve's decisions are in `story/STORY.md` (his words: Copying, Vessel numbers, The
+  memory, Joining, Names, One Metanoia, Bases, the Vessel menu, the Vessel Printer in the tech tree, the timeline) and
+  the plan in `docs/plan-metanoia.md` (five steps, the data model, security, tests, his questions).
+- Not taken (Steve): a Vessel's price rising with each one made, and every Vessel needing materials from two worlds.
+- Measured for the plan: the nine designs cost salt 108, iron 86, wood 53, quartz 51, copper 37, Ember 27 in all
+  (Supercomputer 96, 293 s); totals already climb from the Lantern to the Supercomputer.
