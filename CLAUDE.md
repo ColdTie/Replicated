@@ -517,6 +517,28 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   `PLAYWRIGHT_BROWSERS_PATH` with links to `/opt/pw-browsers` runs them (`playtest-become` passes).
 - Verified: build, typecheck, `tools/check-mind-tools.mjs`, `playtest-become`, CI on the PR.
 
+### Session 25b (2026-10-29): "After using the chip to make another Vessel, nothing happened" (Steve)
+- **What the live data showed:** his print was saved on Earth (WAKE, with the Cems, 40 s, a row id chosen), the chip
+  and Ember spent; his game stopped 23 s later (the tab closed or backgrounded), so the Vessel's row was not made yet.
+  A copy of his exact Earth save, played headless: no errors, the body prints and the Vessel steps out at 40 s, and
+  his save as it stands steps it out the moment Earth loads. Two things made it read as nothing: the first 10-15 s of
+  a print showed a few pixel rows at the feet of a 16x20 body (the printed part glowing the same cyan as the light),
+  and the live game still had the minds paused, so a WAKE copy stepped out grey and stayed so. PR #73 merged (the
+  minds on in the game); the 16:17 hourly run made his last two blank copies themselves (Tamsin, Vigil).
+- **The print reads from the first second** (`Replication.ts`): the whole Vessel to be shows at once as a faint cyan
+  guide (as the Cems' prints show theirs), flaring as it appears and filled from the feet up; a thread of light runs
+  from the Replicator to the row being laid (green with the Cems, gold without); the printed part's sheen is white and
+  softer, so solid, living green and still-to-come cyan read apart.
+- **An independent review** (a diff reviewer and a root-cause hunter, a skeptic on each finding) found the diff sound
+  and confirmed three more, fixed here: a game opened before the minds came back kept them paused in its own code (now
+  the game always asks and the function's answer decides: `CloudStore.mindTick`); a flush asked for while a save was
+  out was dropped, so a print begun then could be lost if the page closed within seconds (`Saving` runs it once the
+  save is back); no Vessel can be begun on a world whose save failed to load (`canReplicate`). Confirmed and left: a
+  maker who leaves the world mid-print makes the Vessel step out only when that world loads again (nothing is lost;
+  a server-side birth would be its own change).
+- Verified: build, typecheck, the repro on his save (`?sim`, device storage), a check that a print begun during a slow
+  save is saved, the full `npm test` (23 of 23 before the last three fixes; again after them).
+
 ### Session 23 (2026-10-27): the beginning (Steve: "Okay we are going to create the beginning and tutorial", "Great decision on the proposed flow", "Make it sound and look pretty", "One cheap step good", "they have to be physically brought to wherever. That will happen automatically after first getting them", "Yes lets back up and erase")
 - **The bible.** `story/STORY.md` has a new section, The beginning: wake and name yourself, Thales' printer waits,
   the first trip to Gliese 12 b for copper and quartz, the printer finished and the Cems awake, the first designs, then

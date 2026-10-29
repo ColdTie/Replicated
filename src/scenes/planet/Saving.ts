@@ -12,6 +12,8 @@ export class Saving {
 
   npcTickAt = 0;
   saving = false;
+  /** a flush asked for while one was out (a print begun, the page hidden): it runs once that one is back */
+  private again = false;
   lastSaveAt = 0;
   lastPosSaveAt = 0;
 
@@ -48,7 +50,8 @@ export class Saving {
   /** Send queued ember / node / structure changes. Server value wins so family members share one pool. */
   async flushPlanet() {
     const st = session.store;
-    if (!st || this.s.shot || this.saving || this.s.loadFailed) return;
+    if (!st || this.s.shot || this.s.loadFailed) return;
+    if (this.saving) { this.again = true; return; }
     const p = this.s.pending;
     // playing time is counted live (copies carry Embers in), so keep the offline clock fresh about once a minute
     if (this.s.npcs.length && p.npcTick === undefined && Date.now() - this.npcTickAt > 60_000) p.npcTick = Date.now();
@@ -100,6 +103,7 @@ export class Saving {
       if (this.s.pending.replication === undefined) this.s.pending.replication = p.replication;
     } finally {
       this.saving = false;
+      if (this.again) { this.again = false; void this.flushPlanet(); }
     }
   }
 

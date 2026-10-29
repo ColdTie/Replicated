@@ -1083,11 +1083,12 @@ export class PlanetScene extends Phaser.Scene {
 
   /**
    * A copy can be made here: the Replicator stands and is not making one already, the store has the Ember, the maker
-   * carries a Nous Chip (drift.json chip) and the world has room for another copy (Thales is not one).
+   * carries a Nous Chip (drift.json chip) and the world has room for another copy (Thales is not one). Not on a world
+   * whose save failed to load: the print could not be saved, and the chip would be spent for nothing.
    */
   canReplicate() {
     const me = session.replicant;
-    return this.base.built && !this.replicating && !this.replication.busy && !this.visit && !!me && this.embers >= DRIFT.cost && (me.traits.chips ?? 0) > 0
+    return this.base.built && !this.replicating && !this.replication.busy && !this.visit && !this.loadFailed && !!me && this.embers >= DRIFT.cost && (me.traits.chips ?? 0) > 0
       && this.npcs.filter((n) => !n.data.traits.thales).length < DRIFT.maxPerPlanet;
   }
 
