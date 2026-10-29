@@ -918,8 +918,8 @@ export class CloudStore implements GameStore {
   }
 
   async mindTick(replicantId: string, ctx: MindContext) {
-    // paused (mind.json paused): no call at all
-    if (MIND.paused) return { skipped: true, reason: 'paused' } as MindResult;
+    // the function decides whether the minds are paused (mind.json paused reaches it through kit.json, and it answers
+    // skipped / paused before any model call): a pause or a resume takes effect in a game already open
     const { data, error } = await this.sb.functions.invoke('mind', { body: { replicant_id: replicantId, context: ctx } });
     if (error) { console.warn('mind', error); return null; }
     return data as MindResult;
