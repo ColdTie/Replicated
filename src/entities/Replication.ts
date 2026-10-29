@@ -2,8 +2,9 @@
 // Its maker has given it a Nous Chip and the Ember and has been scanned; the Replicator prints the body by itself, by
 // the clock and also while nobody plays (planet_states.data.replication). The Cems and the Replicator are one system:
 // where this world's Cems are awake they carry themselves to it and the body rises in printMs (quicker with their
-// strain); without them it rises the slow way Thales made the tenth Vessel (printMsAlone). The newest rows are still
-// the Cems' green (or the Replicator's warm light, alone); when the body is whole the Vessel steps out
+// strain); without them it rises the slow way Thales made the tenth Vessel (printMsAlone). The whole body shows at once
+// as a cyan guide, filled from the feet up while a thread of light runs from the Replicator to the row being laid; the
+// newest rows are still the Cems' green (or the Replicator's warm light, alone); when the body is whole the Vessel steps out
 // (PlanetScene.bornAt). Its row's id was chosen when it began, so it is made once whoever is here when it is done.
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
@@ -25,7 +26,10 @@ export class Replication {
   /** playtests: a print time to use instead of the world's (ms) */
   testMs?: number;
   private light?: Light;
-  private forming?: { body: Phaser.GameObjects.Image; sheen: Phaser.GameObjects.Image; band: Phaser.GameObjects.Image; line: Phaser.GameObjects.Rectangle; glow: Phaser.GameObjects.Image; rows: number };
+  private forming?: {
+    body: Phaser.GameObjects.Image; sheen: Phaser.GameObjects.Image; band: Phaser.GameObjects.Image; guide: Phaser.GameObjects.Image;
+    line: Phaser.GameObjects.Rectangle; beam: Phaser.GameObjects.Rectangle; glow: Phaser.GameObjects.Image; rows: number;
+  };
   private flowing = false;
   /** the body is whole and the Vessel has stepped out; its row is being saved (the print stays in the save until then) */
   private finishing = false;
@@ -71,7 +75,7 @@ export class Replication {
   private clearForming() {
     const f = this.forming;
     if (!f) return;
-    for (const o of [f.body, f.sheen, f.band, f.line, f.glow]) o.destroy();
+    for (const o of [f.body, f.sheen, f.band, f.guide, f.line, f.beam, f.glow]) o.destroy();
     this.forming = undefined;
   }
 
@@ -86,10 +90,15 @@ export class Replication {
       const glow = s.add.image(at.x, at.y - 10, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(tint).setScale(0.45).setAlpha(0.3).setDepth(depth);
       const body = s.add.image(at.x, at.y, key, 0).setOrigin(0.5, 1).setDepth(depth);
       // the fresh print shines a little until it wakes
-      const sheen = s.add.image(at.x, at.y, key, 0).setOrigin(0.5, 1).setDepth(depth).setTintFill(PALETTE[18]).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.4);
+      const sheen = s.add.image(at.x, at.y, key, 0).setOrigin(0.5, 1).setDepth(depth).setTintFill(PALETTE[19]).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.22);
       const band = s.add.image(at.x, at.y, key, 0).setOrigin(0.5, 1).setDepth(depth).setTintFill(tint).setAlpha(0.9);
+      // the whole Vessel to be, from the first moment: a cyan guide of its body (as the Cems' prints show theirs),
+      // filled from the feet up as the rows are printed
+      const guide = s.add.image(at.x, at.y, key, 0).setOrigin(0.5, 1).setDepth(depth).setTintFill(PALETTE[18]).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.8);
       const line = s.add.rectangle(at.x, at.y, 12, 1, 0xffffff).setBlendMode(Phaser.BlendModes.ADD).setDepth(depth + 1);
-      this.forming = { body, sheen, band, line, glow, rows: -1 };
+      // the Replicator prints it: a thread of light from the machine to the row being laid
+      const beam = s.add.rectangle(0, 0, 1, 1, tint).setBlendMode(Phaser.BlendModes.ADD).setDepth(depth + 1).setAlpha(0);
+      this.forming = { body, sheen, band, guide, line, beam, glow, rows: -1 };
       this.light ??= s.lighting.add({ x: at.x, y: at.y - 10, radius: 30, color: tint, intensity: 0 });
     }
     const f = this.forming, h = f.body.height, w = f.body.width;
@@ -99,7 +108,11 @@ export class Replication {
       f.body.setCrop(0, h - solid, w, solid);
       f.sheen.setCrop(0, h - solid, w, solid);
       f.band.setCrop(0, h - rows, w, rows - solid);
+      f.guide.setCrop(0, 0, w, h - rows);
       f.line.setPosition(at.x, at.y - rows);
+      // from the Replicator's face to the print line
+      const fx = s.base.x, fy = s.base.y - 10, tx = at.x, ty = at.y - rows;
+      f.beam.setPosition((fx + tx) / 2, (fy + ty) / 2).setSize(Math.hypot(tx - fx, ty - fy), 1).setRotation(Math.atan2(ty - fy, tx - fx));
       if (f.rows >= 0 && rows > f.rows) {
         s.fx.sparks(at.x + (Math.random() - 0.5) * 8, at.y - rows, st.cems ? PALETTE[12] : PALETTE[10], 2);
         const p = s.player;
@@ -107,7 +120,11 @@ export class Replication {
       }
       f.rows = rows;
     }
+    const printing = Date.now() >= st.start;
     f.line.setAlpha(0.5 + 0.4 * Math.sin(time / 90));
+    // the guide shows at once and settles to a shimmer; the beam runs once the scan is done
+    f.guide.setAlpha(Math.max(0.17 + 0.07 * Math.sin(time / 160), f.guide.alpha - 0.01));
+    f.beam.setAlpha(printing ? 0.35 + 0.25 * Math.sin(time / 70) : 0);
     f.glow.setAlpha(0.22 + 0.1 * Math.sin(time / 500));
     if (this.light) this.light.intensity = 0.55 + 0.2 * Math.sin(time / 500);
     // whole: it steps out (never on a visit, where nothing here is ours to change)
