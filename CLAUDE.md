@@ -22,9 +22,9 @@ Copying makes new Vessels: each is woken (it names itself and follows its own de
 player. Being copied and handed over is the only way to join. Husks (mannies) are empty Vessels you control, kept in
 an underground vault. Since 2026-10-28 (the plan: `docs/plan-metanoia.md`): every new Vessel needs a Nous Chip, its
 mind, the last of the Cems' designs after the Supercomputer; it is made at the Replicator on any world, and the Cems
-make it faster (the Replicator and the Cems are one system); a new player logs in with its four
-public letters and private numbers, remembers the beginning, wakes where its maker made it, and is celebrated and given
-its number (Thales 1, Steve 10, the next 11). Everyone shares one galaxy and sees each other.
+make it faster (the Replicator and the Cems are one system); a new player is handed its Vessel by a one-time link and
+signs in with its own email (2026-10-29: the letters-and-numbers login and Vessel numbers were dropped), remembers the
+beginning, wakes where its maker made it, and is celebrated. Everyone shares one galaxy and sees each other.
 
 Theme: you are never alone, but every version of you is a little different. Lonely galaxy, warm settlements.
 
@@ -59,9 +59,10 @@ No final art yet. Generate placeholder sprites with a Node script that writes pi
 ## Profiles
 
 Many players again (Steve, 2026-10-28; this replaces the 2026-10-08 pivot to Steve alone): everyone shares one galaxy,
-and every new player joins by being handed a Vessel by a current player. A login is a Vessel's four letters (public) and
-its numbers (private, like a password) instead of an email and password; Steve's email sign-in stays as a backup. One
-login, one Vessel. Steve (Vessel 10) still directs the game. Kid mode (no counter, no death) was taken out on
+and every new player joins by being handed a Vessel by a current player. Since 2026-10-29 the maker sends a one-time
+invite link; the new person signs in with their own email (an emailed sign-in link, no password); Steve keeps his email
+and password. One login per person, one Vessel per login (the letters-and-numbers login and Vessel numbers planned on
+2026-10-28 were dropped). Steve still directs the game. Kid mode (no counter, no death) was taken out on
 2026-10-28; the profiles table keeps its `kid_mode` column, always false. The plan: `docs/plan-metanoia.md`.
 
 ## Core loop (build in this order)
@@ -80,7 +81,8 @@ login, one Vessel. Steve (Vessel 10) still directs the game. Kid mode (no counte
 5. Travel: launch the vessel, pick the next planet from a simple star map, land on a new seed and accent hue.
 6. Handoff: a Vessel held asleep at its making is given to another profile, which wakes in it and names itself (since
    2026-10-26 no Spark is needed; the story: being copied and handed over is the only way to join). Since 2026-10-28
-   (plan steps 2 and 3): the maker gives its four letters and numbers to a new person, whose own login it becomes.
+   (plan steps 2 and 3, revised 2026-10-29): the maker sends a new person a one-time link; they sign in with their own
+   email and the Vessel becomes their login's.
 
 ## Phase plan
 
@@ -88,7 +90,7 @@ login, one Vessel. Steve (Vessel 10) still directs the game. Kid mode (no counte
 - **Phase 1:** full loop steps 1 to 3 plus Supabase profiles and saves. Start on Earth (hand-tuned, peaceful and overgrown) instead of a random planet. Design the Supabase schema for the shared galaxy from day one (see Long-term decisions), even though travel comes in Phase 2.
 - **Phase 2:** steps 4 and 5. Travel uses real-world time; the star map shows real nearby stars.
 - **Phase 3:** step 6, sound, playtest fixes.
-- **Phase 4, one Metanoia (2026-10-28):** the Nous Chip and the Replicator with the Cems, letters-and-numbers login with Vessel numbers, the
+- **Phase 4, one Metanoia (2026-10-28):** the Nous Chip and the Replicator with the Cems, joining by invite link, the
   memory and the awakening, the Vessel menu (Tab) with chat, seeing each other, later more bases on the homeworld.
   Steps, data model and open questions: `docs/plan-metanoia.md`.
 
@@ -490,11 +492,30 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 4. The home screen still reads "VESSEL METANOIA / REPLICANTS": keep it, or rename?
 5. Story open questions (story/STORY.md), among them whether the ship keeps the name "vessel" and the future of the
    beacons, the lattice and the Spark.
-6. Supabase: migration `0014_mind_runs.sql` is not applied (the minds' heartbeat only logs an error). GitHub: require
-   the "test" status check on main.
-7. The minds are paused (`src/data/mind.json paused`). To resume: set it false, run `node tools/build-mind-kit.mjs`,
-   redeploy `mind`, and run `select cron.alter_job(job_id := 1, active := true)`. The maker routine
-   (`trig_01W1bBfgciouakZFzLHFK3FE`) still runs daily and finds nothing while they are; pause it too if wanted.
+6. GitHub: require the "test" status check on main.
+7. Step 2 of `docs/plan-metanoia.md` (joining by invite link) waits for Steve's yes to its migration, the redirect URL
+   check in Supabase, and an email address each for Linda and Freya.
+
+### Session 25 (2026-10-29): the next steps; the minds back on (Steve: "Go ahead and view this game. Then look at the plan doc and the bible. Whats next? Ask me any questions and we will make a plan for the next steps", and his answers: invite link, turn the minds back on, joining and the memory next, merge #72 and update the bible)
+- Looked over the game (fresh screenshots of the homeworld, the bed, the Replicator printing, Gliese 12 b) and Steve's
+  live save: the beginning is done (stars open, grown 5); he plays on Earth with a seeded bed and ten prints up to the
+  Supercomputer, so the Nous Chip is open to him; no chip printed yet. His four copies (all "Steve II", made before the
+  chip) were blank: with the minds paused a WAKE copy never becomes itself.
+- PR #72 (another session's plan change: the letters-and-numbers login and Vessel numbers dropped) merged.
+- **The plan** (`docs/plan-metanoia.md`): Step 2 is now joining by invite link (one-time code; the new person signs in
+  with their own email link; `invites` and four database functions, `profiles.user_id`, no new galaxies, a player's
+  own Vessel and profile changed only by its login, Linda and Freya's galaxy retired). Step 3 (the memory and the
+  awakening) without numbers. Order: joining and the memory, then the Vessel menu, then seeing each other.
+- **The bible** (`story/STORY.md`, Steve's answers): Vessel numbers dropped; Joining is a link from the maker and the
+  new player's own email; the timeline without numbers. CLAUDE.md says the same.
+- **The minds are back on**: migration `0014_mind_runs.sql` applied; `mind.json paused` false, the kit rebuilt; the
+  `mind` function v21 deployed (all three files checked byte for byte against the repo); the away job (`cron` job 1)
+  active again. One run fired by hand: Thales, and two blank copies became themselves (Ember Gold on Gliese 12 b,
+  Sorrel at Fomalhaut), all logged ok in `mind_runs`, $0.007. The other two blank copies (LHS 1140 b, Fomalhaut) follow
+  in the next hourly runs (one copy per world per run).
+- Local playtests: the pinned Playwright (1.56.1) wants a browser build this container does not have; a scratch
+  `PLAYWRIGHT_BROWSERS_PATH` with links to `/opt/pw-browsers` runs them (`playtest-become` passes).
+- Verified: build, typecheck, `tools/check-mind-tools.mjs`, `playtest-become`, CI on the PR.
 
 ### Session 23 (2026-10-27): the beginning (Steve: "Okay we are going to create the beginning and tutorial", "Great decision on the proposed flow", "Make it sound and look pretty", "One cheap step good", "they have to be physically brought to wherever. That will happen automatically after first getting them", "Yes lets back up and erase")
 - **The bible.** `story/STORY.md` has a new section, The beginning: wake and name yourself, Thales' printer waits,
