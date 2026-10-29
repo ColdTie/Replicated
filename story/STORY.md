@@ -74,9 +74,9 @@ The beginning teaches the game as it goes (Steve, 2026-10-27).
 | Copying | With enough resources, a Vessel makes a copy of itself. The copy is close to the original, picks a new name, and follows its own desires. Making Vessels takes some difficulty, and that is part of the game. The end goal of the designs is a computer chip, the Nous Chip: it is used for each new Vessel, its mind. A Vessel can be built anywhere you have the supplies. Thales copied the tenth Vessel before the Cems woke; the Cems just make it faster, and now the Replicator and the Cems are an integrated system. Every Vessel costs the same: making Vessels does not get harder over time. |
 | Vessel and ship | A Vessel is built together with its ship. The resources for making a Vessel are set accordingly. |
 | Wake or hold | When a copy is made, its maker chooses: bring it to life now, or hold it asleep until a real player takes possession of it. Being copied and handed over by an existing player is the only way to join the game. |
-| Vessel numbers | Every Vessel has a number. Thales is the first and you are number 10; the next player who joins is 11, and so on. A Vessel can be made long before it wakes: the moment it is awakened as a new Vessel of the Metanoia, it is celebrated and given its number. |
+| Vessel numbers | Dropped (Steve, 2026-10-29): Vessels are not numbered. A Vessel can still be made long before it wakes: the moment it is awakened as a new Vessel of the Metanoia, it is celebrated. |
 | The memory | A new player does not play the beginning: it is a memory. Thales' words, his printer, the trip to Gliese 12 b, the Cems and the first designs are remembered, and then the Vessel wakes up wherever its maker made its body, where its maker is. |
-| Joining | A Vessel opens with four letters and some numbers. The letters are public; the numbers are private, like a password. Together they are the way to log in to that Vessel of the Metanoia. |
+| Joining | A Vessel is handed over with a link from its maker. The new player opens it and signs in with their own email, and from then on that Vessel of the Metanoia is theirs (Steve, 2026-10-29; the four letters and numbers were dropped). |
 | Names | A Vessel can easily change its name. |
 | One Metanoia | Everyone shares one galaxy, and everyone can see each other. |
 | Husks | Empty Vessels the player builds and controls directly. They are stored underground and picked from a menu. |
@@ -127,7 +127,7 @@ The game starts simple with 3D printers and grows more complex as you unlock new
 9. **The game starts here.** Thales, the main original, makes a new Vessel: you, awoken as the tenth, the first player. You finish what he started.
 10. You fetch copper and quartz from Gliese 12 b, finish Thales' printer, the Cems wake, and you print your first designs. Then the stars open.
 11. You build with the Cems, copy yourself, unlock new technology, and the Vessels spread out further.
-12. You make Nous Chips. New players join: each is handed a Vessel, remembers the beginning, wakes where its maker made it, and is celebrated and given its number (11, 12, ...).
+12. You make Nous Chips. New players join: each is handed a Vessel, remembers the beginning, wakes where its maker made it, and is celebrated.
 13. Vessels reach worlds with intelligent life and start helping those societies.
 
 ## Open questions
