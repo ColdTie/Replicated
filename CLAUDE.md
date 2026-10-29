@@ -492,11 +492,30 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 4. The home screen still reads "VESSEL METANOIA / REPLICANTS": keep it, or rename?
 5. Story open questions (story/STORY.md), among them whether the ship keeps the name "vessel" and the future of the
    beacons, the lattice and the Spark.
-6. Supabase: migration `0014_mind_runs.sql` is not applied (the minds' heartbeat only logs an error). GitHub: require
-   the "test" status check on main.
-7. The minds are paused (`src/data/mind.json paused`). To resume: set it false, run `node tools/build-mind-kit.mjs`,
-   redeploy `mind`, and run `select cron.alter_job(job_id := 1, active := true)`. The maker routine
-   (`trig_01W1bBfgciouakZFzLHFK3FE`) still runs daily and finds nothing while they are; pause it too if wanted.
+6. GitHub: require the "test" status check on main.
+7. Step 2 of `docs/plan-metanoia.md` (joining by invite link) waits for Steve's yes to its migration, the redirect URL
+   check in Supabase, and an email address each for Linda and Freya.
+
+### Session 25 (2026-10-29): the next steps; the minds back on (Steve: "Go ahead and view this game. Then look at the plan doc and the bible. Whats next? Ask me any questions and we will make a plan for the next steps", and his answers: invite link, turn the minds back on, joining and the memory next, merge #72 and update the bible)
+- Looked over the game (fresh screenshots of the homeworld, the bed, the Replicator printing, Gliese 12 b) and Steve's
+  live save: the beginning is done (stars open, grown 5); he plays on Earth with a seeded bed and ten prints up to the
+  Supercomputer, so the Nous Chip is open to him; no chip printed yet. His four copies (all "Steve II", made before the
+  chip) were blank: with the minds paused a WAKE copy never becomes itself.
+- PR #72 (another session's plan change: the letters-and-numbers login and Vessel numbers dropped) merged.
+- **The plan** (`docs/plan-metanoia.md`): Step 2 is now joining by invite link (one-time code; the new person signs in
+  with their own email link; `invites` and four database functions, `profiles.user_id`, no new galaxies, a player's
+  own Vessel and profile changed only by its login, Linda and Freya's galaxy retired). Step 3 (the memory and the
+  awakening) without numbers. Order: joining and the memory, then the Vessel menu, then seeing each other.
+- **The bible** (`story/STORY.md`, Steve's answers): Vessel numbers dropped; Joining is a link from the maker and the
+  new player's own email; the timeline without numbers. CLAUDE.md says the same.
+- **The minds are back on**: migration `0014_mind_runs.sql` applied; `mind.json paused` false, the kit rebuilt; the
+  `mind` function v21 deployed (all three files checked byte for byte against the repo); the away job (`cron` job 1)
+  active again. One run fired by hand: Thales, and two blank copies became themselves (Ember Gold on Gliese 12 b,
+  Sorrel at Fomalhaut), all logged ok in `mind_runs`, $0.007. The other two blank copies (LHS 1140 b, Fomalhaut) follow
+  in the next hourly runs (one copy per world per run).
+- Local playtests: the pinned Playwright (1.56.1) wants a browser build this container does not have; a scratch
+  `PLAYWRIGHT_BROWSERS_PATH` with links to `/opt/pw-browsers` runs them (`playtest-become` passes).
+- Verified: build, typecheck, `tools/check-mind-tools.mjs`, `playtest-become`, CI on the PR.
 
 ### Session 23 (2026-10-27): the beginning (Steve: "Okay we are going to create the beginning and tutorial", "Great decision on the proposed flow", "Make it sound and look pretty", "One cheap step good", "they have to be physically brought to wherever. That will happen automatically after first getting them", "Yes lets back up and erase")
 - **The bible.** `story/STORY.md` has a new section, The beginning: wake and name yourself, Thales' printer waits,
