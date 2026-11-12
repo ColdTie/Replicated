@@ -50,6 +50,8 @@ const TEMP_WORDS: Record<SystemPlanet['temp'], string> = { hot: 'HOT', warm: 'TE
 const SIGNATURE = SUPPLIES.signature as { byWorld: Record<string, string>; names: Record<string, string> };
 /** how far (game px) a tap may land from a star or a planet and still pick it */
 const TAP_STAR = 24, TAP_PLANET = 22;
+/** how long after the map opens Enter / Space start to act: the press that opened it is still going down */
+const GO_AFTER_MS = 350;
 
 interface Projected { star: Star; sx: number; sy: number; depth: number; r: number }
 interface SysItem { sp: SystemPlanet; img: Phaser.GameObjects.Image; label: Phaser.GameObjects.BitmapText; globe: Globe; x: number; y: number; angle: number; rx: number; ry: number }
@@ -90,6 +92,7 @@ export class StarMapScene extends Phaser.Scene {
   /** the planet menu beside the map (src/ui/planetMenu.ts), and the room the map makes for it (game px) */
   private menu?: PlanetMenu;
   private offX = 0;
+  private openedAt = 0;
   private visited: { star: string; planet: number }[] = [];
 
   constructor() { super('starmap'); }
@@ -218,6 +221,12 @@ export class StarMapScene extends Phaser.Scene {
       this.lastInputAt = this.time.now;
     });
     onPress(this, ['ESC'], () => (this.view === 'system' ? this.closeSystem() : this.close()));
+    // Enter or Space does what the lit button would: launch, else link, else open the picked star's planets. Not in
+    // the map's first moment and not on a held key's repeats: the press that opened the map from the ship's ring is
+    // the same key.
+    this.openedAt = this.time.now;
+    const seen = new WeakSet<KeyboardEvent>();
+    for (const k of ['ENTER', 'SPACE']) this.input.keyboard?.on(`keydown-${k}`, (e: KeyboardEvent) => { if (seen.has(e) || e.repeat) return; seen.add(e); this.go(); });
 
     // Who is where, what has been found, who is flying (best effort; the map works without it)
     const st = session.store;
@@ -239,7 +248,7 @@ export class StarMapScene extends Phaser.Scene {
     sound.coreHum();
 
     // The planet menu: the same worlds as a list beside the map (recent and closest, each with its details)
-    this.menu = new PlanetMenu(this.game.canvas, (star, planet) => this.pickFromMenu(star, planet), () => { sound.menuMove(0); this.layout(); });
+    this.menu = new PlanetMenu(this.game.canvas, (star, planet) => this.pickFromMenu(star, planet), () => { sound.menuMove(0); this.layout(); }, () => this.go());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.menu?.destroy(); this.menu = undefined; });
     this.layout();
     this.fillMenu();
@@ -247,7 +256,37 @@ export class StarMapScene extends Phaser.Scene {
     this.time.delayedCall(1200, () => this.fillMenu()); // who lives where has loaded by then
     // the beginning wants you somewhere: the map opens picked on it
     const guide = this.d.guide && starById(this.d.guide.star);
-    if (guide && this.d.mode === 'launch') { this.selected = guide; this.updateInfo(); this.menu?.select(guide.id); }
+    if (guide && this.d.mode === 'launch') { this.selected = guide; this.frame(guide); this.updateInfo(); this.menu?.select(guide.id); }
+  }
+
+  /** Enter or Space (here, or on the list's chosen row): what the lit button would do. */
+  private go() {
+    if (this.time.now - this.openedAt < GO_AFTER_MS) return;
+    if (this.launchBtn.visible) this.launch();
+    else if (this.linkBtn.visible) this.link();
+    else if (this.view === 'galaxy' && this.selected) this.openSystem(this.selected);
+  }
+
+  /**
+   * Turns and pulls back the view until this star is on the screen, clear of the list, the title and the panel at
+   * the bottom: the map opens centered on where you are, and a world it sends you to can lie past the edge.
+   */
+  private frame(star: Star) {
+    const { width: w, height: h } = this.scale;
+    const fits = () => {
+      const p = this.project(star);
+      return p.sx > this.offX + 40 && p.sx < w - 40 && p.sy > 34 && p.sy < h - 96;
+    };
+    if (fits()) return;
+    const yaw0 = this.yaw, zoom0 = this.zoom;
+    let best = { yaw: yaw0, zoom: 0 };
+    for (let i = 0; i < 48; i++) {
+      this.yaw = yaw0 + (i / 48) * Math.PI * 2;
+      for (this.zoom = zoom0; this.zoom > 0.25 && !fits(); this.zoom *= 0.9);
+      if (fits() && this.zoom > best.zoom + 0.001) best = { yaw: this.yaw, zoom: this.zoom };
+    }
+    this.yaw = best.zoom ? best.yaw : yaw0;
+    this.zoom = best.zoom || zoom0;
   }
 
   /** Thales' gold ring around the world the beginning wants you to fly to: two arcs turning, breathing. */
@@ -443,7 +482,8 @@ export class StarMapScene extends Phaser.Scene {
       lines.push(s.name + (s.beacon ? (this.d.lit?.includes(s.id) ? '  - BEACON LIT' : '  - BEACON') : s.id === this.d.from ? '  - YOU ARE HERE' : ''));
       if (s.id !== this.d.from) lines.push(`${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
       const known = planets.some((p) => p.real);
-      lines.push(`${planets.length} ${planets.length === 1 ? 'WORLD' : 'WORLDS'}${known ? ' KNOWN TO ASTRONOMERS' : ''}  - TAP FOR PLANETS`);
+      lines.push(`${planets.length} ${planets.length === 1 ? 'WORLD' : 'WORLDS'}${known ? ' KNOWN TO ASTRONOMERS' : ''}`);
+      lines.push('TAP HERE FOR ITS PLANETS');
       if (this.d.mode === 'launch' && s.id !== this.d.from) lines.push(this.fuelLine(s.id, defaultPlanetIndex(s.id), fuel));
       const mp = this.mannyAt(s.id);
       if (mp !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, mp) ? 'YOU DRIVE YOUR HUSK HERE' : `YOUR HUSK WAITS ON ${planetFor(s.id, mp)?.name ?? 'A WORLD'} - LINK`);
