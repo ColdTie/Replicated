@@ -335,7 +335,7 @@ class SoundEngine {
       case 'ice':
         // a hard click with a glassy ring under it
         this.noise(0.03, { ...o, type: 'highpass', freq: vary(4200, 0.15), vol: v(0.08) });
-        this.tone(vary(pick([2400, 2800, 3300]), 0.05), 0.12, { ...o, type: 'sine', vol: v(0.012) });
+        this.tone(vary(pick([2349, 2960, 3520]), 0.02), 0.12, { ...o, type: 'sine', vol: v(0.012) });
         return;
       case 'metal':
         // a clank on plate: a short ringing partial and a click
@@ -681,14 +681,17 @@ class SoundEngine {
     const root = 55 + PENTA[(level - 1) % 5] + (level > 5 ? 12 : 0);
     this.noise(0.9, { type: 'bandpass', freq: 900, to: 2600, q: 0.8, vol: 0.025, attack: 0.5, rev: 0.8 });
     [0, 7, 12, 14].forEach((st, i) => this.tone(midi(root + st), 2.6, { type: i % 2 ? 'triangle' : 'sine', vol: i ? 0.03 : 0.05, attack: 0.45, delay: 0.1 + i * 0.12, rev: 0.85 }));
+    // the bells: D pentatonic from D4 up, rung by rung (the run starts one rung higher each level, the last bell
+    // hangs two rungs above its top)
+    const rung = (k: number) => 62 + PENTA[k % 5] + 12 * Math.floor(k / 5);
     const n = 3 + level;
     for (let i = 0; i < n; i++) {
-      const k = i + level - 1, bell = 74 + PENTA[k % 5] + 12 * Math.floor(k / 5), d = 0.35 + i * 0.13;
+      const d = 0.35 + i * 0.13, bell = rung(i + level + 2);
       this.tone(midi(bell), 0.9, { type: 'sine', vol: 0.028, delay: d, rev: 0.9 });
       this.tone(midi(bell) * 2.76, 0.25, { type: 'sine', vol: 0.006, delay: d, rev: 0.9 });
     }
     this.noise(1.4, { type: 'highpass', freq: 3000, to: 9000, vol: 0.012, attack: 0.6, delay: 0.5, rev: 0.9 });
-    this.tone(midi(root + 31), 2.2, { type: 'sine', vol: 0.016, attack: 0.05, delay: 0.4 + n * 0.13, rev: 0.95 });
+    this.tone(midi(rung(n + level + 3)), 2.2, { type: 'sine', vol: 0.016, attack: 0.05, delay: 0.4 + n * 0.13, rev: 0.95 });
   }
 
   /** A link: attack, the beam strikes (a high zap); body, its hum sweeping up or down the column; tail, sparkle. */
@@ -769,7 +772,7 @@ class SoundEngine {
     const { k, pan } = this.spatial(at);
     if (k < 0.03) return;
     this.noise(2.2, { pan, freq: vary(500, 0.15), to: vary(900, 0.15), q: 1.3, vol: 0.028 * k, attack: 0.9, rev: 0.6, bus: 'ambience' });
-    this.tone(vary(110, 0.05), 2, { pan, type: 'sine', vol: 0.02 * k, attack: 0.8, bus: 'ambience' });
+    this.tone(vary(110, 0.01), 2, { pan, type: 'sine', vol: 0.02 * k, attack: 0.8, bus: 'ambience' });
   }
   /** The fungus' light runs over the bed: a soft puff of spores, a low bloop, a breath of shimmer. */
   fungusClean(at?: At) {

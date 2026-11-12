@@ -746,6 +746,8 @@ export class Npc {
    */
   sing(text: string, opts: { silent?: boolean; harmony?: boolean; notes?: string } = {}) {
     if (this.state === 'below') { this.scene.warren.view?.sing(this, text, opts); return; } // sung down in the warren
+    // its own talk box is open: the box has its voice (a wake that lands mid-talk would sing and float its words over it)
+    if (this.state === 'talk') return;
     const sc = this.scene;
     const p = sc.player;
     const dp = Math.hypot(p.x - this.x, p.y - this.y);

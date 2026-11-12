@@ -273,10 +273,11 @@ export class UIScene extends Phaser.Scene {
     this.embers = n;
     this.counterText.setText(String(n));
     if (quiet) { if (!this.counterFade?.getRemaining()) this.counter.setAlpha(idleAlpha(n)); return; }
+    this.tweens.killTweensOf(this.counter);
     this.counter.setAlpha(1);
     this.tweens.add({ targets: this.counter, scale: { from: 1.25, to: 1 }, duration: 160, ease: 'Back.easeOut' });
     this.counterFade?.remove();
-    this.counterFade = this.time.delayedCall(2500, () => this.tweens.add({ targets: this.counter, alpha: idleAlpha(this.embers), duration: 600 }));
+    this.counterFade = this.time.delayedCall(2500, () => this.tweens.add({ targets: this.counter, alpha: idleAlpha(this.embers), duration: 600, onComplete: () => this.counter.setAlpha(idleAlpha(this.embers)) }));
   }
 
   /** The world's store changed: a counter lights up when its material did. */

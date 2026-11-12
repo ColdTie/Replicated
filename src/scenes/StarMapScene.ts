@@ -52,6 +52,8 @@ const SIGNATURE = SUPPLIES.signature as { byWorld: Record<string, string>; names
 const TAP_STAR = 24, TAP_PLANET = 22;
 /** how long after the map opens Enter / Space start to act: the press that opened it is still going down */
 const GO_AFTER_MS = 350;
+/** how far the map pulls back (the wheel, a pinch, framing a world) */
+const ZOOM_MIN = 0.25;
 
 interface Projected { star: Star; sx: number; sy: number; depth: number; r: number }
 interface SysItem { sp: SystemPlanet; img: Phaser.GameObjects.Image; label: Phaser.GameObjects.BitmapText; globe: Globe; x: number; y: number; angle: number; rx: number; ry: number }
@@ -208,7 +210,7 @@ export class StarMapScene extends Phaser.Scene {
       this.lastInputAt = this.time.now;
       if (this.pinching()) {
         const d = this.pinchDistance();
-        if (this.pinchStart > 0) this.zoom = Phaser.Math.Clamp(this.zoomStart * d / this.pinchStart, 0.25, 6);
+        if (this.pinchStart > 0) this.zoom = Phaser.Math.Clamp(this.zoomStart * d / this.pinchStart, ZOOM_MIN, 6);
         return;
       }
       if (!this.dragging) return;
@@ -221,7 +223,7 @@ export class StarMapScene extends Phaser.Scene {
     });
     this.input.on('wheel', (_p: unknown, _o: unknown, _dx: number, dy: number) => {
       if (this.view !== 'galaxy') return;
-      this.zoom = Phaser.Math.Clamp(this.zoom * (dy > 0 ? 0.9 : 1.1), 0.25, 6);
+      this.zoom = Phaser.Math.Clamp(this.zoom * (dy > 0 ? 0.9 : 1.1), ZOOM_MIN, 6);
       this.lastInputAt = this.time.now;
     });
     onPress(this, ['ESC'], () => (this.view === 'system' ? this.closeSystem() : this.close()));
@@ -263,10 +265,13 @@ export class StarMapScene extends Phaser.Scene {
     if (guide && this.d.mode === 'launch') { this.selected = guide; this.frame(guide); this.updateInfo(); this.menu?.select(guide.id); }
   }
 
+  /** Enter / Space go by LAUNCH: it is lit, or it is dimmed (no fuel, not allowed) and there is no LINK to take instead. */
+  private byLaunch() { return this.launchBtn.visible && (this.launchBtn.alpha === 1 || !this.linkBtn.visible); }
+
   /** Enter or Space: what the lit button would do. */
   private go() {
     if (performance.now() - this.openedAt < GO_AFTER_MS) return;
-    if (this.launchBtn.visible) this.launch();
+    if (this.byLaunch()) this.launch();
     else if (this.linkBtn.visible) this.link();
     else if (this.view === 'galaxy' && this.selected) this.openSystem(this.selected);
   }
@@ -277,7 +282,7 @@ export class StarMapScene extends Phaser.Scene {
    * its first row in the list, while the button flies to the star's first planet: the two can differ.)
    */
   private goRow(star: string, planet: number) {
-    const d = this.launchBtn.visible ? this.destination() : null;
+    const d = this.byLaunch() ? this.destination() : null;
     const t = d ? { star: d.star.id, planet: d.planet } : this.linkBtn.visible ? this.linkTarget() : null;
     if (t && t.star === star && t.planet === planet) this.go(); else this.pickFromMenu(star, planet);
   }
@@ -297,7 +302,7 @@ export class StarMapScene extends Phaser.Scene {
     let best = { yaw: yaw0, zoom: 0 };
     for (let i = 0; i < 48; i++) {
       this.yaw = yaw0 + (i / 48) * Math.PI * 2;
-      for (this.zoom = zoom0; this.zoom > 0.25 && !fits(); this.zoom *= 0.9);
+      for (this.zoom = zoom0; this.zoom > ZOOM_MIN && !fits(); this.zoom = Math.max(ZOOM_MIN, this.zoom * 0.9));
       if (fits() && this.zoom > best.zoom + 0.001) best = { yaw: this.yaw, zoom: this.zoom };
     }
     this.yaw = best.zoom ? best.yaw : yaw0;

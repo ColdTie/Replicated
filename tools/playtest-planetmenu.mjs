@@ -116,6 +116,26 @@ try {
     log('Enter and Space', JSON.stringify(second));
     if (second.launched.length !== 1 || second.launched[0] !== lit.row || second.open) fail(`the keys did not launch once to the row's world (${JSON.stringify(second.launched)})`);
   }
+
+  // a husk waits on a world the ship cannot reach (no Ember): LAUNCH is dimmed, LINK is lit, and Enter takes the link
+  await ev(() => { const s = window.__scene; window.__launched = []; window.__linked = []; s.scene.launch('starmap', { mode: 'launch', from: s.planet.star, fromPlanet: s.planet.planetIndex, embers: 0, onLaunch: (star, planet) => window.__launched.push(`${star}:${planet}`), onLink: (star, planet) => window.__linked.push(`${star}:${planet}`) }); });
+  await page.waitForSelector('.pm .pm-row', { timeout: 8000 }).catch(() => fail('the planet menu did not open a third time'));
+  await page.waitForTimeout(1500);
+  const husk = await ev(() => {
+    const m = window.__game.scene.getScene('starmap');
+    const e = m.menu.rows.map((r) => r.e).find((x) => x.star !== m.d.from);
+    m.d.mannies = [`${e.star}:${e.planet}`];
+    m.selected = m.projected.find((p) => p.star.id === e.star).star;
+    m.updateInfo(); m.menu.select(e.star);
+    return { world: `${e.star}:${e.planet}`, launch: m.launchBtn.visible && m.launchBtn.alpha, link: m.linkBtn.visible };
+  });
+  log('husk world', JSON.stringify(husk));
+  if (husk.launch !== 0.35 || !husk.link) fail('the check needs a dimmed LAUNCH beside a lit LINK');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(600);
+  const linked = await ev(() => ({ launched: window.__launched, linked: window.__linked, open: window.__game.scene.isActive('starmap') }));
+  log('Enter with LAUNCH dimmed', JSON.stringify(linked));
+  if (linked.launched.length || linked.linked.length !== 1 || linked.linked[0] !== husk.world || linked.open) fail(`Enter did not take the lit LINK past a dimmed LAUNCH (${JSON.stringify(linked)})`);
   log('errors', JSON.stringify(errors));
 } finally {
   await b.close();
