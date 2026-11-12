@@ -247,8 +247,14 @@ src/world/groundPaint.ts painted floor: one full-color image per planet (relief-
                          per-kind detail: grass blades, snow ridges, sand ripples, spore pores, glowing basalt
                          cracks, craters; pebbles, ruin slabs, wall shadows, pond banks). Styles in src/data/floor.json.
                          The tilemap now only draws water and walls.
-src/fx/                  Lighting (multiply darkness RT + additive lights), Atmosphere (sky, stars, fog,
-                         dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
+src/fx/                  Lighting (multiply darkness RT + additive lights; a lamp fades as the ambient brightens:
+                         lampStrength), Atmosphere (sky, stars, fog, dust, spores), Fx (particle bursts, slash, floating
+                         icons), procedural textures
+src/data/light.json      how light and text sit on every world: lamps (full in the dark, faint under a bright sky), nightSun
+                         (the share of a red dwarf's tint the night keeps), ink (the dark edge under small text, and how
+                         far the counters fade when idle or at zero)
+src/ui/ink.ts            ink(): the dark edge under bitmap text drawn straight over the world (counters, place, title
+                         cards, notices, readouts, names); idleAlpha(): a counter's fade
 src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember, iron, hydrogen, salt,
                          quartz, copper by kind; each its own glint, hit and pickup sound),
                          Base (pad + Replicator: since 2026-10-28 a copy takes a Nous Chip and its Ember, and the body
@@ -257,7 +263,10 @@ src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode
 src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
 src/audio/Sound.ts       procedural WebAudio: every sound effect, the generative music, each world's ambience bed (no audio
                          files); buses sfx / music / ambience / ui / voice, ducking under voices, distance and panning
-                         (listen, At), footsteps per surface (PlanetScene.footSurface); tunables in src/data/sound.json
+                         (listen, At), footsteps per surface (PlanetScene.footSurface); tunables in src/data/sound.json.
+                         One key: the pad plays in D major and every pitched effect uses that scale's notes (root a new
+                         one on D, G or A); each world plays its own chords inside it (sound.json moods, worldMood) and
+                         its bed's drone is tuned to a note of it
 src/entities/            ... Spitter + Spore (reflectable), Wildlife
                          (Grazer you pet, bird Flock that scatters, Butterflies by day), Npc (drifted copies), Gear
 src/core/drift.ts        replication drift (visor, headgear, trail, stats) from src/data/drift.json
@@ -469,7 +478,8 @@ attack there opens the designs; standing on a bed's ghost with the salt for it (
 Down choose, Left / Right or a drag turn the model, attack / E / Enter or a click on PRINT prints, Esc or the X (top right) closes.
 A tap or click inside a menu (the star map, the designs, the husk vault) belongs to the menu: it never also swings in the
 world (UIScene MENUS). At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
-LINK; at the empty berth (the vessel is elsewhere) it has LINK and TO VESSEL / TO SHIP; in flight a world with your
+LINK; Enter or Space in the map does what the lit button would (launch, else link, else open the picked star's planets;
+on the list's chosen row too), never in the map's first moment or on a held key; at the empty berth (the vessel is elsewhere) it has LINK and TO VESSEL / TO SHIP; in flight a world with your
 manny in the top-left row links you there. Dash Shift/K/X, gamepad
 B/L1/R2, swipe on the right side. Talk to the copy beside you (a speech mark shows over it): E, right click, gamepad Y,
 or the touch talk button (a mouse click on it works too, for touchscreen laptops); or click (left or right) on any copy
@@ -508,6 +518,72 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 6. GitHub: require the "test" status check on main.
 7. Step 2 of `docs/plan-metanoia.md` (joining by invite link) waits for Steve's yes to its migration, the redirect URL
    check in Supabase, and an email address each for Linda and Freya.
+8. Day and night on the generated worlds (session 28): only the homeworld, Earth and Gliese 12 b follow the clock;
+   every other world keeps one fixed light, day and night. Give them the day cycle too?
+9. The ship's ring opens the star map only on attack; the hatch, the vault, the Printworks' door and a bed's ghost also
+   open by standing on them a moment. Give the ring the same dwell?
+10. The copies sing in keys of their own (a root from each copy's id), over a pad that is now in one key with every
+    effect. Keep that (each a little different), or bring their songs into the key?
+
+### Session 28 (2026-11-12): harmony and disharmony (Steve: "run this game. Play a bit of each world and see the harmony and the disharmony. Then write up some changes. Lets see what you can do to improve this")
+- **How it was played.** A fresh `?local` start with real keys in headless Chromium: the opening, the name, Thales'
+  printer words, salt, iron and Ember gathered, the star map, the trip to Gliese 12 b, copper and quartz, the wild Cems.
+  Then about a minute on each of ten worlds at 13:00 and at 23:00 (the homeworld, Earth, Gliese 12 b, Solace and one
+  world of every biome: Mercury, Venus, Mars, Europa, Proxima b, Sirius e), the staged views, the phone-wide layout,
+  and the sound (the master bus recorded for levels; every effect's notes listed against the music).
+- **In harmony, left alone:** Earth by day, Mars, Proxima b and Mercury; the Cem bed, the prints and the design menu;
+  the town at dusk; the warren; the travel scene; movement, the dash and the swing. Levels are fine (about -31 dBFS,
+  peaks under 0.7, nothing clips).
+- **Light: lamps fade under a bright sky** (`Lighting.lampStrength`, `light.json lamps`). A lamp takes the darkness
+  away, and by day there is little to take: on pale ground (the salt of Gliese 12 b at noon, Europa's snow) your own
+  light wiped the sky's color off the ground and left a white hole with you lost in it. Every lamp is now scaled by how
+  dark the ambient color is: full at night and on the dark worlds, about 0.4 at noon under a red dwarf, 0.12 under
+  Earth's noon (where it already showed nothing). Measured on the same frame: 15% of Gliese 12 b's noon was blown out
+  around the player, now the player stands in a soft warm pool.
+- **Light: the night keeps a share of a red dwarf's tint** (`light.json nightSun` 0.3, `Environment.apply`). The
+  homeworld's `sunTint` multiplied the night's own dark as well: 88% of the screen was near black at 23:00, darker than
+  Earth's night. The tint is the sun's, so it fades as the night comes; the homeworld's night now reads like Earth's,
+  a little warmer. (Open question 2, a tidally locked world, stays Steve's.)
+- **Text: a dark edge** (`src/ui/ink.ts`, `light.json ink`). The counters, the place and who lives here, title cards,
+  notices, names, WAKE / HOLD and what a printer or the ship waits for are drawn straight over the world: on salt and
+  snow the landing card "GLIESE 12 B" and the readouts could not be read. Each has a one pixel dark edge now. The
+  store's counters fade to 0.5 when idle (they were 0.35) and to 0.22 while a material stands at zero, so six zeros no
+  longer line the top of a new game. The printer's readout has room between its materials (38 px a column, it was 30).
+- **The star map.** It opened centered on where you are, and the world the beginning sends you to (Gliese 12, 24 light
+  years up) lay past the top edge: a dashed line ran off the screen under a cut-off label. It now turns and pulls back
+  until the picked world is in view (`StarMapScene.frame`). Enter or Space does what the lit button would: launch, else
+  link, else open the picked star's planets (also on the list's chosen row, which used to choose it again); not in the
+  map's first 350 ms and not on a held key's repeats, since the press that opens the map from the ring is the same
+  key. Before, a launch needed the mouse. The hint "TAP HERE FOR ITS PLANETS" has its own line: with the list open the
+  long line ran under the LAUNCH button.
+- **Sound: one key** (`Sound.ts`, `sound.json`). The pad plays in D major, but the effects were in keys of their own:
+  Ember crystals in E major pentatonic, quartz, menus, building, petting, linking and the design menu in C major, a
+  finished print and the fungus in E major, a seeded bed in D minor, HOLD in A minor, and two of the five growings in
+  B major and E major: a semitone off the music at every G#, C and F. Every pitched effect is now rooted on a note of
+  D major and uses its notes; each moved a whole tone at most, so they sound like themselves. A growing's chord is
+  root, fifth, octave and ninth (open, never minor, in the key on every root) and its bells climb D pentatonic, one
+  step higher each level as before. Copper's bong wandered a quarter tone either way; it stays within a few cents.
+  Checked by playing every effect once with its notes listed: all chords and melodies are in the key (the bell and
+  metal partials are inharmonic by design).
+- **Sound: every world its own chords, inside the key** (`sound.json moods`, `worldMood`). One progression played on
+  every world. Now: home (D, B minor, G, A, as before) on the homeworld, Earth and green worlds; open (G add 9, D sus 2,
+  E minor 7, A sus 4) on Gliese 12 b and dune worlds; dusk (B minor, G, E minor, F# minor) on Venus, spore worlds and
+  Solace; still (D sus 2, B minor 7, G major 9, A sus 2) on ice, moons and the ship in flight. All four use only the
+  key's notes, so every effect fits every world. The beds' drones sat between notes (38 Hz on Gliese 12 b, 30 on the
+  moon, 36 on Venus) or outside the key (33 Hz, a C, in flight): each is tuned to a note of it now.
+- **Talk.** A copy's song bubble no longer hangs over the scene while its own talk box is open (Thales said one thing
+  in a bubble and another in the box).
+- **The story is being rewritten.** Steve's lore binder (an artifact, not in `story/` yet): the Noia leave Earth for
+  Delta Pavonis, Freya is the one Vessel, the Chem of Gliese 832 build in layered calcium, a signal comes from Epsilon
+  Indi. Nothing in this session touches story text, the beginning's steps or names; all three stars are already in
+  the catalog.
+- Verified: build, typecheck (also with unused locals and parameters), the full `npm test` (23 of 23); the beginning
+  replayed with real keys from a fresh start (the landing card, the counters and the readouts read on the salt; a held
+  Enter opens the map and does not launch, a fresh Enter launches); the same frames before and after on Gliese 12 b at
+  noon, Europa and the homeworld at 23:00; dusk and night on the homeworld, Earth and Gliese 12 b; a fight on Proxima b
+  outside the town. **The sound was checked by its notes and levels, not by ear** (a session cannot hear): Steve should
+  listen to the pickups, the menus and a landing on each kind of world. Screenshots `cemworld-day.png`,
+  `homeworld-night.png`, `floor-frost.png`, `tutorial-cemworld.png`, `tutorial-printer.png`.
 
 ### Session 27 (2026-11-01): wood is gone (Steve: "lets remove wood and not replace it with anything ... It just doesnt make sense")
 - **No wood anywhere.** It is no longer a material: not in any store, cost, recipe, carry limit, readout, icon or
