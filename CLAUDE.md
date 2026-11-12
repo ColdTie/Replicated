@@ -526,6 +526,9 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
    open by standing on them a moment. Give the ring the same dwell?
 10. The copies sing in keys of their own (a root from each copy's id), over a pad that is now in one key with every
     effect. Keep that (each a little different), or bring their songs into the key?
+11. CI's test job is pinned to `ubuntu-24.04` (session 28): GitHub's `ubuntu-latest` is Ubuntu 26.04 now, which the
+    pinned Playwright 1.56.1 does not support. Moving on means a newer Playwright (a dependency version change, and a
+    newer Chromium for every playtest): say when.
 
 ### Session 28 (2026-11-12): harmony and disharmony (Steve: "run this game. Play a bit of each world and see the harmony and the disharmony. Then write up some changes. Lets see what you can do to improve this")
 - **How it was played.** A fresh `?local` start with real keys in headless Chromium: the opening, the name, Thales'
@@ -600,6 +603,9 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   Delta Pavonis, Freya is the one Vessel, the Chem of Gliese 832 build in layered calcium, a signal comes from Epsilon
   Indi. Nothing in this session touches story text, the beginning's steps or names; all three stars are already in
   the catalog.
+- **CI.** The PR's first `test` run failed before the build: `ubuntu-latest` had moved to Ubuntu 26.04 and Playwright
+  1.56.1 cannot install Chromium's system packages there. `.github/workflows/test.yml` runs on `ubuntu-24.04` now
+  (open question 11); the deploy workflow installs no browser and is unaffected.
 - Verified: build, typecheck (also with unused locals and parameters), the full `npm test` (23 of 23, three times: the
   first diff, after each review's fixes; `playtest-planetmenu` now checks Enter on a row and the dimmed LAUNCH); the beginning
   replayed with real keys from a fresh start (the landing card, the counters and the readouts read on the salt; a held
