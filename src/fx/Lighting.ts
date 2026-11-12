@@ -1,6 +1,7 @@
 // Darkness layer: a screen-sized render texture filled with the ambient color, lights stamped in
 // additively, then multiplied over the scene. Glow sprites add warm bloom on top.
 import Phaser from 'phaser';
+import LIGHT from '../data/light.json';
 import { MAX_W, onScreenSize } from '../core/viewport';
 
 export interface Light {
@@ -18,12 +19,26 @@ export interface Light {
 // shakes by intensity x width; the keeper's slam is 0.014)
 const M = Math.ceil(0.015 * MAX_W) + 1;
 
+/**
+ * How strong a lamp is under this ambient color (light.json lamps): full in the dark, faint under a bright sky. A lamp
+ * takes the darkness away, so in daylight there is little for it to take; at full strength it only wiped the sky's
+ * color off pale ground and left a white hole.
+ */
+export function lampStrength(ambient: number) {
+  const luma = (0.2126 * ((ambient >> 16) & 255) + 0.7152 * ((ambient >> 8) & 255) + 0.0722 * (ambient & 255)) / 255;
+  const { fullDark, curve, floor } = LIGHT.lamps;
+  return Math.max(floor, Math.min(1, Math.pow((1 - luma) / fullDark, curve)));
+}
+
 export class Lighting {
   private rt: Phaser.GameObjects.RenderTexture;
   private lights = new Set<Light>();
   private t = 0;
+  /** every lamp's strength under the ambient color now (lampStrength) */
+  private lamp = 1;
 
   constructor(private scene: Phaser.Scene, private ambient: number, private depth: number) {
+    this.lamp = lampStrength(ambient);
     // As big as the game is now (it is filled every frame, so a bigger one costs on every screen), made again when the
     // game's width changes (src/core/viewport.ts). Not rt.resize(): Phaser 3.90 makes a RenderTexture's GL target with
     // autoResize off, so resize() changes its frame but not its framebuffer and the lights land in the wrong place.
@@ -51,7 +66,9 @@ export class Lighting {
   }
 
   setAmbient(c: number) {
+    if (c === this.ambient) return;
     this.ambient = c;
+    this.lamp = lampStrength(c);
   }
 
   remove(l: Light) {
@@ -72,7 +89,7 @@ export class Lighting {
       this.rt.stamp('light', undefined, Math.round(l.x - vx) + M, Math.round(l.y - vy) + M, {
         scale,
         tint: l.color,
-        alpha: Math.min(1, l.intensity * f),
+        alpha: Math.min(1, l.intensity * f) * this.lamp,
         blendMode: Phaser.BlendModes.ADD,
       });
     }

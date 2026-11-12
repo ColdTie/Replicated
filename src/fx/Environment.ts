@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { DAYCYCLE, PALETTE, hex, type PlanetDef } from '../core/data';
+import LIGHT from '../data/light.json';
 import type { Atmosphere } from './Atmosphere';
 import type { Light, Lighting } from './Lighting';
 import { makeRays, makeWeatherBits, rgb } from './textures';
@@ -146,8 +147,13 @@ export class Environment {
     const t = (hr - a.hour) / (b.hour - a.hour);
     let ambient = mix(hex(a.ambient), hex(b.ambient), t);
     let sky = mix(hex(a.sky), hex(b.sky), t);
-    if (this.planet.sunTint) { const k = hex(this.planet.sunTint); ambient = tintBy(ambient, k); sky = tintBy(sky, k); }
     this.night = lerp(a.night, b.night, t);
+    // a red dwarf tints the day; the night keeps only a share of it (light.json nightSun): the tint is the sun's, and
+    // over the night's own dark it left almost nothing to see
+    if (this.planet.sunTint) {
+      const k = mix(hex(this.planet.sunTint), 0xffffff, this.night * (1 - LIGHT.nightSun));
+      ambient = tintBy(ambient, k); sky = tintBy(sky, k);
+    }
     ambient = scale(ambient, lerp(1, DAYCYCLE.rainDarken, this.rainLevel));
     this.lighting.setAmbient(ambient);
     this.atmosphere.sky.setTint(sky);
