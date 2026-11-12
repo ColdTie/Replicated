@@ -32,7 +32,7 @@
     "frost": { "wind": { "freq": 1300, "q": 1.1, "vol": 0.06, "lfo": 0.05 }, "event": "creak", "every": 6 },
     "dune": { "wind": { "freq": 700, "q": 0.5, "vol": 0.05, "lfo": 0.09 }, "event": "sand", "every": 6 },
     "spore": { "wind": { "freq": 400, "q": 0.8, "vol": 0.025, "lfo": 0.13 }, "drone": { "freq": 55, "vol": 0.02 }, "event": "bubble", "every": 3 },
-    "ember": { "wind": { "freq": 250, "q": 0.6, "vol": 0.04, "lfo": 0.08 }, "drone": { "freq": 61.74, "vol": 0.035 }, "event": "ember", "every": 4 },
+    "ember": { "wind": { "freq": 250, "q": 0.6, "vol": 0.04, "lfo": 0.08 }, "drone": { "freq": 61.74, "vol": 0.025 }, "event": "ember", "every": 4 },
     "moon": { "wind": { "freq": 3000, "q": 3, "vol": 0.008, "lfo": 0.03 }, "drone": { "freq": 36.71, "vol": 0.02 } },
     "cave": { "wind": { "freq": 180, "q": 0.9, "vol": 0.035, "lfo": 0.04 }, "drone": { "freq": 49, "vol": 0.03 }, "event": "drip", "every": 3 },
     "vault": { "drone": { "freq": 55, "vol": 0.05 }, "event": "tick", "every": 4 },
