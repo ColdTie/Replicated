@@ -696,6 +696,8 @@ export class Npc {
     const now = this.scene.time.now;
     this.talkResume = { state: this.state, left: Math.max(0, this.until - now) };
     this.state = 'talk';
+    // what it was saying out loud gives way to the talk box (the same voice twice, one over the other)
+    this.bubbleUntil = 0;
     this.sprite.setFlipX(this.scene.player.x < this.x);
     this.sprite.play(anim(this.key, 'idle'), true);
     this.hop();
