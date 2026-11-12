@@ -247,8 +247,14 @@ src/world/groundPaint.ts painted floor: one full-color image per planet (relief-
                          per-kind detail: grass blades, snow ridges, sand ripples, spore pores, glowing basalt
                          cracks, craters; pebbles, ruin slabs, wall shadows, pond banks). Styles in src/data/floor.json.
                          The tilemap now only draws water and walls.
-src/fx/                  Lighting (multiply darkness RT + additive lights), Atmosphere (sky, stars, fog,
-                         dust, spores), Fx (particle bursts, slash, floating icons), procedural textures
+src/fx/                  Lighting (multiply darkness RT + additive lights; a lamp fades as the ambient brightens:
+                         lampStrength), Atmosphere (sky, stars, fog, dust, spores), Fx (particle bursts, slash, floating
+                         icons), procedural textures
+src/data/light.json      how light and text sit on every world: lamps (full in the dark, faint under a bright sky), nightSun
+                         (the share of a red dwarf's tint the night keeps), ink (the dark edge under small text, and how
+                         far the counters fade when idle or at zero)
+src/ui/ink.ts            ink(): the dark edge under bitmap text drawn straight over the world (counters, place, title
+                         cards, notices, readouts, names); idleAlpha(): a counter's fade
 src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode + Shard (Ember, iron, hydrogen, salt,
                          quartz, copper by kind; each its own glint, hit and pickup sound),
                          Base (pad + Replicator: since 2026-10-28 a copy takes a Nous Chip and its Ember, and the body
@@ -257,7 +263,10 @@ src/entities/            Player, Skitter + Hopper (Enemy interface), CrystalNode
 src/fx/Environment.ts    real-time day/night (device clock), sunbeams, daylight lift, fireflies, rain + ripples + lightning
 src/audio/Sound.ts       procedural WebAudio: every sound effect, the generative music, each world's ambience bed (no audio
                          files); buses sfx / music / ambience / ui / voice, ducking under voices, distance and panning
-                         (listen, At), footsteps per surface (PlanetScene.footSurface); tunables in src/data/sound.json
+                         (listen, At), footsteps per surface (PlanetScene.footSurface); tunables in src/data/sound.json.
+                         One key: the pad plays in D major and every pitched effect uses that scale's notes (root a new
+                         one on D, G or A); each world plays its own chords inside it (sound.json moods, worldMood) and
+                         its bed's drone is tuned to a note of it
 src/entities/            ... Spitter + Spore (reflectable), Wildlife
                          (Grazer you pet, bird Flock that scatters, Butterflies by day), Npc (drifted copies), Gear
 src/core/drift.ts        replication drift (visor, headgear, trail, stats) from src/data/drift.json
@@ -417,7 +426,8 @@ a blank copy, dash still on Shift, the real talk wake with the canned mind),
 `node tools/playtest-homeworld.mjs` (a new player on LHS 1140 b: the scan, Thales' word, the visor, the founded
 structures, Thales by his work, the Printworks printed to the end, Thales never handed over),
 `node tools/playtest-planetmenu.mjs` (the list opens with the map, a row picks its planet, Down follows, a map pick
-lights its row, L hides it, gone with the map),
+lights its row, L hides it, gone with the map; Enter on the chosen row picks its planet when LAUNCH points at another,
+then launches there once; Enter takes a lit LINK past a dimmed LAUNCH),
 `node tools/playtest-sound.mjs` (the buses, each world's bed and the cave's and vault's, footsteps by ground, the talk
 box ducking, distance and panning, every new sound plays),
 `node tools/playtest-bioworks.mjs` (the bed asleep by the Printworks, salt / quartz / copper into the store, the Cems wake
@@ -469,7 +479,9 @@ attack there opens the designs; standing on a bed's ghost with the salt for it (
 Down choose, Left / Right or a drag turn the model, attack / E / Enter or a click on PRINT prints, Esc or the X (top right) closes.
 A tap or click inside a menu (the star map, the designs, the husk vault) belongs to the menu: it never also swings in the
 world (UIScene MENUS). At the vessel's board ring the star map has LAUNCH and, for a world with your manny,
-LINK; at the empty berth (the vessel is elsewhere) it has LINK and TO VESSEL / TO SHIP; in flight a world with your
+LINK; Enter or Space in the map does what the lit button would (launch, else link, else open the picked star's planets;
+a dimmed LAUNCH gives way to a lit LINK), never in the map's first moment or on a held key; on the list's chosen row it
+does so only when that row is the world the button points at, otherwise it picks the row first, as a click would; at the empty berth (the vessel is elsewhere) it has LINK and TO VESSEL / TO SHIP; in flight a world with your
 manny in the top-left row links you there. Dash Shift/K/X, gamepad
 B/L1/R2, swipe on the right side. Talk to the copy beside you (a speech mark shows over it): E, right click, gamepad Y,
 or the touch talk button (a mouse click on it works too, for touchscreen laptops); or click (left or right) on any copy
@@ -508,6 +520,100 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 6. GitHub: require the "test" status check on main.
 7. Step 2 of `docs/plan-metanoia.md` (joining by invite link) waits for Steve's yes to its migration, the redirect URL
    check in Supabase, and an email address each for Linda and Freya.
+8. Day and night on the generated worlds (session 28): only the homeworld, Earth and Gliese 12 b follow the clock;
+   every other world keeps one fixed light, day and night. Give them the day cycle too?
+9. The ship's ring opens the star map only on attack; the hatch, the vault, the Printworks' door and a bed's ghost also
+   open by standing on them a moment. Give the ring the same dwell?
+10. The copies sing in keys of their own (a root from each copy's id), over a pad that is now in one key with every
+    effect. Keep that (each a little different), or bring their songs into the key?
+11. CI's test job is pinned to `ubuntu-24.04` (session 28): GitHub's `ubuntu-latest` is Ubuntu 26.04 now, which the
+    pinned Playwright 1.56.1 does not support. Moving on means a newer Playwright (a dependency version change, and a
+    newer Chromium for every playtest): say when.
+
+### Session 28 (2026-11-12): harmony and disharmony (Steve: "run this game. Play a bit of each world and see the harmony and the disharmony. Then write up some changes. Lets see what you can do to improve this")
+- **How it was played.** A fresh `?local` start with real keys in headless Chromium: the opening, the name, Thales'
+  printer words, salt, iron and Ember gathered, the star map, the trip to Gliese 12 b, copper and quartz, the wild Cems.
+  Then about a minute on each of ten worlds at 13:00 and at 23:00 (the homeworld, Earth, Gliese 12 b, Solace and one
+  world of every biome: Mercury, Venus, Mars, Europa, Proxima b, Sirius e), the staged views, the phone-wide layout,
+  and the sound (the master bus recorded for levels; every effect's notes listed against the music).
+- **In harmony:** the look of Earth by day, Mars, Proxima b and Mercury (unchanged: their lamps are at full strength
+  or within a few percent); the Cem bed, the prints and the design menu; the town at dusk; the warren; the travel
+  scene; movement, the dash and the swing. Levels are fine (about -31 dBFS, peaks under 0.7, nothing clips), and the
+  same after the changes.
+- **Light: lamps fade under a bright sky** (`Lighting.lampStrength`, `light.json lamps`). A lamp takes the darkness
+  away, and by day there is little to take: on pale ground (the salt of Gliese 12 b at noon, Europa's snow) your own
+  light wiped the sky's color off the ground and left a white hole with you lost in it. Every lamp is now scaled by how
+  dark the ambient color is (`fullDark` 0.42, `curve` 3, `floor` 0.12). Under a day sky: about 0.4 at noon on the
+  homeworld, 0.3 on Gliese 12 b, the floor under Earth's noon (where a lamp already showed nothing), back to full by
+  18:00 to 19:00. On the worlds with one fixed light: 1 on the dark ones, Mars, Mercury and Venus, 0.94 on Proxima b,
+  0.84 on Europa; lower where a bright star lifts the ambient (snow under an A star 0.57, dunes under a K star 0.64).
+  On Gliese 12 b at noon the player now stands in a soft warm pool where a white disc was.
+- **Light: the night keeps a share of a red dwarf's tint** (`light.json nightSun` 0.3, `Environment.apply`). The
+  homeworld's `sunTint` multiplied the night's own dark as well: 88% of the screen was near black at 23:00, darker than
+  Earth's night. The tint is the sun's, so it fades as the night comes; the homeworld's night now reads like Earth's,
+  a little warmer. (Open question 2, a tidally locked world, stays Steve's.)
+- **Text: a dark edge** (`src/ui/ink.ts`, `light.json ink`). The counters, the place and who lives here, title cards,
+  notices, names, WAKE / HOLD and what a printer or the ship waits for are drawn straight over the world: on salt and
+  snow the landing card "GLIESE 12 B" and the readouts could not be read. Each has a one pixel dark edge now. The
+  store's counters fade to 0.5 when idle (they were 0.35) and to 0.22 while a material stands at zero, so six zeros no
+  longer line the top of a new game. The printer's readout has room between its materials (38 px a column, it was 30).
+- **The star map.** It opened centered on where you are, and the world the beginning sends you to (Gliese 12, 24 light
+  years up) lay past the top edge: a dashed line ran off the screen under a cut-off label. It now turns and pulls back
+  until the picked world is in view (`StarMapScene.frame`). Enter or Space does what the lit button would: launch, else
+  link, else open the picked star's planets; a dimmed LAUNCH (no fuel, not allowed) gives way to a lit LINK; not in the
+  map's first 350 ms and not on a held key's repeats, since the press that opens the map from the ring is the same
+  key; a launch, a link or a close happens once even when two keys land in one frame. On the list's chosen row it goes
+  only when that row is the world the button points at, and otherwise picks the row first, as before (a star picked on
+  the map lights its first row, while LAUNCH points at the star's first planet). Before, a launch needed the mouse. The hint "TAP HERE FOR ITS PLANETS" has its own line: with the list open the
+  long line ran under the LAUNCH button.
+- **Sound: one key** (`Sound.ts`, `sound.json`). The pad plays in D major, but the effects were in keys of their own:
+  Ember crystals in E major pentatonic, quartz, menus, building, petting, linking and the design menu in C major, a
+  finished print and the fungus in E major, a seeded bed in D minor, HOLD in A minor, and two of the five growings in
+  B major and E major: a semitone off the music at every G#, C and F. Every pitched effect is now rooted on a note of
+  D major and uses its notes; most moved a whole tone, quartz and the seeded bed a minor third, so they sound like
+  themselves. A growing's chord is root, fifth, octave and ninth (open, never minor, in the key on every root); its
+  bells climb D pentatonic from A4, one rung higher each level as before, and the last bell hangs two rungs above the
+  run. Copper's bong and the Cems' breath wandered up to a quarter tone and more either way; they stay within about 15
+  cents. The ice's ring underfoot is on D, F# and A. Checked by playing every effect once with its notes listed: all
+  chords and melodies are in the key (the bell and metal partials are inharmonic by design, the iron clang still
+  varies, and the copies' own songs keep their own keys: open question 10).
+- **Sound: every world its own chords, inside the key** (`sound.json moods`, `worldMood`). One progression played on
+  every world. Now: home (D, B minor, G, A, as before) on the homeworld, Earth and green worlds; open (G add 9, D sus 2,
+  E minor 7, A sus 4) on Gliese 12 b and dune worlds; dusk (B minor, G, E minor, F# minor) on Venus, spore worlds and
+  Solace; still (D sus 2, B minor 7, G major 9, A sus 2) on ice, moons and the ship in flight. All four use only the
+  key's notes, so every effect fits every world; so Mars and Mercury, whose look is unchanged, sound different now.
+  The beds' drones sat between notes (38 Hz on Gliese 12 b, 30 on the moon, 36 on Venus) or outside the key (33 Hz, a
+  C, in flight): now D1 on the homeworld and moons, A1 on Gliese 12 b and in flight, B1 on Venus (a little quieter:
+  at its new pitch it carries further).
+- **Talk.** A copy's song bubble no longer hangs over the scene while its own talk box is open (Thales said one thing
+  in a bubble and another in the box): a bubble already up comes down when the box opens, and a song that would start
+  during the talk (a wake landing mid-talk) is not sung.
+- **Two reviews.** One reviewer on the first diff: four findings, all fixed (Enter on a list row launched to the
+  star's first planet when a map pick had lit another row; the 350 ms guard read the scene clock in `create()`, where
+  it is stale, and now reads the wall clock; two keys in one frame launched twice; a counter fade still waiting when
+  the UI scene shut down left the Ember counter dim after the next start). Then four reviewers by dimension (input,
+  light, sound, the notes against the code) with a skeptic on each of the five most severe findings: all five
+  confirmed and fixed (the song during a talk, the dimmed LAUNCH in front of LINK, the Ember counter's fade ending on
+  the wrong look, stale notes). The nine low findings left without a skeptic were checked by hand and held: the
+  growing's last bell was no longer above its run, the Cems' breath and the ice's ring were untuned, and the notes
+  overstated three things (worlds "left alone" whose lamps had dimmed, "a whole tone at most", copper "within a few
+  cents"). The lamp numbers were then moved so that only a day sky fades a lamp and the fixed-light worlds keep
+  theirs.
+- **The story is being rewritten.** Steve's lore binder (an artifact, not in `story/` yet): the Noia leave Earth for
+  Delta Pavonis, Freya is the one Vessel, the Chem of Gliese 832 build in layered calcium, a signal comes from Epsilon
+  Indi. Nothing in this session touches story text, the beginning's steps or names; all three stars are already in
+  the catalog.
+- **CI.** The PR's first `test` run failed before the build: `ubuntu-latest` had moved to Ubuntu 26.04 and Playwright
+  1.56.1 cannot install Chromium's system packages there. `.github/workflows/test.yml` runs on `ubuntu-24.04` now
+  (open question 11); the deploy workflow installs no browser and is unaffected.
+- Verified: build, typecheck (also with unused locals and parameters), the full `npm test` (23 of 23, three times: the
+  first diff, after each review's fixes; `playtest-planetmenu` now checks Enter on a row and the dimmed LAUNCH); the beginning
+  replayed with real keys from a fresh start (the landing card, the counters and the readouts read on the salt; a held
+  Enter opens the map and does not launch, a fresh Enter launches); the same frames before and after on Gliese 12 b at
+  noon, Europa and the homeworld at 23:00; dusk and night on the homeworld, Earth and Gliese 12 b; a fight on Proxima b
+  outside the town. **The sound was checked by its notes and levels, not by ear** (a session cannot hear): Steve should
+  listen to the pickups, the menus and a landing on each kind of world. Screenshots `cemworld-day.png`,
+  `homeworld-night.png`, `floor-frost.png`, `tutorial-cemworld.png`, `tutorial-printer.png`.
 
 ### Session 27 (2026-11-01): wood is gone (Steve: "lets remove wood and not replace it with anything ... It just doesnt make sense")
 - **No wood anywhere.** It is no longer a material: not in any store, cost, recipe, carry limit, readout, icon or

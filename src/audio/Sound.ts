@@ -15,6 +15,10 @@ const pick = <T>(list: T[]) => list[Math.floor(Math.random() * list.length)];
 interface Bed { wind?: { freq: number; q: number; vol: number; lfo: number }; drone?: { freq: number; vol: number }; event?: string; every?: number }
 
 const PENTA = [0, 2, 4, 7, 9]; // major pentatonic steps
+// The key (2026-11-12): the pad plays in D major (sound.json moods), so every pitched effect is rooted on a note of
+// that scale and uses its notes (D E F# G A B C#): Ember crystals ring in D pentatonic, quartz in A, pickups in G,
+// arpeggios on D, G or A (or B minor). Before, crystals rang in E major, menus and building in C major and a seeded
+// bed in D minor over the same pad, a semitone off it at every G#, C and F. A new pitched sound: root it on D, G or A.
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
 // --- the copies' instruments, moods and tempos (a copy picks its own with the sing_as tool) ---
@@ -164,6 +168,8 @@ class SoundEngine {
 
   /** The world you stand on: its ambience bed under open air (sound.json beds, space.reverb.open). */
   setWorld(id: string) { this.world = id; this.places = []; this.applyPlace(); }
+  /** The chords the pad plays on this world (sound.json moods, worldMood): the next chord takes them up. */
+  get mood(): string { const m = SOUND.worldMood as Record<string, string>; return m[this.world] ?? m.default; }
   /** Into a place under the world (the cave of the warren, the husk vault): its bed and its reverb. */
   enterPlace(id: 'cave' | 'vault') { this.places.push(id); this.applyPlace(); }
   leavePlace() { this.places.pop(); this.applyPlace(); }
@@ -329,7 +335,7 @@ class SoundEngine {
       case 'ice':
         // a hard click with a glassy ring under it
         this.noise(0.03, { ...o, type: 'highpass', freq: vary(4200, 0.15), vol: v(0.08) });
-        this.tone(vary(pick([2400, 2800, 3300]), 0.05), 0.12, { ...o, type: 'sine', vol: v(0.012) });
+        this.tone(vary(pick([2349, 2960, 3520]), 0.02), 0.12, { ...o, type: 'sine', vol: v(0.012) });
         return;
       case 'metal':
         // a clank on plate: a short ringing partial and a click
@@ -370,7 +376,7 @@ class SoundEngine {
     if (!this.ready('crystal', 30)) return;
     const { k, pan } = this.spatial(at);
     if (k < 0.02) return;
-    const n = 76 + PENTA[Math.floor(Math.random() * 5)] + 12 * Math.floor(Math.random() * 2);
+    const n = 74 + PENTA[Math.floor(Math.random() * 5)] + 12 * Math.floor(Math.random() * 2);
     this.tone(midi(n), 0.9, { type: 'sine', vol: vary(0.07, 0.15) * k, rev: 0.6, pan });
     this.tone(midi(n) * 2.76, 0.4, { type: 'sine', vol: 0.025 * k, rev: 0.6, pan });
     this.noise(0.03, { type: 'highpass', freq: vary(5000, 0.1), vol: 0.07 * k, pan });
@@ -404,7 +410,7 @@ class SoundEngine {
         this.tone(vary(pick([3520, 3950, 4430]), 0.03), 0.09, { ...o, type: 'sine', vol: 0.018 * k, delay: 0.03, rev: 0.4 });
         return;
       case 'quartz': {
-        const f = midi(84 + PENTA[Math.floor(Math.random() * 5)] + 12 * Math.floor(Math.random() * 2));
+        const f = midi(81 + PENTA[Math.floor(Math.random() * 5)] + 12 * Math.floor(Math.random() * 2));
         this.tone(f, 1.7, { ...o, type: 'sine', vol: 0.05 * k, attack: 0.012, rev: 0.85 });
         this.tone(f * 1.0045, 1.7, { ...o, type: 'sine', vol: 0.04 * k, attack: 0.02, rev: 0.85 });
         this.tone(f * 2.41, 0.5, { ...o, type: 'sine', vol: 0.012 * k, rev: 0.9 });
@@ -412,7 +418,7 @@ class SoundEngine {
         return;
       }
       case 'copper': {
-        const f = vary(pick([262, 294, 330]), 0.03);
+        const f = vary(pick([247, 294, 330]), 0.008);
         this.tone(f, 1.5, { ...o, type: 'sine', vol: 0.09 * k, attack: 0.006, rev: 0.6 });
         this.tone(f * 1.006, 1.5, { ...o, type: 'sine', vol: 0.06 * k, attack: 0.01, rev: 0.6 });
         this.tone(f * 2.71, 0.8, { ...o, type: 'sine', vol: 0.025 * k, rev: 0.7 });
@@ -432,8 +438,8 @@ class SoundEngine {
       case 'iron': this.tone(vary(2200, 0.05), 0.12, { type: 'sine', vol: 0.03, delay: 0.02, rev: 0.3 }); this.tone(vary(2200 * 2.76, 0.05), 0.06, { type: 'sine', vol: 0.012, delay: 0.02 }); return;
       case 'hydrogen': this.tone(vary(420, 0.1), 0.09, { type: 'sine', to: vary(1100, 0.1), vol: 0.05, delay: 0.02 }); return;
       case 'salt': [0, 1, 2].forEach((i) => this.noise(0.008, { type: 'highpass', freq: 5000 + i * 900, vol: 0.05, delay: 0.015 + i * 0.035 })); return;
-      case 'quartz': { const f = midi(96 + PENTA[Math.floor(Math.random() * 5)]); this.tone(f, 0.6, { type: 'sine', vol: 0.03, delay: 0.02, rev: 0.85 }); this.tone(f * 1.005, 0.6, { type: 'sine', vol: 0.02, delay: 0.03, rev: 0.85 }); return; }
-      case 'copper': { const f = vary(523, 0.03); this.tone(f, 0.45, { type: 'sine', vol: 0.04, delay: 0.02, rev: 0.5 }); this.tone(f * 2.71, 0.2, { type: 'sine', vol: 0.012, delay: 0.02 }); return; }
+      case 'quartz': { const f = midi(93 + PENTA[Math.floor(Math.random() * 5)]); this.tone(f, 0.6, { type: 'sine', vol: 0.03, delay: 0.02, rev: 0.85 }); this.tone(f * 1.005, 0.6, { type: 'sine', vol: 0.02, delay: 0.03, rev: 0.85 }); return; }
+      case 'copper': { const f = vary(494, 0.008); this.tone(f, 0.45, { type: 'sine', vol: 0.04, delay: 0.02, rev: 0.5 }); this.tone(f * 2.71, 0.2, { type: 'sine', vol: 0.012, delay: 0.02 }); return; }
     }
   }
 
@@ -484,7 +490,7 @@ class SoundEngine {
 
   pet() {
     if (!this.ready('pet', 300)) return;
-    [0, 4, 7].forEach((s, i) => this.tone(midi(84 + s), 0.3, { type: 'sine', vol: 0.08, delay: i * 0.08, rev: 0.5 }));
+    [0, 4, 7].forEach((s, i) => this.tone(midi(86 + s), 0.3, { type: 'sine', vol: 0.08, delay: i * 0.08, rev: 0.5 }));
   }
 
   // --- the copies' voices ---
@@ -621,7 +627,7 @@ class SoundEngine {
     if (!this.ready('build', 200)) return;
     const { k, pan } = this.spatial(at);
     if (k < 0.02) return;
-    [0, 4, 7, 12, 16].forEach((s, i) => this.tone(midi(60 + s), 1.6, { type: 'triangle', vol: 0.08 * k, delay: i * vary(0.12, 0.1), rev: 0.7, pan }));
+    [0, 4, 7, 12, 16].forEach((s, i) => this.tone(midi(62 + s), 1.6, { type: 'triangle', vol: 0.08 * k, delay: i * vary(0.12, 0.1), rev: 0.7, pan }));
     this.noise(1.2, { freq: 300, to: 3000, q: 2, vol: 0.06 * k, attack: 0.6, pan });
   }
 
@@ -662,27 +668,30 @@ class SoundEngine {
     this.tone(2600, 0.05, { type: 'square', vol: 0.015 });
     this.tone(110, 0.9, { type: 'sine', to: 220, vol: 0.09, attack: 0.15, delay: 0.05 });
     this.tone(165, 0.9, { type: 'triangle', to: 330, vol: 0.03, attack: 0.2, delay: 0.1 });
-    [0, 7, 12, 16].forEach((s, i) => this.tone(midi(76 + s), 1.6, { type: 'sine', vol: 0.03, delay: 0.8 + i * 0.1, attack: 0.1, rev: 0.9 }));
+    [0, 7, 12, 16].forEach((s, i) => this.tone(midi(74 + s), 1.6, { type: 'sine', vol: 0.03, delay: 0.8 + i * 0.1, attack: 0.1, rev: 0.9 }));
   }
 
   /**
-   * Growing (the beginning, story/STORY.md): attack, a soft glassy breath in; body, a warm chord swelling from the
-   * ground up with bells climbing the pentatonic scale over it (one more bell and a step higher at every level);
-   * tail, a shimmer rising away and one high bell left hanging.
+   * Growing (the beginning, story/STORY.md): attack, a soft glassy breath in; body, a warm open chord (root, fifth,
+   * octave, ninth: in the key on every root) swelling from the ground up with bells climbing the pentatonic scale over
+   * it (one more bell and a step higher at every level); tail, a shimmer rising away and one high bell left hanging.
    */
   grow(level: number) {
     if (!this.ready('grow', 1500)) return;
     const root = 55 + PENTA[(level - 1) % 5] + (level > 5 ? 12 : 0);
     this.noise(0.9, { type: 'bandpass', freq: 900, to: 2600, q: 0.8, vol: 0.025, attack: 0.5, rev: 0.8 });
-    [0, 7, 12, 16].forEach((st, i) => this.tone(midi(root + st), 2.6, { type: i % 2 ? 'triangle' : 'sine', vol: i ? 0.03 : 0.05, attack: 0.45, delay: 0.1 + i * 0.12, rev: 0.85 }));
+    [0, 7, 12, 14].forEach((st, i) => this.tone(midi(root + st), 2.6, { type: i % 2 ? 'triangle' : 'sine', vol: i ? 0.03 : 0.05, attack: 0.45, delay: 0.1 + i * 0.12, rev: 0.85 }));
+    // the bells: D pentatonic from D4 up, rung by rung (the run starts one rung higher each level, the last bell
+    // hangs two rungs above its top)
+    const rung = (k: number) => 62 + PENTA[k % 5] + 12 * Math.floor(k / 5);
     const n = 3 + level;
     for (let i = 0; i < n; i++) {
-      const st = 12 + PENTA[i % 5] + 12 * Math.floor(i / 5), d = 0.35 + i * 0.13;
-      this.tone(midi(root + st), 0.9, { type: 'sine', vol: 0.028, delay: d, rev: 0.9 });
-      this.tone(midi(root + st) * 2.76, 0.25, { type: 'sine', vol: 0.006, delay: d, rev: 0.9 });
+      const d = 0.35 + i * 0.13, bell = rung(i + level + 2);
+      this.tone(midi(bell), 0.9, { type: 'sine', vol: 0.028, delay: d, rev: 0.9 });
+      this.tone(midi(bell) * 2.76, 0.25, { type: 'sine', vol: 0.006, delay: d, rev: 0.9 });
     }
     this.noise(1.4, { type: 'highpass', freq: 3000, to: 9000, vol: 0.012, attack: 0.6, delay: 0.5, rev: 0.9 });
-    this.tone(midi(root + 31), 2.2, { type: 'sine', vol: 0.016, attack: 0.05, delay: 0.4 + n * 0.13, rev: 0.95 });
+    this.tone(midi(rung(n + level + 3)), 2.2, { type: 'sine', vol: 0.016, attack: 0.05, delay: 0.4 + n * 0.13, rev: 0.95 });
   }
 
   /** A link: attack, the beam strikes (a high zap); body, its hum sweeping up or down the column; tail, sparkle. */
@@ -691,7 +700,7 @@ class SoundEngine {
     this.noise(0.08, { type: 'highpass', freq: 6000, to: 2500, vol: 0.08 });
     for (const det of [0, 7]) this.tone(down ? 880 : 220, 0.6, { type: 'sawtooth', to: down ? 220 : 880, vol: 0.02, attack: 0.05, delay: 0.04 + det * 0.002 });
     this.noise(0.6, { freq: down ? 4000 : 800, to: down ? 800 : 4000, q: 5, vol: 0.03, delay: 0.05 });
-    [0, 4, 7, 12, 16].forEach((s, i) => this.tone(midi(84 + s), 0.4, { type: 'sine', vol: 0.03, delay: 0.55 + i * 0.05, rev: 0.85 }));
+    [0, 4, 7, 12, 16].forEach((s, i) => this.tone(midi(86 + s), 0.4, { type: 'sine', vol: 0.03, delay: 0.55 + i * 0.05, rev: 0.85 }));
   }
 
   /** Lift-off: attack, ignition (a thump and a crack); body, the roar rising as the ship climbs; tail, the whoosh
@@ -722,7 +731,7 @@ class SoundEngine {
   choicePick(kind: 'wake' | 'hold') {
     if (!this.ready('choicePick', 300)) return;
     const notes = kind === 'wake' ? [0, 7, 12] : [12, 7, 3, 0];
-    notes.forEach((s, i) => this.tone(midi((kind === 'wake' ? 69 : 57) + s), kind === 'wake' ? 0.5 : 0.9, { type: kind === 'wake' ? 'triangle' : 'sine', vol: 0.07, delay: i * (kind === 'wake' ? 0.08 : 0.16), rev: 0.7, bus: 'ui' }));
+    notes.forEach((s, i) => this.tone(midi((kind === 'wake' ? 69 : 59) + s), kind === 'wake' ? 0.5 : 0.9, { type: kind === 'wake' ? 'triangle' : 'sine', vol: 0.07, delay: i * (kind === 'wake' ? 0.08 : 0.16), rev: 0.7, bus: 'ui' }));
   }
 
   /** The husk vault: its door (a heavy iron slide, a hiss of air), the hum of the pods below while you are in it, and
@@ -735,8 +744,8 @@ class SoundEngine {
   }
   /** The vault below: its own bed (the pods' hum, a tick now and then) and a short metal room's reverb. */
   vaultHum(on: boolean) { if (on) this.enterPlace('vault'); else this.leavePlace(); }
-  menuMove(i: number) { if (this.ready('menuMove', 40)) this.tone(midi(84 + (i % 3) * 2), 0.06, { type: 'triangle', vol: 0.04, bus: 'ui' }); }
-  menuPick() { if (this.ready('menuPick', 120)) [0, 7].forEach((s, i) => this.tone(midi(84 + s), 0.12, { type: 'triangle', vol: 0.06, delay: i * 0.06, rev: 0.3, bus: 'ui' })); }
+  menuMove(i: number) { if (this.ready('menuMove', 40)) this.tone(midi(86 + (i % 3) * 2), 0.06, { type: 'triangle', vol: 0.04, bus: 'ui' }); }
+  menuPick() { if (this.ready('menuPick', 120)) [0, 7].forEach((s, i) => this.tone(midi(86 + s), 0.12, { type: 'triangle', vol: 0.06, delay: i * 0.06, rev: 0.3, bus: 'ui' })); }
 
   /** A printer lays a layer: the head's servo whirs across, a click as it sets down, a soft hiss of the bead. Quieter
    * and panned with distance (dx, d in px from the player); never twice the same. */
@@ -750,7 +759,7 @@ class SoundEngine {
   /** The last layer: a rising chord of the head running home, the gantry settling, the warm hum fading. */
   printDone() {
     if (!this.ready('printDone', 800)) return;
-    [0, 4, 7, 12].forEach((s, i) => this.tone(midi(64 + s), 0.6, { type: 'triangle', vol: 0.06, delay: i * 0.07, rev: 0.6 }));
+    [0, 4, 7, 12].forEach((s, i) => this.tone(midi(62 + s), 0.6, { type: 'triangle', vol: 0.06, delay: i * 0.07, rev: 0.6 }));
     this.noise(0.4, { type: 'lowpass', freq: 400, to: 120, vol: 0.12, delay: 0.32 });
     this.tone(110, 1.4, { type: 'sine', vol: 0.05, delay: 0.3, attack: 0.05, rev: 0.4 });
   }
@@ -763,7 +772,7 @@ class SoundEngine {
     const { k, pan } = this.spatial(at);
     if (k < 0.03) return;
     this.noise(2.2, { pan, freq: vary(500, 0.15), to: vary(900, 0.15), q: 1.3, vol: 0.028 * k, attack: 0.9, rev: 0.6, bus: 'ambience' });
-    this.tone(vary(110, 0.05), 2, { pan, type: 'sine', vol: 0.02 * k, attack: 0.8, bus: 'ambience' });
+    this.tone(vary(110, 0.01), 2, { pan, type: 'sine', vol: 0.02 * k, attack: 0.8, bus: 'ambience' });
   }
   /** The fungus' light runs over the bed: a soft puff of spores, a low bloop, a breath of shimmer. */
   fungusClean(at?: At) {
@@ -772,7 +781,7 @@ class SoundEngine {
     if (k < 0.03) return;
     this.noise(0.3, { pan, type: 'lowpass', freq: 900, to: 300, vol: 0.06 * k, attack: 0.04 });
     this.tone(vary(190, 0.08), 0.35, { pan, type: 'sine', to: 120, vol: 0.05 * k, delay: 0.05 });
-    [0, 4, 7].forEach((st, i) => this.tone(midi(88 + st), 0.9, { pan, type: 'sine', vol: 0.012 * k, delay: 0.3 + i * 0.12, rev: 0.9 }));
+    [0, 4, 7].forEach((st, i) => this.tone(midi(86 + st), 0.9, { pan, type: 'sine', vol: 0.012 * k, delay: 0.3 + i * 0.12, rev: 0.9 }));
   }
   /** Ants on the march nearby: a tiny dry patter. */
   antPatter() {
@@ -823,7 +832,7 @@ class SoundEngine {
     this.tone(vary(1320, 0.02), 0.6, { pan, type: 'sine', vol: 0.035 * kk, delay: 0.03, rev: 0.7 });
     this.tone(vary(1980, 0.02), 0.4, { pan, type: 'sine', vol: 0.018 * kk, delay: 0.05, rev: 0.7 });
     this.noise(0.7, { pan, freq: 500, to: 260, q: 1.6, vol: 0.05 * kk, attack: 0.05, delay: 0.15 });
-    [0, 3, 7, 12].forEach((st, i) => this.marimba(midi(62 + st), 0.5 + i * 0.1, 0.05 * kk, pan));
+    [0, 3, 7, 12].forEach((st, i) => this.marimba(midi(59 + st), 0.5 + i * 0.1, 0.05 * kk, pan));
   }
   /** A struck bar of lignin: a quick sine with its fourth-octave partial, woody and round. */
   private marimba(freq: number, delay: number, vol: number, pan = 0, bus: Bus = 'sfx') {
@@ -832,8 +841,8 @@ class SoundEngine {
     this.tone(freq * 10, 0.03, { pan, type: 'triangle', vol: vol * 0.08, delay, bus });
   }
   /** The design menu: it opens with a little rising marimba figure; each row its own bar; a design chosen; a print begun. */
-  designOpen() { if (this.ready('designOpen', 300)) [0, 4, 7].forEach((st, i) => this.marimba(midi(72 + st), i * 0.07, 0.05, 0, 'ui')); }
-  designMove(i: number) { if (this.ready('designMove', 40)) this.marimba(midi(72 + PENTA[i % 5] + 12 * Math.floor(i / 5)), 0, 0.045, 0, 'ui'); }
+  designOpen() { if (this.ready('designOpen', 300)) [0, 4, 7].forEach((st, i) => this.marimba(midi(74 + st), i * 0.07, 0.05, 0, 'ui')); }
+  designMove(i: number) { if (this.ready('designMove', 40)) this.marimba(midi(74 + PENTA[i % 5] + 12 * Math.floor(i / 5)), 0, 0.045, 0, 'ui'); }
   designPrint() {
     if (!this.ready('designPrint', 600)) return;
     [0, 2, 4, 7, 9, 12, 16].forEach((st, i) => this.marimba(midi(67 + st), i * 0.06, 0.05, 0, 'ui'));
@@ -875,7 +884,7 @@ class SoundEngine {
   guardianDie() {
     if (!this.ready('guardianDie', 1000)) return;
     this.noise(2.2, { type: 'lowpass', freq: 400, to: 40, vol: 0.3, attack: 0.05, rev: 0.6 });
-    [0, -3, -7, -12].forEach((st, i) => this.tone(midi(48 + st), 0.9, { type: 'triangle', vol: 0.08, delay: i * 0.22, rev: 0.7 }));
+    [0, -3, -7, -12].forEach((st, i) => this.tone(midi(50 + st), 0.9, { type: 'triangle', vol: 0.08, delay: i * 0.22, rev: 0.7 }));
   }
   /** The beacon lights: a boom, then a chord that climbs into the sky. */
   beacon() {
@@ -909,10 +918,11 @@ class SoundEngine {
 
   /** Slow generative pad with sparse plucks. Brighter by day, sparser and lower at night. */
   private startMusic() {
-    const chords = SOUND.chords;
+    const moods = SOUND.moods as Record<string, number[][]>;
     const tick = () => {
       if (!this.ctx) return;
       const ctx = this.ctx;
+      const chords = moods[this.mood] ?? moods.home;
       const chord = chords[this.chordIdx++ % chords.length];
       const t = ctx.currentTime;
       const len = SOUND.chordSeconds;

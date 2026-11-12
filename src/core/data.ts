@@ -39,7 +39,7 @@ export interface PlanetDef {
   trees: number;
   towers: number;
   intro: 'scan' | 'land';
-  /** multiplies the day cycle's light and sky (hex; a red dwarf's day) */
+  /** multiplies the day cycle's light and sky (hex; a red dwarf's day); the night keeps a share of it (light.json nightSun) */
   sunTint?: string;
   /** surface gravity in Earth g (1 when missing) */
   gravity?: number;

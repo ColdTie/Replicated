@@ -6,6 +6,7 @@ import { onPress, touch } from '../input/Controls';
 import { sound } from '../audio/Sound';
 import { TalkBox } from '../ui/dialogue';
 import { onScreenSize } from '../core/viewport';
+import { idleAlpha, ink } from '../ui/ink';
 
 /** scenes that open over the world with their own buttons */
 const MENUS = ['starmap', 'designs', 'vault'];
@@ -16,6 +17,8 @@ export class UIScene extends Phaser.Scene {
   private counter!: Phaser.GameObjects.Container;
   private counterText!: Phaser.GameObjects.BitmapText;
   private counterFade?: Phaser.Time.TimerEvent;
+  /** the Ember count shown (a counter at zero fades further: light.json ink) */
+  private embers = 0;
   private sparkCounter!: Phaser.GameObjects.Container;
   /** the store's counters (n: the count shown) */
   private stock: Record<string, { c: Phaser.GameObjects.Container; text: Phaser.GameObjects.BitmapText; n: number }> = {};
@@ -45,20 +48,24 @@ export class UIScene extends Phaser.Scene {
 
   create() {
     const { height } = this.scale;
+    // (the scene object is reused: a fade still waiting when the last one shut down never runs, and would read as
+    // one under way for good)
+    this.counterFade = undefined;
+    this.embers = 0;
     this.centred.clear();
     this.centredW = this.scale.width;
 
     // Ember counter: icon + number, fades when idle
     const icon = this.add.image(0, 0, 'shard').setOrigin(0, 0);
-    this.counterText = this.add.bitmapText(15, 5, 'pixel', '0');
-    this.counter = this.add.container(6, 4, [icon, this.counterText]).setAlpha(0.35);
+    this.counterText = ink(this.add.bitmapText(15, 5, 'pixel', '0'));
+    this.counter = this.add.container(6, 4, [icon, this.counterText]).setAlpha(idleAlpha(0));
 
     // Iron and hydrogen (the materials of a husk), salt, quartz and copper (the Cems' designs) in this world's store,
     // beside the Embers
     const tints: Record<string, number> = { iron: 20, hydrogen: 29, salt: 2, quartz: 28, copper: 9 };
     for (const [i, kind] of (['iron', 'hydrogen', 'salt', 'quartz', 'copper'] as const).entries()) {
-      const text = this.add.bitmapText(15, 5, 'pixel', '0').setTint(PALETTE[tints[kind]]);
-      const c = this.add.container(44 + i * 38, 4, [this.add.image(0, 0, kind).setOrigin(0, 0), text]).setAlpha(0.35);
+      const text = ink(this.add.bitmapText(15, 5, 'pixel', '0').setTint(PALETTE[tints[kind]]));
+      const c = this.add.container(44 + i * 38, 4, [this.add.image(0, 0, kind).setOrigin(0, 0), text]).setAlpha(idleAlpha(0));
       this.stock[kind] = { c, text, n: -1 };
     }
     this.onSupplies((this.scene.get('planet') as unknown as { supplies?: Record<string, number> }).supplies ?? {}, true);
@@ -66,20 +73,20 @@ export class UIScene extends Phaser.Scene {
 
     // Sparks (rare): a white star next to the rest, only once the family has one
     const sparkIcon = this.add.image(0, 0, 'spark', 0).setOrigin(0, 0).setScale(0.75);
-    this.sparkText = this.add.bitmapText(14, 5, 'pixel', '0').setTint(PALETTE[18]);
+    this.sparkText = ink(this.add.bitmapText(14, 5, 'pixel', '0').setTint(PALETTE[18]));
     this.sparkCounter = this.add.container(234, 3, [sparkIcon, this.sparkText]).setAlpha(0.6).setVisible(false);
     this.onSparks(session.replicant?.traits.sparks ?? 0, true);
     this.game.events.on('sparks', this.onSparks, this);
 
     // Nous Chips carried (designs.json nouschip): the mind of the next Vessel, shown once you hold one
     const chipIcon = this.add.sprite(0, 0, 'nouschip', 0).setOrigin(0, 0).setScale(0.75);
-    this.chipText = this.add.bitmapText(14, 5, 'pixel', '0').setTint(PALETTE[18]);
+    this.chipText = ink(this.add.bitmapText(14, 5, 'pixel', '0').setTint(PALETTE[18]));
     this.chipCounter = this.add.container(234, 3, [chipIcon, this.chipText]).setAlpha(0.6).setVisible(false);
     this.onChips(session.replicant?.traits.chips ?? 0, true);
     this.game.events.on('chips', this.onChips, this);
 
     this.game.events.on('embers', this.onEmbers, this);
-    this.counterText.setText(String((this.scene.get('planet') as unknown as { embers: number }).embers ?? 0));
+    this.onEmbers((this.scene.get('planet') as unknown as { embers: number }).embers ?? 0, true);
     this.game.events.on('titlecard', this.titleCard, this);
     this.game.events.on('location', this.showLocation, this);
     this.game.events.on('notice', this.notice, this);
@@ -263,12 +270,14 @@ export class UIScene extends Phaser.Scene {
   }
 
   private onEmbers(n: number, quiet = false) {
+    this.embers = n;
     this.counterText.setText(String(n));
-    if (quiet) return;
+    if (quiet) { if (!this.counterFade?.getRemaining()) this.counter.setAlpha(idleAlpha(n)); return; }
+    this.tweens.killTweensOf(this.counter);
     this.counter.setAlpha(1);
     this.tweens.add({ targets: this.counter, scale: { from: 1.25, to: 1 }, duration: 160, ease: 'Back.easeOut' });
     this.counterFade?.remove();
-    this.counterFade = this.time.delayedCall(2500, () => this.tweens.add({ targets: this.counter, alpha: 0.35, duration: 600 }));
+    this.counterFade = this.time.delayedCall(2500, () => this.tweens.add({ targets: this.counter, alpha: idleAlpha(this.embers), duration: 600, onComplete: () => this.counter.setAlpha(idleAlpha(this.embers)) }));
   }
 
   /** The world's store changed: a counter lights up when its material did. */
@@ -279,11 +288,11 @@ export class UIScene extends Phaser.Scene {
       const first = st.n < 0;
       st.n = n;
       st.text.setText(String(n));
-      if (quiet || first) continue;
+      if (quiet || first) { st.c.setAlpha(idleAlpha(n)); continue; }
       st.c.setAlpha(1);
       this.tweens.killTweensOf(st.c);
       this.tweens.add({ targets: st.c, scale: { from: 1.25, to: 1 }, duration: 160, ease: 'Back.easeOut' });
-      this.tweens.add({ targets: st.c, alpha: 0.35, delay: 2500, duration: 600 });
+      this.tweens.add({ targets: st.c, alpha: idleAlpha(n), delay: 2500, duration: 600, onComplete: () => st.c.setAlpha(idleAlpha(st.n)) });
     }
   }
 
@@ -310,13 +319,13 @@ export class UIScene extends Phaser.Scene {
   /** Top left, under the counter: "MARS - SOL" and the replicants living here, each in its visor color. */
   private showLocation(place: string, who: { name: string; color: number }[]) {
     this.location?.destroy();
-    const items: Phaser.GameObjects.GameObject[] = [this.add.bitmapText(0, 0, 'pixel', place).setTint(PALETTE[20])];
+    const items: Phaser.GameObjects.GameObject[] = [ink(this.add.bitmapText(0, 0, 'pixel', place).setTint(PALETTE[20]))];
     who.slice(0, 7).forEach((w, i) => {
       items.push(this.add.rectangle(1, 11 + i * 9 + 3, 3, 3, w.color).setOrigin(0, 0.5));
-      items.push(this.add.bitmapText(7, 11 + i * 9, 'pixel', w.name).setTint(w.color).setAlpha(0.85));
+      items.push(ink(this.add.bitmapText(7, 11 + i * 9, 'pixel', w.name).setTint(w.color).setAlpha(0.85)));
     });
-    if (who.length > 7) items.push(this.add.bitmapText(7, 11 + 7 * 9, 'pixel', `+${who.length - 7}`).setTint(PALETTE[21]));
-    this.location = this.add.container(7, 19, items).setAlpha(0.6).setDepth(10);
+    if (who.length > 7) items.push(ink(this.add.bitmapText(7, 11 + 7 * 9, 'pixel', `+${who.length - 7}`).setTint(PALETTE[21])));
+    this.location = this.add.container(7, 19, items).setAlpha(0.7).setDepth(10);
   }
 
   /** ?perf: where the planet's load went, bottom left, for a while. */
@@ -330,7 +339,7 @@ export class UIScene extends Phaser.Scene {
     const { width, height } = this.scale;
     // above the talk box while it is open
     const y = this.talking ? this.talkBox.y - 16 : height * 0.72;
-    const label = this.add.bitmapText(width / 2, y + 6, 'pixel', text).setOrigin(0.5).setTint(PALETTE[11]).setAlpha(0).setDepth(20);
+    const label = ink(this.add.bitmapText(width / 2, y + 6, 'pixel', text).setOrigin(0.5).setTint(PALETTE[11]).setAlpha(0).setDepth(20));
     const lineW = label.width / 2 + 8;
     const lines = this.add.graphics().setAlpha(0).setDepth(20);
     lines.fillStyle(PALETTE[9], 1).fillRect(width / 2 - lineW - 14, y + 6, 10, 1).fillRect(width / 2 + lineW + 4, y + 6, 10, 1);
@@ -348,8 +357,8 @@ export class UIScene extends Phaser.Scene {
 
   private titleCard(name: string, subtitle: string) {
     const { width, height } = this.scale;
-    const title = this.add.bitmapText(width / 2, height * 0.3, 'pixel', name.split('').join(' ')).setOrigin(0.5).setScale(2).setTint(PALETTE[2]);
-    const sub = this.add.bitmapText(width / 2, height * 0.3 + 18, 'pixel', subtitle).setOrigin(0.5).setTint(PALETTE[21]);
+    const title = ink(this.add.bitmapText(width / 2, height * 0.3, 'pixel', name.split('').join(' ')).setOrigin(0.5).setScale(2).setTint(PALETTE[2]));
+    const sub = ink(this.add.bitmapText(width / 2, height * 0.3 + 18, 'pixel', subtitle).setOrigin(0.5).setTint(PALETTE[20]));
     const lineW = title.width / 2 + 6;
     const lines = this.add.graphics();
     lines.fillStyle(PALETTE[9], 1);

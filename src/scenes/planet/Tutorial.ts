@@ -8,6 +8,7 @@ import type { Light } from '../../fx/Lighting';
 import HOMEWORLD from '../../data/homeworld.json';
 import TUT from '../../data/tutorial.json';
 import type { PlanetScene } from '../PlanetScene';
+import { ink } from '../../ui/ink';
 
 type State = NonNullable<ReplicantSave['traits']['tutorial']>;
 type Pt = { x: number; y: number };
@@ -291,13 +292,13 @@ export class Tutorial {
     const had = !!this.readout;
     this.showReadout(null);
     const box = s.add.container(at!.x, at!.y).setDepth(6200).setAlpha(had ? 1 : 0);
-    const per = 30, rows = Math.ceil(mats.length / 3);
+    const per = 38, rows = Math.ceil(mats.length / 3);
     mats.forEach((m, i) => {
       const col = i % 3, row = Math.floor(i / 3), inRow = Math.min(3, mats.length - row * 3);
       const x = (col - (inRow - 1) / 2) * per, y = (row - (rows - 1) / 2) * 11;
       const have = Math.min(need[m], this.have(m)), done = have >= need[m];
       box.add(s.add.image(x - 7, y, 'supplies', MATERIALS[m]?.icon ?? 0).setAlpha(done ? 1 : 0.8));
-      box.add(s.add.bitmapText(x + 1, y - 3, 'pixel', `${have}/${need[m]}`).setTint(done ? PALETTE[12] : PALETTE[21]));
+      box.add(ink(s.add.bitmapText(x + 1, y - 3, 'pixel', `${have}/${need[m]}`).setTint(done ? PALETTE[12] : PALETTE[20])));
     });
     this.readout = { box, at: at!, key };
   }

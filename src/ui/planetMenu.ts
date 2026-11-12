@@ -47,7 +47,9 @@ export class PlanetMenu {
   private onKey = (ev: KeyboardEvent) => this.key(ev);
   private onResize = () => this.place();
 
-  constructor(private canvas: HTMLCanvasElement, private onPick: (star: string, planet: number) => void, private onToggle: () => void) {
+  constructor(private canvas: HTMLCanvasElement, private onPick: (star: string, planet: number) => void, private onToggle: () => void,
+    /** Enter or Space on the chosen row: go to that world (the map launches or links, or picks it first) */
+    private onGo?: (star: string, planet: number) => void) {
     ensureStyle();
     this.root = document.createElement('div');
     this.root.className = 'pm';
@@ -149,7 +151,13 @@ export class PlanetMenu {
     if (!this.open) return;
     const move = k === 'ArrowDown' || k === 'KeyS' ? 1 : k === 'ArrowUp' || k === 'KeyW' ? -1 : 0;
     if (move) { this.choose(Math.max(0, Math.min(this.rows.length - 1, (this.index < 0 ? -1 : this.index) + move)), true); ev.preventDefault(); ev.stopPropagation(); return; }
-    if ((k === 'Enter' || k === 'Space') && this.index >= 0) { this.choose(this.index, true); ev.preventDefault(); ev.stopPropagation(); return; }
+    if ((k === 'Enter' || k === 'Space') && this.index >= 0) {
+      ev.preventDefault(); ev.stopPropagation();
+      if (ev.repeat) return;
+      const e = this.rows[this.index].e;
+      if (this.onGo) this.onGo(e.star, e.planet); else this.choose(this.index, true);
+      return;
+    }
     if (k === 'Escape') { this.toggle(false); ev.preventDefault(); ev.stopPropagation(); }
   }
 

@@ -1,6 +1,7 @@
 // Headless playtest of the planet menu (src/ui/planetMenu.ts) beside the 3D star map: it opens with the map, lists
 // RECENT and CLOSEST worlds with their details; a click on a row picks that planet on the map, a pick on the map lights
-// its row, Up / Down walk the rows (the map follows), L hides and shows the list, and it is gone with the map.
+// its row, Up / Down walk the rows (the map follows), L hides and shows the list, it is gone with the map, and Enter on
+// the chosen row goes to that row's world (picking it first when the LAUNCH button points elsewhere), once.
 // Usage: npm run build && node tools/playtest-planetmenu.mjs   (saves screenshots/planet-menu*.png)
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
@@ -80,6 +81,61 @@ try {
   await ev(() => window.__game.scene.getScene('starmap').close());
   await page.waitForTimeout(300);
   if (await ev(() => !!document.querySelector('.pm'))) fail('the planet menu stayed after the map closed');
+
+  // Enter on the list's chosen row goes to that row's world and no other. A star picked on the map lights its first
+  // row in the list, which is not always the planet the LAUNCH button would fly to: the first Enter then picks the
+  // row's planet, the next one launches there, and two keys in one breath launch once
+  await ev(() => { const s = window.__scene; window.__launched = []; s.scene.launch('starmap', { mode: 'launch', from: s.planet.star, fromPlanet: s.planet.planetIndex, embers: 9999, onLaunch: (star, planet) => window.__launched.push(`${star}:${planet}`) }); });
+  await page.waitForSelector('.pm .pm-row', { timeout: 8000 }).catch(() => fail('the planet menu did not open a second time'));
+  await page.waitForTimeout(1500);
+  const lit = await ev(() => {
+    const m = window.__game.scene.getScene('starmap');
+    for (const id of [...new Set(m.menu.rows.map((r) => r.e.star))]) {
+      if (id === m.d.from) continue;
+      m.selected = m.projected.find((p) => p.star.id === id)?.star ?? null;
+      if (!m.selected) continue;
+      m.updateInfo(); m.menu.select(id);
+      const e = m.menu.rows[m.menu.index]?.e, d = m.destination();
+      if (e && d && e.star === d.star.id && e.planet !== d.planet) return { row: `${e.star}:${e.planet}`, button: `${d.star.id}:${d.planet}` };
+    }
+    return null;
+  });
+  log('lit row and button', JSON.stringify(lit));
+  if (!lit) fail('no star whose first row differs from the planet LAUNCH flies to (the check needs one)');
+  else {
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(500);
+    const first = await ev(() => { const m = window.__game.scene.getScene('starmap'); return { launched: window.__launched, open: window.__game.scene.isActive('starmap'), picked: `${m.sysStar?.id}:${m.selPlanet?.index}` }; });
+    log('Enter', JSON.stringify(first));
+    if (first.launched.length || !first.open) fail(`Enter on a row launched to ${first.launched} though the button pointed at another planet`);
+    if (first.picked !== lit.row) fail(`Enter on a row did not pick its planet (${first.picked}, the row is ${lit.row})`);
+    await page.keyboard.down('Enter'); await page.keyboard.down('Space');
+    await page.keyboard.up('Enter'); await page.keyboard.up('Space');
+    await page.waitForTimeout(600);
+    const second = await ev(() => ({ launched: window.__launched, open: window.__game.scene.isActive('starmap') }));
+    log('Enter and Space', JSON.stringify(second));
+    if (second.launched.length !== 1 || second.launched[0] !== lit.row || second.open) fail(`the keys did not launch once to the row's world (${JSON.stringify(second.launched)})`);
+  }
+
+  // a husk waits on a world the ship cannot reach (no Ember): LAUNCH is dimmed, LINK is lit, and Enter takes the link
+  await ev(() => { const s = window.__scene; window.__launched = []; window.__linked = []; s.scene.launch('starmap', { mode: 'launch', from: s.planet.star, fromPlanet: s.planet.planetIndex, embers: 0, onLaunch: (star, planet) => window.__launched.push(`${star}:${planet}`), onLink: (star, planet) => window.__linked.push(`${star}:${planet}`) }); });
+  await page.waitForSelector('.pm .pm-row', { timeout: 8000 }).catch(() => fail('the planet menu did not open a third time'));
+  await page.waitForTimeout(1500);
+  const husk = await ev(() => {
+    const m = window.__game.scene.getScene('starmap');
+    const e = m.menu.rows.map((r) => r.e).find((x) => x.star !== m.d.from);
+    m.d.mannies = [`${e.star}:${e.planet}`];
+    m.selected = m.projected.find((p) => p.star.id === e.star).star;
+    m.updateInfo(); m.menu.select(e.star);
+    return { world: `${e.star}:${e.planet}`, launch: m.launchBtn.visible && m.launchBtn.alpha, link: m.linkBtn.visible };
+  });
+  log('husk world', JSON.stringify(husk));
+  if (husk.launch !== 0.35 || !husk.link) fail('the check needs a dimmed LAUNCH beside a lit LINK');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(600);
+  const linked = await ev(() => ({ launched: window.__launched, linked: window.__linked, open: window.__game.scene.isActive('starmap') }));
+  log('Enter with LAUNCH dimmed', JSON.stringify(linked));
+  if (linked.launched.length || linked.linked.length !== 1 || linked.linked[0] !== husk.world || linked.open) fail(`Enter did not take the lit LINK past a dimmed LAUNCH (${JSON.stringify(linked)})`);
   log('errors', JSON.stringify(errors));
 } finally {
   await b.close();

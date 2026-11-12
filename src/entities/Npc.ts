@@ -696,6 +696,8 @@ export class Npc {
     const now = this.scene.time.now;
     this.talkResume = { state: this.state, left: Math.max(0, this.until - now) };
     this.state = 'talk';
+    // what it was saying out loud gives way to the talk box (the same voice twice, one over the other)
+    this.bubbleUntil = 0;
     this.sprite.setFlipX(this.scene.player.x < this.x);
     this.sprite.play(anim(this.key, 'idle'), true);
     this.hop();
@@ -744,6 +746,8 @@ export class Npc {
    */
   sing(text: string, opts: { silent?: boolean; harmony?: boolean; notes?: string } = {}) {
     if (this.state === 'below') { this.scene.warren.view?.sing(this, text, opts); return; } // sung down in the warren
+    // its own talk box is open: the box has its voice (a wake that lands mid-talk would sing and float its words over it)
+    if (this.state === 'talk') return;
     const sc = this.scene;
     const p = sc.player;
     const dp = Math.hypot(p.x - this.x, p.y - this.y);

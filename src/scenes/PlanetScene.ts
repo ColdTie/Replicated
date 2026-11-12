@@ -55,6 +55,7 @@ import { NO_INPUT, kitLists } from './planet/shared';
 import { PARTS } from '../core/body';
 import HOMEWORLD from '../data/homeworld.json';
 import { onScreenSize } from '../core/viewport';
+import { ink } from '../ui/ink';
 
 export const DEPTH = { ground: 0, walls: 1, shadow: 50, actors: 100, fog: 5000, dark: 6000, glow: 6100, fx: 6150, ui: 6300, vignette: 7000 };
 
@@ -1242,7 +1243,7 @@ export class PlanetScene extends Phaser.Scene {
   /** The copy's name floats above it for a moment so the family knows who is who (a blank copy has none yet). */
   floatName(npc: Npc) {
     if (npc.data.traits.blank) return;
-    const t = this.add.bitmapText(npc.x, npc.y - 30, 'pixel', npc.data.name.toUpperCase()).setOrigin(0.5).setTint(npc.trailColor).setDepth(6300).setAlpha(0);
+    const t = ink(this.add.bitmapText(npc.x, npc.y - 30, 'pixel', npc.data.name.toUpperCase()).setOrigin(0.5).setTint(npc.trailColor).setDepth(6300).setAlpha(0));
     this.tweens.add({ targets: t, alpha: 1, y: t.y - 4, duration: 400, ease: 'Sine.easeOut' });
     this.tweens.add({ targets: t, alpha: 0, delay: 2200, duration: 600, onComplete: () => t.destroy() });
   }

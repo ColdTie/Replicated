@@ -7,6 +7,7 @@ import Phaser from 'phaser';
 import { sound } from '../audio/Sound';
 import { PALETTE } from '../core/data';
 import type { InputFrame } from '../input/Controls';
+import { ink } from './ink';
 
 export type WakeOrHold = 'wake' | 'hold';
 const OPTIONS: { kind: WakeOrHold; label: string; color: number; dx: number }[] = [
@@ -28,7 +29,7 @@ export class WakeChoice {
   constructor(private scene: Phaser.Scene, readonly x: number, readonly y: number, private onPick: (k: WakeOrHold) => void, private onCancel: () => void) {
     this.gfx = scene.add.graphics();
     this.glows = OPTIONS.map((o) => scene.add.image(o.dx, 0, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(o.color).setScale(0.35).setAlpha(0.3));
-    this.labels = OPTIONS.map((o) => scene.add.bitmapText(o.dx, 10, 'pixel', o.label).setOrigin(0.5, 0).setTint(o.color));
+    this.labels = OPTIONS.map((o) => ink(scene.add.bitmapText(o.dx, 10, 'pixel', o.label).setOrigin(0.5, 0).setTint(o.color)));
     this.root = scene.add.container(x, y, [...this.glows, this.gfx, ...this.labels]).setDepth(6300).setAlpha(0);
     scene.tweens.add({ targets: this.root, alpha: 1, y: y - 3, duration: 300, ease: 'Sine.easeOut' });
     this.draw();
