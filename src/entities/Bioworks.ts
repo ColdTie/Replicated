@@ -27,6 +27,7 @@ import type { PlanetScene } from '../scenes/PlanetScene';
 import { roofHeight } from '../world/buildingPaint';
 import { buildingDoor, type Lot } from '../world/town';
 import { CrystalNode, NODE } from './Resources';
+import { ink } from '../ui/ink';
 
 type Pt = { x: number; y: number };
 const DEPTH_ANTS = 6, DEPTH_GLOW = 6100;
@@ -270,7 +271,7 @@ export class Bioworks {
       const have = Math.min(n, Math.floor(s.supplies[m] ?? 0)), x = (i - (entries.length - 1) / 2) * 30;
       const icon = (SUPPLIES.materials as Record<string, { icon: number }>)[m]?.icon ?? 0;
       g.readout.add(s.add.image(x - 7, 0, 'supplies', icon));
-      g.readout.add(s.add.bitmapText(x + 1, -3, 'pixel', `${have}/${n}`).setTint(have >= n ? PALETTE[12] : PALETTE[21]));
+      g.readout.add(ink(s.add.bitmapText(x + 1, -3, 'pixel', `${have}/${n}`).setTint(have >= n ? PALETTE[12] : PALETTE[20])));
     });
   }
 
