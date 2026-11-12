@@ -48,8 +48,8 @@ export class PlanetMenu {
   private onResize = () => this.place();
 
   constructor(private canvas: HTMLCanvasElement, private onPick: (star: string, planet: number) => void, private onToggle: () => void,
-    /** Enter or Space on the chosen row: go there (the map launches or links), instead of choosing it again */
-    private onGo?: () => void) {
+    /** Enter or Space on the chosen row: go to that world (the map launches or links, or picks it first) */
+    private onGo?: (star: string, planet: number) => void) {
     ensureStyle();
     this.root = document.createElement('div');
     this.root.className = 'pm';
@@ -154,7 +154,8 @@ export class PlanetMenu {
     if ((k === 'Enter' || k === 'Space') && this.index >= 0) {
       ev.preventDefault(); ev.stopPropagation();
       if (ev.repeat) return;
-      if (this.onGo) this.onGo(); else this.choose(this.index, true);
+      const e = this.rows[this.index].e;
+      if (this.onGo) this.onGo(e.star, e.planet); else this.choose(this.index, true);
       return;
     }
     if (k === 'Escape') { this.toggle(false); ev.preventDefault(); ev.stopPropagation(); }

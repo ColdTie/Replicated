@@ -48,6 +48,10 @@ export class UIScene extends Phaser.Scene {
 
   create() {
     const { height } = this.scale;
+    // (the scene object is reused: a fade still waiting when the last one shut down never runs, and would read as
+    // one under way for good)
+    this.counterFade = undefined;
+    this.embers = 0;
     this.centred.clear();
     this.centredW = this.scale.width;
 
