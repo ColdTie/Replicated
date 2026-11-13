@@ -539,7 +539,8 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   `keepIron` 10, which the designs and husks need; `Warren.press`, `canPress`). Only while the world is played, like
   scavenging. The minds' supplies line says so (kit `press`). `playtest-carry` checks it. Screenshot `press-scrap.png`.
 - Merged as PR #79. CI failed twice first on playtests the change does not touch (cemprint, then planetmenu and
-  beacon; runner timing), then passed; 23 of 23 locally. The `mind` function redeployed; Ember Gold answered.
+  beacon; runner timing), then passed; 23 of 23 locally. The `mind` function v24 deployed, all three
+  files byte for byte with main (v23 had one line of `demoWarren` mistyped, unused by the function). Ember Gold answered.
 
 ### Session 28 (2026-11-12): harmony and disharmony (Steve: "run this game. Play a bit of each world and see the harmony and the disharmony. Then write up some changes. Lets see what you can do to improve this")
 - **How it was played.** A fresh `?local` start with real keys in headless Chromium: the opening, the name, Thales'

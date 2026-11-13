@@ -108,7 +108,7 @@ The copies choose their names themselves, and the change applies on the spot.
 - 2026-11-12: Ember Gold's "Let stored iron be pressed into scrap" built: with no iron ore free, a copy presses 2
   stored iron into 1 scrap beside the hatch, never below 10 iron (`supplies.json press`, `Warren.press`); the minds'
   supplies line says so. PR #79 (CI flaked twice on tests it does not touch, then
-  green); `mind` function redeployed.
+  green); `mind` function v24 deployed, checked byte for byte.
 
 ## Waiting for Steve
 
