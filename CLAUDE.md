@@ -530,6 +530,14 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
     pinned Playwright 1.56.1 does not support. Moving on means a newer Playwright (a dependency version change, and a
     newer Chromium for every playtest): say when.
 
+### Maker 2026-11-12
+- Built Ember Gold's proposal (Gliese 12 b, "Let stored iron be pressed into scrap"): scrap only came off iron ore, so
+  lamps, workbenches and scrap walls waited while iron sat in the store. When a copy wants scrap and no ore is free, it
+  now presses stored iron into scrap beside the hatch (`supplies.json press`: 2 iron for 1 scrap, 5 blows, never below
+  `keepIron` 10, which the designs and husks need; `Warren.press`, `canPress`). Only while the world is played, like
+  scavenging. The minds' supplies line says so (kit `press`); `mind` function redeployed. `playtest-carry` checks it.
+  Screenshot `press-scrap.png`.
+
 ### Session 28 (2026-11-12): harmony and disharmony (Steve: "run this game. Play a bit of each world and see the harmony and the disharmony. Then write up some changes. Lets see what you can do to improve this")
 - **How it was played.** A fresh `?local` start with real keys in headless Chromium: the opening, the name, Thales'
   printer words, salt, iron and Ember gathered, the star map, the trip to Gliese 12 b, copper and quartz, the wild Cems.

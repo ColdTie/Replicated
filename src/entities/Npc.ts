@@ -431,6 +431,7 @@ export class Npc {
     const down = this.scene.warren.pickTask(this, this.scene.env.night);
     if (down?.task === 'entrance') { this.scene.warren.digEntrance(this); return; }
     if (down?.task === 'scavenge') { this.scene.warren.scavenge(this, down.oreIndex ?? 0); return; }
+    if (down?.task === 'press') { this.scene.warren.press(this); return; }
     else if (down) {
       this.descent = { task: down.task, room: down.room };
       this.mineAt = null;

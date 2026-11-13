@@ -29,6 +29,7 @@ const out = {
   upgradeWords: SUPPLIES.upgrade?.words ?? [],
   baseCap: SUPPLIES.baseCap, shelfCap: SUPPLIES.shelfCap,
   maxRooms: WARREN.maxRooms,
+  press: SUPPLIES.press,
   digYield: SUPPLIES.digYield, entranceYield: SUPPLIES.entrance.yield, maxRoomsDugAway: SUPPLIES.offline.maxRoomsDugAway,
   warren: { grid: WARREN.grid, entrance: WARREN.entrance, sizes: WARREN.sizes, maxRooms: WARREN.maxRooms, maxItemsPerRoom: WARREN.maxItemsPerRoom, kinds: WARREN.kinds, items: WARREN.items },
   buildingKit: {
