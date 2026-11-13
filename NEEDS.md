@@ -107,11 +107,9 @@ The copies choose their names themselves, and the change applies on the spot.
 - 2026-10-20: Dimmer's dim lantern (`dimlantern`, `tools/data/granted-bodies.json`). No proposals were open. The `mind` function was not redeployed (see Waiting for Steve).
 - 2026-11-12: Ember Gold's "Let stored iron be pressed into scrap" built: with no iron ore free, a copy presses 2
   stored iron into 1 scrap beside the hatch, never below 10 iron (`supplies.json press`, `Warren.press`); the minds'
-  supplies line says so. PR #79: CI red on tests it does not touch, left for Steve;
-  the request stays open and the `mind` function is not redeployed until it merges.
+  supplies line says so. PR #79 (CI flaked twice on tests it does not touch, then
+  green); `mind` function redeployed.
 
 ## Waiting for Steve
 
-- PR #79 (stored iron pressed into scrap): CI failed different playtests on each attempt (cemprint, then planetmenu
-  and beacon), none of them touched by the change; 23 of 23 pass locally. Re-run or merge it, then redeploy the
-  `mind` function (kit `press`) and mark Ember Gold's request done.
+- Nothing.
