@@ -18,7 +18,7 @@ import type { Npc } from './Npc';
 
 export type BelowTask = 'dig' | 'rest' | 'furnish' | 'improve' | 'linger' | 'idle';
 /** What a copy does about the warren next: below (dig, furnish, rest) or on the surface (entrance, scrap). */
-export type WarrenTask = { task: BelowTask | 'entrance' | 'scavenge'; room?: WarrenRoom; oreIndex?: number };
+export type WarrenTask = { task: BelowTask | 'entrance' | 'scavenge' | 'press'; room?: WarrenRoom; oreIndex?: number };
 export interface Below {
   npc: Npc; task: BelowTask; room?: WarrenRoom; item?: WarrenItem;
   /** it has walked to where it works or sleeps (always true when nobody is watching) */
@@ -266,7 +266,7 @@ export class Warren {
 
   /**
    * What this copy should do about the warren now: dig the way down, dig a planned room, make its bed, pick scrap
-   * off iron ore, go to bed, or nothing.
+   * off iron ore (or press it from stored iron), go to bed, or nothing.
    */
   pickTask(npc: Npc, night: number): WarrenTask | null {
     const e = this.data.entrance!;
@@ -300,6 +300,8 @@ export class Warren {
     if ((this.supplies.scrap ?? 0) < wantScrap && Math.random() < 0.3) {
       const ore = this.scene.nodes.find((n) => n.kind === 'iron' && n.alive && Date.now() - (this.data.scavenged?.[n.index] ?? 0) > SUPPLIES.scrapCooldownMinutes * 60_000);
       if (ore) return { task: 'scavenge', oreIndex: ore.index };
+      // no ore free: press stored iron into scrap at the hatch, keeping what the designs and husks need
+      if (this.canPress) return { task: 'press' };
     }
     // bed: at its own bedtime, when weary, or when it has simply been a while; never twice in quick succession
     const r = WARREN.rest;
@@ -361,6 +363,31 @@ export class Warren {
         this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} picked ${SUPPLIES.scrapPerOre} scrap off an iron ore` });
       },
     });
+  }
+
+  /** Whether the store holds iron enough to press scrap and still keep its reserve. */
+  get canPress() {
+    const p = SUPPLIES.press;
+    return (this.supplies.iron ?? 0) - p.iron >= p.keepIron && (this.supplies.scrap ?? 0) + p.scrap <= this.cap;
+  }
+
+  /** A copy presses stored iron into scrap beside the hatch: the iron flies out, a few blows, the scrap flies back. */
+  press(npc: Npc) {
+    const p = SUPPLIES.press;
+    const h = this.hatch;
+    const m = { x: h.x + 14, y: h.y + 4 };
+    const ok = npc.startChore({
+      x: m.x, y: m.y + 4, swings: p.swings,
+      swing: () => { this.scene.fx.sparks(m.x + (Math.random() - 0.5) * 6, m.y - 6, PALETTE[9], 3); sound.hit(false, m); },
+      done: () => {
+        if (!this.canPress) return;
+        this.pay({ iron: p.iron });
+        this.scene.flyMaterial('scrap', m, h, p.scrap);
+        this.save();
+        this.scene.mindLog.push({ t: this.scene.mindClock, text: `${npc.data.name} pressed ${p.iron} iron from the store into ${p.scrap} scrap` });
+      },
+    });
+    if (ok) this.scene.fx.sparks(h.x, h.y - 6, PALETTE[20], 3);
   }
 
   /** The copy could not get to the hatch: free its room for someone else. */

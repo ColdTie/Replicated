@@ -105,7 +105,13 @@ The copies choose their names themselves, and the change applies on the spot.
   ring of saplings and Sprout's garden by the Watchtower, on Earth.
 - 2026-10-19: proposals and the maker begin.
 - 2026-10-20: Dimmer's dim lantern (`dimlantern`, `tools/data/granted-bodies.json`). No proposals were open. The `mind` function was not redeployed (see Waiting for Steve).
+- 2026-11-12: Ember Gold's "Let stored iron be pressed into scrap" built: with no iron ore free, a copy presses 2
+  stored iron into 1 scrap beside the hatch, never below 10 iron (`supplies.json press`, `Warren.press`); the minds'
+  supplies line says so. PR #79: CI red on tests it does not touch, left for Steve;
+  the request stays open and the `mind` function is not redeployed until it merges.
 
 ## Waiting for Steve
 
-- Migration `0014_mind_runs.sql` is not applied (`mind_runs` does not exist), so the maker cannot read the minds' heartbeat. The repo's `mind` function is ahead of live v18 (S1, M3, M5) and `kit.json` now lists `dimlantern`; the maker leaves that deploy to Steve's go-ahead.
+- PR #79 (stored iron pressed into scrap): CI failed different playtests on each attempt (cemprint, then planetmenu
+  and beacon), none of them touched by the change; 23 of 23 pass locally. Re-run or merge it, then redeploy the
+  `mind` function (kit `press`) and mark Ember Gold's request done.

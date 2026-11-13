@@ -1,7 +1,8 @@
 // Scripted headless playtest of the original's hands (session 15, M1): a swing at a tree leaves it standing and gives
 // nothing, stone broken off rock rides above the head (the same rock gives none again right away), a copy's building
 // that waits for stone shows it over the copy's head, walking into the site with the stone hands it over and pays it,
-// swings help raise it, a load handed to a copy cheers it, a load stowed when leaving.
+// swings help raise it, a load handed to a copy cheers it, a load stowed when leaving; with no iron ore free a copy
+// presses stored iron into scrap, never below the iron kept in reserve (the maker, 2026-11-12).
 // Usage: npm run build && node tools/playtest-carry.mjs
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
@@ -160,6 +161,28 @@ try {
   });
   log('stowed', JSON.stringify(stowed));
   if (stowed.load || stowed.scrap !== 2) fail('a carried load was lost when leaving');
+
+  // 8. no iron ore free: a copy presses stored iron into scrap at the hatch, and never below the reserve
+  const P = JSON.parse((await import('node:fs')).readFileSync('src/data/supplies.json', 'utf8')).press;
+  const press = await ev(async (P) => {
+    const s = window.__scene, w = s.warren, n = s.npcs[1];
+    w.data.entrance.dug = true;
+    w.data.scavenged = Object.fromEntries(s.nodes.filter((o) => o.kind === 'iron').map((o) => [o.index, Date.now()]));
+    w.supplies.iron = P.keepIron + P.iron; w.supplies.scrap = 0;
+    const tasks = new Set();
+    for (let i = 0; i < 60; i++) { const t = w.pickTask(n, 0); if (t) tasks.add(t.task); for (const id of [...w.digging.keys()]) w.digging.delete(id); }
+    n.state = 'idle';
+    w.press(n);
+    for (let i = 0; i < 60 && (w.supplies.scrap ?? 0) < P.scrap; i++) await new Promise((r) => setTimeout(r, 250));
+    const after = { iron: w.supplies.iron, scrap: w.supplies.scrap };
+    const tasksAfter = new Set();
+    for (let i = 0; i < 60; i++) { const t = w.pickTask(n, 0); if (t) tasksAfter.add(t.task); for (const id of [...w.digging.keys()]) w.digging.delete(id); }
+    return { tasks: [...tasks], after, canPress: w.canPress, tasksAfter: [...tasksAfter] };
+  }, P);
+  log('press', JSON.stringify(press));
+  if (!press.tasks.includes('press')) fail('a copy never chose to press iron into scrap with no ore free');
+  if (press.after.iron !== P.keepIron || press.after.scrap !== P.scrap) fail('pressing did not turn iron into scrap');
+  if (press.canPress || press.tasksAfter.includes('press')) fail('a copy would press below the iron reserve');
 } finally { await b.close(); try { process.kill(-server.pid); } catch {} }
 console.log('errors', errors);
 process.exit(errors.length ? 1 : 0);

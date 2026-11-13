@@ -1,5 +1,5 @@
 {
-  "_doc": "The material economy that ties the surface to the bunker. Supplies are per planet (planet_states.data.supplies), shared by every copy; Ember is the planet's Ember pool. Sources: stone and soil from digging (digYield per tile, the entrance has its own), scrap picked off iron ore by the copies (scrapPerOre, each ore once per scrapCooldownMinutes); iron and hydrogen from their nodes (items.json; the materials of mannies, manny.json); salt, quartz and copper from theirs too (items.json; what the Cems' designs are printed from, designs.json). Storage: baseCap of each material, plus shelfCap per shelf in the warren. recipes: what each furnishing takes (ember draws on the Ember pool); bench = needs a workbench in the warren. icons: frames in tools/sprites/supplies.json. upgrade: when stone is at least whenFull of capacity, a copy goes down and improves a dug room one level (cost each time, swings blows; up to max): fitted flagstones, carved walls with a band of the planet's crystal, stone pillars. Each level lifts every copy's mood by moodPerLevel (up to moodMax in all).",
+  "_doc": "The material economy that ties the surface to the bunker. Supplies are per planet (planet_states.data.supplies), shared by every copy; Ember is the planet's Ember pool. Sources: stone and soil from digging (digYield per tile, the entrance has its own), scrap picked off iron ore by the copies (scrapPerOre, each ore once per scrapCooldownMinutes), or pressed from stored iron at the hatch when no ore is free (press: iron in, scrap out, swings blows; never below keepIron, which the Cems' designs and the husks need); iron and hydrogen from their nodes (items.json; the materials of mannies, manny.json); salt, quartz and copper from theirs too (items.json; what the Cems' designs are printed from, designs.json). Storage: baseCap of each material, plus shelfCap per shelf in the warren. recipes: what each furnishing takes (ember draws on the Ember pool); bench = needs a workbench in the warren. icons: frames in tools/sprites/supplies.json. upgrade: when stone is at least whenFull of capacity, a copy goes down and improves a dug room one level (cost each time, swings blows; up to max): fitted flagstones, carved walls with a band of the planet's crystal, stone pillars. Each level lifts every copy's mood by moodPerLevel (up to moodMax in all).",
   "materials": {
     "stone": {
       "icon": 0,
@@ -43,6 +43,7 @@
   },
   "scrapPerOre": 2,
   "scrapCooldownMinutes": 30,
+  "press": { "iron": 2, "scrap": 1, "keepIron": 10, "swings": 5 },
   "recipes": {
     "rest": {
       "stone": 2
