@@ -11,6 +11,7 @@ import fs from 'node:fs';
 
 const read = (f) => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const PARTS = read('parts.json'), PLAYER = read('player.json'), SUPPLIES = read('supplies.json'), BUILDINGS = read('buildings.json');
+const PLANETS = read('planets.json');
 const MIND = read('mind.json'), WARREN = read('warren.json'), STARS = read('stars.json'), BEACON = read('beacon.json');
 const names = (o) => Object.keys(o ?? {}).filter((k) => !k.startsWith('_'));
 const colorIndex = Object.fromEntries(names(PARTS.colors).map((k) => [k, PARTS.colors[k]]));
@@ -42,6 +43,9 @@ const out = {
   beacons: STARS.beacons, latticeRadius: BEACON.lattice.radius,
   away: MIND.away,
   journal: MIND.journal,
+  day: MIND.day,
+  // what a world lacks (planets.json lacks), by 'star:planet': a day's gather cannot find it there
+  lacks: Object.fromEntries((PLANETS.planets ?? PLANETS).filter((p) => p.lacks?.length && p.star).map((p) => [`${p.star}:${p.planetIndex}`, p.lacks])),
   mind: { model: MIND.model, effort: MIND.effort, budget: MIND.budget, prices: MIND.prices, paused: !!MIND.paused },
   stars: Object.fromEntries(STARS.stars.map((s) => [s.id, [s.name, s.x, s.y, s.z]])),
 };

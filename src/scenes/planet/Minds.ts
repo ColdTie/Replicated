@@ -86,6 +86,8 @@ export class Minds {
         else if (a.type === 'wants' && a.wants) npc.data.traits.wants = a.wants;
         else if (a.type === 'rename') log(`${a.was ?? 'a copy'} took the name ${a.name}`);
         else if (a.type === 'note') log(`${name} wrote itself a note`);
+        else if (a.type === 'gather') log(`${name} gathered ${a.n ?? 'some'} ${a.material ?? 'supplies'}`);
+        else if (a.type === 'go') log(`${name} went to ${a.place ?? 'somewhere'}`);
         else if (a.type === 'journal') log(a.scope === 'private' ? `${name} wrote in its private journal` : `${name} wrote in the shared journal`);
         else if (a.type === 'mail') log(`${name} wrote to ${a.to}`);
         else if (a.type === 'request') log(`${name} asked the original for ${a.kind}`);

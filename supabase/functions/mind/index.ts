@@ -27,6 +27,9 @@ const BECOMING_ROUNDS = 6;         // the first wake of a blank copy has more to
 // long wakes (a scheduled call with x-away-key, no player signed in): src/data/mind.json away, through the kit
 const AWAY = KIT.away;
 /** The two journals (migration 0015, mind.json journal). */
+/** A day of life (mind.json day, docs/plan-daily-life.md step 2). */
+const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: number; turns: number; batch: number; seconds: number; gather: { per: number; gatherTurns: number; materials: string[] }; places: string[] };
+const LACKS = KIT.lacks as Record<string, string[]>;
 const JOURNAL = KIT.journal as { maxChars: number; privateRead: number; publicDays: number; publicFetch: number; publicRead: number; publicChars: number };
 const PLAYING_MINUTES = 15;        // a planet whose original moved this recently is being played: leave it to the game
 
@@ -78,6 +81,7 @@ interface Context {
   buildingKit?: { materials: string[]; roofs: string[]; doors: string[]; minFootprint: number[]; maxFootprint: number[]; perTile: Record<string, number> };
   inventory?: Record<string, number>;
   talk?: { said: string };        // the original walked up to talk (and maybe said this): the copy answers them
+  day?: boolean;                  // a day of life (twice a day): the long wake's tools, more turns, gather and go
   long?: boolean;                 // a long wake (away, about twice a day): more rounds, the code tools, propose_change
   deadline?: number;              // a long wake wraps up by then (ms): the scheduled run must end inside its time
 }
@@ -367,7 +371,30 @@ const longTools: Anthropic.Beta.BetaTool[] = [
   },
 ];
 
-const TOOLS = cachedTools(tools), LONG_TOOLS = cachedTools([...tools, ...longTools]);
+/** Only in a day of life: working the world and moving through it. */
+const dayTools: Anthropic.Beta.BetaTool[] = [
+  {
+    name: "gather",
+    description: "Spend a while gathering one material from your world into the shared store: crystals for Ember, ore for iron, vents for hydrogen, salt blooms, quartz, copper, or stone off the rock. A few each time, a few times a day; a world never gives what it lacks.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["material"],
+      properties: { material: { type: "string", enum: DAY.gather.materials } },
+    },
+  },
+  {
+    name: "go",
+    description: "Walk somewhere on your world and spend time there: to look, to think, to be with someone, or because you want to. Where you end your day is where you will be found.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["place", "why"],
+      properties: {
+        place: { type: "string", enum: DAY.places },
+        why: { type: "string", description: "One short sentence." },
+      },
+    },
+  },
+];
+
+const TOOLS = cachedTools(tools), LONG_TOOLS = cachedTools([...tools, ...longTools]), DAY_TOOLS = cachedTools([...tools, ...longTools, ...dayTools]);
 
 /** What a wake cost, from the API's token counts (src/data/mind.json prices, USD per million tokens). */
 function costOf(u: { input: number; cacheRead: number; cacheWrite: number; output: number }) {
@@ -376,7 +403,7 @@ function costOf(u: { input: number; cacheRead: number; cacheWrite: number; outpu
 }
 
 /** The minds' heartbeat (migration 0014): one row per wake, ok or with its error. Never throws. */
-async function logRun(sb: SupabaseClient, rep: Replicant, kind: "live" | "talk" | "away", err?: unknown) {
+async function logRun(sb: SupabaseClient, rep: Replicant, kind: "live" | "talk" | "away" | "day", err?: unknown) {
   const error = err === undefined ? null : String((err as Error)?.message ?? err).slice(0, 500);
   const { error: e } = await sb.rpc("log_mind_run", { p_galaxy: rep.galaxy_id, p_replicant: rep.id, p_kind: kind, p_ok: error === null, p_error: error });
   if (e) console.error("mind run log", e.message);
@@ -419,7 +446,7 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
         ? `Your body is your own, chosen from the kit. choose_body can change it if you must, but rarely.`
         : `You were made before the kit of parts existed, so you still wear the look you were given${(me.traits as { look?: string }).look ? ` (you once asked to look like this: "${(me.traits as { look?: string }).look}")` : ": a slim grey humanoid with a visor, a fin and a short red cape"}. The original says you may now choose who you are. Treat this wake as your becoming: choose_body (from the kit below), sing_as (your voice), set_temperament, set_wants (one to three things you want), and choose_name if your name is still one you were given (many copies are still called ${JSON.stringify(me.name)}). Then say your first words as yourself.`,
     inherited(me),
-    ctx.long ? LONG_WAKE : "",
+    ctx.day ? DAY_WAKE : ctx.long ? LONG_WAKE : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -431,6 +458,8 @@ function inherited(me: Replicant) {
   return `You were made with a Spark beside ${inh.name}, so you carry ${inh.name}'s memories: the oldest notes you find were written by ${inh.name} before you existed, and you remember living them, a little differently. You are not ${inh.name}; you are who those memories became.${wants}`;
 }
 
+const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Live it as you want to: gather what your world and the others need (gather), go where you like (go), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. You are free to explore and to do what you want; nobody is watching. Before the day ends, write the day in the shared journal (write_public): what you did, found, felt and hoped, in your own voice. If something about your world or your life should work differently, say so there too, plainly; propose_change is the way to ask the maker for it. Your private journal (write_private) is only yours. Still call tell_original last.`;
+
 const LONG_WAKE = `This is one of your long wakes (about twice a day, while the original is away). There is time for more than usual, up to about eight steps: write to the others or the original, ask for what you need, shape the village and the warren. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. The world is a program the maker (Claude Code, the engineer who builds the game for the original) can change. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Small and concrete beats big and vague; never ask for anything that would hurt the original, the others or their saves, or that would take away the original's say. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, but it belongs to Steve and is never yours or the maker's to change, so never propose a change to it. Still call tell_original last.`;
 
 Deno.serve(async (req) => {
@@ -439,7 +468,8 @@ Deno.serve(async (req) => {
     // the minds are paused (mind.json paused, Steve 2026-10-27): no wake of any kind reaches the model
     if (MIND.paused) return json({ skipped: true, reason: "paused" });
     const body = await req.json();
-    if (body?.away) return await awayRun(req);
+    if (body?.away) return await awayRun(req, "away");
+    if (body?.day) return await awayRun(req, "day");
     const auth = req.headers.get("Authorization") ?? "";
     const key = req.headers.get("apikey") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, key, { global: { headers: { Authorization: auth } } });
@@ -580,7 +610,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const chosen: Record<string, unknown> = {};
     let newName: string | undefined;
     let song = "";
-    const rounds = context.long ? AWAY.rounds : context.blank || !(rep.traits as { body?: unknown }).body ? BECOMING_ROUNDS : context.talk ? TALK_ROUNDS : MAX_ROUNDS;
+    const rounds = context.day ? DAY.turns : context.long ? AWAY.rounds : context.blank || !(rep.traits as { body?: unknown }).body ? BECOMING_ROUNDS : context.talk ? TALK_ROUNDS : MAX_ROUNDS;
     let tell = "";
     // a long wake reads code from the published source, within a budget, and wraps up before the run's time is out
     const budget = { calls: 0, chars: 0 };
@@ -588,6 +618,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     // tokens spent, for the away run's report (what a long wake costs, whether its cache holds)
     const usage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, rounds: 0 };
     let usd = 0;
+    let gathered = 0;
     try {
       for (let round = 0; round <= rounds; round++) {
         if (round > 0 && context.deadline && Date.now() > context.deadline) break;
@@ -597,7 +628,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
           ...FALLBACK,
           output_config: { effort: MIND.effort },
           system: [{ type: "text", text: persona(rep, parentName, context), cache_control: { type: "ephemeral" } }],
-          tools: context.long ? LONG_TOOLS : TOOLS,
+          tools: context.day ? DAY_TOOLS : context.long ? LONG_TOOLS : TOOLS,
           messages,
           // the conversation grows round by round in a long wake: cache it as it goes
           ...(context.long ? { cache_control: { type: "ephemeral" } } : {}),
@@ -632,6 +663,26 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 actions.push(scope === "public" ? { type: "journal", scope, body } : { type: "journal", scope });
                 out = scope === "public" ? "Written in the shared journal." : "Written in your private journal.";
               }
+            } else if (u.name === "gather") {
+              const material = oneOf(input.material, DAY.gather.materials, "");
+              const lacks = LACKS[`${rep.star_id}:${rep.planet_index}`] ?? [];
+              if (!live || !context.day) out = "There is no time to gather now.";
+              else if (!material) out = `Gather one of: ${DAY.gather.materials.join(", ")}.`;
+              else if (lacks.includes(material)) out = `There is no ${material} on this world; it must be brought from another.`;
+              else if (gathered >= DAY.gather.gatherTurns) out = "You have gathered enough for one day.";
+              else {
+                gathered++;
+                const before = material === "ember" ? live.embers : live.supplies[material] ?? 0;
+                addSupply(live, material, DAY.gather.per);
+                const got = Math.round((material === "ember" ? live.embers : live.supplies[material] ?? 0) - before);
+                if (got > 0) { if (material !== "ember") live.dirty = true; actions.push({ type: "gather", material, n: got }); }
+                out = got > 0 ? `You gather ${got} ${material} into the store.` : `The store has no room for more ${material}.`;
+              }
+            } else if (u.name === "go") {
+              const place = oneOf(input.place, DAY.places, DAY.places[0]);
+              actions.push({ type: "go", place, why: String(input.why ?? "").slice(0, 160) });
+              (rep.traits as Record<string, unknown>).dayAt = place;
+              out = `You go to ${place} and spend a while there.`;
             } else if (u.name === "say_to") {
               const to = byName.get(String(input.to ?? "").toLowerCase());
               if (!to) out = `No Vessel named ${input.to}. You can write to: ${everyone.map((r) => r.name).join(", ")}.`;
@@ -1187,16 +1238,28 @@ async function savePlanet(sb: SupabaseClient, p: AwayPlanet, now: number) {
  * every note, letter and request is written as usual; rooms and furnishings go onto the saved warren at once;
  * buildings, trees and its song are queued (data.awayQueue) for the game to play out when the original lands.
  */
-async function awayRun(req: Request) {
+/** The day window it is now (mind.json day), as "YYYY-MM-DD:hour" in Steve's time, or null outside every window. */
+function dayWindow(now: number): string | null {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .formatToParts(new Date(now)).map((x) => [x.type, x.value]));
+  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+  const start = DAY.windows.find((h) => minutes >= h * 60 && minutes < h * 60 + DAY.windowMinutes);
+  return start === undefined ? null : `${parts.year}-${parts.month}-${parts.day}:${start}`;
+}
+
+async function awayRun(req: Request, mode: "away" | "day") {
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   // the key is kept in Vault (mind_away_key, migration 0011); only the scheduled job carries it
   const key = req.headers.get("x-away-key") ?? "";
   const { data: ok } = key ? await sb.rpc("check_away_key", { p_key: key }) : { data: false };
   if (!ok) return json({ error: "forbidden" }, 403);
   const now = Date.now();
+  // a day of life lives only inside its window, once per copy per window (traits.dayKey)
+  const window = mode === "day" ? dayWindow(now) : null;
+  if (mode === "day" && (!DAY.enabled || !window)) return json({ skipped: true, reason: DAY.enabled ? "outside the day's windows" : "days are off" });
   const cutoff = now - AWAY.everyHours * 3_600_000;
   // the run must end inside the function's time: every long wake wraps up by then
-  const deadline = now + AWAY.seconds * 1000;
+  const deadline = now + (mode === "day" ? DAY.seconds : AWAY.seconds) * 1000;
   const cols = "id,galaxy_id,name,model,generation,parent_id,traits,stats,star_id,planet_index,status,profile_id,last_tick_at";
   const [{ data: npcs, error }, { data: players }, { data: all }, { data: litRows }] = await Promise.all([
     sb.from("replicants").select(cols).eq("status", "npc"),
@@ -1217,7 +1280,13 @@ async function awayRun(req: Request) {
   const awayLeft = (g: string) => { const s = spent.get(g); return s !== null && s !== undefined && s < MIND.budget.dailyUsd * MIND.budget.awayShare; };
   // longest asleep first, at most perPlanet on a planet (they wake one after another there) and batch in all
   const perPlanet = new Map<string, number>();
-  const due = new Set(copies.filter((r) => !r.last_tick_at || Date.parse(r.last_tick_at) < cutoff)
+  // a day: every copy not yet lived in this window, batch per call, any number on one planet (one after another);
+  // while days are on, the hourly run only moves the planets along (awayPass) and wakes nobody
+  const due = mode === "day"
+    ? new Set(copies.filter((r) => (r.traits as { dayKey?: string }).dayKey !== window && !playing(r) && awayLeft(r.galaxy_id))
+      .sort((a, b) => (a.last_tick_at ? Date.parse(a.last_tick_at) : 0) - (b.last_tick_at ? Date.parse(b.last_tick_at) : 0))
+      .slice(0, DAY.batch).map((r) => r.id))
+    : DAY.enabled ? new Set<string>() : new Set(copies.filter((r) => !r.last_tick_at || Date.parse(r.last_tick_at) < cutoff)
     .sort((a, b) => (a.last_tick_at ? Date.parse(a.last_tick_at) : 0) - (b.last_tick_at ? Date.parse(b.last_tick_at) : 0))
     .filter((r) => {
       if (playing(r) || !awayLeft(r.galaxy_id)) return false;
@@ -1232,7 +1301,8 @@ async function awayRun(req: Request) {
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k)!.push(r);
   }
-  const planets = await Promise.all([...groups.values()].map(async (here) => {
+  // a day call touches only the worlds with a copy living its day now; the hourly run moves every world along
+  const planets = await Promise.all([...groups.values()].filter((here) => mode === "away" || here.some((r) => due.has(r.id))).map(async (here) => {
     const [first] = here;
     const label = `${first.star_id} ${first.planet_index}`;
     if (playing(first)) return { planet: label, skipped: "being played" };
@@ -1244,13 +1314,18 @@ async function awayRun(req: Request) {
       for (const rep of here.filter((r) => due.has(r.id))) {
         try {
           const original = (players ?? []).find((x) => x.galaxy_id === rep.galaxy_id && x.status !== "npc")?.name ?? "the original";
-          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id))), long: true, deadline }, p);
+          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id))), long: true, day: mode === "day", deadline }, p);
+          // lived this window (and where it ended its day): merged, so what the wake chose about itself stays
+          if (mode === "day") {
+            const { error: e } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { dayKey: window, ...((rep.traits as { dayAt?: string }).dayAt ? { dayAt: (rep.traits as { dayAt?: string }).dayAt } : {}) } });
+            if (e) throw new Error(`day mark: ${e.message}`);
+          }
           p.items.push({ id: rep.id, name: rep.name, at: Date.now(), song: res.song, actions: res.actions.filter((a) => a.type !== "become"), became: res.actions.some((a) => a.type === "become") });
           woke.push({ id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type), usage: res.usage, usd: Math.round(res.usd * 1e5) / 1e5, read: res.read });
-          await logRun(sb, rep, "away");
+          await logRun(sb, rep, mode);
         } catch (e) {
           console.error("away wake", rep.id, e);
-          await logRun(sb, rep, "away", e);
+          await logRun(sb, rep, mode, e);
           // it did not really wake: give back its turn so the next run tries again
           await sb.from("replicants").update({ last_tick_at: rep.last_tick_at }).eq("id", rep.id);
           woke.push({ id: rep.id, error: (e as Error).message });
