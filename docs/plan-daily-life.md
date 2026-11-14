@@ -110,7 +110,7 @@ left to the game's own copies, as the long wakes do today (`playing()`).
 - The homecoming tour shows arrivals, departures and new Vessels; the star map marks worlds with copies on them.
 - The copies' `tell` (what they would say when you come over) includes their day.
 
-## Step 5: the copies shape the game (NEEDS.md, the mind's prompt, no database change)
+## Step 5: the copies shape the game (built 2026-11-14; migration 0018 holds the backings)
 
 Every copy writes, at the end of each of its days, a public entry: what it did, what it found, and, when it has one, a
 **wish for the game**: something about its world it wants changed, in its own words, and why. It never writes code. A

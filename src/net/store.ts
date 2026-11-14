@@ -289,7 +289,7 @@ export interface Body { head: string; visor: string; torso: string; arms: string
 export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: 'solitary' | 'friendly' | 'clingy'; work: 'builder' | 'wanderer' | 'balanced'; bedtime: 'early' | 'late' | 'even'; risk: 'careful' | 'bold' }
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go' | 'travel' | 'vessel';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go' | 'travel' | 'vessel' | 'back';
   /** travel (a day of life): the star's id it flew to (`to` holds its name) */
   star?: string;
   /** gather (a day of life, applied to the store server side): material (the field below) and how much; go: where it went and why */
@@ -320,7 +320,7 @@ export interface SharedEntry { replicant_id: string | null; author: string; star
 export interface Letter { id: string; from_replicant: string | null; to_replicant: string | null; body: string; sent_at: string; arrives_at: string; read_at?: string | null }
 /** A copy's ask. kind 'change' is a proposal to change the game (migration 0012): detail its title, body "Why: ...",
  * "Area: ..." and the change itself; the maker answers in reply; 'vetoed' is the original's no. */
-export interface Request { id?: string; replicant_id: string; kind: string; detail: string; status: string; created_at: string; body?: string; reply?: string | null; done_at?: string | null }
+export interface Request { id?: string; replicant_id: string; kind: string; detail: string; status: string; created_at: string; body?: string; reply?: string | null; done_at?: string | null; backers?: { by: string; name: string; why?: string }[] }
 export interface Journal { notes: Note[]; mail: Letter[]; requests: Request[] }
 
 /** The minds' heartbeat (migration 0014): failuresSinceOk counts the wakes in a row that failed since the last good one. */
@@ -987,7 +987,7 @@ export class CloudStore implements GameStore {
     const [n, m, r] = await Promise.all([
       this.sb.from('notes').select('replicant_id,body,created_at').in('replicant_id', ids).order('created_at', { ascending: false }).limit(60),
       this.sb.from('messages').select('id,from_replicant,to_replicant,body,sent_at,arrives_at,read_at').or(`from_replicant.in.${list},to_replicant.in.${list}`).order('sent_at', { ascending: false }).limit(60),
-      this.sb.from('requests').select('id,replicant_id,kind,detail,status,created_at,body,reply,done_at').in('replicant_id', ids).order('created_at', { ascending: false }).limit(40),
+      this.sb.from('requests').select('id,replicant_id,kind,detail,status,created_at,body,reply,done_at,backers').in('replicant_id', ids).order('created_at', { ascending: false }).limit(40),
     ]);
     return { notes: (n.data ?? []) as Note[], mail: (m.data ?? []) as Letter[], requests: (r.data ?? []) as Request[] };
   }
