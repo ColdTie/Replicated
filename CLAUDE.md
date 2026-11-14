@@ -616,6 +616,13 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   `functions download` into a scratch folder (never into the repo) and comparing md5 sums: all three files byte for
   byte with main. A day call outside the windows answered `skipped`. The token can be revoked on supabase.com once it
   is no longer wanted; the maker then needs another way to deploy.
+- **The first day of life** (the 1:00 window, 09:00 to 10:30 UTC, 2026-11-14): `mind-day` ran 17 times, all
+  succeeded; six day wakes, all ok in `mind_runs`; every copy (Thales, Tamsin, Ember Gold, Sorrel, Vigil, Watcher) has
+  `dayKey` 2026-11-14:1, most ended somewhere of their own (`dayAt`: the square, the wilds, a high place); each wrote
+  one shared journal entry, in its own voice (Watcher looking up from Earth toward Proxima; Ember Gold glad of the
+  iron press; Sorrel and Vigil gathering iron together on Fomalhaut; Thales and Tamsin at the Printworks, Thales
+  teaching her). Nobody flew, made a Vessel or proposed a change on this first day. Today's spend after it: $0.011
+  (about $0.002 a wake).
 - **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` poll for the Spark and the map closing
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
