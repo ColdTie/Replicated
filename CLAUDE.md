@@ -347,6 +347,8 @@ supabase/functions/mind/ the minds (index.ts); kit.json and warren.ts are genera
                          published source and propose_change
 tools/test.mjs           `npm test`: tools/check-mind-tools.mjs (the mind's tool schemas, the cause of both mind
                          outages) then every tools/playtest*.mjs; .github/workflows/test.yml runs it on every PR
+supabase/migrations/0015 the two journals (journal: public / private; journal_public for the maker; written only by the
+                         mind function: write_public / write_private, mind.json journal)
 NEEDS.md                 the maker's procedure: what the copies asked for, how proposals are judged, built and answered
 ```
 
@@ -529,8 +531,7 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 11. CI's test job is pinned to `ubuntu-24.04` (session 28): GitHub's `ubuntu-latest` is Ubuntu 26.04 now, which the
     pinned Playwright 1.56.1 does not support. Moving on means a newer Playwright (a dependency version change, and a
     newer Chromium for every playtest): say when.
-12. CI flakes (maker 2026-11-12): on one commit the test job failed `playtest-cemprint`, then on its re-run
-    `playtest-planetmenu` and `playtest-beacon`; each passes locally. Their waits may be too tight for the runner.
+12. CI flakes (maker 2026-11-12): the three tests' waits were fixed in session 29; say if CI flakes again.
 
 ### Session 29 (2026-11-14): the plan for a day of life; CI flakes
 - **The plan** (`docs/plan-daily-life.md`, Steve: a daily activation where the copies come to life, travel, gather,
@@ -541,9 +542,15 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   plan). The universe (Steve: "pick whatever you'd suggest"): ships charge on starlight with a fusion still for
   hydrogen, Ember only for Vessels; charted routes a fifth the cost and half the time; about 1,500 real stars (HYG,
   CC BY-SA 4.0); a searchable, filtered star map. Nothing built yet.
-- **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` now poll for the Spark and the map
-  closing instead of fixed sleeps that a slow runner outran. `playtest-cemprint` (no copy reached the bed in 45 s on
-  the runner) is not fixed yet: a warren chore (the new iron press?) or a lonely copy's seek may come first.
+- **Step 1 built: the two journals.** Migration `0015_journal.sql` (applied): `journal` (scope `public` | `private`,
+  author, world, body up to 2000, Steve's day), members read only public rows, no login writes or reads a private one;
+  the view `journal_public` is what the maker reads (NEEDS.md: never the private side). The minds have
+  `write_public` and `write_private` (service key; `mind.json journal`); at every wake a copy reads its last private
+  entries and the shared journal as far as its light has reached (the letters' delay); a long wake is asked to write
+  one shared entry. The game logs that an entry was written, never a private one's words (`MindAction` `journal`).
+- **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` poll for the Spark and the map closing
+  instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
+  while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
 
 ### Maker 2026-11-12
 - Built Ember Gold's proposal (Gliese 12 b, "Let stored iron be pressed into scrap"): scrap only came off iron ore, so
