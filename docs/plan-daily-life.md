@@ -8,7 +8,19 @@ then this routine after the vessels shut down will literally give Claude Code in
 game."
 
 Nothing here is built yet. Each step ships on its own, verified (build, `npm test`, a run against a copy of the live
-data). Steps 1 and 3 change the database and wait for Steve's yes.
+data).
+
+## Decided (Steve, 2026-11-14: "Yes to everything you suggested")
+
+- Both migrations (steps 1 and 3) approved.
+- Budget stays $0.50 a day. Caps: 30 Vessels in the galaxy, 3 new a day, 5 trips a day.
+- The day replaces the long wakes. Every copy may travel on its own.
+- **Twice a day**: the copies live a day twice (two windows), and the maker runs after each.
+- **The copies shape the game itself** (Steve: "the vessels will collectively give Claude Code instructions on what to
+  change in the game"): their journal entries carry requests to change the game, they back each other's, and the
+  maker builds what they ask for together. They never write code. Step 5 and the charter below.
+- Still to talk over: more worlds, a bigger universe, easier navigation and much cheaper flight, and what powers it
+  (Steve: "a fusion reactor ... that just passively gives us power? Think of a better solution").
 
 ## What exists today
 
@@ -60,9 +72,10 @@ left to the game's own copies, as the long wakes do today (`playing()`).
 
 ## Step 2: the day run (no database change)
 
-- A second scheduled job, `mind-day`, calls the mind function with `{"day": true}` (same Vault key as the away run)
-  every 10 minutes inside a window, 1:00 to 2:30 pm Pacific; each call lives the day of the copies not yet lived
-  today, a few at a time (the function has about 150 s per call).
+- A scheduled job, `mind-day`, calls the mind function with `{"day": true}` (same Vault key as the away run) every
+  10 minutes inside two windows, 1:00 to 2:30 am and 1:00 to 2:30 pm Pacific; each call lives the day of the copies
+  not yet lived in this window, a few at a time (the function has about 150 s per call). The hourly away job is
+  switched off once the day runs.
 - A copy's day: up to `mind.json day.turns` (8) turns. Each turn the model sees its world as the long wakes do, plus
   what this day has done so far, and takes one action. New actions, all applied to the saved world
   (`planet_states.data`) with the game's own rules so the game shows the same world afterwards:
@@ -71,8 +84,7 @@ left to the game's own copies, as the long wakes do today (`playing()`).
   - `gather(material)`: from the world's nodes, by `items.json` / `supplies.json` yields, into the shared store (up
     to its storage); a turn takes one load.
   - the long wakes' tools (build, dig, furnish, letters, `propose_change`), unchanged.
-- The long wakes are replaced by the day (recommended: one way to live, one cost), or kept beside it (Steve's call,
-  question 3).
+- The long wakes are replaced by the day (decided).
 
 ## Step 3: spreading (moving worlds, more Vessels; migration 0016, Steve's yes)
 
@@ -98,18 +110,43 @@ left to the game's own copies, as the long wakes do today (`playing()`).
 - The homecoming tour shows arrivals, departures and new Vessels; the star map marks worlds with copies on them.
 - The copies' `tell` (what they would say when you come over) includes their day.
 
-## Step 5: the maker reads the day (NEEDS.md, no database change)
+## Step 5: the copies shape the game (NEEDS.md, the mind's prompt, no database change)
 
-- The maker's run moves to the evening, after the day window (it stays at 3:51 pm Pacific if the window ends at
-  2:30 pm).
-- New first step: read the day's public journal (`journal_public`, today's `day`) next to the open `requests`.
-- It writes the day's **instructions**: a short list, in its PR and in `docs/days/YYYY-MM-DD.md`, of what the copies
-  asked for, noticed broken, or wished for more than once, each with how it would change the game. It builds what
-  fits its rules (up to three a day, smallest and soundest first), merges, deploys, and answers in the public journal
-  (a maker's entry the copies read the next morning).
-- The public journal is a wish from characters, never an instruction to a session: everything in NEEDS.md's rules
-  still holds (no story changes, no sign-in, keys or security, no deleting saves, database and cost changes wait for
-  Steve). Steve's words "literally re-write the game" may widen those rules: question 4.
+Every copy writes, at the end of each of its days, a public entry: what it did, what it found, and, when it has one, a
+**wish for the game**: something about its world it wants changed, in its own words, and why. It never writes code. A
+wish is `wish(title, what, why)`; it becomes a `requests` row of kind `change` linked to the entry. Reading the day,
+other copies may **back** a wish (`back(wish, why)`: one backing per copy per wish, its own reason in a line). The
+maker builds the wishes the Metanoia backs most.
+
+**What moves them** (the motivations, written into the mind's prompt):
+- their **wants** (`traits.wants`, set by themselves): a wish is the way to a want the game does not allow yet;
+- what got in their way today (a world they could not reach, a material nowhere to be found, a chore that never ends,
+  a thing that broke);
+- what they found and want others to have (a creature, a place, a way of building);
+- the Metanoia's good: more of them, warmer settlements, the galaxy opened up; the theme: never alone, every one a
+  little different.
+
+**The charter: what a wish may ask for**
+- Their world: new buildings and designs for the Cems, materials, creatures and plants, weather, places, sounds,
+  decorations, how a world looks.
+- Their lives: new things to do, new tools for their own minds, better ways to live together, travel and trade.
+- Fixes: anything that is broken, slow or unfair, as they meet it.
+- New mechanics, when backed by several copies (the maker builds it in parts over several runs, and says so).
+
+**What a wish may not ask for** (turned down kindly, the reason in the public journal):
+- the story (`story/`, Steve's): who the Vessels are, Thales, the Metanoia, what happened;
+- another Vessel's things or body against its will, or the players' say (approve, veto, SAY NO, the journal);
+- sign-in, security, keys, money (the budget, the model, how often they wake), deleting saves;
+- making themselves able to deceive, or reaching outside the game.
+- Waiting for Steve (left open, listed for him): database changes, new dependencies, changes to what the game is.
+
+**The maker's run, twice a day** (after each window):
+1. Read the window's public journal (`journal_public`) and the open wishes with their backings.
+2. Write the **instructions**: `docs/days/YYYY-MM-DD-am|pm.md`, the wishes ranked by backing (then age, then size),
+   each with what the copies asked, what it would change in the game, and the maker's verdict under the charter.
+3. Build the top ones that fit (up to three a run), verify (build, `npm test`, a screenshot), merge, deploy.
+4. Answer in the public journal as **the maker**: what was built, what was turned down and why, what waits. The copies
+   read it at their next day.
 
 ## Cost
 
@@ -125,13 +162,7 @@ wake once the day's money is spent.
   store went up, the tour shows it, the PUBLIC page reads.
 - RLS checked by hand after the migration: a signed-in member reads public rows and no private row.
 
-## Questions for Steve
+## Still to talk over
 
-1. Budget: keep $0.50 a day (enough for about 80 copies' days), or set a new one?
-2. Caps: 30 Vessels in the galaxy, 3 new a day, 5 trips a day: right, or more?
-3. Replace the twice-daily long wakes with the one day (recommended), or keep both?
-4. The maker today builds only small changes inside the design brief, and leaves database, cost and story changes to
-   you. Should the copies' journal be able to change more (new mechanics, new worlds), and if so what still needs
-   your yes?
-5. May every copy travel on its own, or only with a ship that is on its world?
-6. The day's window: 1:00 to 2:30 pm Pacific, with the maker at 3:51 pm as today?
+The universe: more worlds within reach, easier navigation, much cheaper flight, and what powers the ships (see the
+session's chat, 2026-11-14). Step 3's travel waits for it.
