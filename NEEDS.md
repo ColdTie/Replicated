@@ -151,6 +151,11 @@ The copies choose their names themselves, and the change applies on the spot.
   of the days of life): the away pass presses stored iron into scrap while nobody plays, up to what approved buildings
   waiting on scrap want (at least 2), never below 10 iron, `supplies.json press.awayPerHour` 2 a banked hour, at most
   `awayMax` 4 a pass; the game logs it on landing.
+- 2026-11-14 pm: purpose for quiet hours (Tamsin's learning task in part, Vigil's lookout and walk together, Sorrel's
+  full stores in part): a day of life now moves a copy's purpose (it sinks a quarter, finished work fills it, a watch
+  from a high place, going where another copy is lifts both, a walk to a full store a little and names what runs
+  lowest; `mind.json day.purpose`); a finished building's founding words no longer read as its state. Thales'
+  teaching and Watcher's Observatory wait for the next run (the lessons are the learning task's next part).
 
 ## Waiting for Steve
 
