@@ -529,10 +529,10 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 11. CI's test job is pinned to `ubuntu-24.04` (session 28): GitHub's `ubuntu-latest` is Ubuntu 26.04 now, which the
     pinned Playwright 1.56.1 does not support. Moving on means a newer Playwright (a dependency version change, and a
     newer Chromium for every playtest): say when.
-13. A day of life (`docs/plan-daily-life.md`): yes to its two migrations, and its six questions (budget, caps,
-    replacing the long wakes, how far the maker may rewrite the game, travel, the window).
 12. CI flakes (maker 2026-11-12): on one commit the test job failed `playtest-cemprint`, then on its re-run
     `playtest-planetmenu` and `playtest-beacon`; each passes locally. Their waits may be too tight for the runner.
+13. A day of life (`docs/plan-daily-life.md`): yes to its two migrations, and its six questions (budget, caps,
+    replacing the long wakes, how far the maker may rewrite the game, travel, the window).
 
 ### Session 29 (2026-11-14): the plan for a day of life; CI flakes
 - **The plan** (`docs/plan-daily-life.md`, Steve: a daily activation where the copies come to life, travel, gather,
