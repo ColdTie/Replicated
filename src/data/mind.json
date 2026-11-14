@@ -33,7 +33,7 @@
     "publicChars": 400
   },
   "day": {
-    "_doc": "A day of life (docs/plan-daily-life.md step 2, Steve 2026-11-14: twice a day). The scheduled job mind-day (migration 0016) calls the function every 10 minutes in the morning and evening UTC hours that cover the windows; the function lives a day only inside a window: windows are start hours in Steve's time (America/Los_Angeles), each windowMinutes long. In a window every copy not on a world being played lives one day, once (traits.dayKey): up to turns model rounds with the long wakes' tools plus gather and go, batch copies per call, the call wrapping up within seconds. gather adds per of a material to its world's store (not one the world lacks, planets.json lacks; ember to the pool), at most gatherTurns times a day. The hourly long wakes stop while enabled (the function skips them).",
+    "_doc": "A day of life (docs/plan-daily-life.md step 2, Steve 2026-11-14: twice a day). The scheduled job mind-day (migration 0016) calls the function every 10 minutes in the morning and evening UTC hours that cover the windows; the function lives a day only inside a window: windows are start hours in Steve's time (America/Los_Angeles), each windowMinutes long. In a window every copy not on a world being played lives one day, once (traits.dayKey): up to turns model rounds with the long wakes' tools plus gather and go, batch copies per call, the call wrapping up within seconds. gather adds per of a material to its world's store (not one the world lacks, planets.json lacks; ember to the pool), at most gatherTurns times a day. The hourly long wakes stop while enabled (the function skips them). Spreading (step 3): travel flies the copy's own ship to a star within travelLy (its cells pay, travel.json power; a charted route a fifth; travelsPerDay copies' flights a day in a galaxy), and the copy lands there when its journey is done (any run after); make_vessel begins a Vessel at its world's Replicator with a finished Nous Chip from the Cem bed (or one it carries) and drift.json cost Ember, born WAKE (a copy never holds one for a player), at most birthsPerDay a day and maxVessels copies in a galaxy; the run that finds it printed makes its row.",
     "enabled": true,
     "windows": [1, 13],
     "windowMinutes": 90,
@@ -41,6 +41,10 @@
     "batch": 3,
     "seconds": 110,
     "gather": { "per": 3, "gatherTurns": 4, "materials": ["ember", "stone", "iron", "hydrogen", "salt", "quartz", "copper"] },
+    "travelLy": 40,
+    "travelsPerDay": 5,
+    "birthsPerDay": 3,
+    "maxVessels": 30,
     "places": ["the square", "my home", "the Cem bed", "the warren", "the ship", "the wilds", "the water", "a high place"]
   },
   "away": {

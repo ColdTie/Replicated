@@ -8,18 +8,20 @@ import { PALETTE, SUPPLIES } from '../core/data';
 import { session } from '../core/session';
 import { Globe } from '../fx/Globe';
 import type { Journey, ReplicantSummary } from '../net/store';
-import { BEACONS, STAR_LIST, defaultPlanetIndex, distanceLy, formatDuration, fuelFor, planetFor, starById, travelMs, type Star } from '../world/galaxy';
+import { BEACONS, STAR_LIST, defaultPlanetIndex, distanceLy, formatDuration, chargeFor, planetFor, starById, travelMs, type Star } from '../world/galaxy';
 import { systemFor, type SystemPlanet } from '../world/system';
 import { shipFlying } from '../core/mannies';
 import { PlanetMenu, type PlanetEntry } from '../ui/planetMenu';
 import { onPress } from '../input/Controls';
+import { chartedRoutes, isCharted, loadRoutes } from '../core/routes';
+import type { Filter } from '../ui/planetMenu';
 
 export interface StarMapData {
   /** launch: at the vessel; view: from the ship in flight; link: at the empty berth while the vessel is elsewhere */
   mode: 'launch' | 'view' | 'link';
   from: string;          // star the ship is at (or flying from)
   fromPlanet?: number;   // planet the ship is at
-  embers?: number;       // fuel available (launch mode)
+  charge?: number;       // the ship's cells (travel.json power; launch mode)
   journey?: Journey;     // the flight in progress (view mode)
   lit?: string[];        // beacon stars the family has lit
   /** launching is not possible from here yet (someone has to stay behind: travel.json needCopy) */
@@ -42,7 +44,7 @@ export interface StarMapData {
 }
 
 const CLASS_COLOR: Record<string, number> = {
-  O: 0x9bb0ff, B: 0xaabfff, A: 0xdfe8ff, F: 0xfaf6e8, G: 0xffeaa0, K: 0xffb46a, M: 0xff7a5a,
+  O: 0x9bb0ff, B: 0xaabfff, A: 0xdfe8ff, F: 0xfaf6e8, G: 0xffeaa0, K: 0xffb46a, M: 0xff7a5a, D: 0xe8eeff,
 };
 const KIND_WORDS: Record<SystemPlanet['kind'], string> = { rock: 'ROCKY WORLD', super: 'SUPER-EARTH', neptune: 'ICE GIANT', giant: 'GAS GIANT' };
 const TEMP_COLOR: Record<SystemPlanet['temp'], number> = { hot: PALETTE[8], warm: PALETTE[12], cold: PALETTE[17] };
@@ -52,6 +54,9 @@ const SIGNATURE = SUPPLIES.signature as { byWorld: Record<string, string>; names
 const TAP_STAR = 24, TAP_PLANET = 22;
 /** how long after the map opens Enter / Space start to act: the press that opened it is still going down */
 const GO_AFTER_MS = 350;
+/** far stars fade: shown out to zoomLy light years from the map's center at zoom 1 (more as you zoom in), over
+ * softLy; red dwarfs are fainter still below dwarfZoom */
+const FADE = { zoomLy: 30, softLy: 8, dwarfZoom: 0.9 };
 /** how far the map pulls back (the wheel, a pinch, framing a world) */
 const ZOOM_MIN = 0.25;
 
@@ -80,6 +85,9 @@ export class StarMapScene extends Phaser.Scene {
   private pinchStart = 0;
   private zoomStart = 1;
   private discovered = new Set<string>(KNOWN_STARS);
+  /** the planet list's search and filter (src/ui/planetMenu.ts) */
+  private query = '';
+  private filter: Filter = 'ALL';
   private replicants: ReplicantSummary[] = [];
   private journeys: Journey[] = [];
   private t = 0;
@@ -149,6 +157,8 @@ export class StarMapScene extends Phaser.Scene {
     this.add.rectangle(0, 0, w, h, PALETTE[25], 0.96).setOrigin(0).setInteractive(); // swallow taps to the world below
     this.g = this.add.graphics();
     this.input.addPointer(1);
+    // charted routes change costs and times: show them once they are known
+    void loadRoutes(true).then(() => { if (this.scene.isActive()) { this.updateInfo(); this.fillMenu(); } });
 
     // Close (X) top right
     const close = this.add.container(w - 16, 14);
@@ -254,7 +264,8 @@ export class StarMapScene extends Phaser.Scene {
     sound.coreHum();
 
     // The planet menu: the same worlds as a list beside the map (recent and closest, each with its details)
-    this.menu = new PlanetMenu(this.game.canvas, (star, planet) => this.pickFromMenu(star, planet), () => { sound.menuMove(0); this.layout(); }, (star, planet) => this.goRow(star, planet));
+    this.menu = new PlanetMenu(this.game.canvas, (star, planet) => this.pickFromMenu(star, planet), () => { sound.menuMove(0); this.layout(); }, (star, planet) => this.goRow(star, planet),
+      (q, f) => { this.query = q; this.filter = f; this.fillMenu(); });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.menu?.destroy(); this.menu = undefined; });
     this.layout();
     this.fillMenu();
@@ -333,8 +344,8 @@ export class StarMapScene extends Phaser.Scene {
     const material = SIGNATURE.byWorld[def.id];
     const details = [
       `STAR ${s.name} - CLASS ${s.cls}`,
-      here ? 'YOU ARE HERE' : ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`,
-      ...(here ? [] : [this.d.only ? this.fuelLine(star, planet, fuelFor(ly)) : `FUEL ${fuelFor(ly)} EMBER${this.d.mode === 'launch' ? ` (YOU HAVE ${this.d.embers ?? 0})` : ''}`]),
+      here ? 'YOU ARE HERE' : ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly, isCharted(this.d.from, star)))}`,
+      ...(here ? [] : [this.d.only ? this.fuelLine(star, planet, this.cost(star)) : `CHARGE ${this.cost(star)}${this.d.mode === 'launch' ? ` OF ${Math.floor(this.d.charge ?? 0)} IN THE CELLS` : ''}${isCharted(this.d.from, star) ? ' - CHARTED ROUTE' : ''}`]),
       `${KIND_WORDS[sp.kind]} - ${def.subtitle} - ${TEMP_WORDS[sp.temp]}`,
       sp.hz ? 'IN THE HABITABLE ZONE' : 'OUTSIDE THE HABITABLE ZONE',
       people.length ? `VESSELS: ${people.join(', ').toUpperCase()}` : 'NO VESSELS',
@@ -365,9 +376,32 @@ export class StarMapScene extends Phaser.Scene {
     }
     const closest: PlanetEntry[] = [];
     const PER_STAR = 3, MAX = 14;
-    for (const s of [...STAR_LIST].sort((a, b) => distanceLy(this.d.from, a.id) - distanceLy(this.d.from, b.id))) {
-      if (s.id === this.d.from) continue;
-      const worlds = systemFor(s.id).slice().sort((a, b) => Number(b.hz) - Number(a.hz) || a.index - b.index).slice(0, PER_STAR).sort((a, b) => a.index - b.index);
+    // a star's rows: at most PER_STAR worlds, those in the habitable zone first, in orbit order
+    const worldsOf = (id: string) => systemFor(id).slice().sort((a, b) => Number(b.hz) - Number(a.hz) || a.index - b.index).slice(0, PER_STAR).sort((a, b) => a.index - b.index);
+    const dist = new Map(STAR_LIST.map((s) => [s.id, distanceLy(this.d.from, s.id)]));
+    const byDistance = [...STAR_LIST].sort((a, b) => dist.get(a.id)! - dist.get(b.id)!);
+    // a search: any star whose name holds the words, nearest first, its first worlds
+    if (this.query) {
+      const q = this.query.toUpperCase();
+      const found: PlanetEntry[] = [];
+      for (const s of byDistance) {
+        if (found.length >= 24) break;
+        if (!s.name.includes(q)) continue;
+        for (const p of worldsOf(s.id)) { const e = this.entry(s.id, p.index); if (e) found.push(e); }
+      }
+      this.menu.setGroups({ recent, closest, found });
+      return;
+    }
+    const vessels = new Set(this.replicants.filter((r) => r.status !== 'in_transit').map((r) => r.star_id));
+    const visitedStars = new Set(this.visited.map((v) => v.star));
+    const keep = (s: Star) => this.filter === 'CHARTED' ? isCharted(this.d.from, s.id)
+      : this.filter === 'VESSELS' ? vessels.has(s.id)
+      : this.filter === 'NEW' ? !visitedStars.has(s.id) && !vessels.has(s.id)
+      : this.filter === 'BRIGHT' ? /III|II|IV/.test(s.cls) || 'OBAF'.includes(s.cls[0])
+      : true;
+    for (const s of byDistance) {
+      if (s.id === this.d.from || !keep(s)) continue;
+      const worlds = worldsOf(s.id);
       for (const p of worlds) {
         if (closest.length >= MAX) break;
         const e = this.entry(s.id, p.index);
@@ -375,7 +409,7 @@ export class StarMapScene extends Phaser.Scene {
       }
       if (closest.length >= MAX) break;
     }
-    this.menu.setGroups({ recent, closest });
+    this.menu.setGroups({ recent, closest, closestTitle: this.filter === 'ALL' ? 'CLOSEST' : `CLOSEST - ${this.filter}` });
   }
 
   /** A row was picked: the map flies into that star's system and picks the planet. */
@@ -465,8 +499,11 @@ export class StarMapScene extends Phaser.Scene {
 
   private canAfford(s: Star, planet = defaultPlanetIndex(s.id)) {
     if (this.d.free && this.allowed(s.id, planet)) return true;
-    return (this.d.embers ?? 0) >= fuelFor(distanceLy(this.d.from, s.id));
+    return (this.d.charge ?? 0) >= this.cost(s.id);
   }
+
+  /** What a flight from here to that star takes from the cells (a charted route costs less). */
+  private cost(star: string) { return chargeFor(distanceLy(this.d.from, star), isCharted(this.d.from, star)); }
 
   /** The beginning lets the ship fly only to some worlds (StarMapData only). */
   private allowed(star: string, planet: number) { return !this.d.only || this.d.only.includes(`${star}:${planet}`); }
@@ -476,7 +513,7 @@ export class StarMapScene extends Phaser.Scene {
     if (this.d.blocked) return 'A COPY MUST STAY BEHIND FIRST';
     if (!this.allowed(star, planet)) return this.d.gateWhy ?? 'NOT YET';
     if (this.d.free) return 'THALES FILLED THE TANKS';
-    return `FUEL ${fuel} OF ${this.d.embers ?? 0}`;
+    return `CELLS ${fuel} OF ${Math.floor(this.d.charge ?? 0)}${isCharted(this.d.from, star) ? ' - CHARTED' : ''}`;
   }
 
   /** Where a launch from the current selection would go. */
@@ -496,12 +533,13 @@ export class StarMapScene extends Phaser.Scene {
     this.info.setVisible(!!s);
     if (!s) { this.launchBtn.setVisible(false); return; }
     const ly = distanceLy(this.d.from, s.id);
-    const fuel = fuelFor(ly);
+    const charted = isCharted(this.d.from, s.id);
+    const fuel = this.cost(s.id);
     const lines: string[] = [];
     const planets = systemFor(s.id);
     if (this.view === 'galaxy') {
       lines.push(s.name + (s.beacon ? (this.d.lit?.includes(s.id) ? '  - BEACON LIT' : '  - BEACON') : s.id === this.d.from ? '  - YOU ARE HERE' : ''));
-      if (s.id !== this.d.from) lines.push(`${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
+      if (s.id !== this.d.from) lines.push(`${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly, charted))}${charted ? ' - CHARTED' : ''}`);
       const known = planets.some((p) => p.real);
       lines.push(`${planets.length} ${planets.length === 1 ? 'WORLD' : 'WORLDS'}${known ? ' KNOWN TO ASTRONOMERS' : ''}`);
       lines.push('TAP HERE FOR ITS PLANETS');
@@ -515,7 +553,7 @@ export class StarMapScene extends Phaser.Scene {
       lines.push(`${KIND_WORDS[p.kind]}${p.moon ? ` - LAND ON ${p.moon}` : ''}${p.hz ? ' - HABITABLE ZONE' : ''}`);
       lines.push(p.real ? 'CONFIRMED BY ASTRONOMERS' : 'UNCHARTED');
       if (!this.isHere(s.id, p.index)) {
-        lines.push(ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly))}`);
+        lines.push(ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly, charted))}${charted ? ' - CHARTED' : ''}`);
         if (this.d.mode === 'launch') lines.push(this.fuelLine(s.id, p.index, fuel));
       }
       if (this.mannyAt(s.id, p.index) !== null) lines.push(this.d.mode !== 'view' && this.d.inManny && this.isHere(s.id, p.index) ? 'YOU DRIVE YOUR HUSK HERE' : 'YOUR HUSK WAITS HERE - LINK');
@@ -705,6 +743,16 @@ export class StarMapScene extends Phaser.Scene {
       }
     }
 
+    // Charted routes (migration 0017): faint lines the Metanoia has flown
+    if (chartedRoutes().size) {
+      const at = new Map(this.projected.map((p) => [p.star.id, p]));
+      g.lineStyle(1, PALETTE[20], 0.28);
+      for (const k of chartedRoutes()) {
+        const [ia, ib] = k.split('|'), a = at.get(ia), b = at.get(ib);
+        if (a && b) g.lineBetween(a.sx, a.sy, b.sx, b.sy);
+      }
+    }
+
     // Ships in flight: line plus a moving dot
     const now = Date.now();
     for (const j of this.journeys.concat(this.d.journey && !this.journeys.some((x) => x.id === this.d.journey!.id) ? [this.d.journey] : [])) {
@@ -738,7 +786,12 @@ export class StarMapScene extends Phaser.Scene {
       const giant = /III/.test(s.cls) || 'OBA'.includes(s.cls[0]);
       const found = this.discovered.has(s.id);
       const inRange = this.d.mode !== 'launch' || this.canAfford(s);
-      const dim = inRange ? 1 : 0.45;
+      // faint far stars fade out until you zoom in, so a big catalog does not crowd the view
+      const keep = found || s.planets || s.beacon || settled.has(s.id) || s.id === this.d.from || this.selected?.id === s.id || KNOWN_STARS.includes(s.id);
+      const far = Math.hypot(s.x - this.center.x, s.y - this.center.y, s.z - this.center.z);
+      const fade = keep ? 1 : Phaser.Math.Clamp((this.zoom * FADE.zoomLy - far) / FADE.softLy + 1, 0, 1) * (s.cls[0] === 'M' ? Phaser.Math.Clamp(this.zoom / FADE.dwarfZoom, 0.25, 1) : 1);
+      if (fade < 0.05) continue;
+      const dim = (inRange ? 1 : 0.45) * fade;
       const r = Math.max(1, (giant ? 2.4 : s.cls[0] === 'M' ? 1.2 : 1.8) * p.r * Math.min(1.6, 0.7 + this.zoom * 0.3));
       radii.set(s.id, r);
       g.fillStyle(col, (found ? 0.35 : 0.15) * dim).fillCircle(p.sx, p.sy, r * 2.4);

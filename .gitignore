@@ -5,3 +5,4 @@ public/assets/gen
 .DS_Store
 dist-sim
 dist-test
+tools/.cache

@@ -6,7 +6,11 @@ import { PALETTE } from '../core/data';
 import { paletteCss as css } from './overlay';
 
 export interface PlanetEntry { star: string; planet: number; name: string; sub: string; details: string[]; mark?: string }
-export interface PlanetGroups { recent: PlanetEntry[]; closest: PlanetEntry[] }
+/** recent and closest as usual; found (a search) replaces both; closestTitle names the filter in force */
+export interface PlanetGroups { recent: PlanetEntry[]; closest: PlanetEntry[]; found?: PlanetEntry[]; closestTitle?: string }
+/** The filters over CLOSEST: every star, routes flown, worlds with Vessels, never visited, bright stars. */
+export const FILTERS = ['ALL', 'CHARTED', 'VESSELS', 'NEW', 'BRIGHT'] as const;
+export type Filter = (typeof FILTERS)[number];
 
 let styled = false;
 function ensureStyle() {
@@ -33,6 +37,15 @@ function ensureStyle() {
   .pm-row .d { display: none; margin-top: 6px; padding-top: 6px; border-top: 1px solid ${css(PALETTE[22])}; color: ${css(PALETTE[20])}; font-size: 11px; }
   .pm-row.open .d { display: block; }
   .pm-row .d div { padding: 1px 0; }
+  .pm.off .pm-tools { display: none; }
+  .pm-tools { padding: 6px 8px 2px; display: flex; flex-direction: column; gap: 5px; }
+  .pm-tools input { font: inherit; color: ${css(PALETTE[19])}; background: ${css(PALETTE[24])}; border: 1px solid ${css(PALETTE[22])};
+    padding: 5px 6px; outline: none; letter-spacing: 1px; text-transform: uppercase; min-height: 28px; box-sizing: border-box; width: 100%; }
+  .pm-tools input:focus { border-color: ${css(PALETTE[19])}; }
+  .pm-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pm-chips span { padding: 3px 5px; font-size: 10px; letter-spacing: 1px; cursor: pointer; color: ${css(PALETTE[21])};
+    border: 1px solid ${css(PALETTE[23])}; }
+  .pm-chips span.on { color: ${css(PALETTE[25])}; background: ${css(PALETTE[19])}; border-color: ${css(PALETTE[19])}; }
   `;
   document.head.appendChild(s);
 }
@@ -43,13 +56,17 @@ export class PlanetMenu {
   private count: HTMLElement;
   private rows: { el: HTMLDivElement; e: PlanetEntry }[] = [];
   private index = -1;
+  private search!: HTMLInputElement;
+  private filter: Filter = 'ALL';
   private open: boolean;
   private onKey = (ev: KeyboardEvent) => this.key(ev);
   private onResize = () => this.place();
 
   constructor(private canvas: HTMLCanvasElement, private onPick: (star: string, planet: number) => void, private onToggle: () => void,
     /** Enter or Space on the chosen row: go to that world (the map launches or links, or picks it first) */
-    private onGo?: (star: string, planet: number) => void) {
+    private onGo?: (star: string, planet: number) => void,
+    /** the search box or a filter changed: the map refills the list (setGroups) */
+    private onQuery?: (query: string, filter: Filter) => void) {
     ensureStyle();
     this.root = document.createElement('div');
     this.root.className = 'pm';
@@ -60,7 +77,36 @@ export class PlanetMenu {
     head.addEventListener('pointerdown', (e) => { e.stopPropagation(); this.toggle(); });
     this.list = document.createElement('div');
     this.list.className = 'pm-list';
-    this.root.append(head, this.list);
+    // a search box (any star by name) and the filters over CLOSEST
+    const tools = document.createElement('div');
+    tools.className = 'pm-tools';
+    this.search = document.createElement('input');
+    this.search.type = 'search';
+    this.search.placeholder = 'FIND A STAR';
+    this.search.setAttribute('aria-label', 'Find a star');
+    this.search.addEventListener('input', () => this.onQuery?.(this.search.value.trim(), this.filter));
+    // typing stays in the box: no key reaches the map (Space or Enter would launch); Enter picks the first match, Esc clears
+    this.search.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter' && this.rows.length) { e.preventDefault(); this.choose(0, true); this.search.blur(); }
+      if (e.key === 'Escape') { e.preventDefault(); this.search.value = ''; this.search.blur(); this.onQuery?.('', this.filter); }
+    });
+    this.search.addEventListener('keyup', (e) => e.stopPropagation());
+    const chips = document.createElement('div');
+    chips.className = 'pm-chips';
+    for (const f of FILTERS) {
+      const c = document.createElement('span');
+      c.textContent = f;
+      c.classList.toggle('on', f === this.filter);
+      c.addEventListener('pointerup', () => {
+        this.filter = f;
+        chips.querySelectorAll('span').forEach((x) => x.classList.toggle('on', x.textContent === f));
+        this.onQuery?.(this.search.value.trim(), f);
+      });
+      chips.append(c);
+    }
+    tools.append(this.search, chips);
+    if (onQuery) this.root.append(head, tools, this.list); else this.root.append(head, this.list);
     // taps on the panel never reach the map below
     for (const t of ['pointerdown', 'pointerup', 'wheel', 'touchstart']) this.root.addEventListener(t, (e) => e.stopPropagation());
     document.body.appendChild(this.root);
@@ -118,8 +164,11 @@ export class PlanetMenu {
         this.rows.push({ el, e });
       }
     };
-    group('RECENT', g.recent);
-    group('CLOSEST', g.closest);
+    if (g.found) group('FOUND', g.found);
+    else {
+      group('RECENT', g.recent);
+      group(g.closestTitle ?? 'CLOSEST', g.closest);
+    }
     this.count.textContent = String(new Set(this.rows.map((r) => `${r.e.star}:${r.e.planet}`)).size);
     this.index = keep ? this.rows.findIndex((r) => r.e.star === keep.star && r.e.planet === keep.planet) : -1;
     this.paint(false);

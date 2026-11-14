@@ -11,7 +11,7 @@ import fs from 'node:fs';
 
 const read = (f) => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const PARTS = read('parts.json'), PLAYER = read('player.json'), SUPPLIES = read('supplies.json'), BUILDINGS = read('buildings.json');
-const PLANETS = read('planets.json');
+const PLANETS = read('planets.json'), TRAVEL = read('travel.json'), DRIFT = read('drift.json');
 const MIND = read('mind.json'), WARREN = read('warren.json'), STARS = read('stars.json'), BEACON = read('beacon.json');
 const names = (o) => Object.keys(o ?? {}).filter((k) => !k.startsWith('_'));
 const colorIndex = Object.fromEntries(names(PARTS.colors).map((k) => [k, PARTS.colors[k]]));
@@ -47,7 +47,13 @@ const out = {
   // what a world lacks (planets.json lacks), by 'star:planet': a day's gather cannot find it there
   lacks: Object.fromEntries((PLANETS.planets ?? PLANETS).filter((p) => p.lacks?.length && p.star).map((p) => [`${p.star}:${p.planetIndex}`, p.lacks])),
   mind: { model: MIND.model, effort: MIND.effort, budget: MIND.budget, prices: MIND.prices, paused: !!MIND.paused },
-  stars: Object.fromEntries(STARS.stars.map((s) => [s.id, [s.name, s.x, s.y, s.z]])),
+  // [name, x, y, z, spectral class letter, confirmed planets (0: generated, planet 1 always exists)]
+  stars: Object.fromEntries(STARS.stars.map((s) => [s.id, [s.name, s.x, s.y, s.z, (s.cls ?? 'M').charAt(0).toUpperCase(), s.planets?.length ?? 0]])),
+  // a day's travel and births (docs/plan-daily-life.md step 3): the ship's cells, charted routes, the cruise, the price
+  // of a Vessel and how a blank one is born (the game's src/core/drift.ts replicate())
+  travel: { power: TRAVEL.power, routes: TRAVEL.routes, secondsPerLy: TRAVEL.cruise.secondsPerLy, inSystemSeconds: TRAVEL.cruise.inSystemSeconds },
+  drift: { cost: DRIFT.cost, chip: DRIFT.chip, printMs: DRIFT.printMs, printMsAlone: DRIFT.printMsAlone, maxPerPlanet: DRIFT.maxPerPlanet, stats: DRIFT.stats, blankDrift: DRIFT.blankDrift },
+  blankBody: PARTS.blank,
 };
 const dest = new URL('../supabase/functions/mind/kit.json', import.meta.url);
 fs.writeFileSync(dest, JSON.stringify(out) + '\n');

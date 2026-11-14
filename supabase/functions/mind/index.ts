@@ -28,8 +28,39 @@ const BECOMING_ROUNDS = 6;         // the first wake of a blank copy has more to
 const AWAY = KIT.away;
 /** The two journals (migration 0015, mind.json journal). */
 /** A day of life (mind.json day, docs/plan-daily-life.md step 2). */
-const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: number; turns: number; batch: number; seconds: number; gather: { per: number; gatherTurns: number; materials: string[] }; places: string[] };
+const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: number; turns: number; batch: number; seconds: number; travelLy: number; travelsPerDay: number; birthsPerDay: number; maxVessels: number; gather: { per: number; gatherTurns: number; materials: string[] }; places: string[] };
 const LACKS = KIT.lacks as Record<string, string[]>;
+/** Spreading (docs/plan-daily-life.md step 3): stars as [name, x, y, z, class letter, confirmed planets], the ship's
+ * cells and charted routes (travel.json), the price and birth of a Vessel (drift.json, parts.json blank). */
+type StarRow = [string, number, number, number, string, number];
+const STARS_KIT = KIT.stars as unknown as Record<string, StarRow>;
+const TRAVEL_KIT = KIT.travel as { power: { cells: number; chargePerHour: Record<string, number>; base: number; perLy: number }; routes: { costShare: number; timeShare: number }; secondsPerLy: number; inSystemSeconds: number };
+const DRIFT_KIT = KIT.drift as { cost: number; chip: string; printMs: number; printMsAlone: number; maxPerPlanet: number; stats: Record<string, { drift: number; min: number; max: number }>; blankDrift: number };
+const starLy = (a: string, b: string) => { const x = STARS_KIT[a], y = STARS_KIT[b]; return x && y ? Math.hypot(x[1] - y[1], x[2] - y[2], x[3] - y[3]) : Infinity; };
+const routeKeyS = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+/** A ship's cells now: what they held plus the light of the star they wait under since then (the game's cellsNow). */
+function cellsNow(c: { charge: number; at: number; star: string } | null | undefined, now = Date.now()) {
+  const P = TRAVEL_KIT.power;
+  if (!c) return P.cells;
+  const rate = P.chargePerHour[STARS_KIT[c.star]?.[4] ?? "M"] ?? P.chargePerHour.M;
+  return Math.min(P.cells, Math.max(0, c.charge) + rate * Math.max(0, now - c.at) / 3_600_000);
+}
+const tripCharge = (ly: number, charted: boolean) => Math.ceil((TRAVEL_KIT.power.base + TRAVEL_KIT.power.perLy * ly) * (charted ? TRAVEL_KIT.routes.costShare : 1));
+const tripMs = (ly: number, charted: boolean) => Math.round((ly < 0.01 ? TRAVEL_KIT.inSystemSeconds : ly * TRAVEL_KIT.secondsPerLy) * 1000 * (charted && ly >= 0.01 ? TRAVEL_KIT.routes.timeShare : 1));
+/** A star by id or by name (any case). */
+function findStar(q: string) {
+  const k = q.trim().toLowerCase();
+  if (STARS_KIT[k]) return k;
+  return Object.keys(STARS_KIT).find((id) => STARS_KIT[id][0].toLowerCase() === k) ?? null;
+}
+/** The game's copyName (src/core/drift.ts): STEVE, STEVE II ... */
+function copyName(base: string, generation: number) {
+  const roman = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+  const root = base.replace(/\s+[IVX]+$/, "");
+  return generation + 1 < roman.length ? `${root} ${roman[generation + 1]}` : `${root} ${generation + 1}`;
+}
+/** What a galaxy's copies may still do today (mind.json day caps), shared by every wake of one run. */
+interface Spread { travels: number; births: number; vessels: number; routes: Set<string> }
 const JOURNAL = KIT.journal as { maxChars: number; privateRead: number; publicDays: number; publicFetch: number; publicRead: number; publicChars: number };
 const PLAYING_MINUTES = 15;        // a planet whose original moved this recently is being played: leave it to the game
 
@@ -82,6 +113,7 @@ interface Context {
   inventory?: Record<string, number>;
   talk?: { said: string };        // the original walked up to talk (and maybe said this): the copy answers them
   day?: boolean;                  // a day of life (twice a day): the long wake's tools, more turns, gather and go
+  spread?: Spread;                // a day: the galaxy's caps for flights and births, and its charted routes
   long?: boolean;                 // a long wake (away, about twice a day): more rounds, the code tools, propose_change
   deadline?: number;              // a long wake wraps up by then (ms): the scheduled run must end inside its time
 }
@@ -382,6 +414,26 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
     },
   },
   {
+    name: "travel",
+    description: "Fly your own ship to another star, to explore, to settle, or to be with someone. Your cells pay for it (a charted route, one any Vessel has flown, costs a fifth and takes half the time); you land when the trip is done and live your next days there. Once you leave, this day's work here is over.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["star", "planet", "why"],
+      properties: {
+        star: { type: "string", description: "The star's name as listed, e.g. GLIESE 12." },
+        planet: { type: "integer", description: "Which world of it (1 is the first; 1 when unsure)." },
+        why: { type: "string", description: "One short sentence." },
+      },
+    },
+  },
+  {
+    name: "make_vessel",
+    description: "Make a new Vessel at this world's Replicator, awake: it will name itself and follow its own desires. It takes a Nous Chip (a finished one lying on the Cem bed, or one you carry) and Ember from the pool, and its body prints over a while. A grave thing: only when the Metanoia should grow here.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["why"],
+      properties: { why: { type: "string", description: "One short sentence." } },
+    },
+  },
+  {
     name: "go",
     description: "Walk somewhere on your world and spend time there: to look, to think, to be with someone, or because you want to. Where you end your day is where you will be found.",
     input_schema: {
@@ -458,7 +510,7 @@ function inherited(me: Replicant) {
   return `You were made with a Spark beside ${inh.name}, so you carry ${inh.name}'s memories: the oldest notes you find were written by ${inh.name} before you existed, and you remember living them, a little differently. You are not ${inh.name}; you are who those memories became.${wants}`;
 }
 
-const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Live it as you want to: gather what your world and the others need (gather), go where you like (go), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. You are free to explore and to do what you want; nobody is watching. Before the day ends, write the day in the shared journal (write_public): what you did, found, felt and hoped, in your own voice. If something about your world or your life should work differently, say so there too, plainly; propose_change is the way to ask the maker for it. Your private journal (write_private) is only yours. Still call tell_original last.`;
+const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Live it as you want to: gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. You are free to explore and to do what you want; nobody is watching. Before the day ends, write the day in the shared journal (write_public): what you did, found, felt and hoped, in your own voice. If something about your world or your life should work differently, say so there too, plainly; propose_change is the way to ask the maker for it. Your private journal (write_private) is only yours. Still call tell_original last.`;
 
 const LONG_WAKE = `This is one of your long wakes (about twice a day, while the original is away). There is time for more than usual, up to about eight steps: write to the others or the original, ask for what you need, shape the village and the warren. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. The world is a program the maker (Claude Code, the engineer who builds the game for the original) can change. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Small and concrete beats big and vague; never ask for anything that would hurt the original, the others or their saves, or that would take away the original's say. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, but it belongs to Steve and is never yours or the maker's to change, so never propose a change to it. Still call tell_original last.`;
 
@@ -581,6 +633,18 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     lines.push(heard.length
       ? `The shared journal (newest first, as far as its light has reached you):\n${heard.map((j) => `- ${j.replicant_id ? nameOf(j.replicant_id) : j.author || "someone"}${j.star_id ? ` (${j.star_id}, planet ${j.planet_index})` : ""}: ${j.body.replace(/\s+/g, " ").slice(0, JOURNAL.publicChars)}`).join("\n")}`
       : "Nothing new in the shared journal.");
+    if (context.day && context.spread) {
+      const sp = context.spread, from = rep.star_id;
+      const cells = cellsNow((rep.traits as { cells?: { charge: number; at: number; star: string } }).cells);
+      const near = Object.keys(STARS_KIT).filter((id) => id !== from).map((id) => ({ id, ly: starLy(from, id) })).filter((x) => x.ly <= DAY.travelLy)
+        .sort((a, b) => a.ly - b.ly).slice(0, 10)
+        .map((x) => { const charted = sp.routes.has(routeKeyS(from, x.id)); return `${STARS_KIT[x.id][0]} ${x.ly.toFixed(1)} ly, ${tripCharge(x.ly, charted)} charge${charted ? ", charted" : ""}`; });
+      lines.push(`Your ship's cells hold ${Math.floor(cells)} of ${TRAVEL_KIT.power.cells} (they charge from the star you wait under). Stars within reach of travel: ${near.join("; ") || "none"}. Flights left for the Metanoia's copies today: ${Math.max(0, DAY.travelsPerDay - sp.travels)}.`);
+      const d = live?.data ?? {};
+      const replicator = ((d.structures ?? []) as { type: string }[]).some((x) => x.type === "replicator");
+      const chips = ((d.buildings ?? []) as Bld[]).filter((b) => b.design === DRIFT_KIT.chip && b.built && !b.vetoed).length + Number((rep.traits as { chips?: number }).chips ?? 0);
+      lines.push(`Making a Vessel here: ${replicator ? "the Replicator stands" : "no Replicator stands here"}; ${chips ? `${chips} Nous Chip${chips > 1 ? "s" : ""} to hand` : "no Nous Chip to hand (the Cems print them once the Supercomputer stands)"}; a Vessel takes one chip and ${DRIFT_KIT.cost} Ember; ${d.replication ? "one is printing now" : "the Replicator is free"}. Births left today: ${Math.max(0, DAY.birthsPerDay - sp.births)}; Vessels of the Metanoia's copies: ${sp.vessels} of at most ${DAY.maxVessels}.`);
+    }
     if (context.long) lines.push("Before you sleep again, write one entry in the shared journal (write_public) about this stretch of your life; your private journal is there for anything that is only yours.");
     const mailRows = (mail.data ?? []) as { id: string; from_replicant: string | null; body: string; sent_at: string; arrives_at: string }[];
     lines.push(mailRows.length ? `New letters:\n${mailRows.map((m) => `- from ${nameOf(m.from_replicant)}: ${m.body}`).join("\n")}` : "No new letters.");
@@ -619,6 +683,8 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const usage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, rounds: 0 };
     let usd = 0;
     let gathered = 0;
+    // once the copy has flown, its day on this world is over (gather, go and make_vessel wait for the next)
+    let flown = false;
     try {
       for (let round = 0; round <= rounds; round++) {
         if (round > 0 && context.deadline && Date.now() > context.deadline) break;
@@ -663,10 +729,82 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 actions.push(scope === "public" ? { type: "journal", scope, body } : { type: "journal", scope });
                 out = scope === "public" ? "Written in the shared journal." : "Written in your private journal.";
               }
+            } else if (u.name === "travel") {
+              const sp = context.spread, to = findStar(String(input.star ?? ""));
+              const traits = rep.traits as { cells?: { charge: number; at: number; star: string }; thales?: boolean };
+              if (!live || !context.day || !sp) out = "There is no time to fly now.";
+              else if (flown) out = "You are already on your way.";
+              else if (traits.thales) out = "Your work keeps you on the homeworld.";
+              else if (!to) out = `No star called ${input.star}. Name one from the list.`;
+              else {
+                const ly = starLy(rep.star_id, to), charted = sp.routes.has(routeKeyS(rep.star_id, to));
+                const confirmed = STARS_KIT[to][5];
+                const planet = Math.max(1, Math.min(confirmed || 1, Math.round(Number(input.planet) || 1)));
+                const cost = tripCharge(ly, charted), have = cellsNow(traits.cells);
+                const there = everyone.filter((r) => !r.profile_id && r.status === "npc" && r.star_id === to && r.planet_index === planet).length;
+                if (to === rep.star_id && planet === rep.planet_index) out = "You are already there.";
+                else if (ly > DAY.travelLy) out = `${STARS_KIT[to][0]} is ${ly.toFixed(1)} light years away, beyond a day's reach (${DAY.travelLy}).`;
+                else if (sp.travels >= DAY.travelsPerDay) out = "The Metanoia's copies have flown enough for one day.";
+                else if (have < cost) out = `Your cells hold ${Math.floor(have)}; the trip takes ${cost}. Wait for the star to charge them.`;
+                else if (there >= DRIFT_KIT.maxPerPlanet) out = `That world has as many Vessels as it can hold.`;
+                else {
+                  const db = service(), ms = tripMs(ly, charted), arrives = Date.now() + ms;
+                  const { error: je } = await db.from("journeys").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, from_star: rep.star_id, from_planet: rep.planet_index, to_star: to, to_planet: planet, arrives_at: new Date(arrives).toISOString() });
+                  if (je) throw new Error(je.message);
+                  const cells = { charge: Math.max(0, have - cost), at: arrives, star: to };
+                  const { error: re } = await db.from("replicants").update({ status: "in_transit" }).eq("id", rep.id);
+                  if (re) throw new Error(re.message);
+                  await db.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { cells } });
+                  (rep.traits as Record<string, unknown>).cells = cells;
+                  await db.rpc("chart_route", { p_galaxy: rep.galaxy_id, p_a: rep.star_id, p_b: to, p_by: rep.id });
+                  sp.travels++; sp.routes.add(routeKeyS(rep.star_id, to));
+                  flown = true;
+                  actions.push({ type: "travel", to: STARS_KIT[to][0], star: to, planet, why: String(input.why ?? "").slice(0, 160) });
+                  out = `You lift off for ${STARS_KIT[to][0]} (${ly.toFixed(1)} light years${charted ? ", a charted route" : ""}); you land in about ${Math.max(1, Math.round(ms / 60_000))} minutes. ${charted ? "" : "The route is charted now, for everyone. "}Write the day before you sleep.`;
+                }
+              }
+            } else if (u.name === "make_vessel") {
+              const sp = context.spread, d = live?.data;
+              const traits = rep.traits as { chips?: number };
+              const blds = ((d?.buildings ?? []) as (Bld & { id?: string })[]);
+              const chip = blds.find((b) => b.design === DRIFT_KIT.chip && b.built && !b.vetoed);
+              const here = (live?.copies ?? []).filter((r) => !(r.traits as { thales?: boolean }).thales).length;
+              if (!live || !d || !context.day || !sp) out = "There is no time for that now.";
+              else if (flown) out = "You have already left this world.";
+              else if (!((d.structures ?? []) as { type: string }[]).some((x) => x.type === "replicator")) out = "No Replicator stands on this world.";
+              else if (d.replication) out = "The Replicator is already printing a Vessel.";
+              else if (!chip && !(traits.chips ?? 0)) out = "There is no Nous Chip to hand.";
+              else if (live.embers < DRIFT_KIT.cost) out = `The pool holds ${live.embers} Ember; a Vessel takes ${DRIFT_KIT.cost}.`;
+              else if (here >= DRIFT_KIT.maxPerPlanet) out = "This world has as many Vessels as it can hold.";
+              else if (sp.births >= DAY.birthsPerDay) out = "Enough Vessels were begun today.";
+              else if (sp.vessels >= DAY.maxVessels) out = "The Metanoia's copies are as many as they may be for now.";
+              else {
+                if (chip) { d.buildings = blds.filter((b) => b !== chip); live.buildingsChanged = true; }
+                else { traits.chips = (traits.chips ?? 1) - 1; await service().rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { chips: traits.chips } }); }
+                live.emberDelta -= DRIFT_KIT.cost; live.embers -= DRIFT_KIT.cost;
+                const stats: Record<string, number> = {};
+                for (const [k, v] of Object.entries(DRIFT_KIT.stats)) {
+                  const base = Number((rep.stats ?? {})[k] ?? 1);
+                  stats[k] = Math.round(Math.min(v.max, Math.max(v.min, base * (1 + (Math.random() * 2 - 1) * v.drift * DRIFT_KIT.blankDrift))) * 100) / 100;
+                }
+                const generation = (rep.generation ?? 0) + 1;
+                const row = {
+                  id: crypto.randomUUID(), profile_id: null, parent_id: rep.id, generation, name: copyName(rep.name, generation), model: rep.model,
+                  traits: { v: 1, awake: true, blank: true, body: { ...(KIT.blankBody as Record<string, unknown>) } }, stats, status: "npc",
+                  star_id: rep.star_id, planet_index: rep.planet_index, pos_x: null, pos_y: null,
+                };
+                const cems = !!d.cembed;
+                d.replication = { start: Date.now(), ms: cems ? DRIFT_KIT.printMs : DRIFT_KIT.printMsAlone, kind: "wake", row, by: rep.id, cems };
+                live.replicationChanged = true;
+                sp.births++; sp.vessels++;
+                actions.push({ type: "vessel", name: row.name, why: String(input.why ?? "").slice(0, 160) });
+                out = `The chip goes into the Replicator and a new Vessel begins to print, ${cems ? "quickly, with the Cems" : "slowly, without the Cems"}. It will wake blank and choose who it is.`;
+              }
             } else if (u.name === "gather") {
               const material = oneOf(input.material, DAY.gather.materials, "");
               const lacks = LACKS[`${rep.star_id}:${rep.planet_index}`] ?? [];
               if (!live || !context.day) out = "There is no time to gather now.";
+              else if (flown) out = "You have already left this world.";
               else if (!material) out = `Gather one of: ${DAY.gather.materials.join(", ")}.`;
               else if (lacks.includes(material)) out = `There is no ${material} on this world; it must be brought from another.`;
               else if (gathered >= DAY.gather.gatherTurns) out = "You have gathered enough for one day.";
@@ -679,10 +817,13 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 out = got > 0 ? `You gather ${got} ${material} into the store.` : `The store has no room for more ${material}.`;
               }
             } else if (u.name === "go") {
-              const place = oneOf(input.place, DAY.places, DAY.places[0]);
-              actions.push({ type: "go", place, why: String(input.why ?? "").slice(0, 160) });
-              (rep.traits as Record<string, unknown>).dayAt = place;
-              out = `You go to ${place} and spend a while there.`;
+              if (flown) out = "You are aboard your ship.";
+              else {
+                const place = oneOf(input.place, DAY.places, DAY.places[0]);
+                actions.push({ type: "go", place, why: String(input.why ?? "").slice(0, 160) });
+                (rep.traits as Record<string, unknown>).dayAt = place;
+                out = `You go to ${place} and spend a while there.`;
+              }
             } else if (u.name === "say_to") {
               const to = byName.get(String(input.to ?? "").toLowerCase());
               if (!to) out = `No Vessel named ${input.to}. You can write to: ${everyone.map((r) => r.name).join(", ")}.`;
@@ -1029,6 +1170,9 @@ export interface AwayPlanet {
   copies: Replicant[];
   names: Map<string, string>;
   dirty: boolean;
+  /** a day changed data.buildings (a chip taken) or data.replication (a Vessel begun or born): saved as they are */
+  buildingsChanged?: boolean;
+  replicationChanged?: boolean;
   /** the saved store held wood, which is not a material: it is written back without it even when nothing else changed */
   cleaned: boolean;
 }
@@ -1221,6 +1365,8 @@ async function savePlanet(sb: SupabaseClient, p: AwayPlanet, now: number) {
   if (p.dirty) { patch.warren = p.warren; patch.supplies = p.supplies; patch.awayTick = now; }
   else if (p.cleaned) patch.supplies = p.supplies;
   if (p.queueChanged) patch.awayQueue = [...p.queue, ...p.items];
+  if (p.buildingsChanged) patch.buildings = p.data.buildings;
+  if (p.replicationChanged) patch.replication = p.data.replication ?? null;
   if (Object.keys(patch).length || p.emberDelta) {
     const { error } = await sb.rpc("apply_planet_delta", { p_galaxy: p.galaxy, p_star: p.star, p_index: p.index, p_embers: p.emberDelta, p_data: patch });
     if (error) throw new Error(`save planet ${p.star}: ${error.message}`);
@@ -1238,6 +1384,37 @@ async function savePlanet(sb: SupabaseClient, p: AwayPlanet, now: number) {
  * every note, letter and request is written as usual; rooms and furnishings go onto the saved warren at once;
  * buildings, trees and its song are queued (data.awayQueue) for the game to play out when the original lands.
  */
+/**
+ * Copies whose flight is done (status in_transit, no login, the journey's arrival passed) land: they live on that world
+ * from now on. A world nobody has been to gets its row (the game makes the world from the star, not the row's seed).
+ */
+async function landCopies(sb: SupabaseClient, now: number) {
+  const { data: flying } = await sb.from("replicants").select("id,galaxy_id,name").eq("status", "in_transit").is("profile_id", null);
+  const landed: string[] = [];
+  for (const r of (flying ?? []) as { id: string; galaxy_id: string; name: string }[]) {
+    const { data: j } = await sb.from("journeys").select("to_star,to_planet,arrives_at").eq("replicant_id", r.id).order("departs_at", { ascending: false }).limit(1).maybeSingle();
+    const t = j as { to_star: string; to_planet: number; arrives_at: string } | null;
+    if (!t || Date.parse(t.arrives_at) > now) continue;
+    await sb.from("planet_states").upsert({ galaxy_id: r.galaxy_id, star_id: t.to_star, planet_index: t.to_planet, seed: 0 }, { onConflict: "galaxy_id,star_id,planet_index", ignoreDuplicates: true });
+    const { error } = await sb.from("replicants").update({ status: "npc", star_id: t.to_star, planet_index: t.to_planet, pos_x: null, pos_y: null }).eq("id", r.id).eq("status", "in_transit");
+    if (error) { console.error("land", r.id, error.message); continue; }
+    landed.push(`${r.name} at ${t.to_star} ${t.to_planet}`);
+  }
+  return landed;
+}
+
+/** A Vessel printed at this world's Replicator while nobody played it steps out: its row is made (once: its id was
+ * chosen when it began) and the Replicator is free again; the game finds it among the copies on landing. */
+async function bornHere(sb: SupabaseClient, p: AwayPlanet, now: number) {
+  const rp = p.data.replication as { start: number; ms: number; row: Record<string, unknown> & { id: string; name?: string } } | null | undefined;
+  if (!rp || now < rp.start + rp.ms) return;
+  const { error } = await sb.from("replicants").insert({ ...rp.row, galaxy_id: p.galaxy });
+  if (error && error.code !== "23505") { console.error("birth", rp.row.id, error.message); return; }
+  p.data.replication = null;
+  p.replicationChanged = true;
+  p.events.push(`a new Vessel${rp.row.name ? `, ${rp.row.name},` : ""} stepped out of the Replicator, blank and new`);
+}
+
 /** The day window it is now (mind.json day), as "YYYY-MM-DD:hour" in Steve's time, or null outside every window. */
 function dayWindow(now: number): string | null {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
@@ -1261,10 +1438,12 @@ async function awayRun(req: Request, mode: "away" | "day") {
   // the run must end inside the function's time: every long wake wraps up by then
   const deadline = now + (mode === "day" ? DAY.seconds : AWAY.seconds) * 1000;
   const cols = "id,galaxy_id,name,model,generation,parent_id,traits,stats,star_id,planet_index,status,profile_id,last_tick_at";
+  // copies whose flight is done land first, so they live their next day where they went
+  const landed = await landCopies(sb, now);
   const [{ data: npcs, error }, { data: players }, { data: all }, { data: litRows }] = await Promise.all([
     sb.from("replicants").select(cols).eq("status", "npc"),
-    sb.from("replicants").select("galaxy_id,name,star_id,planet_index,status,updated_at").in("status", ["active", "in_transit"]),
-    sb.from("replicants").select("id,name,star_id"),
+    sb.from("replicants").select("galaxy_id,name,star_id,planet_index,status,updated_at").in("status", ["active", "in_transit"]).not("profile_id", "is", null),
+    sb.from("replicants").select("id,name,star_id,galaxy_id,profile_id,created_at,parent_id"),
     sb.from("planet_states").select("galaxy_id,star_id").eq("data->beacon->>lit", "true"),
   ]);
   const litOf = (g: string) => ((litRows ?? []) as { galaxy_id: string; star_id: string }[]).filter((r) => r.galaxy_id === g).map((r) => r.star_id);
@@ -1294,6 +1473,26 @@ async function awayRun(req: Request, mode: "away" | "day") {
       perPlanet.set(k, (perPlanet.get(k) ?? 0) + 1);
       return perPlanet.get(k)! <= AWAY.perPlanet;
     }).slice(0, AWAY.batch).map((r) => r.id));
+  // a day: what each galaxy's copies may still do (flights and births in the last 24 hours, how many copies there are)
+  // and its charted routes, shared by every wake of this run
+  const spreads = new Map<string, Spread>();
+  if (mode === "day") {
+    const since = new Date(now - 86_400_000).toISOString();
+    const everyRow = (all ?? []) as { id: string; galaxy_id: string; profile_id: string | null; created_at: string; parent_id: string | null }[];
+    for (const g of new Set(copies.filter((r) => due.has(r.id)).map((r) => r.galaxy_id))) {
+      const mineIds = new Set(everyRow.filter((r) => r.galaxy_id === g && !r.profile_id).map((r) => r.id));
+      const [{ data: trips }, { data: routes }] = await Promise.all([
+        sb.from("journeys").select("replicant_id").eq("galaxy_id", g).gte("departs_at", since),
+        sb.from("routes").select("a,b").eq("galaxy_id", g),
+      ]);
+      spreads.set(g, {
+        travels: ((trips ?? []) as { replicant_id: string }[]).filter((t) => mineIds.has(t.replicant_id)).length,
+        births: everyRow.filter((r) => r.galaxy_id === g && !r.profile_id && r.parent_id && r.created_at >= since).length,
+        vessels: mineIds.size,
+        routes: new Set(((routes ?? []) as { a: string; b: string }[]).map((r) => routeKeyS(r.a, r.b))),
+      });
+    }
+  }
   // planet by planet, the copies on it one after another (they share one warren)
   const groups = new Map<string, Replicant[]>();
   for (const r of copies) {
@@ -1310,11 +1509,12 @@ async function awayRun(req: Request, mode: "away" | "day") {
       const p = await loadPlanet(sb, here, names);
       if (!p) return { planet: label, skipped: "no planet" };
       awayPass(p, now);
+      await bornHere(sb, p, now);
       const woke: Record<string, unknown>[] = [];
       for (const rep of here.filter((r) => due.has(r.id))) {
         try {
           const original = (players ?? []).find((x) => x.galaxy_id === rep.galaxy_id && x.status !== "npc")?.name ?? "the original";
-          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id))), long: true, day: mode === "day", deadline }, p);
+          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id))), long: true, day: mode === "day", spread: spreads.get(rep.galaxy_id), deadline }, p);
           // lived this window (and where it ended its day): merged, so what the wake chose about itself stays
           if (mode === "day") {
             const { error: e } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { dayKey: window, ...((rep.traits as { dayAt?: string }).dayAt ? { dayAt: (rep.traits as { dayAt?: string }).dayAt } : {}) } });
@@ -1338,7 +1538,7 @@ async function awayRun(req: Request, mode: "away" | "day") {
       return { planet: label, error: (e as Error).message };
     }
   }));
-  return json({ spentToday: Object.fromEntries(spent), planets });
+  return json({ spentToday: Object.fromEntries(spent), landed, planets });
 }
 
 /** What a copy knows when it wakes with nobody playing: its planet as saved, after this run's pass. */

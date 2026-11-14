@@ -86,7 +86,7 @@ left to the game's own copies, as the long wakes do today (`playing()`).
   - the long wakes' tools (build, dig, furnish, letters, `propose_change`), unchanged.
 - The long wakes are replaced by the day (decided).
 
-## Step 3: spreading (moving worlds, more Vessels; migration 0017, Steve's yes)
+## Step 3: spreading (moving worlds, more Vessels; built 2026-11-14, no migration needed: journeys already take a copy)
 
 - `travel(star, planet)`: a copy takes the ship of its world only if one is there, or (recommended) every copy may
   launch itself, as the story's Vessels do. Fuel from the world it leaves (`travel.json fuelBase + fuelPerLy × ly`),
@@ -198,5 +198,5 @@ beacons stay pinned, and no save changes.
 **The copies** may fly anywhere within `day.travelLy`, charted or not (Steve: pick what you suggest); the charge comes
 from their own world's ship cells, so a world with a fusion still and hydrogen sends its copies further.
 
-**Order:** the universe goes in before step 3 (spreading), so the copies fly in the new economy from their first trip:
+**Built 2026-11-14** (CLAUDE.md session 29). **Order:** the universe goes in before step 3 (spreading), so the copies fly in the new economy from their first trip:
 1, 2, then the universe, then 3, 4, 5.

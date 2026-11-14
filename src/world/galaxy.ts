@@ -13,7 +13,8 @@ export const STAR_LIST = STARS.stars as Star[];
 export const BEACONS = STARS.beacons;
 export { TRAVEL };
 
-export const starById = (id: string) => STAR_LIST.find((s) => s.id === id);
+const BY_ID = new Map(STAR_LIST.map((s) => [s.id, s]));
+export const starById = (id: string) => BY_ID.get(id);
 
 /**
  * How long a letter takes between two stars, in seconds: light speed (mailSecondsPerLy), or at once along the beacon
@@ -39,7 +40,11 @@ export function distanceLy(a: string, b: string) {
 
 /** Trip length in milliseconds: the cruise (travel.json, secondsPerLy for every light year), fixedSeconds when above
  * 0, or real time (?fast: minutes become seconds). */
-export function travelMs(ly: number) {
+export function travelMs(ly: number, charted = false) {
+  return Math.round(baseTravelMs(ly) * (charted && ly >= 0.01 ? TRAVEL.routes.timeShare : 1));
+}
+
+function baseTravelMs(ly: number) {
   if (TRAVEL.fixedSeconds > 0) return TRAVEL.fixedSeconds * 1000;
   const c = TRAVEL.cruise;
   if (c.enabled) {
@@ -53,7 +58,26 @@ export function travelMs(ly: number) {
   return Math.round(minutes * (fast ? 1000 : 60_000));
 }
 
-export const fuelFor = (ly: number) => Math.round(TRAVEL.fuelBase + TRAVEL.fuelPerLy * ly);
+/** A ship's cells (travel.json power): where it is parked, how full, since when (ms; a ship in flight charges from
+ * its arrival on). Ember no longer flies a ship: it is only for Vessels. */
+export interface Cells { charge: number; at: number; star: string }
+export const POWER = TRAVEL.power;
+/** Charge per hour from a star's light, by its spectral class. */
+export function chargeRate(star: string) {
+  const cls = (starById(star)?.cls ?? 'M').charAt(0).toUpperCase() as keyof typeof TRAVEL.power.chargePerHour;
+  return TRAVEL.power.chargePerHour[cls] ?? TRAVEL.power.chargePerHour.M;
+}
+/** The cells now: what they held, plus the light of the star they wait under since then, up to full. No cells yet: full. */
+export function cellsNow(cells: Cells | null | undefined, now = Date.now()) {
+  if (!cells) return TRAVEL.power.cells;
+  const hours = Math.max(0, now - cells.at) / 3_600_000;
+  return Math.min(TRAVEL.power.cells, Math.max(0, cells.charge) + chargeRate(cells.star) * hours);
+}
+/** What a trip takes from the cells: a fifth on a charted route (travel.json routes). */
+export const chargeFor = (ly: number, charted = false) =>
+  Math.ceil((TRAVEL.power.base + TRAVEL.power.perLy * ly) * (charted ? TRAVEL.routes.costShare : 1));
+/** A route between two stars, the same either way round. */
+export const routeKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 /** "0.4 SEC", "40 SEC", "1 MIN 5 SEC", "45 MIN", "9 H 40 MIN", "6 DAYS 2 H" */
 export function formatDuration(ms: number) {
