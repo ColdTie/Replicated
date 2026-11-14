@@ -546,7 +546,9 @@ Deno.serve(async (req) => {
     if (MIND.paused) return json({ skipped: true, reason: "paused" });
     const body = await req.json();
     if (body?.away) return await awayRun(req, "away");
-    if (body?.day) return await awayRun(req, "day");
+    // {"day": "now"}: a day lived at once, outside the windows (a run by hand, e.g. to watch them live); the away key
+    // still guards it, and each copy lives it once (its own window key)
+    if (body?.day) return await awayRun(req, "day", body.day === "now");
     const auth = req.headers.get("Authorization") ?? "";
     const key = req.headers.get("apikey") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, key, { global: { headers: { Authorization: auth } } });
@@ -1492,6 +1494,12 @@ async function finishBirths(sb: SupabaseClient, now: number, played: (g: string,
   return printing;
 }
 
+/** A day lived by hand: its own window key, by the hour, so each copy lives it once. */
+function nowWindow(now: number) {
+  const d = new Date(now);
+  return `${d.toISOString().slice(0, 10)}:now-${d.getUTCHours()}`;
+}
+
 /** The day window it is now (mind.json day), as "YYYY-MM-DD:hour" in Steve's time, or null outside every window. */
 function dayWindow(now: number): string | null {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
@@ -1501,7 +1509,7 @@ function dayWindow(now: number): string | null {
   return start === undefined ? null : `${parts.year}-${parts.month}-${parts.day}:${start}`;
 }
 
-async function awayRun(req: Request, mode: "away" | "day") {
+async function awayRun(req: Request, mode: "away" | "day", now_ = false) {
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   // the key is kept in Vault (mind_away_key, migration 0011); only the scheduled job carries it
   const key = req.headers.get("x-away-key") ?? "";
@@ -1509,7 +1517,7 @@ async function awayRun(req: Request, mode: "away" | "day") {
   if (!ok) return json({ error: "forbidden" }, 403);
   const now = Date.now();
   // a day of life lives only inside its window, once per copy per window (traits.dayKey)
-  const window = mode === "day" ? dayWindow(now) : null;
+  const window = mode === "day" ? (now_ ? nowWindow(now) : dayWindow(now)) : null;
   if (mode === "day" && (!DAY.enabled || !window)) return json({ skipped: true, reason: DAY.enabled ? "outside the day's windows" : "days are off" });
   const cutoff = now - AWAY.everyHours * 3_600_000;
   // the run must end inside the function's time: every long wake wraps up by then
