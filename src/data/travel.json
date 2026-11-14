@@ -1,5 +1,5 @@
 {
-  "_doc": "Real-time travel. Trip minutes = minutesAtRef * (lightYears / refLy) ^ exponent: Alpha Centauri about 45 minutes, 12 ly about 10 hours, a beacon (25-43 ly) about 3 to 10 days. fuel (Embers from the planet you leave) = fuelBase + fuelPerLy * lightYears. needCopy: someone has to stay behind, so you can only launch from a planet that has at least one copy (off since 2026-10-28: every copy now needs a Nous Chip, so most worlds have no copy to leave). ?fast in the URL turns minutes into seconds for testing. inSystemMinutes: real-time length of a hop between two planets of the same star. fixedSeconds: when above 0, every trip takes exactly that many seconds (Steve asked for 5 s trips on 2026-10-06); set it to 0 to bring back real-time travel. cruise (below) is used when fixedSeconds is 0.",
+  "_doc": "Real-time travel. Trip minutes = minutesAtRef * (lightYears / refLy) ^ exponent: Alpha Centauri about 45 minutes, 12 ly about 10 hours, a beacon (25-43 ly) about 3 to 10 days. Since 2026-11-14 (docs/plan-daily-life.md, the universe) a ship runs on starlight, not Ember: see power and routes. needCopy: someone has to stay behind, so you can only launch from a planet that has at least one copy (off since 2026-10-28: every copy now needs a Nous Chip, so most worlds have no copy to leave). ?fast in the URL turns minutes into seconds for testing. inSystemMinutes: real-time length of a hop between two planets of the same star. fixedSeconds: when above 0, every trip takes exactly that many seconds (Steve asked for 5 s trips on 2026-10-06); set it to 0 to bring back real-time travel. cruise (below) is used when fixedSeconds is 0.",
   "fixedSeconds": 0,
   "cruise": {
     "_doc": "A trip takes secondsPerLy for every light year (Steve, 2026-10-27: 2 seconds a light year, after 0.1 and 15 on 2026-10-25; from the homeworld the nearest star, TRAPPIST-1, about 44 s, Gliese 12 about 49 s, Earth about 1 min 38 s, the farthest catalog star about 4 min); a hop between planets of the same star takes inSystemSeconds. Used while enabled; set enabled false (and fixedSeconds 0) for real-time travel, or fixedSeconds above 0 for a fixed trip.",
@@ -10,14 +10,62 @@
   "minutesAtRef": 45,
   "refLy": 4.37,
   "exponent": 2.5,
-  "fuelBase": 10,
-  "fuelPerLy": 2,
   "needCopy": false,
   "landedPlanetIndex": 1,
   "inSystemMinutes": 5,
   "starLight": {
     "_doc": "Light color of each spectral class (first letter), mixed into a world's darkness color and sky.",
-    "O": ["9bb0ff", 0.3], "B": ["aabfff", 0.25], "A": ["cad7ff", 0.2], "F": ["f8f7ff", 0.1],
-    "G": ["fff4ea", 0.0], "K": ["ffd2a1", 0.25], "M": ["ff8a6a", 0.3]
+    "O": [
+      "9bb0ff",
+      0.3
+    ],
+    "B": [
+      "aabfff",
+      0.25
+    ],
+    "A": [
+      "cad7ff",
+      0.2
+    ],
+    "F": [
+      "f8f7ff",
+      0.1
+    ],
+    "G": [
+      "fff4ea",
+      0.0
+    ],
+    "K": [
+      "ffd2a1",
+      0.25
+    ],
+    "M": [
+      "ff8a6a",
+      0.3
+    ],
+    "D": ["e8eeff", 0.15]
+  },
+  "power": {
+    "_doc": "A ship's cells (Steve, 2026-11-14: ships run on starlight; Ember is only for Vessels). cells: what a full ship holds. Parked on a world, the cells charge from its star by the clock, also while nobody plays: chargePerHour by spectral class (first letter; a red dwarf slowly, a bright star fast). A trip costs base + perLy for every light year (a fifth on a charted route, routes.costShare). A finished fusion still on the world you board from tops the cells up from the store's hydrogen: hydrogenCharge per hydrogen, never taking the store below keepHydrogen (husks need it). A ship with no cells saved yet starts full.",
+    "cells": 100,
+    "chargePerHour": {
+      "O": 60,
+      "B": 60,
+      "A": 50,
+      "F": 40,
+      "G": 30,
+      "K": 20,
+      "M": 12,
+      "D": 6
+    },
+    "base": 4,
+    "perLy": 1.5,
+    "hydrogenCharge": 8,
+    "keepHydrogen": 6
+  },
+  "routes": {
+    "_doc": "Charted routes (migration 0017): the first flight between two stars charts the route for the whole Metanoia; a charted route costs costShare of the charge and takes timeShare of the time, and the star map draws it.",
+    "costShare": 0.2,
+    "timeShare": 0.5
   }
 }

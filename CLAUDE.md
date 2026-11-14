@@ -231,7 +231,8 @@ src/core/viewport.ts     keeps the game inside what a phone shows: the game's bo
 supabase/manual/         SQL run by hand, only when Steve asks: 2026-10-27_tutorial_fresh_start.sql (backs up and erases his
                          galaxy only; run 2026-10-28)
 src/data/*.json          palette, planets, player, enemies, items, structures, backend, village, warren (all tunables)
-src/data/stars.json      123 real stars + 141 confirmed exoplanets (built by tools/build-stars.mjs; edit the catalog there)
+src/data/stars.json      1,500 real stars (the nearest 123 hand-written with 141 confirmed exoplanets, the rest from HYG v4.1,
+                         CC BY-SA 4.0; built by tools/build-stars.mjs; edit the catalog there)
 src/core/                rng/noise, typed data access, sprite manifest helpers, session (store/profile/replicant)
 src/net/store.ts         GameStore interface: CloudStore (Supabase) and LocalStore (localStorage)
 src/world/planetGen.ts   seeded island: floor/rock/water/void (no ruins since 2026-10-26), tiles, nodes, enemies, decor, glows,
@@ -347,6 +348,8 @@ supabase/functions/mind/ the minds (index.ts); kit.json and warren.ts are genera
                          published source and propose_change
 tools/test.mjs           `npm test`: tools/check-mind-tools.mjs (the mind's tool schemas, the cause of both mind
                          outages) then every tools/playtest*.mjs; .github/workflows/test.yml runs it on every PR
+src/core/routes.ts       charted routes (migration 0017): loaded with every star map, isCharted, chart (a flight)
+supabase/migrations/0017 routes and chart_route; a copy's travel and birth are in the mind function (travel, make_vessel)
 supabase/migrations/0016 the day run's job (mind-day) and the `day` kind of mind_runs; mind.json day, awayRun(req, "day")
 supabase/migrations/0015 the two journals (journal: public / private; journal_public for the maker; written only by the
                          mind function: write_public / write_private, mind.json journal)
@@ -455,7 +458,8 @@ steps out after a reload; on Earth, without Cems, the Replicator is built on its
 home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wisp, the printer's readout, the trip there
 (growing, copper and quartz, the readout over the ship), the hold brings them home, the printer is fed and lays the rest
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
-`node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
+`node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
+route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, the vault opens from its doorway, a husk built
 from its menu, linked
 into from a ship in flight, from manny to manny, back to the ship once it landed alone, from your own body, from the vault's menu), `node tools/build-code-view.mjs [outDir]` (the source bundle the copies read; the deploy runs it),
@@ -557,6 +561,43 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   copies a call; migration `0016_day_run.sql` adds the job `mind-day` (every 10 minutes, 8-10 and 20-22 UTC; the
   function lives a day only inside a window) and the `day` kind in `mind_runs`. While days are on, the hourly run
   wakes nobody and only moves the worlds along. The game logs a day's gathering and walks.
+- **Step 3, the universe and spreading** (Steve: "Go ahead with step 3"):
+  - **1,500 real stars** (`tools/build-stars.mjs`: the 123 hand-written ones unchanged, then HYG v4.1 within 75 ly:
+    every named star, then Gliese / HD nearest first; CC BY-SA 4.0, credited in `stars.json` and README; the CSV is
+    cached in `tools/.cache/`, gitignored). White dwarfs (`D`) have a light, a habitable zone and a charge rate.
+    `starById` is a Map; the planet list sorts by precomputed distances.
+  - **Ships run on starlight** (`travel.json power`, `galaxy.ts cellsNow / chargeFor`, `traits.cells`): 100 cells,
+    charging from the star you are parked under by the clock (M 12 an hour .. O/B 60); a trip costs 4 + 1.5 a light
+    year; Ember no longer flies a ship (`fuelBase` / `fuelPerLy` are gone). A ship with no cells saved starts full.
+    The cells charge again under the new star from the landing on.
+  - **The Fusion Still** (`designs.json fusion`, after the Workshop): on boarding, a finished one tops the cells up
+    from the store's hydrogen (8 charge each), never taking it below `keepHydrogen` 6 (`Departure.fuse`).
+  - **Charted routes** (migration `0017_routes.sql`, applied; `src/core/routes.ts`): the first flight between two
+    stars charts it for the galaxy (`chart_route`); a charted route costs a fifth and takes half the time
+    (`travel.json routes`); the map draws them, reloads them every time it opens, and says CHARTED.
+  - **The star map**: a search box (FIND A STAR: any star by name, Enter picks the first, typing never reaches the
+    map) and filters over CLOSEST (ALL, CHARTED, VESSELS, NEW, BRIGHT) in the planet list; faint far stars fade until
+    you zoom in (`FADE`). Rows show CHARGE and CELLS instead of FUEL.
+  - **The copies spread** (the day run): `travel` flies a copy's own ship (its cells, a charted route a fifth) to a
+    star within `day.travelLy` 40; it is `in_transit` with a journey and lands on the next run after arriving
+    (`landCopies`; a world nobody had been to gets its row); `make_vessel` begins a Vessel at its world's Replicator
+    with a Nous Chip (lying on the bed, or carried) and 30 Ember, born WAKE, blank, quick with the Cems; the run that
+    finds it printed makes its row (`bornHere`, every hourly run too). Caps (`mind.json day`): 5 flights and 3 births
+    a day per galaxy, 30 copies. A day's context lists the cells, the stars within reach with their charge, and
+    whether a Vessel can be made. The kit carries each star's class and confirmed planets, the power, the price.
+    No database change beyond 0017: journeys already take a copy.
+  - **A review of the server code** (one reviewer, live schema read-only): nothing that could crash a run or break the
+    tool loop; fixed: the day's caps now count Vessels still printing (a call could otherwise start three more each
+    time), flights and births are reserved before anything is awaited (planets run side by side on one galaxy's caps),
+    a chip finished while nobody played counts (`chipReady`), the homeworld's founded bed prints quickly (and a strain
+    quicker: `cemsOf`, kit `home`), a printed Vessel steps out on any world, copies or not (`finishBirths` at the start
+    of every run, replacing the per-planet step), a copy flying home lands on LHS 1140 b (planet 2), a failed step of
+    a flight undoes the ones before (the cells are paid first), and once flown a copy cannot change the world it left.
+    Left: a player landing mid-run on a world a copy just took a chip from could save the chip back (the away run's
+    old race); a landed copy does not mark its star discovered.
+  - `tools/playtest-universe.mjs` (new): full cells, charging by the clock, the still (and the hydrogen it keeps), a
+    world past the cells dimmed then reachable once charted, a launch spending a fifth, charting, charging from the
+    landing; `playtest-planetmenu` finds TRAPPIST-1 with the search (the closest stars are new ones now).
 - **The function typechecks** with Deno now: `npm i --prefix <scratch>/denobin deno`, copy the three files to a
   scratch folder with `{"nodeModulesDir":"none"}` in a `deno.json`, then `deno check index.ts`.
 - `mind` v25 deployed (the journals), all three files byte for byte with main; `verify_jwt` stays on, as on v24.

@@ -56,6 +56,8 @@ export interface ReplicantSave {
     /** while you drive a manny: where your own body waits aboard the vessel, a world or a flight that goes on
      * without you (star / planet: where the vessel is, or will land) */
     ship?: { star: string; planet: number; journey?: Journey } | null;
+    /** the ship's cells (travel.json power): charge, since when, under which star; missing = full */
+    cells?: { charge: number; at: number; star: string } | null;
     /** Thales, the first Vessel (src/data/homeworld.json): a fixed character with a mind, never handed over or held */
     thales?: boolean;
     /** held asleep by its maker for a new player (wake or hold at the Replicator); it has no mind until handed over */
@@ -287,7 +289,9 @@ export interface Body { head: string; visor: string; torso: string; arms: string
 export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: 'solitary' | 'friendly' | 'clingy'; work: 'builder' | 'wanderer' | 'balanced'; bedtime: 'early' | 'late' | 'even'; risk: 'careful' | 'bold' }
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go' | 'travel' | 'vessel';
+  /** travel (a day of life): the star's id it flew to (`to` holds its name) */
+  star?: string;
   /** gather (a day of life, applied to the store server side): material (the field below) and how much; go: where it went and why */
   n?: number; place?: string; why?: string;
   /** journal: which journal (migration 0015); a private entry comes back without its body */
@@ -341,6 +345,10 @@ export interface GameStore {
   createReplicant(r: Omit<ReplicantSave, 'id'>, id?: string): Promise<ReplicantSave>;
   /** Launch: records the journey and marks the replicant in transit. */
   startJourney(r: ReplicantSave, toStar: string, toPlanet: number, arrivesAt: Date): Promise<Journey>;
+  /** The charted routes of the galaxy (migration 0017), as routeKey strings. */
+  routes(): Promise<string[]>;
+  /** The first flight between two stars charts the route; later flights count. */
+  chartRoute(a: string, b: string, by: string): Promise<void>;
   /** The replicant's current journey, if it is in transit. */
   activeJourney(r: ReplicantSave): Promise<Journey | null>;
   /** Arrival: the replicant is now at the new star, and the family has discovered it. */
@@ -411,6 +419,7 @@ interface LocalDb {
   notes: Note[];
   mail: Letter[];
   requests: Request[];
+  routes?: string[];
 }
 
 export class LocalStore implements GameStore {
@@ -540,6 +549,13 @@ export class LocalStore implements GameStore {
       this.flush();
     }
     return { ...r, traits: { ...r.traits } };
+  }
+
+  async routes() { return [...(this.db.routes ?? [])]; }
+  async chartRoute(a: string, b: string) {
+    const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+    this.db.routes ??= [];
+    if (!this.db.routes.includes(k)) { this.db.routes.push(k); this.flush(); }
   }
 
   async startJourney(r: ReplicantSave, toStar: string, toPlanet: number, arrivesAt: Date) {
@@ -764,6 +780,17 @@ export class CloudStore implements GameStore {
     const { data, error } = await this.sb.from('replicants').insert({ ...r, ...(id ? { id } : {}), galaxy_id: this.galaxyId }).select(REPLICANT_COLS).single();
     if (error) throw error;
     return data as ReplicantSave;
+  }
+
+  async routes() {
+    const { data, error } = await this.sb.from('routes').select('a,b').eq('galaxy_id', this.galaxyId);
+    if (error) throw error;
+    // (the database orders the pair by its own collation; the game's key orders it as JavaScript does)
+    return ((data ?? []) as { a: string; b: string }[]).map((r) => (r.a < r.b ? `${r.a}|${r.b}` : `${r.b}|${r.a}`));
+  }
+  async chartRoute(a: string, b: string, by: string) {
+    const { error } = await this.sb.rpc('chart_route', { p_galaxy: this.galaxyId, p_a: a, p_b: b, p_by: by });
+    if (error) throw error;
   }
 
   async startJourney(r: ReplicantSave, toStar: string, toPlanet: number, arrivesAt: Date) {

@@ -3,7 +3,8 @@ import { sound } from '../../audio/Sound';
 import { PALETTE } from '../../core/data';
 import { inManny, mannyWorlds, shipFlying, worldKey } from '../../core/mannies';
 import { session } from '../../core/session';
-import { TRAVEL, distanceLy, fuelFor, travelMs } from '../../world/galaxy';
+import { POWER, TRAVEL, cellsNow, chargeFor, distanceLy, travelMs } from '../../world/galaxy';
+import { chart, isCharted, loadRoutes } from '../../core/routes';
 import type { StarMapData } from '../StarMapScene';
 import type { PlanetScene } from '../PlanetScene';
 import { DEPTH } from '../PlanetScene';
@@ -38,6 +39,26 @@ export class Departure {
     return this.canLaunch() || !!this.s.visit || this.s.vesselAway || (!this.s.shot && this.linkable().length > 0);
   }
 
+  /** The ship's cells now (travel.json power). */
+  charge() { return cellsNow(session.replicant?.traits.cells); }
+
+  /** A fusion still standing here (designs.json fusion) tops the cells up from the store's hydrogen, keeping a little
+   * for the husks. Returns how much hydrogen it burned. */
+  fuse() {
+    const r = session.replicant;
+    const still = this.s.buildings.designsBuilt().get('fusion');
+    if (!r || !still) return 0;
+    const have = this.charge(), room = POWER.cells - have;
+    const spare = Math.floor((this.s.supplies.hydrogen ?? 0) - POWER.keepHydrogen);
+    const burn = Math.min(spare, Math.ceil(room / POWER.hydrogenCharge));
+    if (room < 1 || burn <= 0) return 0;
+    this.s.supplies.hydrogen -= burn;
+    this.s.markSupplies();
+    r.traits.cells = { charge: Math.min(POWER.cells, have + burn * POWER.hydrogenCharge), at: Date.now(), star: this.s.planet.star };
+    void session.store?.patchTraits(r.id, { cells: r.traits.cells }).catch((e) => console.warn('cells', e));
+    return burn;
+  }
+
   tryBoard(): boolean {
     if (this.s.visit) {
       // hologram visit: the vessel takes you back to your ship in flight
@@ -56,12 +77,14 @@ export class Departure {
     this.s.player.locked = true;
     this.s.player.body.setVelocity(0, 0);
     sound.coreHum();
+    if (!this.s.vesselAway && this.fuse() > 0) sound.collect();
+    void loadRoutes();
     const r = session.replicant;
     const data: StarMapData = {
       mode: this.s.vesselAway ? 'link' : 'launch',
       from: this.s.planet.star,
       fromPlanet: this.s.planet.planetIndex,
-      embers: this.s.embers,
+      charge: this.charge(),
       lit: this.s.litBeacons,
       blocked: !this.canLaunch(),
       ...(this.s.tutorial.active ? {
@@ -91,13 +114,14 @@ export class Departure {
     });
   }
 
-  /** Fuel paid, the replicant hops in, the vessel lifts off, then the flight begins. */
+  /** The cells paid (a charted route costs less), the replicant hops in, the vessel lifts off, then the flight begins. */
   launch(to: string, toPlanet: number) {
     this.s.scene.resume();
     // a word still open in the talk box (Thales' at the beginning) does not fly along
     if (this.s.talker.talk) this.s.talker.closeTalk();
     const ly = distanceLy(this.s.planet.star, to);
-    const fuel = this.s.tutorial.free(to, toPlanet) ? 0 : fuelFor(ly);
+    const from = this.s.planet.star, charted = isCharted(from, to);
+    const cost = this.s.tutorial.free(to, toPlanet) ? 0 : chargeFor(ly, charted);
     this.s.launching = true;
     // driving this world's manny: it steps back into its dock and you board in your own body
     const r = session.replicant;
@@ -111,9 +135,12 @@ export class Departure {
     this.s.trade.loadCulture();
     this.s.trade.loadGoods(to, toPlanet);
     this.s.homecoming.remember();
-    this.s.embers -= fuel;
-    this.s.pending.embers -= fuel;
-    this.s.game.events.emit('embers', this.s.embers);
+    // the cells pay; they charge again under the new star from the landing on, and the route is charted
+    if (r) {
+      r.traits.cells = { charge: Math.max(0, this.charge() - cost), at: Date.now() + travelMs(ly, charted), star: to };
+      void session.store?.patchTraits(r.id, { cells: r.traits.cells }).catch((e) => console.warn('cells', e));
+      if (!this.s.shot) chart(from, to, r.id);
+    }
     void this.s.saver.flushPlanet();
     const pl = this.s.player, v = this.s.vessel;
     pl.locked = true;
@@ -123,11 +150,11 @@ export class Departure {
     this.s.tweens.add({
       targets: hop, t: 1, duration: 360,
       onUpdate: () => { pl.setPosition(sx + (ex - sx) * hop.t, sy + (ey - sy) * hop.t); pl.sprite.y -= Math.sin(hop.t * Math.PI) * 12; },
-      onComplete: () => { pl.hide(); this.liftOff(to, toPlanet, ly); },
+      onComplete: () => { pl.hide(); this.liftOff(to, toPlanet, ly, charted); },
     });
   }
 
-  liftOff(to: string, toPlanet: number, ly: number) {
+  liftOff(to: string, toPlanet: number, ly: number, charted = false) {
     const v = this.s.vessel;
     const thrust = this.s.add.particles(0, 0, 'px', {
       lifespan: { min: 200, max: 500 }, speedY: { min: 60, max: 140 }, speedX: { min: -20, max: 20 },
@@ -143,7 +170,7 @@ export class Departure {
       onUpdate: () => { thrust.setPosition(v.x, v.y - 4); light.x = v.x; light.y = v.y; this.s.cameras.main.centerOn(v.x, Math.max(v.y + 40, this.s.boardSpot.y - 200)); },
     });
     this.s.time.delayedCall(2400, () => this.s.cameras.main.fadeOut(700, 24, 20, 37));
-    const arrivesAt = new Date(Date.now() + travelMs(ly));
+    const arrivesAt = new Date(Date.now() + travelMs(ly, charted));
     const r = session.replicant, st = session.store;
     const journeyP = r && st && !this.s.shot
       ? st.startJourney(r, to, toPlanet, arrivesAt)

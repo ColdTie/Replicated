@@ -1,16 +1,40 @@
-// Builds src/data/stars.json from a catalog of real nearby stars (J2000 right ascension / declination, distance in
-// light years, spectral class) and the confirmed planets known around them.
+// Builds src/data/stars.json: the hand-written catalog of the nearest 123 stars below (with their confirmed planets),
+// then about 1,400 more real stars within 75 light years from the HYG database.
 //
-// Sources (snapshot authored 2026-10-06, values rounded): RECONS nearest-star list and the NASA Exoplanet Archive
-// (planetary systems composite table), IAU Working Group on Star Names for proper names of stars and planets.
-// Planet entries: [letter, kind, orbital period in days, flags]. kind = rock (Earth-size or smaller),
-// super (super-Earth), neptune (ice giant), giant (gas giant). flags: hz = in the star's habitable zone,
-// name = IAU proper name, moon = the moon you land on (giants), biome = fixed world type.
+// The first 123 (CATALOG): J2000 right ascension / declination, distance in light years, spectral class, and the
+// confirmed planets known around them. Sources (snapshot authored 2026-10-06, values rounded): RECONS nearest-star
+// list and the NASA Exoplanet Archive (planetary systems composite table), IAU Working Group on Star Names for proper
+// names of stars and planets. Planet entries: [letter, kind, orbital period in days, flags]. kind = rock (Earth-size
+// or smaller), super (super-Earth), neptune (ice giant), giant (gas giant). flags: hz = in the star's habitable zone,
+// name = IAU proper name, moon = the moon you land on (giants), biome = fixed world type. These keep their ids,
+// names and positions for good (saves, journeys and the beacons point at them).
+//
+// The rest (added 2026-11-14, Steve's yes to HYG): the HYG database v4.1 by David Nash (astronexus), CC BY-SA 4.0,
+// https://github.com/astronexus/HYG-Database (hyg/CURRENT/hygdata_v41.csv: dist and x/y/z in parsecs, heliocentric
+// equatorial, the same axes as the catalog's; converted to light years). The CSV is not committed: it is downloaded
+// once into tools/.cache/ (gitignored), or read from --hyg <path>. Because of it src/data/stars.json is CC BY-SA 4.0.
+// Selection:
+// - rows within 75 ly, not the Sun, with a usable name (an IAU proper name, Bayer / Flamsteed, Gliese / GJ or HD;
+//   rows known only by a HIP number are left out);
+// - one entry per system: rows are taken brightest first, and a row within 0.3 ly of a star already taken, or in the
+//   same direction (under 0.25 degrees) at a distance within 15% of a catalog star, or carrying one of a catalog
+//   star's names, is that star or its companion and is dropped;
+// - every star with a proper or Bayer / Flamsteed name is kept (the bright landmarks), then the Gliese / HD ones
+//   fill up nearest first until the whole file holds TOTAL stars; new stars follow the catalog, ordered by distance;
+// - name: the IAU proper name (accents dropped; Gould numbers such as "96 G. Psc" are not used), else Bayer spelled
+//   out ("ALPHA CEPHEI", "PHI2 CETI"), else Flamsteed ("61 URSAE MAJORIS"), else "GLIESE n" (Gl and GJ alike; a
+//   component letter other than A is kept: "GLIESE 412 B"), else "HD n"; a name already taken gets its component
+//   letter or HD number. id: the name as a lowercase slug, made unique;
+// - cls: HYG's spect with spaces removed; a lowercase letter class ("m", "k-m") becomes its capital, a dwarf prefix
+//   ("dM4e", "sdM3") is dropped, white dwarfs keep their D class ("DA7"); an empty or unreadable one is taken from the
+//   B-V color index (B under 0, A under 0.3, F under 0.58, G under 0.81, K under 1.4, else M), or M without one.
+// New stars have no planets field: the game generates their planets from the id (src/world/system.ts).
 //
 // Positions are heliocentric equatorial x/y/z in light years. Beacons are pinned (four far stars near the
 // vertices of a tetrahedron around the Sun) so the family's long-term goals never move when the catalog grows.
-// Usage: node tools/build-stars.mjs
+// Usage: node tools/build-stars.mjs [--hyg path/to/hygdata_v41.csv]
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -176,8 +200,143 @@ const stars = CATALOG.map(([id, name, [h, m, s], dec, ly, cls, planets]) => {
 });
 for (const b of BEACON_IDS) if (!ids.has(b)) throw new Error(`beacon ${b} is not in the catalog`);
 
+// --- the HYG stars (see the header) ---
+const TOTAL = 1500, MAX_LY = 75, PC = 3.26156;
+const HYG_URL = 'https://raw.githubusercontent.com/astronexus/HYG-Database/main/hyg/CURRENT/hygdata_v41.csv';
+
+const CON = {
+  And: 'ANDROMEDAE', Ant: 'ANTLIAE', Aps: 'APODIS', Aqr: 'AQUARII', Aql: 'AQUILAE', Ara: 'ARAE', Ari: 'ARIETIS',
+  Aur: 'AURIGAE', Boo: 'BOOTIS', Cae: 'CAELI', Cam: 'CAMELOPARDALIS', Cnc: 'CANCRI', CVn: 'CANUM VENATICORUM',
+  CMa: 'CANIS MAJORIS', CMi: 'CANIS MINORIS', Cap: 'CAPRICORNI', Car: 'CARINAE', Cas: 'CASSIOPEIAE', Cen: 'CENTAURI',
+  Cep: 'CEPHEI', Cet: 'CETI', Cha: 'CHAMAELEONTIS', Cir: 'CIRCINI', Col: 'COLUMBAE', Com: 'COMAE BERENICES',
+  CrA: 'CORONAE AUSTRALIS', CrB: 'CORONAE BOREALIS', Crv: 'CORVI', Crt: 'CRATERIS', Cru: 'CRUCIS', Cyg: 'CYGNI',
+  Del: 'DELPHINI', Dor: 'DORADUS', Dra: 'DRACONIS', Equ: 'EQUULEI', Eri: 'ERIDANI', For: 'FORNACIS', Gem: 'GEMINORUM',
+  Gru: 'GRUIS', Her: 'HERCULIS', Hor: 'HOROLOGII', Hya: 'HYDRAE', Hyi: 'HYDRI', Ind: 'INDI', Lac: 'LACERTAE',
+  Leo: 'LEONIS', LMi: 'LEONIS MINORIS', Lep: 'LEPORIS', Lib: 'LIBRAE', Lup: 'LUPI', Lyn: 'LYNCIS', Lyr: 'LYRAE',
+  Men: 'MENSAE', Mic: 'MICROSCOPII', Mon: 'MONOCEROTIS', Mus: 'MUSCAE', Nor: 'NORMAE', Oct: 'OCTANTIS',
+  Oph: 'OPHIUCHI', Ori: 'ORIONIS', Pav: 'PAVONIS', Peg: 'PEGASI', Per: 'PERSEI', Phe: 'PHOENICIS', Pic: 'PICTORIS',
+  Psc: 'PISCIUM', PsA: 'PISCIS AUSTRINI', Pup: 'PUPPIS', Pyx: 'PYXIDIS', Ret: 'RETICULI', Sge: 'SAGITTAE',
+  Sgr: 'SAGITTARII', Sco: 'SCORPII', Scl: 'SCULPTORIS', Sct: 'SCUTI', Ser: 'SERPENTIS', Sex: 'SEXTANTIS', Tau: 'TAURI',
+  Tel: 'TELESCOPII', Tri: 'TRIANGULI', TrA: 'TRIANGULI AUSTRALIS', Tuc: 'TUCANAE', UMa: 'URSAE MAJORIS',
+  UMi: 'URSAE MINORIS', Vel: 'VELORUM', Vir: 'VIRGINIS', Vol: 'VOLANTIS', Vul: 'VULPECULAE',
+};
+const GREEK = {
+  Alp: 'ALPHA', Bet: 'BETA', Gam: 'GAMMA', Del: 'DELTA', Eps: 'EPSILON', Zet: 'ZETA', Eta: 'ETA', The: 'THETA',
+  Iot: 'IOTA', Kap: 'KAPPA', Lam: 'LAMBDA', Mu: 'MU', Nu: 'NU', Xi: 'XI', Omi: 'OMICRON', Pi: 'PI', Rho: 'RHO',
+  Sig: 'SIGMA', Tau: 'TAU', Ups: 'UPSILON', Phi: 'PHI', Chi: 'CHI', Psi: 'PSI', Ome: 'OMEGA',
+};
+
+function hygPath() {
+  const i = process.argv.indexOf('--hyg');
+  if (i > 0 && process.argv[i + 1]) return path.resolve(process.argv[i + 1]);
+  const cached = path.join(root, 'tools/.cache/hygdata_v41.csv');
+  if (!fs.existsSync(cached)) {
+    fs.mkdirSync(path.dirname(cached), { recursive: true });
+    console.log(`downloading ${HYG_URL}`);
+    execFileSync('curl', ['-sSfL', '-o', cached + '.part', HYG_URL], { stdio: 'inherit' });
+    fs.renameSync(cached + '.part', cached);
+  }
+  return cached;
+}
+
+function csvRow(line) {
+  const out = [];
+  let cur = '', q = false;
+  for (const c of line) {
+    if (q) { if (c === '"') q = false; else cur += c; } else if (c === '"') q = true;
+    else if (c === ',') { out.push(cur); cur = ''; } else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+const plain = (t) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+const slug = (t) => t.toLowerCase().replace(/'/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+function bayerName(r) {
+  const con = CON[r.con];
+  if (!con) return null;
+  const m = r.bayer.match(/^([A-Za-z]+)(?:-(\d+))?$/);
+  if (m && GREEK[m[1]]) return `${GREEK[m[1]]}${m[2] ?? ''} ${con}`;
+  if (r.flam) return `${r.flam} ${con}`;
+  return null;
+}
+function glieseName(r) {
+  const m = r.gl.trim().match(/^(?:Gl|GJ|NN|Wo)\s+([\d.]+)\s*([A-Z]*)$/);
+  if (!m) return null;
+  return m[2] && m[2] !== 'A' ? `GLIESE ${m[1]} ${m[2]}` : `GLIESE ${m[1]}`;
+}
+function properName(r) {
+  if (!r.proper || /\bG\.\s/.test(r.proper)) return null;
+  return plain(r.proper);
+}
+function classFor(r) {
+  let c = r.spect.replace(/\s+/g, '');
+  c = c.replace(/^(sd|d)(?=[OBAFGKM])/, '');
+  if (/^[obafgkm]/.test(c)) c = c[0].toUpperCase() + c.slice(1).replace(/^-[a-z]$/, '');
+  if (/^[OBAFGKM]/.test(c) || /^D[ABCOQZXG]/.test(c)) return c;
+  const ci = r.ci === '' ? NaN : +r.ci;
+  if (Number.isNaN(ci)) return 'M';
+  return ci < 0 ? 'B' : ci < 0.3 ? 'A' : ci < 0.58 ? 'F' : ci < 0.81 ? 'G' : ci < 1.4 ? 'K' : 'M';
+}
+
+const lines = fs.readFileSync(hygPath(), 'utf8').split('\n');
+const head = csvRow(lines[0]);
+for (const col of ['proper', 'bf', 'bayer', 'flam', 'con', 'gl', 'hd', 'hip', 'dist', 'x', 'y', 'z', 'spect', 'ci', 'mag']) {
+  if (!head.includes(col)) throw new Error(`HYG has no column ${col}`);
+}
+const rows = [];
+for (const line of lines.slice(1)) {
+  if (!line) continue;
+  const a = csvRow(line), r = Object.fromEntries(head.map((h, i) => [h, a[i] ?? '']));
+  const ly = +r.dist * PC;
+  if (!(ly > 0) || ly > MAX_LY) continue;
+  const names = [properName(r), bayerName(r), glieseName(r), r.hd ? `HD ${r.hd}` : null].filter(Boolean);
+  if (!names.length) continue;
+  const tier = properName(r) || bayerName(r) ? 0 : 1;
+  rows.push({ r, ly, x: +r.x * PC, y: +r.y * PC, z: +r.z * PC, names, tier, mag: r.mag === '' ? 99 : +r.mag });
+}
+
+// the catalog's own names, also as "GLIESE n" for its GJ ones, to know a catalog star when HYG has it
+const known = new Set();
+for (const s of stars) { known.add(s.name); known.add(s.name.replace(/^GJ /, 'GLIESE ')); }
+const near3 = (a, b, d) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2 < d * d;
+const sameSky = (a, s) => {
+  if (!s.ly) return false;
+  const dot = (a.x * s.x + a.y * s.y + a.z * s.z) / (a.ly * Math.hypot(s.x, s.y, s.z));
+  return dot > Math.cos(0.25 * Math.PI / 180) && Math.abs(a.ly - s.ly) < 0.15 * s.ly;
+};
+const kept = [];
+for (const c of [...rows].sort((a, b) => a.mag - b.mag || a.ly - b.ly)) {
+  if (c.names.some((n) => known.has(n))) continue;
+  if (stars.some((s) => near3(c, s, 0.3) || sameSky(c, s))) continue;
+  if (kept.some((k) => near3(c, k, 0.3))) continue;
+  kept.push(c);
+}
+const room = TOTAL - stars.length;
+const landmarks = kept.filter((c) => c.tier === 0);
+const fill = kept.filter((c) => c.tier === 1).sort((a, b) => a.ly - b.ly).slice(0, Math.max(0, room - landmarks.length));
+const chosen = [...landmarks, ...fill].sort((a, b) => a.ly - b.ly);
+
+const names = new Set(stars.map((s) => s.name));
+for (const c of chosen) {
+  let name = c.names.find((n) => !names.has(n));
+  if (!name) {
+    const comp = c.r.gl.trim().match(/([A-Z])$/)?.[1] ?? 'B';
+    name = `${c.names[0]} ${comp}`;
+    for (let k = 2; names.has(name); k++) name = `${c.names[0]} ${k}`;
+  }
+  names.add(name);
+  let id = slug(name);
+  for (let k = 2; ids.has(id); k++) id = `${slug(name)}-${k}`;
+  ids.add(id);
+  stars.push({ id, name, cls: classFor(c.r), ly: r1(c.ly), x: r1(c.x), y: r1(c.y), z: r1(c.z) });
+}
+const farthest = chosen.reduce((m, c) => Math.max(m, c.ly), 0);
+console.log(`HYG: ${rows.length} named rows within ${MAX_LY} ly, ${kept.length} after merging systems and the catalog; added ${chosen.length} (${landmarks.length} named landmarks, ${fill.length} Gliese / HD nearest first, up to ${r1(Math.max(...fill.map((c) => c.ly), 0))} ly; farthest ${r1(farthest)} ly)`);
+
 const out = {
-  _doc: 'Real nearby stars and their confirmed planets (generated by tools/build-stars.mjs; edit the catalog there). x/y/z = heliocentric equatorial position in light years, ly = distance from the Sun, cls = spectral class, beacon = one of four pinned long-term goals. planets = confirmed worlds in orbit order: letter, kind (rock/super/neptune/giant), period (days), hz, name (IAU), moon (what you land on at a giant), biome (fixed world type).',
+  _doc: 'Real nearby stars and their confirmed planets (generated by tools/build-stars.mjs; edit the catalog there). The first 123 are the hand-written catalog (with confirmed planets); the rest, within 75 light years, come from HYG and have no planets field (the game generates their worlds from the id). Star positions and classes beyond the nearest 123 from the HYG database v4.1 by David Nash (astronexus), CC BY-SA 4.0, https://github.com/astronexus/HYG-Database. This data file as a whole is licensed under CC BY-SA 4.0. Where HYG gives no spectral class, cls comes from the B-V color index (M without one). x/y/z = heliocentric equatorial position in light years, ly = distance from the Sun, cls = spectral class, beacon = one of four pinned long-term goals. planets = confirmed worlds in orbit order: letter, kind (rock/super/neptune/giant), period (days), hz, name (IAU), moon (what you land on at a giant), biome (fixed world type).',
   beacons: BEACON_IDS,
   stars,
 };

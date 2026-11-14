@@ -46,7 +46,7 @@ function rngFrom(key: string) {
 /** Habitable-zone orbital periods (days) by spectral class letter: [inner, outer]. Giant stars (III) are wider. */
 function hzPeriod(cls: string): [number, number] {
   const base: Record<string, [number, number]> = {
-    M: [6, 45], K: [40, 200], G: [180, 700], F: [400, 1500], A: [900, 3500], B: [2000, 8000], O: [4000, 15000],
+    D: [0.4, 3], M: [6, 45], K: [40, 200], G: [180, 700], F: [400, 1500], A: [900, 3500], B: [2000, 8000], O: [4000, 15000],
   };
   const [lo, hi] = base[cls[0]] ?? base.G;
   const k = /III/.test(cls) ? 4 : /IV/.test(cls) ? 1.6 : 1;

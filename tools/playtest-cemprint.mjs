@@ -56,7 +56,10 @@ try {
     const s = window.__scene;
     s.warren.__pickTask ??= s.warren.pickTask;
     s.warren.pickTask = () => null;
-    s.npcs.forEach((n) => { n.state = 'idle'; n.chore = null; n.target = null; n.until = 0; n.nextBuild = 0; n.nextSeek = Infinity; n.needs.company = 1; });
+    // (and they start beside the bed: on a slow runner the game's clock, which runs on frame time, made the walk there
+    // outlast the wait; this step checks that they tend it, not how fast they walk)
+    const bw = s.bioworks;
+    s.npcs.forEach((n, i) => { n.state = 'idle'; n.chore = null; n.target = null; n.until = 0; n.nextBuild = 0; n.nextSeek = Infinity; n.needs.company = 1; n.setPosition(bw.center.x - 30 + i * 20, bw.center.y + 34); });
   };
   const t0 = await ev(([id, f]) => { new Function(`return (${f})`)()(); return window.__scene.buildings.list.find((x) => x.id === id).printStart; }, [proposed.id, fresh.toString()]);
   await page.waitForFunction(([id, t]) => window.__scene.buildings.list.find((x) => x.id === id).printStart < t - 1000, [proposed.id, t0], { timeout: 30000 }).catch(() => fail('no copy tended the bed for the print'));
