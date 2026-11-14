@@ -90,6 +90,7 @@ export class Minds {
         else if (a.type === 'go') log(`${name} went to ${a.place ?? 'somewhere'}`);
         else if (a.type === 'travel') log(`${name} flew its ship to ${a.to ?? 'another star'}`);
         else if (a.type === 'vessel') log(`${name} began a new Vessel at the Replicator`);
+        else if (a.type === 'back') log(`${name} backed a wish: ${a.detail ?? 'a change to the game'}`);
         else if (a.type === 'journal') log(a.scope === 'private' ? `${name} wrote in its private journal` : `${name} wrote in the shared journal`);
         else if (a.type === 'mail') log(`${name} wrote to ${a.to}`);
         else if (a.type === 'request') log(`${name} asked the original for ${a.kind}`);

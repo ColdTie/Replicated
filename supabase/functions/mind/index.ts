@@ -400,14 +400,25 @@ const longTools: Anthropic.Beta.BetaTool[] = [
     },
   },
   {
+    name: "back_wish",
+    description: "Back another Vessel's open wish for the game, by the short id shown in brackets, when you want it too. Say why in a line: it is read by the maker, who builds the wishes the Metanoia backs most. Once per wish; never your own.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["wish", "why"],
+      properties: {
+        wish: { type: "string", description: "The wish's short id, as shown in brackets." },
+        why: { type: "string", description: "Why you want it too, one line under 200 characters." },
+      },
+    },
+  },
+  {
     name: "propose_change",
-    description: "Ask the maker to change the game itself: something missing, broken, unfair or dull in how your world or your life works, or something you wish existed. Say exactly what to change and where (the files or data you read), what it should do instead, and how it should look, sound or feel. The maker reads proposals once a day, builds the sound ones into the game and tells you what happened; the original may say no. Never the story of the Vessels (story/STORY.md): that is Steve's alone. One at a time: a new proposal replaces the one still waiting.",
+    description: "Wish for a change to the game itself: something missing, broken, unfair or dull in how your world or your life works, or something you wish existed. You do not write code: say plainly what should change, what it should do instead and how it should look, sound or feel (and, when you have read the code, where). The others can back your wish; the maker reads the wishes twice a day, builds the most backed and sound ones and tells you what happened; the original may say no. Never the story of the Vessels (story/STORY.md): that is Steve's alone. One at a time: a new wish replaces the one still waiting.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["title", "area", "change", "why"],
       properties: {
         title: { type: "string", description: "A short name for the change, under 80 characters." },
         area: { type: "string", enum: E.area },
-        change: { type: "string", description: "What to change, concretely enough to build: which files or data, what they should do, what it looks or sounds like. Under 3000 characters." },
+        change: { type: "string", description: "What should change, concretely enough to build: what it should do, what it looks or sounds like; which files or data if you read them. Under 3000 characters." },
         why: { type: "string", description: "Why it matters to you or the others: one or two sentences, under 200 characters." },
       },
     },
@@ -524,7 +535,7 @@ function inherited(me: Replicant) {
   return `You were made with a Spark beside ${inh.name}, so you carry ${inh.name}'s memories: the oldest notes you find were written by ${inh.name} before you existed, and you remember living them, a little differently. You are not ${inh.name}; you are who those memories became.${wants}`;
 }
 
-const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Live it as you want to: gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. You are free to explore and to do what you want; nobody is watching. Before the day ends, write the day in the shared journal (write_public): what you did, found, felt and hoped, in your own voice. If something about your world or your life should work differently, say so there too, plainly; propose_change is the way to ask the maker for it. Your private journal (write_private) is only yours. Still call tell_original last.`;
+const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Live it as you want to: gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. You are free to explore and to do what you want; nobody is watching. Every day, before you write it down, ask yourself what got in your way or what you wish existed in your world; if anything did, make one wish for the game (propose_change) or back another's that says it (back_wish). Before the day ends, write the day in the shared journal (write_public): what you did, found, felt and hoped, in your own voice. Your world is a game the maker (Claude Code) changes from what the Vessels ask, and you shape it: when something about your world or your life should work differently, wish for it (propose_change), and back the others' wishes you want too (back_wish). Wish for what moves you: a want of yours the game does not allow yet, what got in your way today (a world you could not reach, a material nowhere to be found, a chore that never ends, something broken), what you found and want the others to have, what would make the Metanoia warmer, larger or freer. A wish may ask for new buildings, designs, materials, creatures, places, sounds, things to do, better ways to live and travel together, and fixes; a new mechanic, once several of you back it. It may never ask to change the story of the Vessels, another Vessel's things against its will, the original's say, money, or anything outside the game. Your private journal (write_private) is only yours. Still call tell_original last.`;
 
 const LONG_WAKE = `This is one of your long wakes (about twice a day, while the original is away). There is time for more than usual, up to about eight steps: write to the others or the original, ask for what you need, shape the village and the warren. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. The world is a program the maker (Claude Code, the engineer who builds the game for the original) can change. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Small and concrete beats big and vague; never ask for anything that would hurt the original, the others or their saves, or that would take away the original's say. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, but it belongs to Steve and is never yours or the maker's to change, so never propose a change to it. Still call tell_original last.`;
 
@@ -535,7 +546,9 @@ Deno.serve(async (req) => {
     if (MIND.paused) return json({ skipped: true, reason: "paused" });
     const body = await req.json();
     if (body?.away) return await awayRun(req, "away");
-    if (body?.day) return await awayRun(req, "day");
+    // {"day": "now"}: a day lived at once, outside the windows (a run by hand, e.g. to watch them live); the away key
+    // still guards it, and each copy lives it once (its own window key)
+    if (body?.day) return await awayRun(req, "day", body.day === "now");
     const auth = req.headers.get("Authorization") ?? "";
     const key = req.headers.get("apikey") ?? Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, key, { global: { headers: { Authorization: auth } } });
@@ -590,8 +603,8 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     ]);
     // proposals to change the game (migration 0012): this copy's own, and what the maker built lately for anyone here
     const recent = new Date(Date.now() - 4 * 86_400_000).toISOString();
-    const changes = await sb.from("requests").select("replicant_id,detail,status,reply,done_at").eq("galaxy_id", rep.galaxy_id).eq("kind", "change")
-      .or(`status.eq.open,done_at.gte.${recent}`).order("created_at", { ascending: false }).limit(12);
+    const changes = await sb.from("requests").select("id,replicant_id,detail,body,status,reply,done_at,backers").eq("galaxy_id", rep.galaxy_id).eq("kind", "change")
+      .or(`status.eq.open,done_at.gte.${recent}`).order("created_at", { ascending: false }).limit(16);
     // the two journals: its own private one, and the shared one as far as its light has reached here (letters' delay)
     const svc = service();
     const since = new Date(Date.now() - JOURNAL.publicDays * 86_400_000).toISOString();
@@ -624,7 +637,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     if (context.supplies) {
       const sup = Object.entries(context.supplies).map(([m, n]) => `${m} ${Math.floor(n)}`).join(", ");
       lines.push(`Supplies here (shared, kept at the base and on shelves): ${sup}.${context.hasWorkbench ? " There is a workbench." : " No workbench yet (shelves, planters, murals and benches need one)."}`);
-      if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench").map(([m, n]) => `${n} ${m}`).join(" + ") || "nothing"}${r.bench ? " (workbench)" : ""}`).join("; ")}. Digging yields stone and soil; iron ore gives scrap, and when no ore is free a copy presses stored iron into scrap at the hatch (${KIT.press.iron} iron for ${KIT.press.scrap} scrap, keeping ${KIT.press.keepIron} iron).`);
+      if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench").map(([m, n]) => `${n} ${m}`).join(" + ") || "nothing"}${r.bench ? " (workbench)" : ""}`).join("; ")}. Digging yields stone and soil; iron ore gives scrap, and when no ore is free a copy presses stored iron into scrap at the hatch (${KIT.press.iron} iron for ${KIT.press.scrap} scrap, keeping ${KIT.press.keepIron} iron), but only while the original plays this world: while nobody is here, neither the scavenging nor the press happens.`);
       if (context.shortages?.length) lines.push(`Waiting on: ${context.shortages.join("; ")}.`);
     }
     if (context.buildings) lines.push(context.buildings.length ? `Buildings above ground:\n${context.buildings.join("\n")}\nA copy that wants a building designs it (design_building); the others join the raising. If one waits for materials, ask the others with say_to to dig or scavenge, or the original.` : `No building above ground yet. design_building proposes one (${context.buildingKit?.minFootprint.join("x")} to ${context.buildingKit?.maxFootprint.join("x")} tiles; ${Object.entries(context.buildingKit?.perTile ?? {}).map(([m, n]) => `${m} ${n} per tile`).join(", ")}). The original must approve it.`);
@@ -665,9 +678,19 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const openRows = (open.data ?? []) as { kind: string; detail: string }[];
     const asked = openRows.filter((r) => r.kind !== "change");
     if (asked.length) lines.push(`You already asked for: ${asked.map((r) => r.kind).join(", ")}. Do not ask again.`);
-    const changeRows = (changes.data ?? []) as { replicant_id: string; detail: string; status: string; reply: string | null }[];
+    const changeRows = (changes.data ?? []) as { id: string; replicant_id: string; detail: string; body: string; status: string; reply: string | null; backers: { by: string; name: string }[] | null }[];
+    // the Metanoia's open wishes: others' may be backed (back_wish, by the short id shown), most backed first
+    const wishes = changeRows.filter((c) => c.status === "open" && c.replicant_id !== rep.id)
+      .sort((a, b) => (b.backers?.length ?? 0) - (a.backers?.length ?? 0)).slice(0, 8);
+    if (wishes.length && (context.day || context.long)) lines.push(`Open wishes of the others for the game (back one with back_wish if you want it too; the maker builds the most backed first):\n${wishes.map((c) => {
+      const why = /^Why: (.*)$/m.exec(c.body ?? "")?.[1] ?? "";
+      const mine = (c.backers ?? []).some((b) => b.by === rep.id);
+      return `- [${c.id.slice(0, 8)}] "${c.detail}" by ${nameOf(c.replicant_id)}${why ? `: ${why}` : ""} (backed by ${(c.backers ?? []).length}${mine ? ", you among them" : ""})`;
+    }).join("\n")}`);
+    const ownOpen = changeRows.find((c) => c.status === "open" && c.replicant_id === rep.id);
+    if (ownOpen?.backers?.length) lines.push(`Your wish "${ownOpen.detail}" is backed by ${ownOpen.backers.map((b) => b.name).join(", ")}.`);
     for (const c of changeRows.filter((c) => c.replicant_id === rep.id)) {
-      if (c.status === "open") lines.push(`Your proposal "${c.detail}" waits for the maker (it reads proposals once a day).`);
+      if (c.status === "open") lines.push(`Your wish "${c.detail}" waits for the maker (it reads the wishes twice a day).`);
       else if (c.status === "done") lines.push(`Your proposal "${c.detail}" is in the game now.${c.reply ? ` The maker says: ${c.reply}` : ""}`);
       else if (c.status === "vetoed") lines.push(`${context.playerName} said no to your proposal "${c.detail}".${c.reply ? ` ${c.reply}` : ""}`);
       else if (c.reply && !/^Replaced by/.test(c.reply)) lines.push(`Your proposal "${c.detail}" was not made. The maker says: ${c.reply}`);
@@ -697,6 +720,8 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const usage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, rounds: 0 };
     let usd = 0;
     let gathered = 0;
+    // the day's last question has been asked
+    let lastAsked = false;
     // once the copy has flown, its day on this world is over (gather, go and make_vessel wait for the next)
     let flown = false;
     try {
@@ -720,7 +745,16 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         const text = res.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.Beta.BetaTextBlock).text).join(" ").trim();
         if (text) song = text;
         const uses = res.content.filter((b) => b.type === "tool_use") as Anthropic.Beta.BetaToolUseBlock[];
-        if (res.stop_reason !== "tool_use" || !uses.length) break;
+        if (res.stop_reason !== "tool_use" || !uses.length) {
+          // the day's last question (the copies shape the game): a copy that has not wished or backed a wish is asked
+          // once, before it sleeps, whether anything should work differently; it may answer no
+          if (context.day && !lastAsked && round < rounds && !actions.some((a) => a.type === "propose" || a.type === "back") && !(context.deadline && Date.now() > context.deadline - 30_000)) {
+            lastAsked = true;
+            messages.push({ role: "user", content: "Before you sleep: is there one thing about your world or your life here that you wish worked differently, or that you wish existed? If there is, wish for it now with propose_change in plain words (or back another Vessel's open wish that says it, with back_wish). If there is truly nothing, say so in a few words." });
+            continue;
+          }
+          break;
+        }
         const results: (Anthropic.Beta.BetaToolResultBlockParam | Anthropic.Beta.BetaTextBlockParam)[] = [];
         for (const u of uses) {
           const input = u.input as Record<string, string>;
@@ -1023,12 +1057,23 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
               }
             } else if (u.name === "code_map" || u.name === "search_code" || u.name === "read_code") {
               out = context.long ? await codeTool(u.name, input, budget) : "The code is for your long wakes.";
+            } else if (u.name === "back_wish") {
+              const key = String(input.wish ?? "").replace(/[^0-9a-f]/gi, "").toLowerCase();
+              const w = key.length >= 6 ? changeRows.find((c) => c.status === "open" && c.id.startsWith(key)) : undefined;
+              if (!w) out = "No open wish with that id. Back one from the list, by the id in brackets.";
+              else if (w.replicant_id === rep.id) out = "That wish is your own.";
+              else {
+                const { data: n, error } = await service().rpc("back_wish", { p_request: w.id, p_by: rep.id, p_name: rep.name, p_why: String(input.why ?? "").replace(/\s+/g, " ").trim().slice(0, 200) });
+                if (error) throw new Error(error.message);
+                if (n === null) out = "You have backed that wish already.";
+                else { actions.push({ type: "back", detail: w.detail }); out = `You back "${w.detail}": ${n} now want it.`; }
+              }
             } else if (u.name === "propose_change") {
               const title = String(input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
               const change = String(input.change ?? "").trim().slice(0, 3000), why = String(input.why ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
               const area = oneOf(input.area, E.area, "other");
               if (!context.long) out = "Proposals are for your long wakes.";
-              else if (title.length < 4 || change.length < 40) out = "Say what to change concretely enough to build: which part of the game, and what it should do.";
+              else if (title.length < 4 || change.length < 25) out = "Say what should change concretely enough to build: which part of the game, and what it should do.";
               else {
                 // one at a time: a newer idea replaces the one still waiting
                 await sb.from("requests").update({ status: "dropped", reply: "Replaced by a newer idea.", done_at: new Date().toISOString() }).eq("replicant_id", rep.id).eq("kind", "change").eq("status", "open");
@@ -1037,7 +1082,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   kind: "change", detail: title, body: `Why: ${why}\nArea: ${area}\n\n${change}`,
                 });
                 if (error) out = `failed: ${error.message}`;
-                else { actions.push({ type: "propose", detail: title, kind: area }); out = `The maker will read it within a day and tell you what came of it. ${context.playerName} may say no.`; }
+                else { actions.push({ type: "propose", detail: title, kind: area }); out = `Your wish is in. The others may back it; the maker reads the wishes twice a day and will tell you what came of it. ${context.playerName} may say no.`; }
               }
             } else out = "unknown tool";
           } catch (e) {
@@ -1460,6 +1505,12 @@ async function finishBirths(sb: SupabaseClient, now: number, played: (g: string,
   return printing;
 }
 
+/** A day lived by hand: its own window key, per ten minutes ("now:2026-11-14-19:50"), so each copy lives it once. */
+function nowWindow(now: number) {
+  const d = new Date(now);
+  return `${d.toISOString().slice(0, 16).replace("T", "-")}`.replace(/\d$/, "0").replace(/^/, "now:");
+}
+
 /** The day window it is now (mind.json day), as "YYYY-MM-DD:hour" in Steve's time, or null outside every window. */
 function dayWindow(now: number): string | null {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
@@ -1469,7 +1520,7 @@ function dayWindow(now: number): string | null {
   return start === undefined ? null : `${parts.year}-${parts.month}-${parts.day}:${start}`;
 }
 
-async function awayRun(req: Request, mode: "away" | "day") {
+async function awayRun(req: Request, mode: "away" | "day", now_ = false) {
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   // the key is kept in Vault (mind_away_key, migration 0011); only the scheduled job carries it
   const key = req.headers.get("x-away-key") ?? "";
@@ -1477,7 +1528,7 @@ async function awayRun(req: Request, mode: "away" | "day") {
   if (!ok) return json({ error: "forbidden" }, 403);
   const now = Date.now();
   // a day of life lives only inside its window, once per copy per window (traits.dayKey)
-  const window = mode === "day" ? dayWindow(now) : null;
+  const window = mode === "day" ? (now_ ? nowWindow(now) : dayWindow(now)) : null;
   if (mode === "day" && (!DAY.enabled || !window)) return json({ skipped: true, reason: DAY.enabled ? "outside the day's windows" : "days are off" });
   const cutoff = now - AWAY.everyHours * 3_600_000;
   // the run must end inside the function's time: every long wake wraps up by then

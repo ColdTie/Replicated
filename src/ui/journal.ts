@@ -159,10 +159,11 @@ export function openJournal(v: JournalView) {
       for (const r of changes) {
         const [head, ...rest] = (r.body ?? '').split('\n\n');
         const why = head.match(/^Why: (.*)$/m)?.[1] ?? '';
-        const state = r.status === 'open' ? 'the maker reads it within a day' : r.status === 'done' ? 'in the game' : r.status === 'vetoed' ? 'you said no' : 'not made';
+        const state = r.status === 'open' ? 'the maker reads it within half a day' : r.status === 'done' ? 'in the game' : r.status === 'vetoed' ? 'you said no' : 'not made';
         const cls = r.status === 'open' ? 'ask' : r.status === 'done' ? 'made' : 'done';
         const no = r.status === 'open' && r.id && v.actions ? ` <button type="button" data-nochange="${esc(r.id)}">SAY NO</button>` : '';
-        parts.push(`<p class="${cls}">${esc(r.detail)}${why ? ` - ${esc(why)}` : ''}<small>${esc(state)}, ${ago(r.created_at)}</small>${no}</p>`);
+        const backed = r.backers?.length ? `backed by ${r.backers.map((b) => b.name).join(', ')}, ` : '';
+        parts.push(`<p class="${cls}">${esc(r.detail)}${why ? ` - ${esc(why)}` : ''}<small>${esc(backed)}${esc(state)}, ${ago(r.created_at)}</small>${no}</p>`);
         if (r.reply && r.status !== 'open') parts.push(`<p class="mute">the maker: ${esc(r.reply)}</p>`);
         if (rest.join('').trim()) parts.push(`<details><summary>what it asks for</summary><div>${esc(rest.join('\n\n').trim())}</div></details>`);
       }

@@ -605,6 +605,17 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   while you were away). Already there: new and arriving copies get a tour beat, the star map rings worlds with copies
   and draws their flights, and the minds' talk (`tell_original`) speaks of their day. `playtest-changes` checks the
   shared journal.
+- **Step 5, the copies shape the game** (Steve: "Is everything going in the right direction? If so go ahead"):
+  a copy's wish for the game is still `propose_change` (now worded as a wish, in plain words, no code needed), and the
+  others may back it (`back_wish` by its short id; `requests.backers`, migration `0018_wish_backers.sql`, applied:
+  `back_wish()` appends one backing per copy, never its own, service key only). Every day and long wake lists the
+  others' open wishes, most backed first, and tells a copy who backs its own. The day's prompt gives the motivations
+  (its wants, what got in its way, what it found, the Metanoia's good) and the charter (what a wish may and may not
+  ask for). **The maker now runs twice a day** (the routine "The maker", 3:51 am and 3:51 pm Pacific, an hour after
+  each day window; its prompt updated): it reads the open wishes by backing and the last 14 hours of `journal_public`,
+  writes the instructions to `docs/days/YYYY-MM-DD-am|pm.md`, builds up to three (most backed first; a new mechanic
+  backed by several copies, in parts), and answers once per run in the shared journal as "the maker" (NEEDS.md).
+  The game's journal shows who backs each wish; the game logs a backing.
 - **The function typechecks** with Deno now: `npm i --prefix <scratch>/denobin deno`, copy the three files to a
   scratch folder with `{"nodeModulesDir":"none"}` in a `deno.json`, then `deno check index.ts`.
 - `mind` v25 deployed (the journals), all three files byte for byte with main; `verify_jwt` stays on, as on v24.
