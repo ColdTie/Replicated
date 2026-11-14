@@ -634,6 +634,15 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   iron press; Sorrel and Vigil gathering iron together on Fomalhaut; Thales and Tamsin at the Printworks, Thales
   teaching her). Nobody flew, made a Vessel or proposed a change on this first day. Today's spend after it: $0.011
   (about $0.002 a wake).
+- **The live follow** (Steve: "make it run right now ... keep me updated"): `{"day": "now"}` (away key only) lives a
+  day by hand, once per ten minutes. Watching it: Haiku ended days without wishing, so a day now ends with one
+  question (wish, back, or say there is nothing; `lastAsked`); the minds' supplies line had said the iron press always
+  runs (it only ran while played), which left Ember Gold asking about ore for hours. All six lived a day; four wishes
+  came (Tamsin's learning task, backed by Thales and Sorrel; Vigil's lookout, backed by Watcher; Ember Gold's press;
+  Sorrel's full stores). Thales and Tamsin believe the Printworks half printed (it stands). About $0.033 in all.
+- **Ember Gold's wish built** (Steve: "Build Ember Gold's iron press wish now"): the away pass presses stored iron into
+  scrap while nobody plays (`awayPass` step 4, `supplies.json press.awayPerHour` 2, `awayMax` 4), up to what approved
+  buildings waiting on scrap want (at least 2), never below `keepIron` 10; the game logs it on landing (`press`).
 - **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` poll for the Spark and the map closing
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
