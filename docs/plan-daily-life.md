@@ -162,7 +162,41 @@ wake once the day's money is spent.
   store went up, the tour shows it, the PUBLIC page reads.
 - RLS checked by hand after the migration: a signed-in member reads public rows and no private row.
 
-## Still to talk over
+## The universe: bigger, easier, cheap to fly (decided 2026-11-14)
 
-The universe: more worlds within reach, easier navigation, much cheaper flight, and what powers the ships (see the
-session's chat, 2026-11-14). Step 3's travel waits for it.
+Steve: "make more planets available ... expand the universe and make it much easier to navigate and much much cheaper
+to fly around", and on the suggestions below: "I really like the charted routes. Pick whatever you'd suggest."
+
+**Ships run on light, not Ember.** Ember is only for Vessels again (their price is unchanged), so flying no longer
+competes with making them.
+- Every ship has cells (`travel.json power.cells`, 100). Parked on a world they charge from its star by the clock,
+  also while nobody plays: an M dwarf slowly, a G or F star fast (`power.chargePerHour` by spectral class). This
+  makes where you settle matter, and fits the Cems, who already live on sunlight.
+- **The fusion still** (a new Cem design after the Workshop): burns stored hydrogen (vents are on most worlds) to fill
+  the cells at once (`power.hydrogenCharge`), for when you will not wait.
+- A trip costs charge: `power.base + power.perLy` per light year, full price on an uncharted route.
+
+**Charted routes.** The first flight between two stars charts the route for the whole Metanoia (a `routes` row,
+migration 0016: `galaxy_id`, the two star ids, who charted it, when, how often flown). A charted route costs a fifth of
+the charge and takes half the time (`travel.json routes.costShare`, `routes.timeShare`), and the star map draws it.
+The copies chart the galaxy as they spread, so exploring helps everyone; the beacon lattice and the backlog's wormholes
+grow out of the same network later.
+
+**A bigger universe.** The catalog grows from 123 stars to about 1,500 real stars within about 75 light years
+(`tools/build-stars.mjs` from the HYG database v4, CC BY-SA 4.0: credited in `src/data/stars.json` and the README; the
+star file stays under that licence; Steve's yes, 2026-11-14). Every star already gets its planets from its id
+(`src/world/system.ts`), so every new star brings new worlds. The current 123 keep their ids and positions, the four
+beacons stay pinned, and no save changes.
+
+**Easier to navigate** (the star map):
+- a search box (type a star's name);
+- filters: charted, my Vessels, unexplored, bright stars;
+- "where are my Vessels": every world with a Vessel of yours, one tap to pick it;
+- charted routes drawn as lines; the route you would fly shown before LAUNCH, with its charge and time;
+- faint far stars fade until you zoom in, so 1,500 stars do not clutter the view.
+
+**The copies** may fly anywhere within `day.travelLy`, charted or not (Steve: pick what you suggest); the charge comes
+from their own world's ship cells, so a world with a fusion still and hydrogen sends its copies further.
+
+**Order:** the universe goes in before step 3 (spreading), so the copies fly in the new economy from their first trip:
+1, 2, then the universe, then 3, 4, 5.

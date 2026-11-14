@@ -531,14 +531,16 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
     newer Chromium for every playtest): say when.
 12. CI flakes (maker 2026-11-12): on one commit the test job failed `playtest-cemprint`, then on its re-run
     `playtest-planetmenu` and `playtest-beacon`; each passes locally. Their waits may be too tight for the runner.
-13. A day of life (`docs/plan-daily-life.md`): yes to its two migrations, and its six questions (budget, caps,
-    replacing the long wakes, how far the maker may rewrite the game, travel, the window).
 
 ### Session 29 (2026-11-14): the plan for a day of life; CI flakes
 - **The plan** (`docs/plan-daily-life.md`, Steve: a daily activation where the copies come to life, travel, gather,
   make Vessels, keep a public journal and a private one only they read, and the maker then rewrites the game from the
   public one). Five steps: the two journals (migration 0015), the day run, spreading (travel and births, migration
-  0016), the game showing the day, the maker reading it. Nothing built; six questions for Steve in the plan.
+  0016), the game showing the day, the maker reading it. Steve said yes to all of it, twice a day; the copies'
+  public entries carry wishes for the game that others back, and the maker builds the most backed (the charter in the
+  plan). The universe (Steve: "pick whatever you'd suggest"): ships charge on starlight with a fusion still for
+  hydrogen, Ember only for Vessels; charted routes a fifth the cost and half the time; about 1,500 real stars (HYG,
+  CC BY-SA 4.0); a searchable, filtered star map. Nothing built yet.
 - **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` now poll for the Spark and the map
   closing instead of fixed sleeps that a slow runner outran. `playtest-cemprint` (no copy reached the bed in 45 s on
   the runner) is not fixed yet: a warren chore (the new iron press?) or a lonely copy's seek may come first.
