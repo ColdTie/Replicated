@@ -51,7 +51,8 @@ export class Homecoming {
     const s = this.s, out: Beat[] = [];
     for (const n of s.npcs) {
       const was = old.copies[n.data.id];
-      if (n.below || n.blank) continue;
+      // (a blank copy is shown only when it is new here: born, or landed, while you were away)
+      if (n.below || (n.blank && old.copies[n.data.id])) continue;
       if (!was || was !== `${n.data.name}|${n.data.traits.body ? 'b' : ''}`) out.push({ x: n.x, y: n.y - 8, by: n });
     }
     for (const b of s.buildings.list) {

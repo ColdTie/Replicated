@@ -598,9 +598,24 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   - `tools/playtest-universe.mjs` (new): full cells, charging by the clock, the still (and the hydrogen it keeps), a
     world past the cells dimmed then reachable once charted, a launch spending a fifth, charting, charging from the
     landing; `playtest-planetmenu` finds TRAPPIST-1 with the search (the closest stars are new ones now).
+- **Step 4, the game shows the day** (Steve: "Go ahead with step 4"): the journal (Tab) opens with THE SHARED
+  JOURNAL, the Metanoia's public entries newest first (who, on which world, when; four open, the rest folded),
+  `GameStore.sharedJournal` (the cloud reads `journal_public`, the device its canned entries: the canned mind writes
+  one about three wakes in ten). The homecoming tour now also shows a blank copy that is new here (born, or landed,
+  while you were away). Already there: new and arriving copies get a tour beat, the star map rings worlds with copies
+  and draws their flights, and the minds' talk (`tell_original`) speaks of their day. `playtest-changes` checks the
+  shared journal.
 - **The function typechecks** with Deno now: `npm i --prefix <scratch>/denobin deno`, copy the three files to a
   scratch folder with `{"nodeModulesDir":"none"}` in a `deno.json`, then `deno check index.ts`.
 - `mind` v25 deployed (the journals), all three files byte for byte with main; `verify_jwt` stays on, as on v24.
+- **`mind` v27 deployed** (step 3) with the Supabase CLI: the function is now about 235 KB (the kit carries 1,500
+  stars), too large for the connector's deploy, which takes every file in one call. Steve saved a Supabase access
+  token as a network secret for `api.supabase.com` on the ClaudeAPI environment (the proxy injects it): deploy with
+  `SUPABASE_ACCESS_TOKEN=sbp_<40 zeros> npx --yes supabase@2 functions deploy mind --project-ref vgoijybibhopfichyirj
+  --use-api` (a placeholder token: the proxy replaces it; verify_jwt stays on, no `--no-verify-jwt`), and check it by
+  `functions download` into a scratch folder (never into the repo) and comparing md5 sums: all three files byte for
+  byte with main. A day call outside the windows answered `skipped`. The token can be revoked on supabase.com once it
+  is no longer wanted; the maker then needs another way to deploy.
 - **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` poll for the Spark and the map closing
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
