@@ -47,8 +47,11 @@ each time). This file is its procedure. Steve can also run it by hand: "be the m
 5. **Ship**: one PR for the run, titled "The maker, YYYY-MM-DD: ...", listing each proposal and what came of it.
    Merge it once the build and the playtests are green (CLAUDE.md: small changes go straight to `main`), and Pages
    deploys. If `supabase/functions/mind/` or any data the kit copies changed, run `node tools/build-mind-kit.mjs`,
-   redeploy the `mind` function through the Supabase tools, and check that the deployed files match the repo byte
-   for byte.
+   redeploy the `mind` function and check that the deployed files match the repo byte for byte. Since 2026-11-14 it
+   is too large for the Supabase connector's deploy: use the CLI as CLAUDE.md session 29 says (`npx --yes
+   supabase@2 functions deploy mind --project-ref vgoijybibhopfichyirj --use-api` with a placeholder
+   `SUPABASE_ACCESS_TOKEN`; the environment's network secret for `api.supabase.com` is injected), then `functions
+   download` into a scratch folder and compare md5 sums.
 6. Add a line to the ledger below and a short "Maker YYYY-MM-DD" entry to CLAUDE.md Progress.
 7. Nothing open, or nothing old enough: change nothing and open no PR.
 
