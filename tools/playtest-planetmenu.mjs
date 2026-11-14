@@ -111,7 +111,9 @@ try {
     if (first.picked !== lit.row) fail(`Enter on a row did not pick its planet (${first.picked}, the row is ${lit.row})`);
     await page.keyboard.down('Enter'); await page.keyboard.down('Space');
     await page.keyboard.up('Enter'); await page.keyboard.up('Space');
-    await page.waitForTimeout(600);
+    // the map stops a frame after the launch: wait for that, then a little longer for a second launch to show
+    await page.waitForFunction(() => window.__launched.length > 0 && !window.__game.scene.isActive('starmap'), null, { timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(400);
     const second = await ev(() => ({ launched: window.__launched, open: window.__game.scene.isActive('starmap') }));
     log('Enter and Space', JSON.stringify(second));
     if (second.launched.length !== 1 || second.launched[0] !== lit.row || second.open) fail(`the keys did not launch once to the row's world (${JSON.stringify(second.launched)})`);
@@ -132,7 +134,8 @@ try {
   log('husk world', JSON.stringify(husk));
   if (husk.launch !== 0.35 || !husk.link) fail('the check needs a dimmed LAUNCH beside a lit LINK');
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => window.__linked.length > 0 && !window.__game.scene.isActive('starmap'), null, { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(400);
   const linked = await ev(() => ({ launched: window.__launched, linked: window.__linked, open: window.__game.scene.isActive('starmap') }));
   log('Enter with LAUNCH dimmed', JSON.stringify(linked));
   if (linked.launched.length || linked.linked.length !== 1 || linked.linked[0] !== husk.world || linked.open) fail(`Enter did not take the lit LINK past a dimmed LAUNCH (${JSON.stringify(linked)})`);

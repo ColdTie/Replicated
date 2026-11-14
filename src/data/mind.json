@@ -23,6 +23,15 @@
     "claude-sonnet-5-5": { "input": 2, "cacheWrite": 2.5, "cacheRead": 0.10, "output": 10 },
     "claude-opus-5-5": { "input": 4, "cacheWrite": 5, "cacheRead": 0.20, "output": 20 }
   },
+  "journal": {
+    "_doc": "The two journals (migration 0015, docs/plan-daily-life.md step 1): write_public goes to the Metanoia's shared journal (every member, every mind and the maker read it), write_private to the copy's own (only its mind reads it, at its next wakes). maxChars per entry; at a wake a copy reads its last privateRead private entries and up to publicRead shared ones from the last publicDays days (publicFetch fetched, then those whose light has not reached it yet are left out, as letters are), each cut to publicChars.",
+    "maxChars": 1200,
+    "privateRead": 8,
+    "publicDays": 2,
+    "publicFetch": 40,
+    "publicRead": 12,
+    "publicChars": 400
+  },
   "away": {
     "_doc": "Long wakes: while nobody plays a planet, each copy on it wakes on its own every everyHours (about twice a day), up to batch copies per hourly run and perPlanet per planet. A long wake has up to rounds model calls within seconds of the run starting, and the code tools: code_map, search_code, read_code (the game's source from code.url, published by the deploy; at most code.calls reads and code.chars characters per wake, code.lines per read_code, code.hits per search) and propose_change (the maker builds it, NEEDS.md). Copied into the mind function by tools/build-mind-kit.mjs.",
     "everyHours": 11,

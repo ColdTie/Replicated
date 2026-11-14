@@ -26,12 +26,19 @@ const MAX_ROUNDS = 3;              // tool rounds per wake
 const BECOMING_ROUNDS = 6;         // the first wake of a blank copy has more to do
 // long wakes (a scheduled call with x-away-key, no player signed in): src/data/mind.json away, through the kit
 const AWAY = KIT.away;
+/** The two journals (migration 0015, mind.json journal). */
+const JOURNAL = KIT.journal as { maxChars: number; privateRead: number; publicDays: number; publicFetch: number; publicRead: number; publicChars: number };
 const PLAYING_MINUTES = 15;        // a planet whose original moved this recently is being played: leave it to the game
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+/** The journal (migration 0015) is written and its private side read only with the service key: no login may. */
+const service = () => createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+/** Steve's day (America/Los_Angeles), as the journal's day column keeps it. */
+const journalDay = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
@@ -118,6 +125,22 @@ const tools: Anthropic.Beta.BetaTool[] = [
     input_schema: {
       type: "object", additionalProperties: false, required: ["note"],
       properties: { note: { type: "string", description: "One or two whole sentences, first person, under 200 characters." } },
+    },
+  },
+  {
+    name: "write_public",
+    description: "Write in the Metanoia's shared journal: every Vessel, the players and the maker read it. What you did, found, thought or hoped today, in your own voice, as a journal entry (whole sentences, not lists). Others on far worlds read it when its light reaches them.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["text"],
+      properties: { text: { type: "string", description: "A journal entry, first person, under 1200 characters." } },
+    },
+  },
+  {
+    name: "write_private",
+    description: "Write in your private journal. Only you will ever read it, at your next wakes: nobody else, not the players, not the other Vessels, not the maker. For what you would not say to anyone, and what you want to remember about yourself.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["text"],
+      properties: { text: { type: "string", description: "First person, under 1200 characters." } },
     },
   },
   {
@@ -473,6 +496,14 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const recent = new Date(Date.now() - 4 * 86_400_000).toISOString();
     const changes = await sb.from("requests").select("replicant_id,detail,status,reply,done_at").eq("galaxy_id", rep.galaxy_id).eq("kind", "change")
       .or(`status.eq.open,done_at.gte.${recent}`).order("created_at", { ascending: false }).limit(12);
+    // the two journals: its own private one, and the shared one as far as its light has reached here (letters' delay)
+    const svc = service();
+    const since = new Date(Date.now() - JOURNAL.publicDays * 86_400_000).toISOString();
+    const [mineJ, sharedJ] = await Promise.all([
+      svc.from("journal").select("body,created_at").eq("replicant_id", rep.id).eq("scope", "private").order("created_at", { ascending: false }).limit(JOURNAL.privateRead),
+      svc.from("journal").select("replicant_id,author,star_id,planet_index,body,created_at").eq("galaxy_id", rep.galaxy_id).eq("scope", "public")
+        .gte("created_at", since).order("created_at", { ascending: false }).limit(JOURNAL.publicFetch),
+    ]);
     const everyone = (others.data ?? []) as { id: string; name: string; star_id: string; planet_index: number; status: string; profile_id: string | null; generation: number }[];
     const byName = new Map(everyone.map((r) => [r.name.toLowerCase(), r]));
     const nameOf = (id: string | null) => everyone.find((r) => r.id === id)?.name ?? "someone";
@@ -512,6 +543,15 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     }
     const noteRows = (notes.data ?? []) as { body: string; created_at: string }[];
     lines.push(noteRows.length ? `Your notes (newest first):\n${noteRows.map((n) => `- ${n.body}`).join("\n")}` : "You have no notes yet.");
+    const privRows = (mineJ.data ?? []) as { body: string; created_at: string }[];
+    if (privRows.length) lines.push(`Your private journal (only you read it; newest first):\n${privRows.map((n) => `- ${n.body}`).join("\n")}`);
+    const heard = ((sharedJ.data ?? []) as { replicant_id: string | null; author: string; star_id: string | null; planet_index: number | null; body: string; created_at: string }[])
+      .filter((j) => j.replicant_id !== rep.id && Date.parse(j.created_at) + Math.max(0, Number(j.replicant_id ? context.delays?.[j.replicant_id] ?? 0 : 0)) * 1000 <= Date.now())
+      .slice(0, JOURNAL.publicRead);
+    lines.push(heard.length
+      ? `The shared journal (newest first, as far as its light has reached you):\n${heard.map((j) => `- ${j.replicant_id ? nameOf(j.replicant_id) : j.author || "someone"}${j.star_id ? ` (${j.star_id}, planet ${j.planet_index})` : ""}: ${j.body.replace(/\s+/g, " ").slice(0, JOURNAL.publicChars)}`).join("\n")}`
+      : "Nothing new in the shared journal.");
+    if (context.long) lines.push("Before you sleep again, write one entry in the shared journal (write_public) about this stretch of your life; your private journal is there for anything that is only yours.");
     const mailRows = (mail.data ?? []) as { id: string; from_replicant: string | null; body: string; sent_at: string; arrives_at: string }[];
     lines.push(mailRows.length ? `New letters:\n${mailRows.map((m) => `- from ${nameOf(m.from_replicant)}: ${m.body}`).join("\n")}` : "No new letters.");
     const openRows = (open.data ?? []) as { kind: string; detail: string }[];
@@ -579,6 +619,19 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
               const body = String(input.note ?? "").slice(0, 400);
               await sb.from("notes").insert({ galaxy_id: rep.galaxy_id, replicant_id: rep.id, body });
               actions.push({ type: "note", body });
+            } else if (u.name === "write_public" || u.name === "write_private") {
+              const body = String(input.text ?? "").trim().slice(0, JOURNAL.maxChars);
+              const scope = u.name === "write_public" ? "public" : "private";
+              if (!body) out = "Nothing written: the entry was empty.";
+              else {
+                const { error } = await service().from("journal").insert({
+                  galaxy_id: rep.galaxy_id, replicant_id: rep.id, author: rep.name, scope, star_id: rep.star_id, planet_index: rep.planet_index, body, day: journalDay(),
+                });
+                if (error) throw new Error(error.message);
+                // the game is told a private entry was written, never what it says
+                actions.push(scope === "public" ? { type: "journal", scope, body } : { type: "journal", scope });
+                out = scope === "public" ? "Written in the shared journal." : "Written in your private journal.";
+              }
             } else if (u.name === "say_to") {
               const to = byName.get(String(input.to ?? "").toLowerCase());
               if (!to) out = `No Vessel named ${input.to}. You can write to: ${everyone.map((r) => r.name).join(", ")}.`;

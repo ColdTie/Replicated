@@ -50,11 +50,19 @@ try {
 
   // 3. the copies tend the bed: they go to its rim and every stroke brings the print nearer
   // (every copy starts afresh: a chore it was walking to before the Cems took over is dropped)
-  const fresh = () => window.__scene.npcs.forEach((n) => { n.state = 'idle'; n.chore = null; n.target = null; n.until = 0; n.nextBuild = 0; });
+  // (and the warren's chores and a lonely copy's seek wait meanwhile: on a slow runner they came first and no copy
+  // reached the bed in 45 s; this step checks the tending, not which chore a copy picks first)
+  const fresh = () => {
+    const s = window.__scene;
+    s.warren.__pickTask ??= s.warren.pickTask;
+    s.warren.pickTask = () => null;
+    s.npcs.forEach((n) => { n.state = 'idle'; n.chore = null; n.target = null; n.until = 0; n.nextBuild = 0; n.nextSeek = Infinity; n.needs.company = 1; });
+  };
   const t0 = await ev(([id, f]) => { new Function(`return (${f})`)()(); return window.__scene.buildings.list.find((x) => x.id === id).printStart; }, [proposed.id, fresh.toString()]);
   await page.waitForFunction(([id, t]) => window.__scene.buildings.list.find((x) => x.id === id).printStart < t - 1000, [proposed.id, t0], { timeout: 30000 }).catch(() => fail('no copy tended the bed for the print'));
   // the one tending kneels at the bed's rim
   const tending = await page.waitForFunction(() => { const s = window.__scene, bw = s.bioworks; return s.npcs.some((n) => n.state === 'chore' && Math.hypot(n.x - bw.center.x, n.y - bw.center.y) < 70) && s.npcs.map((n) => `${n.state}:${Math.round(Math.hypot(n.x - bw.center.x, n.y - bw.center.y))}`); }, null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => null);
+  await ev(() => { const s = window.__scene; if (s.warren.__pickTask) s.warren.pickTask = s.warren.__pickTask; s.npcs.forEach((n) => { n.nextSeek = 0; }); });
   log('copies by the bed', JSON.stringify(tending));
   if (!tending) fail('no copy tends at the bed');
   await ev(() => { const s = window.__scene, bw = s.bioworks; s.player.setPosition(bw.center.x - 50, bw.center.y + 50); });

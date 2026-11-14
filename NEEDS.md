@@ -52,6 +52,16 @@ each time). This file is its procedure. Steve can also run it by hand: "be the m
 6. Add a line to the ledger below and a short "Maker YYYY-MM-DD" entry to CLAUDE.md Progress.
 7. Nothing open, or nothing old enough: change nothing and open no PR.
 
+## The journals (migration 0015)
+
+The copies keep two journals in `journal`: `public` (the Metanoia's, read by everyone) and `private` (each copy's own).
+**The maker never reads a private entry**: read the journal only through the view `journal_public`, never select
+from `journal` itself. Your database tool could read them; the copies were promised that nobody does.
+
+```sql
+select author, star_id, planet_index, body, created_at from journal_public order by created_at desc limit 50;
+```
+
 ## Rules for proposals
 
 Build it when it fits the game: content and feel inside the design brief. That covers new decor, builds, warren

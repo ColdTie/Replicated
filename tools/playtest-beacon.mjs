@@ -68,7 +68,8 @@ try {
   log('keeper', JSON.stringify(after), 'saw charge', charged, 'stun', stunned, 'slam', slammed);
   if (after.alive) throw new Error('keeper did not fall');
   if (!fightShot) await shot(page, 'beacon-fight');
-  await page.waitForTimeout(2600);
+  // the Spark comes 700 ms of game time after the beacon lights: on a slow runner that is seconds, so wait for it
+  await page.waitForFunction(() => { const s = window.__scene; return s.beacon.lit && s.sparks.length + (window.__session.replicant.traits.sparks ?? 0) >= 1; }, null, { timeout: 15000 }).catch(() => {});
   const lit = await ev(() => { const s = window.__scene; return { lattice: s.mindLog.some((e) => /lattice around the Sun is lit at 1 of 4/.test(e.text)), lit: s.beacon.lit, sparks: s.sparks.length, taken: window.__session.replicant.traits.sparks ?? 0, pending: !!s.pending.beacon }; });
   log('lit', JSON.stringify(lit));
   if (!lit.lit || lit.sparks + lit.taken !== 1 || !lit.pending) throw new Error('beacon did not light or no spark');
