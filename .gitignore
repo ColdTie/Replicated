@@ -6,3 +6,4 @@ public/assets/gen
 dist-sim
 dist-test
 tools/.cache
+supabase/.temp
