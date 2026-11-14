@@ -43,7 +43,7 @@
   },
   "scrapPerOre": 2,
   "scrapCooldownMinutes": 30,
-  "press": { "iron": 2, "scrap": 1, "keepIron": 10, "swings": 5 },
+  "press": { "iron": 2, "scrap": 1, "keepIron": 10, "swings": 5, "awayPerHour": 2, "awayMax": 4 },
   "recipes": {
     "rest": {
       "stone": 2

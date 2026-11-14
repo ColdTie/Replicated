@@ -76,6 +76,7 @@ export class Minds {
           // the away wake put it on the saved warren itself (it loaded with the planet): only say so
           if (a.failed) continue;
           if (a.type === 'dig') log(`${name} marked out ${a.name ?? 'a room'} in the warren`);
+          else if (a.type === 'press') log(`${name} pressed ${a.iron ?? 'some'} iron into ${a.scrap ?? 'some'} scrap at the hatch`);
           else if (a.type === 'furnish') log(a.item === 'rest' ? `${name} made a resting station${a.forId && a.forId !== npc.data.id ? ` for ${this.s.npcs.find((n) => n.data.id === a.forId)?.data.name ?? 'someone'}` : ''} in ${a.room ?? 'the warren'}` : `${name} put a ${a.item ?? 'thing'} in ${a.room ?? 'the warren'}`);
         }
         else if (a.type === 'dig') this.s.warren.dig(npc, a);

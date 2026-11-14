@@ -637,7 +637,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     if (context.supplies) {
       const sup = Object.entries(context.supplies).map(([m, n]) => `${m} ${Math.floor(n)}`).join(", ");
       lines.push(`Supplies here (shared, kept at the base and on shelves): ${sup}.${context.hasWorkbench ? " There is a workbench." : " No workbench yet (shelves, planters, murals and benches need one)."}`);
-      if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench").map(([m, n]) => `${n} ${m}`).join(" + ") || "nothing"}${r.bench ? " (workbench)" : ""}`).join("; ")}. Digging yields stone and soil; iron ore gives scrap, and when no ore is free a copy presses stored iron into scrap at the hatch (${KIT.press.iron} iron for ${KIT.press.scrap} scrap, keeping ${KIT.press.keepIron} iron), but only while the original plays this world: while nobody is here, neither the scavenging nor the press happens.`);
+      if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench").map(([m, n]) => `${n} ${m}`).join(" + ") || "nothing"}${r.bench ? " (workbench)" : ""}`).join("; ")}. Digging yields stone and soil; iron ore gives scrap, and when no ore is free a copy presses stored iron into scrap at the hatch (${KIT.press.iron} iron for ${KIT.press.scrap} scrap, keeping ${KIT.press.keepIron} iron), also while nobody plays (about ${KIT.press.awayPerHour} an hour, when the store has less scrap than the approved buildings and the furnishings want); scavenging ore only happens while the original plays this world.`);
       if (context.shortages?.length) lines.push(`Waiting on: ${context.shortages.join("; ")}.`);
     }
     if (context.buildings) lines.push(context.buildings.length ? `Buildings above ground:\n${context.buildings.join("\n")}\nA copy that wants a building designs it (design_building); the others join the raising. If one waits for materials, ask the others with say_to to dig or scavenge, or the original.` : `No building above ground yet. design_building proposes one (${context.buildingKit?.minFootprint.join("x")} to ${context.buildingKit?.maxFootprint.join("x")} tiles; ${Object.entries(context.buildingKit?.perTile ?? {}).map(([m, n]) => `${m} ${n} per tile`).join(", ")}). The original must approve it.`);
@@ -1432,6 +1432,24 @@ export function awayPass(p: AwayPlanet, now: number) {
       queueItem(c.id, { type: "furnish", applied: true, item: "rest", room: room.name, forId: c.id });
       break;
     }
+  }
+  // 4. the press (Ember Gold's wish, 2026-11-14): with nobody here a copy still presses stored iron into scrap beside
+  //    the hatch, as the game does while it is played: up to what the approved buildings waiting on scrap want (at
+  //    least two, for a lamp and a workbench), never below the iron the designs and husks need
+  const P = KIT.press;
+  const waiting = ((p.data.buildings ?? []) as Bld[]).filter((b) => !b.vetoed && !b.built && b.approved && !b.paid && (b.cost?.scrap ?? 0) > 0);
+  const want = Math.min(capOf(p), Math.max(2, ...waiting.map((b) => b.cost.scrap ?? 0)));
+  const presses = hours >= 0.25 ? Math.min(P.awayMax, Math.max(1, Math.floor(hours * P.awayPerHour))) : 0;
+  let pressed = 0;
+  while (pressed < presses && (p.supplies.scrap ?? 0) < want && (p.supplies.iron ?? 0) - P.iron >= P.keepIron && (p.supplies.scrap ?? 0) + P.scrap <= capOf(p)) {
+    pay(p, { iron: P.iron });
+    addSupply(p, "scrap", P.scrap);
+    pressed++;
+  }
+  if (pressed) {
+    const by = [...p.copies].sort((a, b) => a.name.localeCompare(b.name))[Math.floor(now / 3_600_000) % p.copies.length];
+    p.events.push(`${by.name} pressed ${pressed * P.iron} iron from the store into ${pressed * P.scrap} scrap at the hatch`);
+    queueItem(by.id, { type: "press", applied: true, iron: pressed * P.iron, scrap: pressed * P.scrap });
   }
 }
 

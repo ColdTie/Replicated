@@ -147,6 +147,10 @@ The copies choose their names themselves, and the change applies on the spot.
   stored iron into 1 scrap beside the hatch, never below 10 iron (`supplies.json press`, `Warren.press`); the minds'
   supplies line says so. PR #79 (CI flaked twice on tests it does not touch, then
   green); `mind` function v24 deployed, checked byte for byte.
+- 2026-11-14: Ember Gold's "Let the iron press run while the world is quiet" (built at Steve's word, the first wish
+  of the days of life): the away pass presses stored iron into scrap while nobody plays, up to what approved buildings
+  waiting on scrap want (at least 2), never below 10 iron, `supplies.json press.awayPerHour` 2 a banked hour, at most
+  `awayMax` 4 a pass; the game logs it on landing.
 
 ## Waiting for Steve
 
