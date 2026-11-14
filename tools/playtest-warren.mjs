@@ -66,7 +66,8 @@ try {
     const n = s.npcs[1];
     const acts = [];
     // the fake copies are not in the local store; the canned mind runs against the real replicant row instead
-    for (let i = 0; i < 8; i++) { const r = await window.__session.store.mindTick(window.__session.replicant.id, s.mindContext(n)); acts.push(...(r?.actions ?? []).map((a) => a.type)); }
+    // (it digs or furnishes by chance, about two wakes in five: up to 30 wakes, stopping at the first; 8 failed one run in 75)
+    for (let i = 0; i < 30 && !acts.includes('dig') && !acts.includes('furnish'); i++) { const r = await window.__session.store.mindTick(window.__session.replicant.id, s.mindContext(n)); acts.push(...(r?.actions ?? []).map((a) => a.type)); }
     const ctx = s.mindContext(n);
     return { acts, warren: ctx.warren, rooms: ctx.warrenRooms, hasRest: ctx.hasRest, around: ctx.around, weariness: ctx.weariness };
   });
