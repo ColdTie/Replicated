@@ -315,6 +315,8 @@ export interface MindAction {
 /** reason 'budget': the day's budget for the minds is spent (mind.json budget); nobody wakes until tomorrow. */
 export interface MindResult { skipped?: boolean; reason?: string; song?: string; actions?: MindAction[]; received?: { from: string; body: string }[]; error?: string }
 export interface Note { replicant_id: string; body: string; created_at: string }
+/** An entry of the Metanoia's shared journal (migration 0015, journal_public): who wrote it, where, when. */
+export interface SharedEntry { replicant_id: string | null; author: string; star_id: string | null; planet_index: number | null; body: string; created_at: string }
 export interface Letter { id: string; from_replicant: string | null; to_replicant: string | null; body: string; sent_at: string; arrives_at: string; read_at?: string | null }
 /** A copy's ask. kind 'change' is a proposal to change the game (migration 0012): detail its title, body "Why: ...",
  * "Area: ..." and the change itself; the maker answers in reply; 'vetoed' is the original's no. */
@@ -330,6 +332,8 @@ export interface GameStore {
   mindTick(replicantId: string, ctx: MindContext): Promise<MindResult | null>;
   /** The notes, letters and requests of these replicants, newest first. */
   journal(ids: string[]): Promise<Journal>;
+  /** The shared journal, newest first (the copies' public entries and the maker's answers). */
+  sharedJournal(limit: number): Promise<SharedEntry[]>;
   listProfiles(): Promise<Profile[]>;
   createProfile(p: Omit<Profile, 'id'>): Promise<Profile>;
   /** The profile's active replicant, created on first play. */
@@ -420,6 +424,8 @@ interface LocalDb {
   mail: Letter[];
   requests: Request[];
   routes?: string[];
+  /** the canned mind's shared journal entries (?local) */
+  entries?: SharedEntry[];
 }
 
 export class LocalStore implements GameStore {
@@ -505,6 +511,13 @@ export class LocalStore implements GameStore {
       const item = !ctx.hasRest ? 'rest' : pick(['lamp', 'bench', 'shelf', 'workbench', 'planter', 'mural', 'crate', 'rest']);
       actions.push({ type: 'furnish', room: pick(rooms.slice(1)), item, forId: item === 'rest' ? me.id : undefined, placement: pick(['', 'wall', 'corner', 'center']), color: pick(['', 'cyan', 'gold', 'moss', 'plum']) });
     }
+    // now and then a line in the shared journal (the canned mind's day, as the real minds write theirs)
+    if (Math.random() < 0.3) {
+      const body = pick(MIND.canned.notes);
+      (this.db.entries ??= []).unshift({ replicant_id: me.id, author: me.name, star_id: me.star_id, planet_index: me.planet_index, body, created_at: new Date(now).toISOString() });
+      this.db.entries = this.db.entries.slice(0, 60);
+      actions.push({ type: 'journal', scope: 'public', body });
+    }
     tell(pick(MIND.canned.tells));
     const received = this.db.mail.filter((m) => m.to_replicant === me.id && !m.read_at && Date.parse(m.arrives_at) <= now);
     for (const m of received) m.read_at = new Date(now).toISOString();
@@ -517,6 +530,8 @@ export class LocalStore implements GameStore {
     this.db.mail.unshift({ id: uuid(), from_replicant: from.id, to_replicant: toId, body: body.slice(0, 500), sent_at: new Date().toISOString(), arrives_at: new Date().toISOString(), read_at: null });
     this.flush();
   }
+
+  async sharedJournal(limit: number) { return (this.db.entries ?? []).slice(0, limit); }
 
   async journal(ids: string[]) {
     const has = (id: string | null) => !!id && ids.includes(id);
@@ -957,6 +972,13 @@ export class CloudStore implements GameStore {
   async sendMessage(from: ReplicantSave, toId: string, body: string) {
     const { error } = await this.sb.from('messages').insert({ galaxy_id: this.galaxyId, from_replicant: from.id, to_replicant: toId, body: body.slice(0, 500), arrives_at: new Date().toISOString() });
     if (error) throw error;
+  }
+
+  async sharedJournal(limit: number) {
+    const { data, error } = await this.sb.from('journal_public').select('replicant_id,author,star_id,planet_index,body,created_at')
+      .eq('galaxy_id', this.galaxyId).order('created_at', { ascending: false }).limit(limit);
+    if (error) throw error;
+    return (data ?? []) as SharedEntry[];
   }
 
   async journal(ids: string[]) {

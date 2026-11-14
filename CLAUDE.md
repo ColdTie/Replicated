@@ -598,6 +598,13 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   - `tools/playtest-universe.mjs` (new): full cells, charging by the clock, the still (and the hydrogen it keeps), a
     world past the cells dimmed then reachable once charted, a launch spending a fifth, charting, charging from the
     landing; `playtest-planetmenu` finds TRAPPIST-1 with the search (the closest stars are new ones now).
+- **Step 4, the game shows the day** (Steve: "Go ahead with step 4"): the journal (Tab) opens with THE SHARED
+  JOURNAL, the Metanoia's public entries newest first (who, on which world, when; four open, the rest folded),
+  `GameStore.sharedJournal` (the cloud reads `journal_public`, the device its canned entries: the canned mind writes
+  one about three wakes in ten). The homecoming tour now also shows a blank copy that is new here (born, or landed,
+  while you were away). Already there: new and arriving copies get a tour beat, the star map rings worlds with copies
+  and draws their flights, and the minds' talk (`tell_original`) speaks of their day. `playtest-changes` checks the
+  shared journal.
 - **The function typechecks** with Deno now: `npm i --prefix <scratch>/denobin deno`, copy the three files to a
   scratch folder with `{"nodeModulesDir":"none"}` in a `deno.json`, then `deno check index.ts`.
 - `mind` v25 deployed (the journals), all three files byte for byte with main; `verify_jwt` stays on, as on v24.

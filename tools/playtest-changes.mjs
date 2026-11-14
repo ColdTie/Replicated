@@ -33,8 +33,19 @@ try {
       { id: 'q-lamp', replicant_id: c.id, kind: 'lamp', detail: 'A lamp by my door.', status: 'open', created_at: at(2) },
     );
   });
+  // the shared journal (migration 0015): six entries from two worlds, the newest four open, the rest folded
+  await ev(() => {
+    const st = window.__session.store, r = window.__session.replicant;
+    st.db.entries = [0, 1, 2, 3, 4, 5].map((i) => ({ replicant_id: null, author: i % 2 ? 'Ember Gold' : 'Sorrel', star_id: i % 2 ? 'gliese-12' : r.star_id, planet_index: i % 2 ? 1 : r.planet_index, body: `Day entry ${i}: the salt was warm today.`, created_at: new Date(Date.now() - i * 3_600_000).toISOString() }));
+  });
   await ev(async () => { await window.__scene.toggleJournal(); });
   await page.waitForTimeout(300);
+  const shared = await ev(() => {
+    const t = document.querySelector('.jn')?.textContent ?? '';
+    return { head: t.includes('THE SHARED JOURNAL'), first: t.includes('Day entry 0'), folded: [...document.querySelectorAll('.jn details summary')].some((x) => x.textContent === '2 more'), where: t.includes('Ember Gold, GLIESE 12 B') };
+  });
+  log('shared journal', JSON.stringify(shared));
+  if (!shared.head || !shared.first || !shared.folded || !shared.where) fail('the shared journal does not show (newest open, the rest folded, who and where)');
   const seen = await ev(() => {
     const t = document.querySelector('.jn')?.textContent ?? '';
     return {

@@ -104,7 +104,7 @@ left to the game's own copies, as the long wakes do today (`playing()`).
 - Caps (`mind.json day`): `maxVessels` in the galaxy (recommended 30), `birthsPerDay` (3), `drift.json maxPerPlanet`
   (6) as today, `travelsPerDay` (5). Thales never leaves the homeworld and is never copied by a copy.
 
-## Step 4: the game shows the day (no database change)
+## Step 4: the game shows the day (built 2026-11-14, no database change)
 
 - The journal (Tab) gets a PUBLIC page: the day's entries, newest first, by world.
 - The homecoming tour shows arrivals, departures and new Vessels; the star map marks worlds with copies on them.

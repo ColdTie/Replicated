@@ -1,7 +1,8 @@
 // The journal: what the copies on this planet remember, write to each other and ask for, and the changes to the game
 // they proposed (with the maker's answer). An HTML panel over the canvas (Tab / I, or tap the corner label).
 import { PALETTE } from '../core/data';
-import type { Journal, ReplicantSave } from '../net/store';
+import type { Journal, ReplicantSave, SharedEntry } from '../net/store';
+import { planetFor } from '../world/galaxy';
 import { paletteCss as css } from './overlay';
 
 let styled = false;
@@ -63,6 +64,8 @@ export interface JournalView {
   /** names of replicants that are not on this planet, by id */
   names: Record<string, string>;
   journal: Journal;
+  /** the Metanoia's shared journal, newest first (every Vessel's days, the maker's answers) */
+  shared?: SharedEntry[];
   /** the warren, room by room (describeWarren); empty when nothing is dug or planned */
   warren?: string[];
   /** the planet's materials in words */
@@ -100,6 +103,16 @@ export function openJournal(v: JournalView) {
   const parts: string[] = [];
   if (v.quiet) parts.push(`<p class="warn">The minds have been quiet since ${esc(v.quiet.since)}: ${esc(v.quiet.error)}</p>`);
   if (v.spend) parts.push(`<p class="mute">${v.spend.usd >= v.spend.cap ? `The minds have spent today's $${v.spend.cap.toFixed(2)} and rest until tomorrow.` : `The minds today: $${v.spend.usd.toFixed(2)} of $${v.spend.cap.toFixed(2)}.`}</p>`);
+  if (v.shared?.length) {
+    // the Metanoia's shared journal: what every Vessel wrote of its days, wherever it is; the newest few open, the rest folded
+    parts.push(`<h3 style="color:${css(PALETTE[2])}">THE SHARED JOURNAL</h3>`);
+    const line = (e: SharedEntry) => {
+      const where = e.star_id ? planetFor(e.star_id, e.planet_index ?? 1)?.name : undefined;
+      return `<p>${esc(e.body)}<small>${esc(e.author || 'someone')}${where ? `, ${esc(where)}` : ''}, ${ago(e.created_at)}</small></p>`;
+    };
+    for (const e of v.shared.slice(0, 4)) parts.push(line(e));
+    if (v.shared.length > 4) parts.push(`<details><summary>${v.shared.length - 4} more</summary>${v.shared.slice(4).map(line).join('')}</details>`);
+  }
   if (!v.copies.length) parts.push(`<p class="mute">Nobody lives here yet.</p>`);
   for (const c of v.copies) {
     parts.push(`<h3 style="color:${color(c)}">${esc(c.name.toUpperCase())}</h3>`);

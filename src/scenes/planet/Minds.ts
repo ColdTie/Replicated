@@ -424,7 +424,7 @@ export class Minds {
     if (journalOpen()) { closeJournal(); return; }
     const st = session.store;
     if (!st) return;
-    const [j, spent, health] = await Promise.all([st.journal(this.s.npcs.map((n) => n.data.id)), st.mindSpend().catch(() => null), st.mindHealth().catch(() => null)]);
+    const [j, spent, health, shared] = await Promise.all([st.journal(this.s.npcs.map((n) => n.data.id)), st.mindSpend().catch(() => null), st.mindHealth().catch(() => null), st.sharedJournal(24).catch(() => [])]);
     const names: Record<string, string> = {};
     for (const r of this.everyone) names[r.id] = r.name;
     if (session.replicant) names[session.replicant.id] = session.replicant.name;
@@ -439,7 +439,7 @@ export class Minds {
       awaken: (id: string) => void this.awakenCopy(id),
       vetoChange: (id: string) => { void st.vetoRequest(id).catch((e) => console.warn('veto', e)).then(() => { closeJournal(); return this.toggleJournal(); }); },
     };
-    openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.s.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.s.placeLabel, copies: this.s.npcs.map((n) => n.data), names, journal: j, feelings, actions,
+    openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.s.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.s.placeLabel, copies: this.s.npcs.map((n) => n.data), names, journal: j, shared, feelings, actions,
       buildings: this.s.buildings.describe(nameOf), pending: this.s.buildings.list.filter((b) => !b.vetoed && !b.approved && !b.built).map((b) => ({ id: b.id, name: b.name })), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
   }
 
