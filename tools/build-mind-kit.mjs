@@ -11,7 +11,7 @@ import fs from 'node:fs';
 
 const read = (f) => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const PARTS = read('parts.json'), PLAYER = read('player.json'), SUPPLIES = read('supplies.json'), BUILDINGS = read('buildings.json');
-const PLANETS = read('planets.json'), TRAVEL = read('travel.json'), DRIFT = read('drift.json');
+const PLANETS = read('planets.json'), TRAVEL = read('travel.json'), DRIFT = read('drift.json'), HOMEWORLD = read('homeworld.json'), BIOWORKS = read('bioworks.json');
 const MIND = read('mind.json'), WARREN = read('warren.json'), STARS = read('stars.json'), BEACON = read('beacon.json');
 const names = (o) => Object.keys(o ?? {}).filter((k) => !k.startsWith('_'));
 const colorIndex = Object.fromEntries(names(PARTS.colors).map((k) => [k, PARTS.colors[k]]));
@@ -54,6 +54,9 @@ const out = {
   travel: { power: TRAVEL.power, routes: TRAVEL.routes, secondsPerLy: TRAVEL.cruise.secondsPerLy, inSystemSeconds: TRAVEL.cruise.inSystemSeconds },
   drift: { cost: DRIFT.cost, chip: DRIFT.chip, printMs: DRIFT.printMs, printMsAlone: DRIFT.printMsAlone, maxPerPlanet: DRIFT.maxPerPlanet, stats: DRIFT.stats, blankDrift: DRIFT.blankDrift },
   blankBody: PARTS.blank,
+  // the homeworld (the first planet in planets.json, src/core/home.ts), its founded bed's goal (it wakes with the
+  // Printworks) and how much faster a bed with the strain prints
+  home: { star: PLANETS.planets[0].star, planet: PLANETS.planets[0].planetIndex, goal: HOMEWORLD.goal, strainTimes: BIOWORKS.strain.printTimes },
 };
 const dest = new URL('../supabase/functions/mind/kit.json', import.meta.url);
 fs.writeFileSync(dest, JSON.stringify(out) + '\n');

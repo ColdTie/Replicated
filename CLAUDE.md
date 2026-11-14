@@ -586,6 +586,15 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
     a day per galaxy, 30 copies. A day's context lists the cells, the stars within reach with their charge, and
     whether a Vessel can be made. The kit carries each star's class and confirmed planets, the power, the price.
     No database change beyond 0017: journeys already take a copy.
+  - **A review of the server code** (one reviewer, live schema read-only): nothing that could crash a run or break the
+    tool loop; fixed: the day's caps now count Vessels still printing (a call could otherwise start three more each
+    time), flights and births are reserved before anything is awaited (planets run side by side on one galaxy's caps),
+    a chip finished while nobody played counts (`chipReady`), the homeworld's founded bed prints quickly (and a strain
+    quicker: `cemsOf`, kit `home`), a printed Vessel steps out on any world, copies or not (`finishBirths` at the start
+    of every run, replacing the per-planet step), a copy flying home lands on LHS 1140 b (planet 2), a failed step of
+    a flight undoes the ones before (the cells are paid first), and once flown a copy cannot change the world it left.
+    Left: a player landing mid-run on a world a copy just took a chip from could save the chip back (the away run's
+    old race); a landed copy does not mark its star discovered.
   - `tools/playtest-universe.mjs` (new): full cells, charging by the clock, the still (and the hydrogen it keeps), a
     world past the cells dimmed then reachable once charted, a launch spending a fifth, charting, charging from the
     landing; `playtest-planetmenu` finds TRAPPIST-1 with the search (the closest stars are new ones now).
