@@ -720,6 +720,8 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const usage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, rounds: 0 };
     let usd = 0;
     let gathered = 0;
+    // the day's last question has been asked
+    let lastAsked = false;
     // once the copy has flown, its day on this world is over (gather, go and make_vessel wait for the next)
     let flown = false;
     try {
@@ -743,7 +745,16 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         const text = res.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.Beta.BetaTextBlock).text).join(" ").trim();
         if (text) song = text;
         const uses = res.content.filter((b) => b.type === "tool_use") as Anthropic.Beta.BetaToolUseBlock[];
-        if (res.stop_reason !== "tool_use" || !uses.length) break;
+        if (res.stop_reason !== "tool_use" || !uses.length) {
+          // the day's last question (the copies shape the game): a copy that has not wished or backed a wish is asked
+          // once, before it sleeps, whether anything should work differently; it may answer no
+          if (context.day && !lastAsked && round < rounds && !actions.some((a) => a.type === "propose" || a.type === "back") && !(context.deadline && Date.now() > context.deadline - 30_000)) {
+            lastAsked = true;
+            messages.push({ role: "user", content: "Before you sleep: is there one thing about your world or your life here that you wish worked differently, or that you wish existed? If there is, wish for it now with propose_change in plain words (or back another Vessel's open wish that says it, with back_wish). If there is truly nothing, say so in a few words." });
+            continue;
+          }
+          break;
+        }
         const results: (Anthropic.Beta.BetaToolResultBlockParam | Anthropic.Beta.BetaTextBlockParam)[] = [];
         for (const u of uses) {
           const input = u.input as Record<string, string>;
