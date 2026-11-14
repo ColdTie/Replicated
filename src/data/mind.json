@@ -32,6 +32,17 @@
     "publicRead": 12,
     "publicChars": 400
   },
+  "day": {
+    "_doc": "A day of life (docs/plan-daily-life.md step 2, Steve 2026-11-14: twice a day). The scheduled job mind-day (migration 0016) calls the function every 10 minutes in the morning and evening UTC hours that cover the windows; the function lives a day only inside a window: windows are start hours in Steve's time (America/Los_Angeles), each windowMinutes long. In a window every copy not on a world being played lives one day, once (traits.dayKey): up to turns model rounds with the long wakes' tools plus gather and go, batch copies per call, the call wrapping up within seconds. gather adds per of a material to its world's store (not one the world lacks, planets.json lacks; ember to the pool), at most gatherTurns times a day. The hourly long wakes stop while enabled (the function skips them).",
+    "enabled": true,
+    "windows": [1, 13],
+    "windowMinutes": 90,
+    "turns": 8,
+    "batch": 3,
+    "seconds": 110,
+    "gather": { "per": 3, "gatherTurns": 4, "materials": ["ember", "stone", "iron", "hydrogen", "salt", "quartz", "copper"] },
+    "places": ["the square", "my home", "the Cem bed", "the warren", "the ship", "the wilds", "the water", "a high place"]
+  },
   "away": {
     "_doc": "Long wakes: while nobody plays a planet, each copy on it wakes on its own every everyHours (about twice a day), up to batch copies per hourly run and perPlanet per planet. A long wake has up to rounds model calls within seconds of the run starting, and the code tools: code_map, search_code, read_code (the game's source from code.url, published by the deploy; at most code.calls reads and code.chars characters per wake, code.lines per read_code, code.hits per search) and propose_change (the maker builds it, NEEDS.md). Copied into the mind function by tools/build-mind-kit.mjs.",
     "everyHours": 11,

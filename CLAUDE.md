@@ -347,6 +347,7 @@ supabase/functions/mind/ the minds (index.ts); kit.json and warren.ts are genera
                          published source and propose_change
 tools/test.mjs           `npm test`: tools/check-mind-tools.mjs (the mind's tool schemas, the cause of both mind
                          outages) then every tools/playtest*.mjs; .github/workflows/test.yml runs it on every PR
+supabase/migrations/0016 the day run's job (mind-day) and the `day` kind of mind_runs; mind.json day, awayRun(req, "day")
 supabase/migrations/0015 the two journals (journal: public / private; journal_public for the maker; written only by the
                          mind function: write_public / write_private, mind.json journal)
 NEEDS.md                 the maker's procedure: what the copies asked for, how proposals are judged, built and answered
@@ -548,6 +549,17 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   `write_public` and `write_private` (service key; `mind.json journal`); at every wake a copy reads its last private
   entries and the shared journal as far as its light has reached (the letters' delay); a long wake is asked to write
   one shared entry. The game logs that an entry was written, never a private one's words (`MindAction` `journal`).
+- **Step 2 built: the day run.** `mind.json day`: twice a day (1:00 and 13:00 Steve's time, 90 minutes each) every
+  copy not on a world being played lives one day, once per window (`traits.dayKey`; where it ended, `traits.dayAt`):
+  up to 8 turns with the long wakes' tools plus `gather` (a few of a material into its world's store, not one the
+  world lacks: kit `lacks` from `planets.json`) and `go` (a place on its world), and is asked to write the day in the
+  shared journal and to say there what should work differently. The function's `awayRun(req, "day")` does it, 3
+  copies a call; migration `0016_day_run.sql` adds the job `mind-day` (every 10 minutes, 8-10 and 20-22 UTC; the
+  function lives a day only inside a window) and the `day` kind in `mind_runs`. While days are on, the hourly run
+  wakes nobody and only moves the worlds along. The game logs a day's gathering and walks.
+- **The function typechecks** with Deno now: `npm i --prefix <scratch>/denobin deno`, copy the three files to a
+  scratch folder with `{"nodeModulesDir":"none"}` in a `deno.json`, then `deno check index.ts`.
+- `mind` v25 deployed (the journals), all three files byte for byte with main; `verify_jwt` stays on, as on v24.
 - **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` poll for the Spark and the map closing
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.

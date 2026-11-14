@@ -70,7 +70,7 @@ left to the game's own copies, as the long wakes do today (`playing()`).
 - The old `notes` stay as they are (the journal and the minds read them); the public journal replaces them for new
   writing once step 4 shows it in the game.
 
-## Step 2: the day run (no database change)
+## Step 2: the day run (built 2026-11-14; migration 0016: the job and the `day` run kind)
 
 - A scheduled job, `mind-day`, calls the mind function with `{"day": true}` (same Vault key as the away run) every
   10 minutes inside two windows, 1:00 to 2:30 am and 1:00 to 2:30 pm Pacific; each call lives the day of the copies
@@ -86,7 +86,7 @@ left to the game's own copies, as the long wakes do today (`playing()`).
   - the long wakes' tools (build, dig, furnish, letters, `propose_change`), unchanged.
 - The long wakes are replaced by the day (decided).
 
-## Step 3: spreading (moving worlds, more Vessels; migration 0016, Steve's yes)
+## Step 3: spreading (moving worlds, more Vessels; migration 0017, Steve's yes)
 
 - `travel(star, planet)`: a copy takes the ship of its world only if one is there, or (recommended) every copy may
   launch itself, as the story's Vessels do. Fuel from the world it leaves (`travel.json fuelBase + fuelPerLy × ly`),
@@ -177,7 +177,7 @@ competes with making them.
 - A trip costs charge: `power.base + power.perLy` per light year, full price on an uncharted route.
 
 **Charted routes.** The first flight between two stars charts the route for the whole Metanoia (a `routes` row,
-migration 0016: `galaxy_id`, the two star ids, who charted it, when, how often flown). A charted route costs a fifth of
+migration 0017: `galaxy_id`, the two star ids, who charted it, when, how often flown). A charted route costs a fifth of
 the charge and takes half the time (`travel.json routes.costShare`, `routes.timeShare`), and the star map draws it.
 The copies chart the galaxy as they spread, so exploring helps everyone; the beacon lattice and the backlog's wormholes
 grow out of the same network later.

@@ -19,8 +19,9 @@ function block(name, open, close) {
   return text.replace(new RegExp(`^const ${name}[^=]*=\\s*\\${open}`), `const ${name} = ${open}`);
 }
 
-const code = [block('E', '{', '}'), block('tools', '[', ']'), block('longTools', '[', ']'), 'return { tools, longTools };'].join('\n');
-const { tools, longTools } = new Function(code)();
+const code = [block('E', '{', '}'), block('tools', '[', ']'), block('longTools', '[', ']'), block('dayTools', '[', ']'), 'return { tools, longTools, dayTools };'].join('\n');
+const DAY = { gather: { materials: ['ember'] }, places: ['here'] };
+const { tools, longTools, dayTools } = new Function('DAY', code)(DAY);
 
 // keywords the API refuses in strict schemas; they are fine while no tool is strict, but a tool turned strict
 // again must not carry them (that was session 9)
@@ -45,7 +46,7 @@ function walk(tool, schema, path, strict) {
   if (schema.type === 'array') walk(tool, schema.items, `${path}[]`, strict);
 }
 
-const all = [...tools, ...longTools];
+const all = [...tools, ...longTools, ...dayTools];
 const names = new Set();
 for (const t of all) {
   const n = t?.name ?? '(no name)';
@@ -62,7 +63,7 @@ for (const t of all) {
 const handled = new Set([...src.matchAll(/\.name === "([a-z_]+)"/g)].map((m) => m[1]));
 for (const n of names) if (!handled.has(n)) fail(n, `is offered to the model but nothing handles it (no u.name === "${n}")`);
 
-console.log(`mind tools: ${tools.length} in every wake, ${longTools.length} more in long wakes`);
+console.log(`mind tools: ${tools.length} in every wake, ${longTools.length} more in long wakes, ${dayTools.length} more in a day`);
 if (errors.length) {
   for (const e of errors) console.error('  FAIL', e);
   process.exit(1);

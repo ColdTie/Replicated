@@ -287,7 +287,9 @@ export interface Body { head: string; visor: string; torso: string; arms: string
 export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: 'solitary' | 'friendly' | 'clingy'; work: 'builder' | 'wanderer' | 'balanced'; bedtime: 'early' | 'late' | 'even'; risk: 'careful' | 'bold' }
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go';
+  /** gather (a day of life, applied to the store server side): material (the field below) and how much; go: where it went and why */
+  n?: number; place?: string; why?: string;
   /** journal: which journal (migration 0015); a private entry comes back without its body */
   scope?: 'public' | 'private';
   body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string; was?: string;
