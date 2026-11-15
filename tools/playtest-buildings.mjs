@@ -1,5 +1,5 @@
-// Scripted headless playtest of session 9 step 4: a copy proposes a building, it waits for the original's word,
-// the original approves it in the journal, the copies pay its stone and raise it together, it lights up; the
+// Scripted headless playtest of session 9 step 4: a copy proposes a building, it goes ahead at once (since 2026-11-15
+// the Vessels govern themselves: no approve / veto), the copies pay its stone and raise it together, it lights up; the
 // original talks to a copy and gives it Ember. Usage: npm run build && node tools/playtest-buildings.mjs
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -32,25 +32,19 @@ try {
   });
   log('proposed', JSON.stringify(proposed));
   if (!proposed) fail('no spot for the building');
-  if (proposed?.approved) fail('proposal was approved before the original spoke');
+  if (proposed && !proposed.approved) fail('a proposal still waits for the original\'s word');
   if (proposed && (proposed.material !== 'stone' || JSON.stringify(proposed.cost) !== JSON.stringify(COST))) fail(`the Watchtower does not cost its stone (${JSON.stringify(proposed.cost)})`);
-  // nobody works on it while it waits
   await ev(() => { const s = window.__scene; s.supplies.stone = 10; s.npcs.forEach((n) => { n.state = 'idle'; n.until = 0; n.nextBuild = 0; }); });
   // every payment out of the store is noted: the building must be paid from it (copies dig and make beds meanwhile, so
   // the store's count alone shows nothing)
   await ev(() => { const s = window.__scene, pay = s.warren.pay.bind(s.warren); window.__paid = []; s.warren.pay = (c) => { window.__paid.push(JSON.stringify(c)); return pay(c); }; });
-  await page.waitForTimeout(2500);
-  log('waiting progress', await ev(() => window.__scene.buildings.list[0].progress));
-  if ((await ev(() => window.__scene.buildings.list[0].progress)) > 0) fail('work started before approval');
 
-  // 2. the original approves through the journal; the copies pay and raise it together
+  // 2. the journal has the original's word for a copy (talk, give) and no approve / veto; the copies pay and raise it
   await ev(async () => { await window.__scene.toggleJournal(); });
   const buttons = await ev(() => ({ approve: !!document.querySelector('[data-approve]'), veto: !!document.querySelector('[data-veto]'), talk: !!document.querySelector('[data-send]'), give: !!document.querySelector('[data-give]') }));
   log('journal buttons', JSON.stringify(buttons));
-  if (!buttons.approve || !buttons.talk || !buttons.give) fail('journal lacks the original\'s actions');
-  await page.click('[data-approve]');
-  await page.waitForTimeout(600);
-  log('approved', await ev(() => JSON.stringify({ approved: window.__scene.buildings.list[0].approved, journalOpen: !!document.querySelector('.jn') })));
+  if (buttons.approve || buttons.veto) fail('the journal still approves or vetoes buildings');
+  if (!buttons.talk || !buttons.give) fail('journal lacks the original\'s actions');
   await ev(() => { document.querySelector('.jn')?.remove(); });
   // a copy finishes the chore it is on before it comes (digging the way down takes a while): 7 to 20 s here, more on a
   // slow runner, so the wait is as long as the one for the finished building below; the time it took is logged

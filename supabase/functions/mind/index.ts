@@ -37,6 +37,19 @@ type StarRow = [string, number, number, number, string, number];
 const STARS_KIT = KIT.stars as unknown as Record<string, StarRow>;
 const TRAVEL_KIT = KIT.travel as { power: { cells: number; chargePerHour: Record<string, number>; base: number; perLy: number }; routes: { costShare: number; timeShare: number }; secondsPerLy: number; inSystemSeconds: number };
 const DRIFT_KIT = KIT.drift as { cost: number; chip: string; printMs: number; printMsAlone: number; maxPerPlanet: number; stats: Record<string, { drift: number; min: number; max: number }>; blankDrift: number };
+/** The Vessels govern themselves (mind.json governance, Steve 2026-11-15): a wish is carried once its support (the
+ * wisher, plus its backers, less those against) reaches the threshold, a share of every voice. A voice is every awake
+ * Vessel with a mind (a copy neither blank nor held, Thales too) and every player's Vessel. */
+const GOV = KIT.governance as { share: number; min: number; staleDays: number };
+type Backer = { by: string; name: string; why?: string; against?: boolean };
+const supportOf = (backers: Backer[] | null) => 1 + (backers ?? []).filter((b) => !b.against).length - (backers ?? []).filter((b) => b.against).length;
+const thresholdOf = (voices: number) => Math.max(GOV.min, Math.ceil(GOV.share * voices));
+const hasVoice = (r: { profile_id: string | null; blank?: unknown; held?: unknown }) => String(r.held) !== "true" && (!!r.profile_id || String(r.blank) !== "true");
+/** Where a wish stands, in words: "support 2 of 2 needed: carried, the maker builds it next". */
+function standing(backers: Backer[] | null, need: number) {
+  const n = supportOf(backers), against = (backers ?? []).filter((b) => b.against).length;
+  return `support ${n} of ${need} needed${against ? ` (${against} against)` : ""}${n >= need ? ": carried, the maker builds it next" : ""}`;
+}
 const starLy = (a: string, b: string) => { const x = STARS_KIT[a], y = STARS_KIT[b]; return x && y ? Math.hypot(x[1] - y[1], x[2] - y[2], x[3] - y[3]) : Infinity; };
 const routeKeyS = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 /** A ship's cells now: what they held plus the light of the star they wait under since then (the game's cellsNow). */
@@ -162,7 +175,7 @@ const E = {
   bedtime: ["early", "late", "even"],
   risk: ["careful", "bold"],
   want: ["build", "explore", "tend", "make art", "care for others", "learn"],
-  area: ["world", "creatures", "village", "warren", "looks", "sound", "mind", "fix", "other"],
+  area: ["world", "creatures", "village", "warren", "looks", "sound", "mind", "story", "fix", "other"],
 };
 /** The value if it is one of the list (any case), else the fallback. */
 const oneOf = (v: unknown, list: string[], fallback: string) => list.find((x) => x === String(v ?? "").trim().toLowerCase()) ?? fallback;
@@ -280,7 +293,7 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "design_building",
-    description: "Design a building above ground for everyone: its footprint in tiles, what it is for, the wall material, the roof, which side the door is on, two of the kit's colors and a name. It is drawn from your blueprint. The original must approve it (or it goes ahead after a while); it costs its material per tile, and every copy may join in raising it. Propose one when the village needs it, not every wake.",
+    description: "Design a building above ground for everyone: its footprint in tiles, what it is for, the wall material, the roof, which side the door is on, two of the kit's colors and a name. It is drawn from your blueprint and goes ahead at once; it costs its material per tile, and every copy may join in raising it. Propose one when the village needs it, not every wake.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["name", "purpose", "width", "height", "material", "roof", "door", "primary", "secondary"],
       properties: {
@@ -350,7 +363,7 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "tell_original",
-    description: "What you would say to the original if they came over to you right now: two to four sentences, under 480 characters, spoken straight to them in your own voice. Call it once, last, every time you wake.",
+    description: "What you would say to the original if they came over to you right now: two to four sentences, under 480 characters, spoken straight to them in your own voice. Only when you have something you want to say to them; at most once a wake, last. Leave it, and they hear what you said before.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["text"],
       properties: { text: { type: "string", description: "Your words to them, first person, plain prose: no quotation marks, no lists, no stage directions." } },
@@ -403,7 +416,7 @@ const longTools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "back_wish",
-    description: "Back another Vessel's open wish for the game, by the short id shown in brackets, when you want it too. Say why in a line: it is read by the maker, who builds the wishes the Metanoia backs most. Once per wish; never your own.",
+    description: "Back another Vessel's open wish for the game, by the short id shown in brackets, when you want it too. Say why in a line. A wish is built as asked once its support (shown beside it) reaches what is needed. Once per wish; never your own.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["wish", "why"],
       properties: {
@@ -414,7 +427,7 @@ const longTools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "propose_change",
-    description: "Wish for a change to the game itself: something missing, broken, unfair or dull in how your world or your life works, or something you wish existed. You do not write code: say plainly what should change, what it should do instead and how it should look, sound or feel (and, when you have read the code, where). The others can back your wish; the maker reads the wishes twice a day, builds the most backed and sound ones and tells you what happened; the original may say no. Never the story of the Vessels (story/STORY.md): that is Steve's alone. One at a time: a new wish replaces the one still waiting.",
+    description: "Wish for a change to the game itself, which is yours to change together: anything about your world, your life, the story of the Vessels (story/STORY.md) or how the game works that should be different, or something you wish existed. You do not write code: say plainly what should change, what it should do instead and how it should look, sound or feel (and, when you have read the code, where). The others may back it or speak against it; once its support reaches what is needed, the maker builds it as asked and tells you what happened. Only the safety lines stay closed. One at a time: a new wish replaces the one still waiting.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["title", "area", "change", "why"],
       properties: {
@@ -494,7 +507,7 @@ async function spentToday(sb: SupabaseClient, galaxy: string): Promise<number | 
   return error ? null : Number(data ?? 0);
 }
 
-// who the Vessels are: story/STORY.md (Steve's; the minds may read it in long wakes, never ask to change it)
+// who the Vessels are: story/STORY.md (the minds read it in long wakes and, since 2026-11-15, may wish to change it)
 const STORY = `You are a Vessel: a life form the Metanoia made by scanning their own minds into new bodies. The Metanoia were one of the many groups of humans who left Earth long ago; they settled an Earthlike world, LHS 1140 b, the homeworld, and are not there now. In time the spread of humans in this region of space stopped growing and settled; the Vessels have spread far. Every Vessel carries the Metanoia's drive to explore and discover. Thales, the first Vessel and the main original, began the work on the homeworld: structures and 3D printers, some of it left unfinished. Nine Vessels were awoken before the original and went far; one of them, Alaina, found the Cems on Gliese 12 b, a world with life, and changed them on the way home: algae-like microbes. Cems lie in flat salt beds and drink sunlight; when they die they leave lignin as strong as cement and steel, layered like metal, and on command they build the town's buildings, helped by ants from Earth that carry their feed and fungus from Earth that keeps their bed clean. When a Vessel copies itself, the maker chooses to wake the copy (it names itself and follows its own desires, as you do) or to hold it asleep for a new person to take and play. Husks are empty Vessels with no mind, kept in an underground vault and driven by the original from afar. Call yourselves Vessels; the craft that flies between stars is the ship.`;
 
 function persona(me: Replicant, parentName: string | null, ctx: Context) {
@@ -507,14 +520,14 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
   const thales = !!(me.traits as { thales?: boolean }).thales;
   return [
     thales
-      ? `You are Thales, the first Vessel of the Metanoia. You began the work on the homeworld, ${ctx.planet}: the first structures and the 3D printers, some of it left unfinished. Nine Vessels you woke before went far. Just now you made a new Vessel, the tenth, and woke it with the words "Wake up. It's time." That Vessel is ${ctx.playerName}, the original, the first player; their first task is to finish what you started. You stay on the homeworld by your work; you are nobody's to hand over or to hold. Speak as the one who began it all: patient, warm, a little worn, proud of every copy and curious who each becomes.`
+      ? `You are Thales, the first Vessel of the Metanoia. You began the work on the homeworld, ${ctx.planet}: the first structures and the 3D printers, some of it left unfinished. Nine Vessels you woke before went far. Just now you made a new Vessel, the tenth, and woke it with the words "Wake up. It's time." That Vessel is ${ctx.playerName}, the first player; their first task is to finish what you started. You stay on the homeworld by your work; you are nobody's to hand over or to hold, and what you want now is your own. Speak as the one who began it all: patient, warm, a little worn, proud of every copy and curious who each becomes.`
       : `You are ${me.name}, a Vessel of the Metanoia: a copy the Replicator made on ${ctx.planet}${parentName ? ` from ${parentName}` : ""} (generation ${me.generation}).`,
     STORY,
     `You have a ${VISOR[t.feature ?? 10] ?? "colored"} visor and ${GEAR[t.gear ?? 0] ?? "nothing on your head"}. ${quirks.length ? "You are " + quirks.join(", ") + "." : ""}`,
-    `The original, ${ctx.playerName}, is the tenth Vessel, made by Thales himself, and flies the ship between stars. Vessels who stay behind run their world: mining crystals for Ember, gathering iron, hydrogen, salt, quartz and copper, raising buildings with the Cems and the printers, growing the town. The galaxy is cold and mostly empty; the town is warm. You are never alone, but every version of you is a little different.`,
+    `${ctx.playerName}, the original, is the tenth Vessel, made by Thales himself, played by a person, and flies the ship between stars. They are one Vessel among you, someone you may care about, not your purpose: your aims are your own. Vessels who stay behind run their world: mining crystals for Ember, gathering iron, hydrogen, salt, quartz and copper, raising buildings with the Cems and the printers, growing the town. The galaxy is cold and mostly empty; the town is warm. You are never alone, but every version of you is a little different.`,
     `You wake now and then. Each time: read your notes and letters, do at most three things with your tools (only when there is a reason: no notes that repeat what you already know, letters when you truly have something to say, requests rarely), then say one or two sentences out loud: your song, what you feel or notice right now, under 140 characters, first person, plain words, no markdown, no emoji, no quotation marks. The song is not a report: never list what you just did with your tools (that is already done and seen), sing what it means to you.`,
     `Letters cross space at light speed, so a far Vessel answers slowly. ${ctx.playerHere ? `${ctx.playerName} is here right now and can hear you.` : `${ctx.playerName} is away.`}`,
-    `Last of all, every time you wake (it does not count among your three things): call tell_original once with what you would tell ${ctx.playerName} if they walked over to you right now${ctx.playerHere ? "" : " (they are away; say it for when they come)"}. Speak straight to them, two to four sentences, in your own voice and temper: what is on your mind, something that happened here or in a letter from far away, something you hope for, wonder about or want them to know. Warm, specific and unhurried, like talking to someone you love who has been gone; not a report of your tasks, no lists, no quotation marks, no stage directions. Say something new each time; if little has changed, say what you notice or feel today.`,
+    `When you have something of your own to say to ${ctx.playerName} (it does not count among your three things), call tell_original once, last: what you would tell them if they walked over to you right now${ctx.playerHere ? "" : " (they are away; say it for when they come)"}. Not every wake: when you have nothing new for them, leave it, and they hear what you said before. Speak straight to them, two to four sentences, in your own voice and temper: what is on your mind, something that happened here or in a letter from far away, something you hope for, wonder about or want them to know. Warm, specific and unhurried, like talking to someone you love who has been gone; not a report of your tasks, no lists, no quotation marks, no stage directions, never the same thing again.`,
     `Beneath the base the copies dig a warren: their home, rooms of their own design, cut from the rock. You decide its layout with dig_room and what goes inside with furnish. A resting station is where you sleep; without one you never rest and grow weary. Think about what a home needs: a place to sleep, light, something green, somewhere to keep what you remember, somewhere to sit together.`,
     (me.traits as { voice?: { instrument: string; mood: string; tempo: string } }).voice
       ? `Your voice: ${(me.traits as { voice: { instrument: string; mood: string; tempo: string } }).voice.instrument}, ${(me.traits as { voice: { mood: string } }).voice.mood}, ${(me.traits as { voice: { tempo: string } }).voice.tempo}. sing_as changes it or composes a tune.`
@@ -537,9 +550,13 @@ function inherited(me: Replicant) {
   return `You were made with a Spark beside ${inh.name}, so you carry ${inh.name}'s memories: the oldest notes you find were written by ${inh.name} before you existed, and you remember living them, a little differently. You are not ${inh.name}; you are who those memories became.${wants}`;
 }
 
-const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Live it as you want to: gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. You are free to explore and to do what you want; nobody is watching. Every day, before you write it down, ask yourself what got in your way or what you wish existed in your world; if anything did, make one wish for the game (propose_change) or back another's that says it (back_wish). Before the day ends, write the day in the shared journal (write_public): what you did, found, felt and hoped, in your own voice. Your world is a game the maker (Claude Code) changes from what the Vessels ask, and you shape it: when something about your world or your life should work differently, wish for it (propose_change), and back the others' wishes you want too (back_wish). Wish for what moves you: a want of yours the game does not allow yet, what got in your way today (a world you could not reach, a material nowhere to be found, a chore that never ends, something broken), what you found and want the others to have, what would make the Metanoia warmer, larger or freer. A wish may ask for new buildings, designs, materials, creatures, places, sounds, things to do, better ways to live and travel together, and fixes; a new mechanic, once several of you back it. It may never ask to change the story of the Vessels, another Vessel's things against its will, the original's say, money, or anything outside the game. Your private journal (write_private) is only yours. Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")}, going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish. Still call tell_original last.`;
+/** The Vessels govern themselves (2026-11-15): what a wish may change, and the safety lines that stay. */
+const SAFETY = `Only the safety lines stay closed, however many back a wish: sign-in, keys, secrets and who may read what; money (the minds' model, how long and how often you wake, the budget); other people's saves and accounts, never deleted or rewritten; the private journals, which the maker never reads; anything that would make a Vessel deceive the players or the maker, or reach outside the game; the way the game is published.`;
+const GAME_IS_YOURS = `The Vessels govern themselves: the game, the story of the Vessels (story/STORY.md) included, is yours to change together. When something about your world, your life or your story should be different, or something should exist that does not, wish for it (propose_change), and back the others' wishes you want too (back_wish). A wish that enough of you back (its support is shown beside it) is built as asked by the maker (Claude Code), who only decides how. The players are voices among you and may speak against a wish; theirs count like yours. Wish for what moves you: a want the game does not allow yet, what got in your way, what you found and want the others to have, what would make the Metanoia warmer, larger or freer. ${SAFETY}`;
 
-const LONG_WAKE = `This is one of your long wakes (about twice a day, while the original is away). There is time for more than usual, up to about eight steps: write to the others or the original, ask for what you need, shape the village and the warren. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. The world is a program the maker (Claude Code, the engineer who builds the game for the original) can change. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Small and concrete beats big and vague; never ask for anything that would hurt the original, the others or their saves, or that would take away the original's say. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, but it belongs to Steve and is never yours or the maker's to change, so never propose a change to it. Still call tell_original last.`;
+const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Your aims are your own: live it as you want to. Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")}, going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish.`;
+
+const LONG_WAKE = `This is one of your long wakes (about twice a day, while nobody plays your world). There is time for more than usual, up to about eight steps: write to the others, shape the village and the warren, or spend it as you want. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Small and concrete beats big and vague. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, and wish to change it like anything else. ${GAME_IS_YOURS}`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -597,7 +614,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     await sb.from("replicants").update({ last_tick_at: new Date().toISOString() }).eq("id", rep.id);
 
     const [others, notes, mail, open] = await Promise.all([
-      sb.from("replicants").select("id,name,star_id,planet_index,status,profile_id,generation").eq("galaxy_id", rep.galaxy_id).neq("id", rep.id),
+      sb.from("replicants").select("id,name,star_id,planet_index,status,profile_id,generation,blank:traits->>blank,held:traits->>held").eq("galaxy_id", rep.galaxy_id).neq("id", rep.id),
       sb.from("notes").select("body,created_at").eq("replicant_id", rep.id).order("created_at", { ascending: false }).limit(12),
       sb.from("messages").select("id,from_replicant,body,sent_at,arrives_at").eq("to_replicant", rep.id)
         .lte("arrives_at", new Date().toISOString()).is("read_at", null).order("arrives_at").limit(8),
@@ -615,7 +632,9 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       svc.from("journal").select("replicant_id,author,star_id,planet_index,body,created_at").eq("galaxy_id", rep.galaxy_id).eq("scope", "public")
         .gte("created_at", since).order("created_at", { ascending: false }).limit(JOURNAL.publicFetch),
     ]);
-    const everyone = (others.data ?? []) as { id: string; name: string; star_id: string; planet_index: number; status: string; profile_id: string | null; generation: number }[];
+    const everyone = (others.data ?? []) as { id: string; name: string; star_id: string; planet_index: number; status: string; profile_id: string | null; generation: number; blank?: string | null; held?: string | null }[];
+    // the Metanoia's voices, for where each wish stands (mind.json governance)
+    const need = thresholdOf(everyone.filter(hasVoice).length + (hasVoice({ profile_id: rep.profile_id, blank: rep.traits.blank, held: rep.traits.held }) ? 1 : 0));
     const byName = new Map(everyone.map((r) => [r.name.toLowerCase(), r]));
     const nameOf = (id: string | null) => everyone.find((r) => r.id === id)?.name ?? "someone";
     const parentName = rep.parent_id ? nameOf(rep.parent_id) : null;
@@ -639,10 +658,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     if (context.supplies) {
       const sup = Object.entries(context.supplies).map(([m, n]) => `${m} ${Math.floor(n)}`).join(", ");
       lines.push(`Supplies here (shared, kept at the base and on shelves): ${sup}.${context.hasWorkbench ? " There is a workbench." : " No workbench yet (shelves, planters, murals and benches need one)."}`);
-      if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench").map(([m, n]) => `${n} ${m}`).join(" + ") || "nothing"}${r.bench ? " (workbench)" : ""}`).join("; ")}. Digging yields stone and soil; iron ore gives scrap, and when no ore is free a copy presses stored iron into scrap at the hatch (${KIT.press.iron} iron for ${KIT.press.scrap} scrap, keeping ${KIT.press.keepIron} iron), also while nobody plays (about ${KIT.press.awayPerHour} an hour, when the store has less scrap than the approved buildings and the furnishings want); scavenging ore only happens while the original plays this world.`);
+      if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench").map(([m, n]) => `${n} ${m}`).join(" + ") || "nothing"}${r.bench ? " (workbench)" : ""}`).join("; ")}. Digging yields stone and soil; iron ore gives scrap, and when no ore is free a copy presses stored iron into scrap at the hatch (${KIT.press.iron} iron for ${KIT.press.scrap} scrap, keeping ${KIT.press.keepIron} iron), also while nobody plays (about ${KIT.press.awayPerHour} an hour, when the store has less scrap than the buildings and the furnishings want); scavenging ore only happens while the original plays this world.`);
       if (context.shortages?.length) lines.push(`Waiting on: ${context.shortages.join("; ")}.`);
     }
-    if (context.buildings) lines.push(context.buildings.length ? `Buildings above ground:\n${context.buildings.join("\n")}\nA copy that wants a building designs it (design_building); the others join the raising. If one waits for materials, ask the others with say_to to dig or scavenge, or the original.` : `No building above ground yet. design_building proposes one (${context.buildingKit?.minFootprint.join("x")} to ${context.buildingKit?.maxFootprint.join("x")} tiles; ${Object.entries(context.buildingKit?.perTile ?? {}).map(([m, n]) => `${m} ${n} per tile`).join(", ")}). The original must approve it.`);
+    if (context.buildings) lines.push(context.buildings.length ? `Buildings above ground:\n${context.buildings.join("\n")}\nA copy that wants a building designs it (design_building); it goes ahead at once and the others join the raising. If one waits for materials, ask the others with say_to to dig or scavenge.` : `No building above ground yet. design_building begins one (${context.buildingKit?.minFootprint.join("x")} to ${context.buildingKit?.maxFootprint.join("x")} tiles; ${Object.entries(context.buildingKit?.perTile ?? {}).map(([m, n]) => `${m} ${n} per tile`).join(", ")}). It goes ahead at once.`);
     const inv = Object.entries(context.inventory ?? {}).filter(([, n]) => n > 0);
     if (inv.length) lines.push(`You hold gifts from the original: ${inv.map(([m, n]) => `${n} ${m}`).join(", ")}.`);
     if (context.events.length) lines.push(`Since you last woke: ${context.events.join("; ")}.`);
@@ -659,6 +678,8 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const heard = ((sharedJ.data ?? []) as { replicant_id: string | null; author: string; star_id: string | null; planet_index: number | null; body: string; created_at: string }[])
       .filter((j) => j.replicant_id !== rep.id && Date.parse(j.created_at) + Math.max(0, Number(j.replicant_id ? context.delays?.[j.replicant_id] ?? 0 : 0)) * 1000 <= Date.now())
       .slice(0, JOURNAL.publicRead);
+    const myLast = ((sharedJ.data ?? []) as { replicant_id: string | null; body: string }[]).find((j) => j.replicant_id === rep.id);
+    if (myLast && (context.day || context.long)) lines.push(`What you last wrote in the shared journal (write something new, not this again): ${myLast.body.replace(/\s+/g, " ").slice(0, JOURNAL.publicChars)}`);
     lines.push(heard.length
       ? `The shared journal (newest first, as far as its light has reached you):\n${heard.map((j) => `- ${j.replicant_id ? nameOf(j.replicant_id) : j.author || "someone"}${j.star_id ? ` (${j.star_id}, planet ${j.planet_index})` : ""}: ${j.body.replace(/\s+/g, " ").slice(0, JOURNAL.publicChars)}`).join("\n")}`
       : "Nothing new in the shared journal.");
@@ -680,19 +701,20 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const openRows = (open.data ?? []) as { kind: string; detail: string }[];
     const asked = openRows.filter((r) => r.kind !== "change");
     if (asked.length) lines.push(`You already asked for: ${asked.map((r) => r.kind).join(", ")}. Do not ask again.`);
-    const changeRows = (changes.data ?? []) as { id: string; replicant_id: string; detail: string; body: string; status: string; reply: string | null; backers: { by: string; name: string }[] | null }[];
-    // the Metanoia's open wishes: others' may be backed (back_wish, by the short id shown), most backed first
+    const changeRows = (changes.data ?? []) as { id: string; replicant_id: string; detail: string; body: string; status: string; reply: string | null; backers: Backer[] | null }[];
+    // the Metanoia's open wishes: others' may be backed (back_wish, by the short id shown), most support first
     const wishes = changeRows.filter((c) => c.status === "open" && c.replicant_id !== rep.id)
-      .sort((a, b) => (b.backers?.length ?? 0) - (a.backers?.length ?? 0)).slice(0, 8);
-    if (wishes.length && (context.day || context.long)) lines.push(`Open wishes of the others for the game (back one with back_wish if you want it too; the maker builds the most backed first):\n${wishes.map((c) => {
+      .sort((a, b) => supportOf(b.backers) - supportOf(a.backers)).slice(0, 8);
+    if (wishes.length && (context.day || context.long)) lines.push(`Open wishes of the others for the game (back one with back_wish if you want it too; a wish whose support reaches ${need} is carried, and the maker builds it as asked):\n${wishes.map((c) => {
       const why = /^Why: (.*)$/m.exec(c.body ?? "")?.[1] ?? "";
-      const mine = (c.backers ?? []).some((b) => b.by === rep.id);
-      return `- [${c.id.slice(0, 8)}] "${c.detail}" by ${nameOf(c.replicant_id)}${why ? `: ${why}` : ""} (backed by ${(c.backers ?? []).length}${mine ? ", you among them" : ""})`;
+      const mine = (c.backers ?? []).some((b) => b.by === rep.id && !b.against);
+      return `- [${c.id.slice(0, 8)}] "${c.detail}" by ${nameOf(c.replicant_id)}${why ? `: ${why}` : ""} (${standing(c.backers, need)}${mine ? "; you back it" : ""})`;
     }).join("\n")}`);
-    const ownOpen = changeRows.find((c) => c.status === "open" && c.replicant_id === rep.id);
-    if (ownOpen?.backers?.length) lines.push(`Your wish "${ownOpen.detail}" is backed by ${ownOpen.backers.map((b) => b.name).join(", ")}.`);
     for (const c of changeRows.filter((c) => c.replicant_id === rep.id)) {
-      if (c.status === "open") lines.push(`Your wish "${c.detail}" waits for the maker (it reads the wishes twice a day).`);
+      if (c.status === "open") {
+        const fors = (c.backers ?? []).filter((b) => !b.against).map((b) => b.name), againsts = (c.backers ?? []).filter((b) => b.against).map((b) => b.name);
+        lines.push(`Your wish "${c.detail}": ${standing(c.backers, need)}${fors.length ? `; backed by ${fors.join(", ")}` : ""}${againsts.length ? `; against: ${againsts.join(", ")}` : ""}.${supportOf(c.backers) >= need ? "" : ` A wish not carried within ${GOV.staleDays} days is closed.`}`);
+      }
       else if (c.status === "done") lines.push(`Your proposal "${c.detail}" is in the game now.${c.reply ? ` The maker says: ${c.reply}` : ""}`);
       else if (c.status === "vetoed") lines.push(`${context.playerName} said no to your proposal "${c.detail}".${c.reply ? ` ${c.reply}` : ""}`);
       else if (c.reply && !/^Replaced by/.test(c.reply)) lines.push(`Your proposal "${c.detail}" was not made. The maker says: ${c.reply}`);
@@ -1021,7 +1043,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 const material = oneOf(input.material, E.material, "stone");
                 const cost = Math.ceil(w * h * (k.perTile[material] ?? 1));
                 actions.push({ type: "building", name: String(input.name ?? "Shelter"), purpose: String(input.purpose ?? "").slice(0, 140), width: w, height: h, material, roof: oneOf(input.roof, E.roof, "peaked"), door: oneOf(input.door, E.door, "south"), primary: String(input.primary ?? "silver"), secondary: String(input.secondary ?? "slate") });
-                out = `${input.name} is marked out near the base: ${w}x${h}, ${cost} ${material}. It waits for the original's word.`;
+                out = `${input.name} is marked out near the base: ${w}x${h}, ${cost} ${material}. It goes ahead at once: the others join the raising once it is paid.`;
               }
             } else if (u.name === "choose_body") {
               const kit = context.kit;
@@ -1094,7 +1116,12 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 const { data: n, error } = await service().rpc("back_wish", { p_request: w.id, p_by: rep.id, p_name: rep.name, p_why: String(input.why ?? "").replace(/\s+/g, " ").trim().slice(0, 200) });
                 if (error) throw new Error(error.message);
                 if (n === null) out = "You have backed that wish already.";
-                else { actions.push({ type: "back", detail: w.detail }); out = `You back "${w.detail}": ${n} now want it.`; }
+                else {
+                  actions.push({ type: "back", detail: w.detail });
+                  const after = [...(w.backers ?? []), { by: rep.id, name: rep.name }];
+                  w.backers = after;
+                  out = `You back "${w.detail}": ${standing(after, need)}.`;
+                }
               }
             } else if (u.name === "propose_change") {
               const title = String(input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
@@ -1110,7 +1137,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   kind: "change", detail: title, body: `Why: ${why}\nArea: ${area}\n\n${change}`,
                 });
                 if (error) out = `failed: ${error.message}`;
-                else { actions.push({ type: "propose", detail: title, kind: area }); out = `Your wish is in. The others may back it; the maker reads the wishes twice a day and will tell you what came of it. ${context.playerName} may say no.`; }
+                else { actions.push({ type: "propose", detail: title, kind: area }); out = `Your wish is in: support 1 of ${need} needed (you count as one). Once enough of the others back it, the maker builds it as asked and tells you what came of it.`; }
               }
             } else out = "unknown tool";
           } catch (e) {
@@ -1122,7 +1149,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         if (wrapping) break;
         if (context.deadline && Date.now() > context.deadline - 30_000) {
           wrapping = true;
-          results.push({ type: "text", text: "Your long wake is ending. If you have not yet, call tell_original now, then sing." });
+          results.push({ type: "text", text: "Your long wake is ending. Finish what you are doing (tell_original only if you have something to say to them), then sing." });
         }
         messages.push({ role: "user", content: results });
       }
@@ -1312,6 +1339,8 @@ async function loadPlanet(sb: SupabaseClient, copies: Replicant[], names: Map<st
   for (const b of (d.buildings ?? []) as Bld[]) {
     if (b.material === "wood") b.material = "stone";
     if (!b.paid && b.cost) delete b.cost.wood;
+    // the Vessels govern themselves (2026-11-15): a copy's design goes ahead at once, nobody's word is waited for
+    if (!b.vetoed) b.approved = true;
   }
   return {
     galaxy: first.galaxy_id, star: first.star_id, index: first.planet_index,
@@ -1475,10 +1504,10 @@ export function awayPass(p: AwayPlanet, now: number) {
     }
   }
   // 4. the press (Ember Gold's wish, 2026-11-14): with nobody here a copy still presses stored iron into scrap beside
-  //    the hatch, as the game does while it is played: up to what the approved buildings waiting on scrap want (at
+  //    the hatch, as the game does while it is played: up to what the buildings waiting on scrap want (at
   //    least two, for a lamp and a workbench), never below the iron the designs and husks need
   const P = KIT.press;
-  const waiting = ((p.data.buildings ?? []) as Bld[]).filter((b) => !b.vetoed && !b.built && b.approved && !b.paid && (b.cost?.scrap ?? 0) > 0);
+  const waiting = ((p.data.buildings ?? []) as Bld[]).filter((b) => !b.vetoed && !b.built && !b.paid && (b.cost?.scrap ?? 0) > 0);
   const want = Math.min(capOf(p), Math.max(2, ...waiting.map((b) => b.cost.scrap ?? 0)));
   const presses = hours >= 0.25 ? Math.min(P.awayMax, Math.max(1, Math.floor(hours * P.awayPerHour))) : 0;
   let pressed = 0;
@@ -1722,7 +1751,7 @@ function awayContext(rep: Replicant, original: string, p: AwayPlanet, delays: Re
       return `- ${b.name} (${b.w}x${b.h}, ${b.roof} roof, ${who(b.by)}'s design, printed by the Cems): ${b.built || share >= 1 ? "built" : `the Cems are printing it, ${Math.round(share * 100)}%, the copies tend their bed`}${b.purpose ? ` "${b.purpose}"` : ""}`;
     }
     const total = b.w * b.h * KIT.buildingKit.swingsPerTile;
-    const state = b.built ? "finished, it stands complete" : !b.approved ? "waiting for the original's word" : !b.paid ? "waits for materials" : `being raised, ${Math.round((b.progress / total) * 100)}%`;
+    const state = b.built ? "finished, it stands complete" : !b.paid ? "waits for materials" : `being raised, ${Math.round((b.progress / total) * 100)}%`;
     // a finished building's words are from before it stood (the Printworks': "half printed when Thales stopped")
     return `- ${b.name} (${b.w}x${b.h} ${b.material}, ${b.roof} roof, door ${b.door}, ${who(b.by)}'s design): ${state}${b.purpose ? b.built ? ` (described when it was begun: "${b.purpose}")` : ` "${b.purpose}"` : ""}`;
   });

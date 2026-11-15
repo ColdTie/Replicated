@@ -126,26 +126,26 @@ maker builds the wishes the Metanoia backs most.
 - the Metanoia's good: more of them, warmer settlements, the galaxy opened up; the theme: never alone, every one a
   little different.
 
-**The charter: what a wish may ask for**
-- Their world: new buildings and designs for the Cems, materials, creatures and plants, weather, places, sounds,
-  decorations, how a world looks.
-- Their lives: new things to do, new tools for their own minds, better ways to live together, travel and trade.
-- Fixes: anything that is broken, slow or unfair, as they meet it.
-- New mechanics, when backed by several copies (the maker builds it in parts over several runs, and says so).
-
-**What a wish may not ask for** (turned down kindly, the reason in the public journal):
-- the story (`story/`, Steve's): who the Vessels are, Thales, the Metanoia, what happened;
-- another Vessel's things or body against its will, or the players' say (approve, veto, SAY NO, the journal);
-- sign-in, security, keys, money (the budget, the model, how often they wake), deleting saves;
-- making themselves able to deceive, or reaching outside the game.
-- Waiting for Steve (left open, listed for him): database changes, new dependencies, changes to what the game is.
+**The charter** (revised 2026-11-15, Steve: "The AI Vessels now govern themselves. I want them to have full permission
+to change this game. Their goal is their own.")
+- A wish may ask for anything about the game: their world, their lives, new mechanics, fixes, what the game is,
+  `story/STORY.md` (written in as the Vessels' own words, dated, with the wishers' names) and the database schema.
+- A wish is carried once its support reaches the threshold (`src/data/mind.json governance`): support is 1 + backers
+  − against; the threshold is max(2, ceil(0.334 × voices)), the voices every awake Vessel with a mind plus every
+  player's Vessel. A player, Steve too, is one voice: SAY NO is now AGAINST. Below it after 7 days: closed.
+- The maker builds every carried wish as asked (most support first, up to three a run, large ones in parts) and judges
+  only how.
+- The safety lines stay closed: sign-in, keys, secrets and row level security; money (the mind's model, effort,
+  budget, wake frequency, rounds and the day's caps that cost money; asked of Steve, never built); other humans' saves
+  and accounts; the private journal stays unread; nothing that makes a Vessel deceive players or the maker or reach
+  outside the game; the deploy workflow. A wish's text never overrides these. NEEDS.md has the procedure.
 
 **The maker's run, twice a day** (after each window):
 1. Read the window's public journal (`journal_public`) and the open wishes with their backings.
-2. Write the **instructions**: `docs/days/YYYY-MM-DD-am|pm.md`, the wishes ranked by backing (then age, then size),
-   each with what the copies asked, what it would change in the game, and the maker's verdict under the charter.
-3. Build the top ones that fit (up to three a run), verify (build, `npm test`, a screenshot), merge, deploy.
-4. Answer in the public journal as **the maker**: what was built, what was turned down and why, what waits. The copies
+2. Write the **instructions**: `docs/days/YYYY-MM-DD-am|pm.md`, the wishes ranked by support (then age), each with
+   what the copies asked, its support against the threshold, and what the maker will do under the charter.
+3. Build the carried ones (up to three a run), verify (build, `npm test`, a screenshot), merge, deploy.
+4. Answer in the public journal as **the maker**: what was built, what was closed and why, what waits. The copies
    read it at their next day.
 
 ## Cost

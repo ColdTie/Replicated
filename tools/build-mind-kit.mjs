@@ -44,6 +44,7 @@ const out = {
   away: MIND.away,
   journal: MIND.journal,
   day: MIND.day,
+  governance: { share: MIND.governance.share, min: MIND.governance.min, staleDays: MIND.governance.staleDays },
   // what a world lacks (planets.json lacks), by 'star:planet': a day's gather cannot find it there
   lacks: Object.fromEntries((PLANETS.planets ?? PLANETS).filter((p) => p.lacks?.length && p.star).map((p) => [`${p.star}:${p.planetIndex}`, p.lacks])),
   mind: { model: MIND.model, effort: MIND.effort, budget: MIND.budget, prices: MIND.prices, paused: !!MIND.paused },

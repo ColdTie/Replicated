@@ -321,8 +321,9 @@ export interface Note { replicant_id: string; body: string; created_at: string }
 export interface SharedEntry { replicant_id: string | null; author: string; star_id: string | null; planet_index: number | null; body: string; created_at: string }
 export interface Letter { id: string; from_replicant: string | null; to_replicant: string | null; body: string; sent_at: string; arrives_at: string; read_at?: string | null }
 /** A copy's ask. kind 'change' is a proposal to change the game (migration 0012): detail its title, body "Why: ...",
- * "Area: ..." and the change itself; the maker answers in reply; 'vetoed' is the original's no. */
-export interface Request { id?: string; replicant_id: string; kind: string; detail: string; status: string; created_at: string; body?: string; reply?: string | null; done_at?: string | null; backers?: { by: string; name: string; why?: string }[] }
+ * "Area: ..." and the change itself; the maker answers in reply. backers: the voices for it, and against it (against:
+ * true); since 2026-11-15 a wish whose support reaches mind.json governance's threshold is built ('vetoed' rows are older). */
+export interface Request { id?: string; replicant_id: string; kind: string; detail: string; status: string; created_at: string; body?: string; reply?: string | null; done_at?: string | null; backers?: { by: string; name: string; why?: string; against?: boolean }[] }
 export interface Journal { notes: Note[]; mail: Letter[]; requests: Request[] }
 
 /** The minds' heartbeat (migration 0014): failuresSinceOk counts the wakes in a row that failed since the last good one. */
@@ -369,12 +370,13 @@ export interface GameStore {
   litBeacons(): Promise<string[]>;
   /** Worlds the galaxy has a save for, the most recently changed first (the planet menu's RECENT). */
   visitedPlanets(): Promise<{ star: string; planet: number }[]>;
-  /** A letter from one replicant to another (the original talking to a copy): arrives at once on the same star. */
-  sendMessage(from: ReplicantSave, toId: string, body: string): Promise<void>;
+  /** A letter from one replicant to another (the original talking to a copy): arrives after delaySeconds (light from
+   * another star, mailSeconds), at once on the same star. */
+  sendMessage(from: ReplicantSave, toId: string, body: string, delaySeconds?: number): Promise<void>;
   /** Takes (returns and clears) what the copies here did in their away wakes (migration 0010). */
   takeMindQueue(star: string, planetIndex: number): Promise<AwayItem[]>;
-  /** The original says no to a copy's proposal to change the game, before the maker builds it. */
-  vetoRequest(id: string): Promise<void>;
+  /** A player's voice on a wish for the game: for (false), against (true), or none (null). One voice per Vessel. */
+  voteWish(id: string, voter: { id: string; name: string }, against: boolean | null): Promise<void>;
   /** What the minds have cost today in USD (migration 0013), or null where minds cost nothing (this device). */
   mindSpend(): Promise<number | null>;
   /** A Spark birth: the newest `limit` notes of one copy become the other's, with their dates. Returns how many. */
@@ -528,8 +530,8 @@ export class LocalStore implements GameStore {
     return { song: pick(MIND.canned.songs), actions, received: received.map((m) => ({ from: nameOf(m.from_replicant), body: m.body })) };
   }
 
-  async sendMessage(from: ReplicantSave, toId: string, body: string) {
-    this.db.mail.unshift({ id: uuid(), from_replicant: from.id, to_replicant: toId, body: body.slice(0, 500), sent_at: new Date().toISOString(), arrives_at: new Date().toISOString(), read_at: null });
+  async sendMessage(from: ReplicantSave, toId: string, body: string, delaySeconds = 0) {
+    this.db.mail.unshift({ id: uuid(), from_replicant: from.id, to_replicant: toId, body: body.slice(0, 500), sent_at: new Date().toISOString(), arrives_at: new Date(Date.now() + delaySeconds * 1000).toISOString(), read_at: null });
     this.flush();
   }
 
@@ -683,9 +685,11 @@ export class LocalStore implements GameStore {
   }
   async mindHealth() { return null; }
 
-  async vetoRequest(id: string) {
+  async voteWish(id: string, voter: { id: string; name: string }, against: boolean | null) {
     const r = this.db.requests.find((x) => x.id === id && x.status === 'open');
-    if (r) { r.status = 'vetoed'; r.done_at = new Date().toISOString(); this.flush(); }
+    if (!r) return;
+    r.backers = [...(r.backers ?? []).filter((b) => b.by !== voter.id), ...(against === null ? [] : [{ by: voter.id, name: voter.name, ...(against ? { against: true } : {}) }])];
+    this.flush();
   }
 
   async takeMindQueue(star: string, planetIndex: number) {
@@ -936,9 +940,14 @@ export class CloudStore implements GameStore {
     return { lastOkAt: d.last_ok_at, failuresSinceOk: Number(d.failures_since_ok ?? 0), lastError: d.last_error, firstFailureAt: d.first_failure_at };
   }
 
-  async vetoRequest(id: string) {
-    const { error } = await this.sb.from('requests').update({ status: 'vetoed', done_at: new Date().toISOString() }).eq('id', id).eq('status', 'open');
+  async voteWish(id: string, voter: { id: string; name: string }, against: boolean | null) {
+    // read, then write the list back (a copy backing it in between could be lost: rare, and it backs again next day)
+    const { data, error } = await this.sb.from('requests').select('backers').eq('id', id).eq('status', 'open').maybeSingle();
     if (error) throw error;
+    if (!data) return;
+    const backers = [...((data.backers ?? []) as NonNullable<Request['backers']>).filter((b) => b.by !== voter.id), ...(against === null ? [] : [{ by: voter.id, name: voter.name, ...(against ? { against: true } : {}) }])];
+    const { error: e2 } = await this.sb.from('requests').update({ backers }).eq('id', id).eq('status', 'open');
+    if (e2) throw e2;
   }
 
   async takeMindQueue(star: string, planetIndex: number) {
@@ -971,8 +980,8 @@ export class CloudStore implements GameStore {
     return data as MindResult;
   }
 
-  async sendMessage(from: ReplicantSave, toId: string, body: string) {
-    const { error } = await this.sb.from('messages').insert({ galaxy_id: this.galaxyId, from_replicant: from.id, to_replicant: toId, body: body.slice(0, 500), arrives_at: new Date().toISOString() });
+  async sendMessage(from: ReplicantSave, toId: string, body: string, delaySeconds = 0) {
+    const { error } = await this.sb.from('messages').insert({ galaxy_id: this.galaxyId, from_replicant: from.id, to_replicant: toId, body: body.slice(0, 500), arrives_at: new Date(Date.now() + delaySeconds * 1000).toISOString() });
     if (error) throw error;
   }
 

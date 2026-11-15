@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { sound } from '../../audio/Sound';
 import { BUILDINGS, MIND, PALETTE, SUPPLIES, WARREN } from '../../core/data';
-import { closeJournal, journalOpen, openJournal } from '../../ui/journal';
+import { closeJournal, journalOpen, openJournal, type JournalTab } from '../../ui/journal';
 import TALK from '../../data/talk.json';
 import { session } from '../../core/session';
 import { Npc } from '../../entities/Npc';
@@ -421,35 +421,46 @@ export class Minds {
     }));
   }
 
-  /** Tab / I, or a tap on the corner label: what the copies here remember, write and ask for. */
-  async toggleJournal() {
+  /** Tab / I, or a tap on the corner label: the Metanoia (src/ui/journal.ts): every Vessel, your letters, the days,
+   * the wishes, this world. tab: open on that page. */
+  async toggleJournal(tab?: JournalTab) {
     if (journalOpen()) { closeJournal(); return; }
     const st = session.store;
-    if (!st) return;
-    const [j, spent, health, shared] = await Promise.all([st.journal(this.s.npcs.map((n) => n.data.id)), st.mindSpend().catch(() => null), st.mindHealth().catch(() => null), st.sharedJournal(24).catch(() => [])]);
-    const names: Record<string, string> = {};
-    for (const r of this.everyone) names[r.id] = r.name;
-    if (session.replicant) names[session.replicant.id] = session.replicant.name;
-    const nameOf = (id: string) => names[id] ?? this.s.npcs.find((n) => n.data.id === id)?.data.name ?? 'someone';
+    const me = session.replicant;
+    if (!st || !me) return;
+    const all = await st.listReplicants().catch(() => this.everyone);
+    this.everyone = all;
+    const ids = [...new Set([...all.map((r) => r.id), ...this.s.npcs.map((n) => n.data.id), me.id])];
+    const [j, spent, health, shared] = await Promise.all([st.journal(ids), st.mindSpend().catch(() => null), st.mindHealth().catch(() => null), st.sharedJournal(60).catch(() => [])]);
+    const nameOf = (id: string) => all.find((r) => r.id === id)?.name ?? this.s.npcs.find((n) => n.data.id === id)?.data.name ?? 'someone';
     const feelings: Record<string, string> = {};
     for (const n of this.s.npcs) feelings[n.data.id] = `${n.moodWord}${n.lowNeeds().length ? ': ' + n.lowNeeds().join(', ') : ''}`;
+    const reopen = (t?: JournalTab) => { closeJournal(); return this.toggleJournal(t); };
     const actions = {
-      approve: (id: string) => { this.s.buildings.approve(id); void this.toggleJournal().then(() => this.toggleJournal()); },
-      veto: (id: string) => { this.s.buildings.veto(id); void this.toggleJournal().then(() => this.toggleJournal()); },
       talk: (id: string, text: string) => void this.talkTo(id, text),
       give: (id: string) => this.giveTo(id),
       awaken: (id: string) => void this.awakenCopy(id),
-      vetoChange: (id: string) => { void st.vetoRequest(id).catch((e) => console.warn('veto', e)).then(() => { closeJournal(); return this.toggleJournal(); }); },
+      vote: (id: string, against: boolean | null) => { void st.voteWish(id, { id: me.id, name: me.name }, against).catch((e) => console.warn('vote', e)).then(() => reopen('wishes')); },
     };
-    openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.s.visit ? 0 : session.replicant?.traits.sparks ?? 0, place: this.s.placeLabel, copies: this.s.npcs.map((n) => n.data), names, journal: j, shared, feelings, actions,
-      buildings: this.s.buildings.describe(nameOf), pending: this.s.buildings.list.filter((b) => !b.vetoed && !b.approved && !b.built).map((b) => ({ id: b.id, name: b.name })), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
+    openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.s.visit ? 0 : me.traits.sparks ?? 0, place: this.s.placeLabel,
+      me: { id: me.id, name: me.name, star: this.s.planet.star, planet: this.s.planet.planetIndex }, all, copies: this.s.npcs.map((n) => n.data), journal: j, shared, feelings, actions, tab,
+      buildings: this.s.buildings.describe(nameOf), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
   }
 
-  /** The original speaks to a copy: a letter that arrives at once; the copy reads it at its next wake. */
+  /** The original writes to a Vessel: a letter that arrives at once on this world, after the light's delay from
+   * another (mailSeconds); the Vessel reads it at its next wake. */
   async talkTo(id: string, text: string) {
     const me = session.replicant, st = session.store;
     const npc = this.s.npcs.find((n) => n.data.id === id);
-    if (!me || !st || !npc || !text.trim()) return;
+    if (!me || !st || !text.trim()) return;
+    if (!npc) {
+      const far = this.everyone.find((r) => r.id === id);
+      if (!far) return;
+      const delay = mailSeconds(this.s.planet.star, far.star_id, this.s.litBeacons, MIND.mailSecondsPerLy);
+      try { await st.sendMessage(me, id, text.trim(), delay); } catch (e) { console.warn('letter failed', e); return; }
+      this.mindLog.push({ t: this.mindClock, text: `${me.name} wrote to ${far.name}` });
+      return;
+    }
     try { await st.sendMessage(me, id, text.trim()); } catch (e) { console.warn('talk failed', e); return; }
     npc.receiveLetter();
     this.mindLog.push({ t: this.mindClock, text: `${me.name} spoke to ${npc.data.name}` });
