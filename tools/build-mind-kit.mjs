@@ -12,6 +12,7 @@ import fs from 'node:fs';
 const read = (f) => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, import.meta.url), 'utf8'));
 const PARTS = read('parts.json'), PLAYER = read('player.json'), SUPPLIES = read('supplies.json'), BUILDINGS = read('buildings.json');
 const PLANETS = read('planets.json'), TRAVEL = read('travel.json'), DRIFT = read('drift.json'), HOMEWORLD = read('homeworld.json'), BIOWORKS = read('bioworks.json');
+const BIOMES = read('biomes.json'), DESIGNS = read('designs.json');
 const MIND = read('mind.json'), WARREN = read('warren.json'), STARS = read('stars.json'), BEACON = read('beacon.json');
 const names = (o) => Object.keys(o ?? {}).filter((k) => !k.startsWith('_'));
 const colorIndex = Object.fromEntries(names(PARTS.colors).map((k) => [k, PARTS.colors[k]]));
@@ -44,6 +45,16 @@ const out = {
   away: MIND.away,
   journal: MIND.journal,
   day: MIND.day,
+  // the universe as it is made (the Vessels' work, mind.json mandate): the mandate, the named worlds, the kinds of
+  // ground a world can have, the materials, the Cems' tree of designs (the technology), what nobody has made yet
+  universe: {
+    mandate: MIND.mandate.text, frontier: MIND.mandate.frontier, kinds: MIND.mandate.kinds, roadmap: MIND.mandate.roadmap,
+    worlds: (PLANETS.planets ?? PLANETS).map((p) => [p.name, p.star, p.planetIndex, p.subtitle ?? '']),
+    biomes: BIOMES.biomes.map((b) => b.id),
+    materials: names(SUPPLIES.materials),
+    tree: DESIGNS.designs.map((d) => [d.id, d.name, d.needs ?? [], d.gives ?? '']),
+    stars: STARS.stars.length,
+  },
   governance: { share: MIND.governance.share, min: MIND.governance.min, staleDays: MIND.governance.staleDays },
   // what a world lacks (planets.json lacks), by 'star:planet': a day's gather cannot find it there
   lacks: Object.fromEntries((PLANETS.planets ?? PLANETS).filter((p) => p.lacks?.length && p.star).map((p) => [`${p.star}:${p.planetIndex}`, p.lacks])),

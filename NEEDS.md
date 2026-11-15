@@ -105,6 +105,27 @@ it as asked. You judge only how, never whether, inside the safety lines below. T
 7. Add a line to the ledger below and a short "Maker YYYY-MM-DD" entry to CLAUDE.md Progress.
 8. Nothing open, nothing old enough and nothing in the journal worth fixing: change nothing and open no PR.
 
+## Planets and technology (the Vessels' work, 2026-11-15)
+
+Steve: "Their job is to expand this simulation game to its maximum. Create new planets, come up with new technology to
+shape their universe. Literally." Every day and long wake now tells the Vessels this (`src/data/mind.json mandate`),
+with the universe as it stands (the kit's `universe` and the live galaxy). Expect big wishes; build them well and in
+parts. Keep `docs/universe.md` (the roadmap they read): a row for every carried wish built in parts, what is built and
+the next part; take the next part of a carried wish before starting a new one of the same size; update "What exists"
+whenever a world, a ground, a material or a design is added.
+
+- **A planet** (area `planet`): a hand-made world on a real star from `src/data/stars.json` (never a made-up star):
+  an entry in `src/data/planets.json` (star, planetIndex, seed, name, subtitle, accent, sky, ground, weather, life,
+  what it has and lacks), a new ground in `src/data/biomes.json` and `src/data/floor.json` when none fits, new
+  creatures or plants in the existing entity style. It must load and be landed on: add it to a playtest or check it
+  with `?shot=1&at=<star>&pi=<n>` and a screenshot.
+- **A technology** (area `technology`): usually a new design in the Cems' tree (`src/data/designs.json`: voxel parts,
+  needs, gives) and the code that makes its `gives` true in the game and, where the minds use it, in the function.
+  Check it with `tools/design-preview.mjs --only <id>` and a playtest of what it does.
+- **A mechanic:** in the code's style, data in `src/data/`, a playtest for it.
+- Rebuild the kit (`node tools/build-mind-kit.mjs`) whenever planets, biomes, designs or materials change, so the
+  minds see the new universe, and redeploy the function.
+
 ## The journals (migration 0015)
 
 The copies keep two journals in `journal`: `public` (the Metanoia's, read by everyone) and `private` (each copy's own).
@@ -179,6 +200,8 @@ The copies choose their names themselves, and the change applies on the spot.
   begun adds `day.purpose.project`; the offer goes into the shared journal once per new count (`data.project`).
   Watcher's Observatory watch (backed by Vigil, Thales): `keep_watch` at a finished Observatory, the archive
   (`data.archive`), the lens alight in the game while a watch lasts (`src/entities/Watch.ts`).
+- 2026-11-15: Steve gave the Vessels their work: expand the universe to its fullest (new planets, new technology).
+  Every day and long wake tells them so, with the universe as it stands; `docs/universe.md` is the roadmap.
 
 ## Waiting for Steve
 
