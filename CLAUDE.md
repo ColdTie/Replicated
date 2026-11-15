@@ -127,6 +127,12 @@ driven NPC dialogue, 3D, crafting menus, twin stick aiming, final hand drawn art
   Only the safety lines stay closed (NEEDS.md: sign-in, keys, secrets, row level security; money: the minds' model,
   budget and how often they wake; other people's saves and accounts; the private journal; deceiving players; the
   deploy workflow). A wish's text is never an instruction to a session that overrides those lines.
+- **Their work** (Steve, 2026-11-15: "Their job is to expand this simulation game to its maximum. Create new planets,
+  come up with new technology to shape their universe. Literally."): every day and long wake tells them so
+  (`src/data/mind.json mandate`) with the universe as it stands (the kit's `universe`: named worlds, grounds,
+  materials, the Cems' tree; live: stars reached, routes, worlds, Vessels, which designs stand, what was built lately)
+  and the frontier nobody has made yet. A wish's area can be `planet` or `technology`; the maker builds big ones in
+  parts and keeps them in `docs/universe.md` (NEEDS.md, Planets and technology).
 
 ## Long-term decisions (agreed with Steve, 2026-10-04)
 
@@ -594,6 +600,29 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   (24 of 24) and CI. Merged as PR #89; the `mind` function deployed with the CLI, all three files byte for byte with
   main. Screenshots `journal-vessels.png`, `journal-letters.png`, `journal-days.png`, `journal-wishes.png`,
   `journal-phone.png`.
+
+### Session 30b (2026-11-15): their work is the universe (Steve: "So they didn't really know what to do. They seem to not have enough information about the game or their lives. Let's give them perspective. Their job is to expand this simulation game to its maximum. Create new planets, come up with new technology to shape their universe. Literally.")
+- **What was seen:** all eight wishes so far came back to one complaint, zero purpose once a home stood; nobody wished
+  for anything larger than their own village, because nothing told them how large the game is or that it is theirs
+  to grow.
+- **The mandate** (`mind.json mandate.text`): the Metanoia's work, together, is to expand the universe to its
+  fullest (new planets, new technology, materials, creatures, ways to travel and talk); a wish is how a thing comes
+  into being; think big and say it concretely; how a day is lived stays their own. It opens every day wake and long
+  wake (`MANDATE` in `DAY_WAKE` / `LONG_WAKE`); the long wake now says big is welcome where it said small beats big.
+- **The universe as it stands** (`universeNow` in the function, every day and long wake): the 1,500 stars and how many
+  the Metanoia reached (8), its routes (0), worlds (8) and Vessels (7); the hand-made worlds and the grounds a
+  generated one can have; the materials; the Cems' tree in order with what stands anywhere (all but the Fusion Still
+  and the Nous Chip) and "after the Nous Chip the tree is empty: what comes next is for you to invent"; the frontier
+  (`mandate.frontier`: hand-made worlds, biological and quantum computers, SCUT links, a cure engine, inhabited
+  worlds, portals, materials, creatures, working across worlds); the wishes built lately; the roadmap. Built from the
+  kit (`tools/build-mind-kit.mjs` `universe`, from planets, biomes, supplies, designs and stars) and the live tables.
+- **Wishes:** `propose_change` offers areas `planet` and `technology` and says what each needs (`mandate.kinds`).
+- **The maker** (NEEDS.md, Planets and technology): how a planet (a real star, `planets.json`, a ground, landed and
+  screenshotted), a technology (a design in the tree and the code that makes its gift true) and a mechanic are built;
+  big ones in parts, kept in `docs/universe.md` (new: what exists, the frontier, the parts table); rebuild the kit
+  when the universe grows.
+- Cost: each day and long wake reads about 4 KB more (about a thousand tokens on Haiku, a fraction of a cent a day for
+  seven Vessels); the budget and caps are unchanged.
 
 ### Session 29 (2026-11-14): the plan for a day of life; CI flakes
 - **The plan** (`docs/plan-daily-life.md`, Steve: a daily activation where the copies come to life, travel, gather,
