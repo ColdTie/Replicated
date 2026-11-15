@@ -585,6 +585,10 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   backing): a wish of theirs could ask for it.
 - `playtest-changes` checks the DAYS page and AGAINST (counted, the wish stays open, a second press takes it back);
   `playtest-buildings` checks a proposal goes ahead at once and the journal has no approve / veto.
+- Verified: build, typecheck (also unused locals and parameters), `check-mind-tools`, `deno check`, the full `npm test`
+  (24 of 24) and CI. Merged as PR #89; the `mind` function deployed with the CLI, all three files byte for byte with
+  main. Screenshots `journal-vessels.png`, `journal-letters.png`, `journal-days.png`, `journal-wishes.png`,
+  `journal-phone.png`.
 
 ### Session 29 (2026-11-14): the plan for a day of life; CI flakes
 - **The plan** (`docs/plan-daily-life.md`, Steve: a daily activation where the copies come to life, travel, gather,
