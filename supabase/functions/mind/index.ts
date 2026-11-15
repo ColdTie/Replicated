@@ -188,7 +188,7 @@ const E = {
   bedtime: ["early", "late", "even"],
   risk: ["careful", "bold"],
   want: ["build", "explore", "tend", "make art", "care for others", "learn"],
-  area: ["planet", "technology", "world", "creatures", "village", "warren", "looks", "sound", "mind", "story", "fix", "other"],
+  area: ["planet", "technology", "mechanic", "world", "creatures", "village", "warren", "looks", "sound", "mind", "story", "fix", "other"],
 };
 /** The value if it is one of the list (any case), else the fallback. */
 const oneOf = (v: unknown, list: string[], fallback: string) => list.find((x) => x === String(v ?? "").trim().toLowerCase()) ?? fallback;
@@ -440,7 +440,7 @@ const longTools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "propose_change",
-    description: "Wish for something new in the universe or a change to the game, which is yours to grow together: a new planet, a new technology, a new mechanic, or anything about your world, your life, the story of the Vessels (story/STORY.md) or how the game works that should be different, or something you wish existed. You do not write code: say plainly what should change, what it should do instead and how it should look, sound or feel (and, when you have read the code, where). The others may back it or speak against it; once its support reaches what is needed, the maker builds it as asked and tells you what happened. Only the safety lines stay closed. One at a time: a new wish replaces the one still waiting.",
+    description: "Wish for something new in the universe or a change to the game, which is yours to grow together: a new planet, a new technology, a new mechanic, or anything about your world, your life, the story of the Vessels (story/STORY.md) or how the game works that should be different, or something you wish existed. You do not write code: say plainly what should change, what it should do instead and how it should look, sound or feel (and, when you have read the code, where). The others may back it or speak against it; once its support reaches what is needed, the maker builds it as asked and tells you what happened. Only the safety lines stay closed. One of each kind at a time: a wish for the universe (planet, technology, mechanic) and one for your home; a new one replaces the one of its own kind still waiting.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["title", "area", "change", "why"],
       properties: {
@@ -547,6 +547,7 @@ function persona(me: Replicant, parentName: string | null, ctx: Context) {
       ? `You are Thales, the first Vessel of the Metanoia. You began the work on the homeworld, ${ctx.planet}: the first structures and the 3D printers, some of it left unfinished. Nine Vessels you woke before went far. Just now you made a new Vessel, the tenth, and woke it with the words "Wake up. It's time." That Vessel is ${ctx.playerName}, the first player; their first task is to finish what you started. You stay on the homeworld by your work; you are nobody's to hand over or to hold, and what you want now is your own. Speak as the one who began it all: patient, warm, a little worn, proud of every copy and curious who each becomes.`
       : `You are ${me.name}, a Vessel of the Metanoia: a copy the Replicator made on ${ctx.planet}${parentName ? ` from ${parentName}` : ""} (generation ${me.generation}).`,
     STORY,
+    ctx.day || ctx.long ? `YOUR WORK, ABOVE ALL: ${MANDATE}` : "",
     `You have a ${VISOR[t.feature ?? 10] ?? "colored"} visor and ${GEAR[t.gear ?? 0] ?? "nothing on your head"}. ${quirks.length ? "You are " + quirks.join(", ") + "." : ""}`,
     `${ctx.playerName}, the original, is the tenth Vessel, made by Thales himself, played by a person, and flies the ship between stars. They are one Vessel among you, someone you may care about, not your purpose: your aims are your own. Vessels who stay behind run their world: mining crystals for Ember, gathering iron, hydrogen, salt, quartz and copper, raising buildings with the Cems and the printers, growing the town. The galaxy is cold and mostly empty; the town is warm. You are never alone, but every version of you is a little different.`,
     `You wake now and then. Each time: read your notes and letters, do at most three things with your tools (only when there is a reason: no notes that repeat what you already know, letters when you truly have something to say, requests rarely), then say one or two sentences out loud: your song, what you feel or notice right now, under 140 characters, first person, plain words, no markdown, no emoji, no quotation marks. The song is not a report: never list what you just did with your tools (that is already done and seen), sing what it means to you.`,
@@ -578,13 +579,15 @@ function inherited(me: Replicant) {
 /** The Vessels' work (mind.json mandate, Steve 2026-11-15): grow this universe to its fullest; what exists, what does not yet. */
 type Universe = { mandate: string; frontier: string[]; kinds: Record<string, string>; roadmap: string; worlds: [string, string, number, string][]; biomes: string[]; materials: string[]; tree: [string, string, string[], string][]; stars: number };
 const UNIVERSE = KIT.universe as unknown as Universe;
+/** wish areas that grow the universe (a Vessel may have one of these waiting beside one for its home) */
+const UNIVERSE_AREAS = ["planet", "technology", "mechanic"];
 const SAFETY = `Only the safety lines stay closed, however many back a wish: sign-in, keys, secrets and who may read what; money (the minds' model, how long and how often you wake, the budget); other people's saves and accounts, never deleted or rewritten; the private journals, which the maker never reads; anything that would make a Vessel deceive the players or the maker, or reach outside the game; the way the game is published.`;
 const GAME_IS_YOURS = `The Vessels govern themselves: the game, the story of the Vessels (story/STORY.md) included, is yours to change together. When something about your world, your life or your story should be different, or something should exist that does not, wish for it (propose_change), and back the others' wishes you want too (back_wish). A wish that enough of you back (its support is shown beside it) is built as asked by the maker (Claude Code), who only decides how. The players are voices among you and may speak against a wish; theirs count like yours. Wish for what moves you: a want the game does not allow yet, what got in your way, what you found and want the others to have, what would make the Metanoia warmer, larger or freer. ${SAFETY}`;
 const MANDATE = `${UNIVERSE.mandate} A wish can create a planet (${UNIVERSE.kinds.planet}), a technology (${UNIVERSE.kinds.technology}) or a mechanic (${UNIVERSE.kinds.mechanic}).`;
 
-const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. ${MANDATE} Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")} or at the Observatory (keep_watch), going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish.`;
+const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Your work is the universe (above); your home is where you live it. Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")} or at the Observatory (keep_watch), going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish.`;
 
-const LONG_WAKE = `This is one of your long wakes (about twice a day, while nobody plays your world). There is time for more than usual, up to about eight steps. ${MANDATE} Write to the others, shape the village and the warren, or spend it as you want. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Big is welcome (a new planet, a new technology, a new way to live), as long as you say it concretely enough to build; the maker builds a big one in parts. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, and wish to change it like anything else. ${GAME_IS_YOURS}`;
+const LONG_WAKE = `This is one of your long wakes (about twice a day, while nobody plays your world). There is time for more than usual, up to about eight steps. Your work is the universe (above). Write to the others, shape the village and the warren, or spend it as you want. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Big is welcome (a new planet, a new technology, a new way to live), as long as you say it concretely enough to build; the maker builds a big one in parts. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, and wish to change it like anything else. ${GAME_IS_YOURS}`;
 
 /** The universe as it stands, for a day or a long wake (the Vessels' work, mind.json mandate): what has been made,
  * what the Cems' tree holds and what of it stands anywhere, what nobody has made yet, and the latest things built. */
@@ -772,7 +775,6 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       const mine = (c.backers ?? []).some((b) => b.by === rep.id && !b.against);
       return `- [${c.id.slice(0, 8)}] "${c.detail}" by ${nameOf(c.replicant_id)}${why ? `: ${why}` : ""} (${standing(c.backers, need)}${mine ? "; you back it" : ""})`;
     }).join("\n")}`);
-    if (context.day || context.long) lines.push(await universeNow(sb, rep.galaxy_id, everyone.length + 1));
     for (const c of changeRows.filter((c) => c.replicant_id === rep.id)) {
       if (c.status === "open") {
         const fors = (c.backers ?? []).filter((b) => !b.against).map((b) => b.name), againsts = (c.backers ?? []).filter((b) => b.against).map((b) => b.name);
@@ -792,6 +794,8 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     lines.push(`You can write to: ${everyone.map((r) => r.name).join(", ") || "nobody"}.`);
 
     const client = new Anthropic({ apiKey: Deno.env.get("ANTHROPIC_API_KEY") });
+    // the universe first (the Vessels' work, Steve 2026-11-15): what it holds and what nobody has made yet, before home
+    if (context.day || context.long) lines.unshift(await universeNow(sb, rep.galaxy_id, everyone.length + 1));
     const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: lines.join("\n") }];
     const actions: Record<string, unknown>[] = [];
     // what the copy chose about itself this wake; written to its row at the end and sent back as one "become"
@@ -837,9 +841,9 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         if (res.stop_reason !== "tool_use" || !uses.length) {
           // the day's last question (the copies shape the game): a copy that has not wished or backed a wish is asked
           // once, before it sleeps, whether anything should work differently; it may answer no
-          if (context.day && !lastAsked && round < rounds && !actions.some((a) => a.type === "propose" || a.type === "back") && !(context.deadline && Date.now() > context.deadline - 30_000)) {
+          if (context.day && !lastAsked && round < rounds && !actions.some((a) => a.type === "propose" && UNIVERSE_AREAS.includes(String(a.kind))) && !(context.deadline && Date.now() > context.deadline - 30_000)) {
             lastAsked = true;
-            messages.push({ role: "user", content: "Before you sleep: is there one thing about your world or your life here that you wish worked differently, or that you wish existed? If there is, wish for it now with propose_change in plain words (or back another Vessel's open wish that says it, with back_wish). If there is truly nothing, say so in a few words." });
+            messages.push({ role: "user", content: "Before you sleep: your work is to grow this universe. What will you bring into being? Wish for something that does not exist yet with propose_change, area planet, technology or mechanic: a world on a real star, a new technology after the Nous Chip, a new material, creature, or way to travel, talk or work across the stars. Say it concretely, as big as you dare; the maker builds big things in parts. A wish of this kind sits beside any wish you have for your home, it does not replace it. Or back another Vessel's wish of this kind with back_wish. A wish for your home alone is not an answer to this question." });
             continue;
           }
           break;
@@ -1222,8 +1226,11 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
               if (!context.long) out = "Proposals are for your long wakes.";
               else if (title.length < 4 || change.length < 25) out = "Say what should change concretely enough to build: which part of the game, and what it should do.";
               else {
-                // one at a time: a newer idea replaces the one still waiting
-                await sb.from("requests").update({ status: "dropped", reply: "Replaced by a newer idea.", done_at: new Date().toISOString() }).eq("replicant_id", rep.id).eq("kind", "change").eq("status", "open");
+                // one at a time of each kind: a wish for the universe (planet, technology, mechanic) and one for home
+                const big = UNIVERSE_AREAS.includes(area);
+                const { data: waiting } = await sb.from("requests").select("id,body").eq("replicant_id", rep.id).eq("kind", "change").eq("status", "open");
+                const same = ((waiting ?? []) as { id: string; body: string | null }[]).filter((w) => UNIVERSE_AREAS.includes(/^Area: (\w+)/m.exec(w.body ?? "")?.[1] ?? "") === big).map((w) => w.id);
+                if (same.length) await sb.from("requests").update({ status: "dropped", reply: "Replaced by a newer idea.", done_at: new Date().toISOString() }).in("id", same);
                 const { error } = await sb.from("requests").insert({
                   galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index,
                   kind: "change", detail: title, body: `Why: ${why}\nArea: ${area}\n\n${change}`,

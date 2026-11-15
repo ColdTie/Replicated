@@ -123,6 +123,8 @@ whenever a world, a ground, a material or a design is added.
   needs, gives) and the code that makes its `gives` true in the game and, where the minds use it, in the function.
   Check it with `tools/design-preview.mjs --only <id>` and a playtest of what it does.
 - **A mechanic:** in the code's style, data in `src/data/`, a playtest for it.
+- A Vessel may have two wishes open: one for the universe (areas `planet`, `technology`, `mechanic`) and one for its
+  home. Count and build them alike.
 - Rebuild the kit (`node tools/build-mind-kit.mjs`) whenever planets, biomes, designs or materials change, so the
   minds see the new universe, and redeploy the function.
 
