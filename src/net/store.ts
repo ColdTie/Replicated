@@ -40,6 +40,8 @@ export interface ReplicantSave {
     /** what the original handed it (gifts), by material */
     inventory?: Record<string, number>;
     tell?: { text: string; at: number };
+    /** a watch kept at the Observatory in a day of life (keep_watch, src/data/watch.json): the star, when, until when */
+    watch?: { star: string; ly: number; at: number; until: number };
     /** born with a Spark beside an older copy: it carries that copy's notes and remembers being it (drift.json spark) */
     inherit?: { from: string; name: string; wants?: string[] };
     /** what the vessel's hold carries between worlds (supplies.json signature): set at launch, unloaded on landing */
@@ -95,6 +97,9 @@ export interface Gift { id: string; type: string; by: string; count?: number; ne
 
 export interface Replicating { start: number; ms: number; kind: 'wake' | 'hold'; row: ReplicantSave; by: string; elder?: string; cems?: boolean }
 
+/** One watch kept at the Observatory: who, toward which star (its distance from here), what it saw. */
+export interface ArchiveEntry { by: string; name: string; star: string; ly: number; text: string; at: number }
+
 export interface PlanetData {
   /** "EARTH - SOL" and the biome's words, kept for the minds' away wakes */
   label?: string; biome?: string;
@@ -130,6 +135,10 @@ export interface PlanetData {
   /** What the original granted a copy (written from outside the game when Steve says yes to a request): placed as
    * builds credited to the copy on the next load, then removed */
   gifts?: Gift[];
+  /** the archive of the Observatory's watches (keep_watch in a day of life), oldest first, the last watch.json keep */
+  archive?: ArchiveEntry[];
+  /** the standing next work offered once every building here stands finished (the mind function): when, at how many */
+  project?: { at: number; built: number };
   /** Who lives where in the town: copy id -> lot index, building id -> lot index (indexes into the town's lots) */
   town?: { lots: Record<string, number>; civic: Record<string, number> };
   /** What the original saw here last (src/scenes/planet/Homecoming.ts): on the next landing what changed is shown */
