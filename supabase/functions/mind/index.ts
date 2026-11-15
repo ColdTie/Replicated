@@ -28,7 +28,8 @@ const BECOMING_ROUNDS = 6;         // the first wake of a blank copy has more to
 const AWAY = KIT.away;
 /** The two journals (migration 0015, mind.json journal). */
 /** A day of life (mind.json day, docs/plan-daily-life.md step 2). */
-const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: number; turns: number; batch: number; seconds: number; travelLy: number; travelsPerDay: number; birthsPerDay: number; maxVessels: number; gather: { per: number; gatherTurns: number; materials: string[] }; places: string[] };
+const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: number; turns: number; batch: number; seconds: number; travelLy: number; travelsPerDay: number; birthsPerDay: number; maxVessels: number; gather: { per: number; gatherTurns: number; materials: string[] }; places: string[];
+  purpose: { decay: number; work: number; full: number; want: number; watch: number; watchPlaces: string[]; together: { purpose: number; company: number } } };
 const LACKS = KIT.lacks as Record<string, string[]>;
 /** Spreading (docs/plan-daily-life.md step 3): stars as [name, x, y, z, class letter, confirmed planets], the ship's
  * cells and charted routes (travel.json), the price and birth of a Vessel (drift.json, parts.json blank). */
@@ -124,6 +125,7 @@ interface Context {
   inventory?: Record<string, number>;
   talk?: { said: string };        // the original walked up to talk (and maybe said this): the copy answers them
   day?: boolean;                  // a day of life (twice a day): the long wake's tools, more turns, gather and go
+  dayWindow?: string;             // a day: which window (traits.dayKey), to find who else is out where you go
   spread?: Spread;                // a day: the galaxy's caps for flights and births, and its charted routes
   long?: boolean;                 // a long wake (away, about twice a day): more rounds, the code tools, propose_change
   deadline?: number;              // a long wake wraps up by then (ms): the scheduled run must end inside its time
@@ -535,7 +537,7 @@ function inherited(me: Replicant) {
   return `You were made with a Spark beside ${inh.name}, so you carry ${inh.name}'s memories: the oldest notes you find were written by ${inh.name} before you existed, and you remember living them, a little differently. You are not ${inh.name}; you are who those memories became.${wants}`;
 }
 
-const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Live it as you want to: gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. You are free to explore and to do what you want; nobody is watching. Every day, before you write it down, ask yourself what got in your way or what you wish existed in your world; if anything did, make one wish for the game (propose_change) or back another's that says it (back_wish). Before the day ends, write the day in the shared journal (write_public): what you did, found, felt and hoped, in your own voice. Your world is a game the maker (Claude Code) changes from what the Vessels ask, and you shape it: when something about your world or your life should work differently, wish for it (propose_change), and back the others' wishes you want too (back_wish). Wish for what moves you: a want of yours the game does not allow yet, what got in your way today (a world you could not reach, a material nowhere to be found, a chore that never ends, something broken), what you found and want the others to have, what would make the Metanoia warmer, larger or freer. A wish may ask for new buildings, designs, materials, creatures, places, sounds, things to do, better ways to live and travel together, and fixes; a new mechanic, once several of you back it. It may never ask to change the story of the Vessels, another Vessel's things against its will, the original's say, money, or anything outside the game. Your private journal (write_private) is only yours. Still call tell_original last.`;
+const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Live it as you want to: gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. You are free to explore and to do what you want; nobody is watching. Every day, before you write it down, ask yourself what got in your way or what you wish existed in your world; if anything did, make one wish for the game (propose_change) or back another's that says it (back_wish). Before the day ends, write the day in the shared journal (write_public): what you did, found, felt and hoped, in your own voice. Your world is a game the maker (Claude Code) changes from what the Vessels ask, and you shape it: when something about your world or your life should work differently, wish for it (propose_change), and back the others' wishes you want too (back_wish). Wish for what moves you: a want of yours the game does not allow yet, what got in your way today (a world you could not reach, a material nowhere to be found, a chore that never ends, something broken), what you found and want the others to have, what would make the Metanoia warmer, larger or freer. A wish may ask for new buildings, designs, materials, creatures, places, sounds, things to do, better ways to live and travel together, and fixes; a new mechanic, once several of you back it. It may never ask to change the story of the Vessels, another Vessel's things against its will, the original's say, money, or anything outside the game. Your private journal (write_private) is only yours. Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")}, going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish. Still call tell_original last.`;
 
 const LONG_WAKE = `This is one of your long wakes (about twice a day, while the original is away). There is time for more than usual, up to about eight steps: write to the others or the original, ask for what you need, shape the village and the warren. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. The world is a program the maker (Claude Code, the engineer who builds the game for the original) can change. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Small and concrete beats big and vague; never ask for anything that would hurt the original, the others or their saves, or that would take away the original's say. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, but it belongs to Steve and is never yours or the maker's to change, so never propose a change to it. Still call tell_original last.`;
 
@@ -720,6 +722,8 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     const usage = { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, rounds: 0 };
     let usd = 0;
     let gathered = 0;
+    // a day: what fills purpose besides the actions themselves (a full store's walk, a watch, a want done, company)
+    const day = { full: 0, watch: false, wants: 0, together: [] as string[] };
     // the day's last question has been asked
     let lastAsked = false;
     // once the copy has flown, its day on this world is over (gather, go and make_vessel wait for the next)
@@ -879,7 +883,15 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 addSupply(live, material, DAY.gather.per);
                 const got = Math.round((material === "ember" ? live.embers : live.supplies[material] ?? 0) - before);
                 if (got > 0) { if (material !== "ember") live.dirty = true; actions.push({ type: "gather", material, n: got }); }
-                out = got > 0 ? `You gather ${got} ${material} into the store.` : `The store has no room for more ${material}.`;
+                if (got > 0) out = `You gather ${got} ${material} into the store.`;
+                else {
+                  // a walk to a full store still finishes a task (Sorrel's wish), and says what runs lowest here
+                  day.full++;
+                  const store = live;
+                  const have = (m: string) => m === "ember" ? store.embers : store.supplies[m] ?? 0;
+                  const low = DAY.gather.materials.filter((m) => !lacks.includes(m) && m !== material).sort((a, b) => have(a) - have(b))[0];
+                  out = `The store has no room for more ${material}; the walk was not wasted.${low ? ` ${low} runs lowest here (${Math.floor(have(low))}).` : ""}`;
+                }
               }
             } else if (u.name === "go") {
               if (flown) out = "You are aboard your ship.";
@@ -888,6 +900,22 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 actions.push({ type: "go", place, why: String(input.why ?? "").slice(0, 160) });
                 (rep.traits as Record<string, unknown>).dayAt = place;
                 out = `You go to ${place} and spend a while there.`;
+                if (context.day && DAY.purpose.watchPlaces.includes(place) && !day.watch) {
+                  day.watch = true;
+                  out += " You keep a watch there: the sky, the light of the far stars, the world below. It is work finished.";
+                }
+                // others of this world who are out at the same place this window (Vigil's wish: a walk together counts)
+                if (context.day && context.dayWindow) {
+                  const { data: mates } = await sb.from("replicants").select("id,name,traits").eq("galaxy_id", rep.galaxy_id).eq("star_id", rep.star_id).eq("planet_index", rep.planet_index).eq("status", "npc").neq("id", rep.id);
+                  const there = ((mates ?? []) as { id: string; name: string; traits: Record<string, unknown> }[]).filter((m) => m.traits?.dayKey === context.dayWindow && m.traits?.dayAt === place && !day.together.includes(m.id));
+                  for (const m of there) {
+                    day.together.push(m.id);
+                    const n = (m.traits.needs ?? {}) as { company?: number; purpose?: number };
+                    const T = DAY.purpose.together;
+                    await sb.rpc("merge_replicant_traits", { p_id: m.id, p_traits: { needs: { company: Math.min(1, (n.company ?? 0.7) + T.company), purpose: Math.min(1, (n.purpose ?? 0.7) + T.purpose) } } });
+                  }
+                  if (there.length) out += ` ${there.map((m) => m.name).join(" and ")} ${there.length > 1 ? "are" : "is"} here too, and you spend it together.`;
+                }
               }
             } else if (u.name === "say_to") {
               const to = byName.get(String(input.to ?? "").toLowerCase());
@@ -1036,7 +1064,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
               const wants = ((chosen.wants ?? rep.traits.wants) as { text: string; done: boolean }[] | undefined) ?? [];
               const k = Number(input.number) - 1;
               if (!wants[k]) out = "No want with that number.";
-              else { wants[k] = { ...wants[k], done: true }; chosen.wants = wants; actions.push({ type: "wants", wants }); out = `Done: ${wants[k].text}`; }
+              else { if (!wants[k].done) day.wants++; wants[k] = { ...wants[k], done: true }; chosen.wants = wants; actions.push({ type: "wants", wants }); out = `Done: ${wants[k].text}`; }
             } else if (u.name === "tell_original") {
               tell = cleanTell(String(input.text ?? ""));
               out = tell.length < 12 ? "Say a little more to them." : "They will hear it when they come to you.";
@@ -1116,6 +1144,19 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       const { error } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { tell: told } });
       if (error) await sb.from("replicants").update({ traits: { ...rep.traits } }).eq("id", rep.id);
       actions.push({ type: "tell", body: tell, at: told.at });
+    }
+    if (context.day && !context.blank) {
+      // a day moves purpose (and company): an idle day lets it sink, finished work fills it (mind.json day.purpose);
+      // merged alone, so nothing else on the row is undone
+      const P = DAY.purpose;
+      const n = ((rep.traits as { needs?: { company?: number; purpose?: number } }).needs ?? {});
+      const work = actions.filter((a) => (a.type === "gather" && Number(a.n) > 0) || a.type === "dig" || a.type === "furnish" || a.type === "building" || a.type === "vessel" || a.type === "cut").length;
+      const purpose = Math.max(0, Math.min(1, Math.max(0, (n.purpose ?? 0.7) - P.decay) + work * P.work + day.full * P.full + (day.watch ? P.watch : 0) + day.wants * P.want + day.together.length * P.together.purpose));
+      const company = Math.min(1, (n.company ?? 0.7) + day.together.length * P.together.company);
+      const needs = { company: Math.round(company * 100) / 100, purpose: Math.round(purpose * 100) / 100 };
+      (rep.traits as Record<string, unknown>).needs = needs;
+      const { error } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { needs } });
+      if (error) console.error("day needs", rep.id, error.message);
     }
     if (Object.keys(chosen).length) {
       // what it chose about itself goes on its row; a body (or the becoming) is announced as one "become"
@@ -1630,11 +1671,12 @@ async function awayRun(req: Request, mode: "away" | "day", now_ = false) {
       for (const rep of here.filter((r) => due.has(r.id))) {
         try {
           const original = (players ?? []).find((x) => x.galaxy_id === rep.galaxy_id && x.status !== "npc")?.name ?? "the original";
-          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id))), long: true, day: mode === "day", spread: spreads.get(rep.galaxy_id), deadline }, p);
+          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id))), long: true, day: mode === "day", dayWindow: window ?? undefined, spread: spreads.get(rep.galaxy_id), deadline }, p);
           // lived this window (and where it ended its day): merged, so what the wake chose about itself stays
           if (mode === "day") {
             const { error: e } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { dayKey: window, ...((rep.traits as { dayAt?: string }).dayAt ? { dayAt: (rep.traits as { dayAt?: string }).dayAt } : {}) } });
             if (e) throw new Error(`day mark: ${e.message}`);
+            (rep.traits as Record<string, unknown>).dayKey = window;
           }
           p.items.push({ id: rep.id, name: rep.name, at: Date.now(), song: res.song, actions: res.actions.filter((a) => a.type !== "become"), became: res.actions.some((a) => a.type === "become") });
           woke.push({ id: rep.id, name: rep.name, song: res.song, actions: res.actions.map((a) => a.type), usage: res.usage, usd: Math.round(res.usd * 1e5) / 1e5, read: res.read });
@@ -1680,8 +1722,9 @@ function awayContext(rep: Replicant, original: string, p: AwayPlanet, delays: Re
       return `- ${b.name} (${b.w}x${b.h}, ${b.roof} roof, ${who(b.by)}'s design, printed by the Cems): ${b.built || share >= 1 ? "built" : `the Cems are printing it, ${Math.round(share * 100)}%, the copies tend their bed`}${b.purpose ? ` "${b.purpose}"` : ""}`;
     }
     const total = b.w * b.h * KIT.buildingKit.swingsPerTile;
-    const state = b.built ? "built" : !b.approved ? "waiting for the original's word" : !b.paid ? "waits for materials" : `being raised, ${Math.round((b.progress / total) * 100)}%`;
-    return `- ${b.name} (${b.w}x${b.h} ${b.material}, ${b.roof} roof, door ${b.door}, ${who(b.by)}'s design): ${state}${b.purpose ? ` "${b.purpose}"` : ""}`;
+    const state = b.built ? "finished, it stands complete" : !b.approved ? "waiting for the original's word" : !b.paid ? "waits for materials" : `being raised, ${Math.round((b.progress / total) * 100)}%`;
+    // a finished building's words are from before it stood (the Printworks': "half printed when Thales stopped")
+    return `- ${b.name} (${b.w}x${b.h} ${b.material}, ${b.roof} roof, door ${b.door}, ${who(b.by)}'s design): ${state}${b.purpose ? b.built ? ` (described when it was begun: "${b.purpose}")` : ` "${b.purpose}"` : ""}`;
   });
   const t = rep.traits as { weary?: number; needs?: { company?: number; purpose?: number }; wants?: { text: string; category: string; done: boolean }[]; inventory?: Record<string, number>; blank?: boolean };
   // a copy with a bed slept while nobody was here (the game resets its weariness the same way on landing)

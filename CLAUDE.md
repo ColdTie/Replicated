@@ -647,6 +647,17 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
 
+### Maker 2026-11-14 pm
+- The copies' days never moved their needs (the server did not touch `traits.needs`), so every copy woke "aimless
+  (purpose 0%)" and four of five wishes were about it. A day now does (`mind.json day.purpose`, merged at the day's
+  end): purpose sinks `decay` 0.25, each finished act fills `work` 0.15 (gather into the store, dig, furnish,
+  building, Vessel, cleared tree), a walk to a full store `full` 0.08 (and it names what runs lowest), a watch from a
+  high place `watch` 0.3 once, a want finished `want` 0.5; going where another copy of the world already is this
+  window (`traits.dayAt`) lifts both by `together`. The day's prompt says what counts. A finished building reads
+  "finished, it stands complete" with its founding words marked as such (the Printworks' "half printed" misled
+  Thales and Tamsin). The plan and verdicts: `docs/days/2026-11-14-pm.md`. Next run: Thales' lessons (the learning
+  task's next part) and Watcher's Observatory watch.
+
 ### Maker 2026-11-12
 - Built Ember Gold's proposal (Gliese 12 b, "Let stored iron be pressed into scrap"): scrap only came off iron ore, so
   lamps, workbenches and scrap walls waited while iron sat in the store. When a copy wants scrap and no ore is free, it
