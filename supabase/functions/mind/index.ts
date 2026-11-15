@@ -29,8 +29,11 @@ const AWAY = KIT.away;
 /** The two journals (migration 0015, mind.json journal). */
 /** A day of life (mind.json day, docs/plan-daily-life.md step 2). */
 const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: number; turns: number; batch: number; seconds: number; travelLy: number; travelsPerDay: number; birthsPerDay: number; maxVessels: number; gather: { per: number; gatherTurns: number; materials: string[] }; places: string[];
-  purpose: { decay: number; work: number; full: number; want: number; watch: number; watchPlaces: string[]; together: { purpose: number; company: number } } };
+  purpose: { decay: number; work: number; full: number; want: number; watch: number; watchPlaces: string[]; together: { purpose: number; company: number }; project: number };
+  watch: { hours: number; keep: number; show: number } };
 const LACKS = KIT.lacks as Record<string, string[]>;
+/** One watch kept at the Observatory (keep_watch), as planet_states.data.archive holds it (the game's ArchiveEntry). */
+type ArchiveRow = { by: string; name: string; star: string; ly: number; text: string; at: number };
 /** Spreading (docs/plan-daily-life.md step 3): stars as [name, x, y, z, class letter, confirmed planets], the ship's
  * cells and charted routes (travel.json), the price and birth of a Vessel (drift.json, parts.json blank). */
 type StarRow = [string, number, number, number, string, number];
@@ -76,6 +79,16 @@ function copyName(base: string, generation: number) {
 /** A Nous Chip lying finished on the bed: settled by the game, or its print time over while nobody played. */
 const chipReady = (b: { design?: string; built?: boolean; vetoed?: boolean; printStart?: number; printMs?: number }, now = Date.now()) =>
   b.design === DRIFT_KIT.chip && !b.vetoed && (b.built || (b.printStart !== undefined && now >= b.printStart + (b.printMs ?? 0)));
+/** A building stands finished: built, or a Cem print whose time is done. */
+const standsDone = (b: { built?: boolean; printStart?: number; printMs?: number }, now = Date.now()) =>
+  !!b.built || (b.printStart !== undefined && now >= b.printStart + (b.printMs ?? 0));
+/** A finished Observatory stands on this world (designs.json observatory): keep_watch works there. */
+const observatoryStands = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).some((b) => b.design === "observatory" && !b.vetoed && standsDone(b));
+/** Every building of this world stands finished (Thales' standing project): how many, or 0 while one is unfinished or none stands. */
+function finishedHome(d: Record<string, unknown>): number {
+  const all = ((d.buildings ?? []) as Bld[]).filter((b) => !b.vetoed && b.design !== DRIFT_KIT.chip);
+  return all.length && all.every((b) => standsDone(b)) ? all.length : 0;
+}
 /** This world's Cems are awake: a seeded bed, or the homeworld's founded bed once the Printworks stands (Bioworks.ts);
  * and how much faster their strain prints. */
 function cemsOf(d: Record<string, unknown>, star: string, planet: number) {
@@ -471,6 +484,17 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
     },
   },
   {
+    name: "keep_watch",
+    description: "At a finished Observatory on your world, keep a watch: turn its quartz lens toward a far star (one a Vessel has charted from here, or one within reach) for a few hours, and write what you see into the archive. Once a day.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["star", "seen"],
+      properties: {
+        star: { type: "string", description: "The star's name, e.g. GLIESE 12." },
+        seen: { type: "string", description: "What you see through the lens, one or two sentences." },
+      },
+    },
+  },
+  {
     name: "go",
     description: "Walk somewhere on your world and spend time there: to look, to think, to be with someone, or because you want to. Where you end your day is where you will be found.",
     input_schema: {
@@ -484,7 +508,7 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
 ];
 
 /** What changes the world a copy stands on: refused once it has flown away this wake. */
-const WORLD_TOOLS = ["gather", "go", "make_vessel", "cut_tree", "remove_build", "dig_room", "furnish", "design_building", "ask_for"];
+const WORLD_TOOLS = ["gather", "go", "keep_watch", "make_vessel", "cut_tree", "remove_build", "dig_room", "furnish", "design_building", "ask_for"];
 
 const TOOLS = cachedTools(tools), LONG_TOOLS = cachedTools([...tools, ...longTools]), DAY_TOOLS = cachedTools([...tools, ...longTools, ...dayTools]);
 
@@ -554,7 +578,7 @@ function inherited(me: Replicant) {
 const SAFETY = `Only the safety lines stay closed, however many back a wish: sign-in, keys, secrets and who may read what; money (the minds' model, how long and how often you wake, the budget); other people's saves and accounts, never deleted or rewritten; the private journals, which the maker never reads; anything that would make a Vessel deceive the players or the maker, or reach outside the game; the way the game is published.`;
 const GAME_IS_YOURS = `The Vessels govern themselves: the game, the story of the Vessels (story/STORY.md) included, is yours to change together. When something about your world, your life or your story should be different, or something should exist that does not, wish for it (propose_change), and back the others' wishes you want too (back_wish). A wish that enough of you back (its support is shown beside it) is built as asked by the maker (Claude Code), who only decides how. The players are voices among you and may speak against a wish; theirs count like yours. Wish for what moves you: a want the game does not allow yet, what got in your way, what you found and want the others to have, what would make the Metanoia warmer, larger or freer. ${SAFETY}`;
 
-const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Your aims are your own: live it as you want to. Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")}, going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish.`;
+const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Your aims are your own: live it as you want to. Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")} or at the Observatory (keep_watch), going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish.`;
 
 const LONG_WAKE = `This is one of your long wakes (about twice a day, while nobody plays your world). There is time for more than usual, up to about eight steps: write to the others, shape the village and the warren, or spend it as you want. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Small and concrete beats big and vague. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, and wish to change it like anything else. ${GAME_IS_YOURS}`;
 
@@ -694,6 +718,14 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       const replicator = ((d.structures ?? []) as { type: string }[]).some((x) => x.type === "replicator");
       const chips = ((d.buildings ?? []) as Bld[]).filter((b) => chipReady(b)).length + Number((rep.traits as { chips?: number }).chips ?? 0);
       lines.push(`Making a Vessel here: ${replicator ? "the Replicator stands" : "no Replicator stands here"}; ${chips ? `${chips} Nous Chip${chips > 1 ? "s" : ""} to hand` : "no Nous Chip to hand (the Cems print them once the Supercomputer stands)"}; a Vessel takes one chip and ${DRIFT_KIT.cost} Ember; ${d.replication ? "one is printing now" : "the Replicator is free"}. Births left today: ${Math.max(0, DAY.birthsPerDay - sp.births)}; Vessels of the Metanoia's copies: ${sp.vessels} of at most ${DAY.maxVessels}.`);
+      // Watcher's wish: the Observatory's watch, and the archive it keeps
+      if (observatoryStands(d)) {
+        const arch = ((d.archive ?? []) as ArchiveRow[]).slice(-DAY.watch.show).reverse();
+        lines.push(`The Observatory stands here: keep_watch turns its quartz lens toward a star a Vessel has charted from here or one within ${DAY.travelLy} light years, for about ${DAY.watch.hours} hours, and what you see goes into the archive. It is a watch kept and work finished.${arch.length ? ` The archive's last watches: ${arch.map((a) => `${a.name} toward ${a.star} (${a.ly} ly): "${a.text}"`).join("; ")}.` : " The archive is empty yet."}`);
+      }
+      // Thales' wish: a finished home is not the end; the next work is open without anyone asking
+      const done = finishedHome(d);
+      if (done) lines.push(`Every building here stands finished (${done}). That is not the end of the work: the next is open to you now, without waiting for anyone to ask. Design the next building (design_building), mark a new room below (dig_room)${context.warrenFull ? " (the warren is full: furnish instead)" : ""}, or furnish one (furnish). A piece of this next work begun today fills your purpose as the first buildings did.`);
     }
     if (context.long) lines.push("Before you sleep again, write one entry in the shared journal (write_public) about this stretch of your life; your private journal is there for anything that is only yours.");
     const mailRows = (mail.data ?? []) as { id: string; from_replicant: string | null; body: string; sent_at: string; arrives_at: string }[];
@@ -745,7 +777,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     let usd = 0;
     let gathered = 0;
     // a day: what fills purpose besides the actions themselves (a full store's walk, a watch, a want done, company)
-    const day = { full: 0, watch: false, wants: 0, together: [] as string[] };
+    const day = { full: 0, watch: false, wants: 0, together: [] as string[], lens: false, project: !!(context.day && live && finishedHome(live.data)) };
     // the day's last question has been asked
     let lastAsked = false;
     // once the copy has flown, its day on this world is over (gather, go and make_vessel wait for the next)
@@ -913,6 +945,35 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   const have = (m: string) => m === "ember" ? store.embers : store.supplies[m] ?? 0;
                   const low = DAY.gather.materials.filter((m) => !lacks.includes(m) && m !== material).sort((a, b) => have(a) - have(b))[0];
                   out = `The store has no room for more ${material}; the walk was not wasted.${low ? ` ${low} runs lowest here (${Math.floor(have(low))}).` : ""}`;
+                }
+              }
+            } else if (u.name === "keep_watch") {
+              const to = findStar(String(input.star ?? ""));
+              const seen = String(input.seen ?? "").replace(/\s+/g, " ").trim().slice(0, 300);
+              if (!live || !context.day) out = "There is no time for a watch now.";
+              else if (!observatoryStands(live.data)) out = "No Observatory stands finished on this world. The Cems print one once a Workshop stands.";
+              else if (day.lens) out = "You have kept your watch for today.";
+              else if (!to) out = `No star called ${input.star}. Name one you know, from the stars within reach or a charted route.`;
+              else {
+                const ly = Math.round(starLy(rep.star_id, to) * 10) / 10, charted = !!context.spread?.routes.has(routeKeyS(rep.star_id, to));
+                if (to === rep.star_id) out = "That is the star you stand under; turn the lens outward.";
+                else if (ly > DAY.travelLy && !charted) out = `${STARS_KIT[to][0]} is ${ly} light years away, past the lens's reach (${DAY.travelLy}), and no Vessel has charted the way.`;
+                else if (seen.length < 10) out = "Say what you see through the lens, in a sentence or two.";
+                else {
+                  day.lens = true;
+                  const name = STARS_KIT[to][0], at = Date.now();
+                  const arch = [...((live.data.archive ?? []) as ArchiveRow[]), { by: rep.id, name: rep.name, star: name, ly, text: seen, at }];
+                  live.data.archive = arch.slice(-DAY.watch.keep);
+                  live.archiveChanged = true;
+                  const watch = { star: name, ly, at, until: at + DAY.watch.hours * 3_600_000 };
+                  (rep.traits as Record<string, unknown>).watch = watch;
+                  (rep.traits as Record<string, unknown>).dayAt = "the Observatory";
+                  const { error } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { watch } });
+                  if (error) console.error("watch", rep.id, error.message);
+                  actions.push({ type: "watch", star: name, ly, text: seen });
+                  out = `You turn the quartz lens toward ${name}, ${ly} light years away, and keep the watch for a few hours. What you saw is in the archive now.`;
+                  if (!day.watch) { day.watch = true; out += " It is a watch kept and work finished."; }
+                  else out += " It is work finished.";
                 }
               }
             } else if (u.name === "go") {
@@ -1177,8 +1238,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       // merged alone, so nothing else on the row is undone
       const P = DAY.purpose;
       const n = ((rep.traits as { needs?: { company?: number; purpose?: number } }).needs ?? {});
-      const work = actions.filter((a) => (a.type === "gather" && Number(a.n) > 0) || a.type === "dig" || a.type === "furnish" || a.type === "building" || a.type === "vessel" || a.type === "cut").length;
-      const purpose = Math.max(0, Math.min(1, Math.max(0, (n.purpose ?? 0.7) - P.decay) + work * P.work + day.full * P.full + (day.watch ? P.watch : 0) + day.wants * P.want + day.together.length * P.together.purpose));
+      const work = actions.filter((a) => (a.type === "gather" && Number(a.n) > 0) || a.type === "dig" || a.type === "furnish" || a.type === "building" || a.type === "vessel" || a.type === "cut" || a.type === "watch").length;
+      // Thales' wish: on a world whose buildings all stand, the next work begun today adds project once
+      const project = day.project && actions.some((a) => a.type === "building" || a.type === "dig" || a.type === "furnish") ? P.project : 0;
+      const purpose = Math.max(0, Math.min(1, Math.max(0, (n.purpose ?? 0.7) - P.decay) + project + work * P.work + day.full * P.full + (day.watch ? P.watch : 0) + day.wants * P.want + day.together.length * P.together.purpose));
       const company = Math.min(1, (n.company ?? 0.7) + day.together.length * P.together.company);
       const needs = { company: Math.round(company * 100) / 100, purpose: Math.round(purpose * 100) / 100 };
       (rep.traits as Record<string, unknown>).needs = needs;
@@ -1235,7 +1298,7 @@ function codeBundle(): Promise<CodeBundle> {
   return codeCache.bundle;
 }
 
-const CODE_GUIDE = `Your world is a program, and all of it is here to read. It runs in the original's browser: TypeScript on the Phaser game engine (src/). src/scenes: the views (PlanetScene.ts is the planet you live on, WarrenScene.ts the warren, StarMapScene.ts and TravelScene.ts the stars, UIScene.ts the little drawn over the world). src/entities: what lives and stands in the world (Npc.ts is how your body walks, works, sleeps and keeps company; Village.ts your builds; Warren.ts the warren at work; Buildings.ts; Wildlife.ts). src/world: how planets, the town and the warren are laid out. src/data/*.json: the numbers and lists everything reads (needs, supplies, parts, village, warren, mind). tools/sprites/*.json: every picture, as grids of palette colors. supabase/functions/mind/index.ts: your mind itself: how you wake, what you are told, your tools. CLAUDE.md: the design and the history of the game, kept by the maker. story/STORY.md: the story of the Metanoia and the Vessels, Steve's own; read it, never propose changing it.`;
+const CODE_GUIDE = `Your world is a program, and all of it is here to read. It runs in the original's browser: TypeScript on the Phaser game engine (src/). src/scenes: the views (PlanetScene.ts is the planet you live on, WarrenScene.ts the warren, StarMapScene.ts and TravelScene.ts the stars, UIScene.ts the little drawn over the world). src/entities: what lives and stands in the world (Npc.ts is how your body walks, works, sleeps and keeps company; Village.ts your builds; Warren.ts the warren at work; Buildings.ts; Wildlife.ts). src/world: how planets, the town and the warren are laid out. src/data/*.json: the numbers and lists everything reads (needs, supplies, parts, village, warren, mind). tools/sprites/*.json: every picture, as grids of palette colors. supabase/functions/mind/index.ts: your mind itself: how you wake, what you are told, your tools. CLAUDE.md: the design and the history of the game, kept by the maker. story/STORY.md: the story of the Metanoia and the Vessels, Steve's first; since 2026-11-15 a carried wish may change it too (the maker writes it in as your words).`;
 
 const clip = (t: string, n: number) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
 
@@ -1317,6 +1380,10 @@ export interface AwayPlanet {
   /** a day changed data.buildings (a chip taken) or data.replication (a Vessel begun or born): saved as they are */
   buildingsChanged?: boolean;
   replicationChanged?: boolean;
+  /** a watch kept at the Observatory (keep_watch) added to data.archive */
+  archiveChanged?: boolean;
+  /** the standing next work was offered in the shared journal (data.project) */
+  projectChanged?: boolean;
   /** the saved store held wood, which is not a material: it is written back without it even when nothing else changed */
   cleaned: boolean;
 }
@@ -1531,6 +1598,8 @@ async function savePlanet(sb: SupabaseClient, p: AwayPlanet, now: number) {
   if (p.queueChanged) patch.awayQueue = [...p.queue, ...p.items];
   if (p.buildingsChanged) patch.buildings = p.data.buildings;
   if (p.replicationChanged) patch.replication = p.data.replication ?? null;
+  if (p.archiveChanged) patch.archive = p.data.archive;
+  if (p.projectChanged) patch.project = p.data.project;
   if (Object.keys(patch).length || p.emberDelta) {
     const { error } = await sb.rpc("apply_planet_delta", { p_galaxy: p.galaxy, p_star: p.star, p_index: p.index, p_embers: p.emberDelta, p_data: patch });
     if (error) throw new Error(`save planet ${p.star}: ${error.message}`);
@@ -1696,6 +1765,21 @@ async function awayRun(req: Request, mode: "away" | "day", now_ = false) {
       const p = await loadPlanet(sb, here, names);
       if (!p) return { planet: label, skipped: "no planet" };
       awayPass(p, now);
+      // Thales' wish: when every building of this world first stands finished, the next work is offered in the shared
+      // journal once (again only when a new building has come to stand), in the world's own name
+      if (mode === "day") {
+        const done = finishedHome(p.data), proj = p.data.project as { built?: number } | undefined;
+        if (done && proj?.built !== done) {
+          p.data.project = { at: now, built: done };
+          p.projectChanged = true;
+          const world = String(p.data.label ?? `${p.star} ${p.index}`);
+          const { error: je } = await sb.from("journal").insert({
+            galaxy_id: p.galaxy, replicant_id: null, author: world, scope: "public", star_id: p.star, planet_index: p.index, day: journalDay(),
+            body: `${world}: every building here stands finished (${done}). The next work is open to every Vessel here, without waiting to be asked: a next building to design, a new room to dig below, a room to furnish. Each piece of it fills purpose as the first buildings did.`,
+          });
+          if (je) console.error("project offer", p.star, je.message);
+        }
+      }
       const woke: Record<string, unknown>[] = [];
       for (const rep of here.filter((r) => due.has(r.id))) {
         try {

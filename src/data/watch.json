@@ -1,0 +1,12 @@
+{
+  "_doc": "The Observatory's watch (Watcher's wish, carried 2026-11-15 by Watcher, Vigil and Thales). In a day of life a copy at a finished Observatory (designs.json observatory) may keep_watch: turn the quartz lens toward a star a Vessel has flown to (a charted route from here) or one within reach (mind.json day.travelLy), and write what it sees into the archive (planet_states.data.archive). How long a watch lasts and how much of the archive is kept: mind.json day.watch. It is a watch kept and finished work for purpose (mind.json day.purpose watch and work), once a day. While one lasts, the game shows the lens under the dome: a faint blue glow on the quartz and a slow sweep of light, at night (scaled by the night; nightMin by day), and the watcher's name over the dome when you walk within labelRange px. lens: the lens's voxel in the design (x, y, z). color: palette index of the quartz's glow. sweepMs: one sweep there and back; sweepDeg: how far it turns either way; beam: its length in px.",
+  "lens": [7, 0.5, 16.5],
+  "color": 18,
+  "light": { "radius": 26, "intensity": 0.55 },
+  "glow": { "scale": 0.35, "alpha": 0.5 },
+  "beam": 34,
+  "sweepMs": 9000,
+  "sweepDeg": 35,
+  "nightMin": 0.15,
+  "labelRange": 70
+}

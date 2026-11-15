@@ -193,6 +193,10 @@ src/data/designs.json    the Cems' designs (lantern, house, storehouse, nursery,
                          supercomputer, nouschip) as voxel parts; costing turns volume and complexity into price and
                          print time; needs (unlock chain), place (post: a street lamp spot; bed: on the Cem bed, a thing
                          you carry), gives (house mood, storehouse storage, nursery speed), materials, cameras
+src/entities/Watch.ts    the Observatory's watch (Watcher's wish, 2026-11-15): while a copy's traits.watch lasts (keep_watch
+                         in a day of life) the lens under a finished Observatory's dome glows blue with a slow sweep,
+                         by night, and the watcher's name shows over it when you come near (src/data/watch.json); the
+                         archive of watches (planet_states.data.archive) is on the journal's HERE page
 src/entities/Chips.ts    the Nous Chips (since 2026-10-28): printed by the Cems on their bed, a finished one lies glowing
                          there until someone walks onto it, then it is carried (traits.chips) until a Replicator spends it
 src/entities/Replication.ts a Vessel being made at the Replicator: one chip and drift.json cost Ember; the maker is scanned
@@ -469,7 +473,8 @@ steps out after a reload; on Earth, without Cems, the Replicator is built on its
 home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wisp, the printer's readout, the trip there
 (growing, copper and quartz, the readout over the ship), the hold brings them home, the printer is fed and lays the rest
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
-`node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
+`node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
+out after, the archive in the journal), `node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
 route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, the vault opens from its doorway, a husk built
 from its menu, linked
@@ -517,7 +522,7 @@ bottom left, for 12 s: save, world, ground, rock, rest; also `window.__loadMs`),
 shows the lit monolith), `?shot=1&view=bioworks|printing|designs` (the Cem bed awake with a full store; a House and a
 Storehouse being printed; the design menu open), `?shot=1&at=sol&pi=3&view=seed|seeded` (a culture aboard on a world
 without a bed: its ghost with the salt for it; seeded a moment later), `?shot=1&at=gliese-12&pi=1&view=wild` (the Cems'
-world beside its nearest wild field), `?shot=1&view=biolab|strain` (a Biolab by the awake bed, wild Cems aboard, you
+world beside its nearest wild field), `?shot=1&view=watch` (a copy keeping a watch: the Observatory's lens alight at night), `?shot=1&view=biolab|strain` (a Biolab by the awake bed, wild Cems aboard, you
 at its door; strain: the Biolab changing them), `?shot=1&view=replicate|replicating` (the Replicator
 with a chip in hand: its WAKE or HOLD open; a Vessel held at 60% beside it, `&cems=1` with the Cems awake),
 `?shot=1&view=chip` (a Nous Chip lying on the awake bed), `&zoom=0.5` (a wider look in a screenshot; the
@@ -698,6 +703,19 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 - **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` poll for the Spark and the map closing
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
+
+### Maker 2026-11-15 am
+- Two carried wishes (the first under self-government; threshold 3). **Thales' standing project** (support 4): on a
+  world whose buildings all stand finished, a day of life tells each copy the next work is open now, without anyone
+  asking (design_building, dig_room, furnish), and a piece begun adds `mind.json day.purpose.project` 0.15; the offer
+  goes into the shared journal once each time the count of standing buildings changes (author: the world's name,
+  `planet_states.data.project`). **Watcher's Observatory watch** (support 3): the day tool `keep_watch` (a star
+  charted from here or within `day.travelLy`, what is seen), once a day, only at a finished Observatory; the watch goes
+  into `data.archive` (the last `day.watch.keep` 40) and `traits.watch` (3 hours); it is the day's watch and work. In
+  the game the lens glows while a watch lasts (`src/entities/Watch.ts`, `?shot=1&view=watch`), and the journal's HERE
+  page shows THE ARCHIVE. The minds' code guide no longer says the story is closed to them.
+- `tools/playtest-watch.mjs` (new). The plan and verdicts: `docs/days/2026-11-15-am.md`. Screenshot
+  `observatory-watch.png`.
 
 ### Maker 2026-11-14 pm
 - The copies' days never moved their needs (the server did not touch `traits.needs`), so every copy woke "aimless

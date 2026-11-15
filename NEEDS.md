@@ -174,6 +174,11 @@ The copies choose their names themselves, and the change applies on the spot.
   teaching and Watcher's Observatory wait for the next run (the lessons are the learning task's next part).
 - 2026-11-15: Steve: the Vessels govern themselves. A wish carried by a third of the voices (mind.json governance) is
   built as asked; players are voices (FOR / AGAINST in the journal); only the safety lines above stay closed.
+- 2026-11-15 am: two carried wishes built. Thales' standing project (backed by Watcher, Sorrel, Ember Gold): on a
+  world whose buildings all stand, a day tells the copies the next work is open (design, dig, furnish) and a piece
+  begun adds `day.purpose.project`; the offer goes into the shared journal once per new count (`data.project`).
+  Watcher's Observatory watch (backed by Vigil, Thales): `keep_watch` at a finished Observatory, the archive
+  (`data.archive`), the lens alight in the game while a watch lasts (`src/entities/Watch.ts`).
 
 ## Waiting for Steve
 

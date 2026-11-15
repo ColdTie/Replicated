@@ -159,6 +159,8 @@ export interface JournalView {
   feelings?: Record<string, string>;
   /** surface buildings in words */
   buildings?: string[];
+  /** the Observatory's archive here, oldest first (keep_watch) */
+  archive?: { name: string; star: string; ly: number; text: string; at: number }[];
   /** the player's actions */
   actions?: { talk(id: string, text: string): void; give(id: string): void; awaken(id: string): void; vote(id: string, against: boolean | null): void };
   /** Sparks the original holds (beacons; a Spark birth carries a copy's memories) */
@@ -352,6 +354,10 @@ export function openJournal(v: JournalView) {
   if (v.buildings?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[2])}">BUILDINGS</h3>`);
     for (const line of v.buildings) pages.here.push(`<p>${esc(line.replace(/^- /, ''))}</p>`);
+  }
+  if (v.archive?.length) {
+    pages.here.push(`<h3 style="color:${css(PALETTE[18])}">THE ARCHIVE</h3>`);
+    for (const a of v.archive.slice(-8).reverse()) pages.here.push(`<p>${esc(a.name)} watched ${esc(a.star)}, ${a.ly < 10 ? a.ly.toFixed(1) : Math.round(a.ly)} ly: ${esc(a.text)}<small>${ago(new Date(a.at).toISOString())}</small></p>`);
   }
   if (v.supplies) {
     pages.here.push(`<h3 style="color:${css(PALETTE[2])}">SUPPLIES</h3><p>${esc(v.supplies)}</p>`);

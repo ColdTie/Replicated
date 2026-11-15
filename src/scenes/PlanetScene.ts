@@ -16,6 +16,7 @@ import { Warren } from '../entities/Warren';
 import { Buildings } from '../entities/Buildings';
 import { Bioworks } from '../entities/Bioworks';
 import { Chips } from '../entities/Chips';
+import { Watch } from '../entities/Watch';
 import { Replication } from '../entities/Replication';
 import { WildCems } from '../entities/WildCems';
 import { MannyDock } from '../entities/Manny';
@@ -33,7 +34,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { vignetteFor } from '../fx/textures';
 import { Controls } from '../input/Controls';
-import type { AwayItem, SeenState, Building, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
+import type { ArchiveEntry, AwayItem, SeenState, Building, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
 import type { JournalTab } from '../ui/journal';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
@@ -97,6 +98,10 @@ export class PlanetScene extends Phaser.Scene {
   replication!: Replication;
   /** Nous Chips the Cems printed, waiting on their bed to be taken (src/entities/Chips.ts) */
   chips!: Chips;
+  /** the Observatory's watch: its lens alight while a copy keeps one (src/entities/Watch.ts) */
+  watch!: Watch;
+  /** the archive of the Observatory's watches (planet_states.data.archive), for the journal */
+  archive: ArchiveEntry[] = [];
   /** the Cem bed (homeworld): where supplies are shipped and the Cems build from */
   bioworks?: Bioworks;
   /** the Cems' world's wild fields (planets.json wildCems) */
@@ -440,6 +445,8 @@ export class PlanetScene extends Phaser.Scene {
     this.buildings = new Buildings(this, save?.data.buildings);
     this.replication = new Replication(this, save);
     this.chips = new Chips(this);
+    this.watch = new Watch(this);
+    this.archive = save?.data.archive ?? [];
     this.homeworld.placePrinters();
     this.time.delayedCall(2500, () => this.towner.grantGifts(save?.data.gifts));
     if (!this.shot && !this.visit) { this.warren.applyOffline(this.awayHours); this.buildings.applyOffline(this.awayHours); this.trade.accrueAway(this.awayHours); }
@@ -785,6 +792,14 @@ export class PlanetScene extends Phaser.Scene {
       this.player.setPosition(px, py);
       this.cameras.main.centerOn(lab ? lab.x : px, py - 16);
     }
+    // a copy keeping a watch at the Observatory: the lens alight under the dome, you in front of it
+    if (view === 'watch') {
+      const obs = this.buildings.list.find((b) => b.design === 'observatory' && b.built) ?? this.buildings.standNow('observatory');
+      this.watch.staged = { name: 'Watcher', until: Date.now() + 3_600_000 };
+      if (obs) { px = obs.x + 26; py = obs.y + 20; }
+      this.player.setPosition(px, py);
+      this.cameras.main.centerOn(obs ? obs.x : px, py - 24);
+    }
     // the Cems' world: beside the wild field nearest the town
     if (view === 'wild' && this.wild?.fields.length) {
       const c = this.baseCenter, f = [...this.wild.fields].sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
@@ -870,6 +885,7 @@ export class PlanetScene extends Phaser.Scene {
     this.base.updateSpot(time, this.canReplicate());
     this.replication.update(time);
     this.chips.update(time);
+    this.watch.update(time);
     this.dock.update(time, dt);
     if (this.boardRing) {
       const ready = this.departure.boardReady();
