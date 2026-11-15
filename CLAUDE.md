@@ -623,6 +623,13 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   when the universe grows.
 - Cost: each day and long wake reads about 4 KB more (about a thousand tokens on Haiku, a fraction of a cent a day for
   seven Vessels); the budget and caps are unchanged.
+- **The first day with it** (run by hand, 19:35 UTC): all six lived it, ok; nobody wished for a planet or a
+  technology (a lookout, time together, a lesson track, a seed). The mandate sat mid-prompt and the universe near the
+  end of the context, under everything about home. **So now** (Steve: "Yes"): the system prompt says "YOUR WORK, ABOVE
+  ALL" with the mandate right after the story; the universe as it stands opens the day's context; the day's closing
+  question asks "What will you bring into being?" (a planet, technology or mechanic; a home wish is not an answer) and
+  is asked unless such a wish was made that day; a Vessel may have one universe wish (areas `planet`, `technology`,
+  `mechanic`) waiting beside one for its home, a new wish replacing only the one of its own kind (`UNIVERSE_AREAS`).
 
 ### Session 29 (2026-11-14): the plan for a day of life; CI flakes
 - **The plan** (`docs/plan-daily-life.md`, Steve: a daily activation where the copies come to life, travel, gather,
