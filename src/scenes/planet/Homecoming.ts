@@ -172,6 +172,6 @@ export class Homecoming {
     sound.pet();
     const from = s.npcs.find((n) => n.data.id === e.letter.from_replicant && !n.below && !n.blank);
     if (from) s.talker.openTalk(from, 'letters:0');
-    else void s.toggleJournal();
+    else void s.toggleJournal('letters');
   }
 }

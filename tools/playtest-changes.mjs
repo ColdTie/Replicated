@@ -42,41 +42,41 @@ try {
   await page.waitForTimeout(300);
   const shared = await ev(() => {
     const t = document.querySelector('.jn')?.textContent ?? '';
-    return { head: t.includes('THE SHARED JOURNAL'), first: t.includes('Day entry 0'), folded: [...document.querySelectorAll('.jn details summary')].some((x) => x.textContent === '2 more'), where: t.includes('Ember Gold, GLIESE 12 B') };
+    const days = document.querySelector('.jn [data-page="days"]');
+    return { head: !!days?.querySelector('.day'), first: days?.querySelector('.entry')?.textContent.includes('Day entry 0'), all: days?.querySelectorAll('.entry').length, where: !!days?.textContent.includes('EMBER GOLD') && !!days?.textContent.includes('GLIESE 12 B') };
   });
   log('shared journal', JSON.stringify(shared));
-  if (!shared.head || !shared.first || !shared.folded || !shared.where) fail('the shared journal does not show (newest open, the rest folded, who and where)');
+  if (!shared.head || !shared.first || shared.all !== 6 || !shared.where) fail('the DAYS page does not show the shared journal (by day, newest first, who and where)');
   const seen = await ev(() => {
     const t = document.querySelector('.jn')?.textContent ?? '';
     return {
-      sections: document.querySelectorAll('.jn .k').length, would: (t.match(/WOULD CHANGE THE GAME/g) ?? []).length,
-      sayNo: [...document.querySelectorAll('[data-nochange]')].map((x) => x.dataset.nochange), details: document.querySelectorAll('.jn details').length,
-      made: t.includes('in the game') && t.includes('Lamps now hum softly'), notMade: t.includes('not made') && t.includes('Copies stay on the ground'),
+      would: document.querySelectorAll('.jn [data-page="wishes"] .wish').length,
+      sayNo: [...document.querySelectorAll('[data-against]')].map((x) => x.dataset.against), details: document.querySelectorAll('.jn [data-page="wishes"] details').length,
+      made: t.includes('in the game') && t.includes('Lamps now hum softly'), notMade: t.includes('not carried') && t.includes('Copies stay on the ground'),
       replacedHidden: !t.includes('An older idea'), lamp: t.includes('A lamp by my door.'),
     };
   });
   log('journal', JSON.stringify(seen));
-  if (seen.would !== 3) fail('every copy with a proposal shows WOULD CHANGE THE GAME');
-  if (seen.sayNo.join() !== 'c-open') fail('only the waiting proposal can be refused');
+  if (seen.would !== 3) fail('the WISHES page does not show every wish');
+  if (seen.sayNo.join() !== 'c-open') fail('only the open wish takes a voice');
   if (!seen.made || !seen.notMade) fail('the maker\'s answers are missing');
   if (!seen.replacedHidden) fail('a replaced proposal still shows');
   if (!seen.lamp) fail('ordinary asks no longer show');
   if (seen.details < 3) fail('the full proposals are not readable');
-  await ev(() => document.querySelectorAll('.jn details').forEach((d) => { d.open = true; }));
-  await ev(() => [...document.querySelectorAll('.jn .k')].find((k) => k.textContent === 'WOULD CHANGE THE GAME')?.scrollIntoView());
+  await page.click('[data-tab="wishes"]');
   await page.screenshot({ path: 'screenshots/changes-journal.png' });
 
-  // 2. SAY NO: the first press asks, the second refuses it
-  await page.click('[data-nochange="c-open"]');
-  const asked = await ev(() => document.querySelector('[data-nochange="c-open"]')?.textContent);
-  log('first press', asked);
-  if (!/SURE/.test(asked ?? '')) fail('the first press does not ask');
-  await page.click('[data-nochange="c-open"]');
+  // 2. AGAINST: one voice, counted against the wish's support; it stays open; a second press takes the voice back
+  await page.click('[data-against="c-open"]');
   await page.waitForTimeout(600);
-  const after = await ev(() => ({ status: window.__session.store.db.requests.find((r) => r.id === 'c-open')?.status, open: !!document.querySelector('.jn'), button: !!document.querySelector('[data-nochange]'), said: (document.querySelector('.jn')?.textContent ?? '').includes('you said no') }));
-  log('after no', JSON.stringify(after));
-  if (after.status !== 'vetoed') fail('the proposal was not vetoed');
-  if (!after.open || after.button || !after.said) fail('the journal does not show the no');
+  const after = await ev(() => ({ r: window.__session.store.db.requests.find((r) => r.id === 'c-open'), open: !!document.querySelector('.jn'), page: document.querySelector('.jn [data-tab].on')?.dataset.tab, me: window.__session.replicant.id, on: document.querySelector('[data-against="c-open"]')?.classList.contains('on'), against: !!document.querySelector('.jn .meter i.a') }));
+  log('after against', JSON.stringify({ status: after.r?.status, backers: after.r?.backers, open: after.open, page: after.page, on: after.on }));
+  if (after.r?.status !== 'open' || !after.r?.backers?.some((b) => b.against && b.by === after.me)) fail('AGAINST was not counted as a voice');
+  if (!after.open || after.page !== 'wishes' || !after.on || !after.against) fail('the journal does not show the voice against');
+  await page.click('[data-against="c-open"]');
+  await page.waitForTimeout(600);
+  const back = await ev(() => window.__session.store.db.requests.find((r) => r.id === 'c-open')?.backers ?? []);
+  if (back.length) fail('a second press did not take the voice back');
   await ev(() => { document.querySelector('.jn')?.remove(); });
 
   // 3. the day's spend on the minds, against the budget (the cloud store reads mind_spend; this device has none)

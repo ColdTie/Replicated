@@ -5,8 +5,8 @@
 // and the designs the original picks at the Printworks (src/data/designs.json, 2026-10-27), which the Cems build on
 // their own: paid at once, shipped by the ants from the store and the bed (src/entities/Bioworks.ts), rising voxel row
 // by voxel row with the clock (also while nobody plays), the newest rows still living Cems. A proposal is placed on a free civic lot
-// of the town (src/world/town.ts; else a home lot nobody lives on) and waits for the original's word (journal: approve / veto; after autoApproveMinutes it goes
-// ahead anyway). The first copy to join pays its material; every copy that joins adds hammer blows to one shared
+// of the town (src/world/town.ts; else a home lot nobody lives on) and goes ahead at once (since 2026-11-15 the Vessels
+// govern themselves: no approve / veto; a proposal saved before still waiting goes ahead on load, autoApproveMinutes 0). The first copy to join pays its material; every copy that joins adds hammer blows to one shared
 // progress, and the building rises row by row (src/world/buildingPaint.ts draws it from its blueprint). Saved in
 // planet_states.data.buildings; blueprints share the warren's shape so a building can get an interior later.
 import Phaser from 'phaser';
@@ -391,7 +391,7 @@ export class Buildings {
       purpose: (a.purpose ?? '').slice(0, 140), w, h, x: spot.x, y: spot.y, by: npc.data.id,
       material, roof: BUILDINGS.roofs.includes(a.roof ?? '') ? a.roof! : 'peaked', door: BUILDINGS.doors.includes(a.door ?? '') ? a.door! : 'south',
       primary: a.primary ?? 'silver', secondary: a.secondary ?? 'slate',
-      approved: !!kind, progress: 0, built: false, helpers: [], cost, paid: false, at: Date.now(), ...(kind ? { kind } : {}),
+      approved: true, progress: 0, built: false, helpers: [], cost, paid: false, at: Date.now(), ...(kind ? { kind } : {}),
     };
     this.list.push(b);
     this.scene.townState.civic[b.id] = lotIndex;

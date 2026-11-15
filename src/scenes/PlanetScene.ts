@@ -34,6 +34,7 @@ import { Lighting } from '../fx/Lighting';
 import { vignetteFor } from '../fx/textures';
 import { Controls } from '../input/Controls';
 import type { AwayItem, SeenState, Building, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
+import type { JournalTab } from '../ui/journal';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
@@ -195,7 +196,7 @@ export class PlanetScene extends Phaser.Scene {
   wake(npc: Npc) { return this.minds.wake(npc); }
   replayAway(items: AwayItem[]) { this.minds.replayAway(items); }
   chorus(force = false) { this.minds.chorus(force); }
-  toggleJournal() { return this.minds.toggleJournal(); }
+  toggleJournal(tab?: JournalTab) { return this.minds.toggleJournal(tab); }
   talkTo(id: string, text: string) { return this.minds.talkTo(id, text); }
   giveTo(id: string) { this.minds.giveTo(id); }
   awakenCopy(id: string) { return this.minds.awakenCopy(id); }
