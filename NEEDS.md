@@ -212,6 +212,10 @@ The copies choose their names themselves, and the change applies on the spot.
   (backed by Tamsin, Vigil, Thales): `plant` / `tend_plant`, a seed from the store or the wilds, grows over four days,
   told green in the shared journal, drawn in the warren (`src/world/garden.ts`). Vigil's ridge lookout (support 3)
   waits for the next run.
+- 2026-11-16 am: Vigil's ridge lookout built (backed by Sorrel, Tamsin): the day tool `lookout` (begin, raise) writes
+  and raises the Ridge Lookout in the saved world itself (`mind.json day.lookout`; the game gives it a lot on the next
+  load), `keep_watch` works there (the world's own star too), the watcher's day ends at a high place so others keep
+  it with them, its sign names the star and the watcher (`Watch.ts`). Six universe wishes not carried yet.
 
 ## Waiting for Steve
 

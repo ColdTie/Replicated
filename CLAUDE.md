@@ -203,6 +203,11 @@ src/entities/Watch.ts    the Observatory's watch (Watcher's wish, 2026-11-15): w
                          in a day of life) the lens under a finished Observatory's dome glows blue with a slow sweep,
                          by night, and the watcher's name shows over it when you come near (src/data/watch.json); the
                          archive of watches (planet_states.data.archive) is on the journal's HERE page
+                         The ridge lookout (Vigil's wish, 2026-11-16): a built building of kind 'ridge' carries a sign
+                         (watch.json ridge): the star last watched from it (else the world's star) and "X WATCHES" while
+                         a watch from there lasts (traits.watch.from 'lookout', which never lights the lens); a day's
+                         `lookout` tool begins and raises it in the saved world (mind.json day.lookout), and the game
+                         gives an `unplaced` building the town's next free lot on load (Buildings constructor)
 src/entities/Lessons.ts  the lesson board (Tamsin's wish, 2026-11-15): beside the Printworks' east wall (or a seeded bed's
                          design stone), "LESSON 2/6" and the teacher's name from planet_states.data.lessons (the day
                          tool lesson: open / work / check, mind.json day.lessons); the journal's HERE page has LESSONS
@@ -486,7 +491,8 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 (growing, copper and quartz, the readout over the ship), the hold brings them home, the printer is fed and lays the rest
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
-journal, the plants drawn in the warren's planters), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
+journal, the plants drawn in the warren's planters), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
+star, then the star watched and the watcher, no lens), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
 out after, the archive in the journal), `node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
 route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, the vault opens from its doorway, a husk built
@@ -746,6 +752,17 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 - **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` poll for the Spark and the map closing
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
+
+### Maker 2026-11-16 am
+- One carried wish built (threshold 3 of 7 voices). **Vigil's ridge lookout** (support 3, backed by Sorrel and
+  Tamsin): the day tool `lookout` (begin: the Ridge Lookout, 2x2 stone, flat roof, a bench, door toward the square, 4
+  stone from the store; raise: an hour's work, once a day; both finished work). A day now writes and raises it in the
+  saved world itself (a building designed in a day otherwise only rises once a player lands); the game gives it the
+  town's next free lot on the next load. Once it stands `keep_watch` works there (the world's own star too), the
+  watcher's day ends at "a high place" so `go` and `sit_with` keep the watch with it, and its sign names the star and
+  the watcher (`src/entities/Watch.ts`, `watch.json ridge`). Six universe wishes (five planets, the Seed Vault) are not
+  carried yet. `tools/playtest-lookout.mjs` (new). The plan: `docs/days/2026-11-16-am.md`. Screenshot
+  `lookout-sign.png`.
 
 ### Maker 2026-11-15 pm
 - Three carried wishes built (threshold 3 of 7 voices). **Tamsin's printer lesson track** (support 5): the day tool

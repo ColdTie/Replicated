@@ -8,5 +8,6 @@
   "sweepMs": 9000,
   "sweepDeg": 35,
   "nightMin": 0.15,
-  "labelRange": 70
+  "labelRange": 70,
+  "ridge": { "_doc": "The ridge lookout's sign (Vigil's wish, 2026-11-16; mind.json day.lookout): over a built lookout of this kind, the star last watched from it (else the world's own star) and, while a watch from there lasts, the watcher's name; shown within labelRange px, above px over its walls, in palette color.", "kind": "ridge", "labelRange": 80, "above": 18, "color": 10 }
 }
