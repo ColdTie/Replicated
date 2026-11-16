@@ -17,6 +17,7 @@ import { Buildings } from '../entities/Buildings';
 import { Bioworks } from '../entities/Bioworks';
 import { Chips } from '../entities/Chips';
 import { Watch } from '../entities/Watch';
+import { Lessons } from '../entities/Lessons';
 import { Replication } from '../entities/Replication';
 import { WildCems } from '../entities/WildCems';
 import { MannyDock } from '../entities/Manny';
@@ -34,7 +35,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { vignetteFor } from '../fx/textures';
 import { Controls } from '../input/Controls';
-import type { ArchiveEntry, AwayItem, SeenState, Building, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
+import type { ArchiveEntry, LessonRow, PlantRow, AwayItem, SeenState, Building, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
 import type { JournalTab } from '../ui/journal';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
@@ -102,6 +103,11 @@ export class PlanetScene extends Phaser.Scene {
   watch!: Watch;
   /** the archive of the Observatory's watches (planet_states.data.archive), for the journal */
   archive: ArchiveEntry[] = [];
+  /** the printer lesson tracks and the warren's seeds (planet_states.data.lessons / plants, the copies' days) */
+  lessons: LessonRow[] = [];
+  plants: Record<string, PlantRow> = {};
+  /** the lesson board at the Printworks (src/entities/Lessons.ts) */
+  lessonBoard!: Lessons;
   /** the Cem bed (homeworld): where supplies are shipped and the Cems build from */
   bioworks?: Bioworks;
   /** the Cems' world's wild fields (planets.json wildCems) */
@@ -447,6 +453,9 @@ export class PlanetScene extends Phaser.Scene {
     this.chips = new Chips(this);
     this.watch = new Watch(this);
     this.archive = save?.data.archive ?? [];
+    this.lessons = save?.data.lessons ?? [];
+    this.plants = save?.data.plants ?? {};
+    this.lessonBoard = new Lessons(this);
     this.homeworld.placePrinters();
     this.time.delayedCall(2500, () => this.towner.grantGifts(save?.data.gifts));
     if (!this.shot && !this.visit) { this.warren.applyOffline(this.awayHours); this.buildings.applyOffline(this.awayHours); this.trade.accrueAway(this.awayHours); }
@@ -749,6 +758,11 @@ export class PlanetScene extends Phaser.Scene {
       // a warren already dug and lived in: rooms, a few things inside, copies asleep and digging
       this.warren.data = demoWarren(this.npcs.map((n) => n.data.id));
       this.warren.data.hatch = this.warren.hatch;
+      // the Grove's planters with seeds in them (Ember Gold's wish): one a sprout, one a full plant
+      const day = 86_400_000;
+      this.warren.data.items.filter((i) => i.kind === 'planter').forEach((i, k) => {
+        this.plants[i.id] = { by: '', name: 'Ember Gold', room: 'Grove', at: Date.now() - (k ? 5 : 1.2) * day, tended: 0 };
+      });
       this.npcs.forEach((n, i) => {
         const planned = this.warren.planned[0];
         if (i === 0 && planned) this.warren.enter(n, 'dig', planned);
@@ -791,6 +805,17 @@ export class PlanetScene extends Phaser.Scene {
       if (view === 'strain') this.time.delayedCall(400, () => this.bioworks?.alter());
       this.player.setPosition(px, py);
       this.cameras.main.centerOn(lab ? lab.x : px, py - 16);
+    }
+    // the printer lesson track (Tamsin's wish): the board beside the Printworks' door, step 2 worked, waiting
+    if (view === 'lessons') {
+      const goal = this.buildings.list.find((b) => b.id === HOMEWORLD.goal);
+      if (goal && !goal.built) this.buildings.finishNow(goal.id);
+      this.bioworks?.wake(false);
+      this.lessons = [{ student: 's', studentName: 'Tamsin', teacher: 't', teacherName: 'Thales', step: 2, worked: Date.now(), did: 'a line of copper along the bead', at: Date.now() }];
+      const at = this.bioworks?.boardSpot;
+      if (at) { px = at.x - 8; py = at.y + 16; }
+      this.player.setPosition(px, py);
+      this.cameras.main.centerOn(at ? at.x : px, py - 24);
     }
     // a copy keeping a watch at the Observatory: the lens alight under the dome, you in front of it
     if (view === 'watch') {
@@ -886,6 +911,7 @@ export class PlanetScene extends Phaser.Scene {
     this.replication.update(time);
     this.chips.update(time);
     this.watch.update(time);
+    this.lessonBoard.update(time);
     this.dock.update(time, dt);
     if (this.boardRing) {
       const ready = this.departure.boardReady();

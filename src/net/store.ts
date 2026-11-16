@@ -99,6 +99,12 @@ export interface Replicating { start: number; ms: number; kind: 'wake' | 'hold';
 
 /** One watch kept at the Observatory: who, toward which star (its distance from here), what it saw. */
 export interface ArchiveEntry { by: string; name: string; star: string; ly: number; text: string; at: number }
+/** A printer lesson track (Tamsin's wish, 2026-11-15; mind.json day.lessons): the step being learned (1-based), worked
+ * when the student worked it and it waits for the teacher's check, done once the last step is checked. */
+export interface LessonRow { student: string; studentName: string; teacher: string; teacherName: string; step: number; worked?: number; did?: string; done?: boolean; at: number }
+/** A seed in a warren planter (Ember Gold's wish, 2026-11-15; mind.json day.plants), by the planter's item id: who
+ * planted it, when, and the growth its tending added (ms). */
+export interface PlantRow { by: string; name: string; room: string; at: number; tended: number; lastTend?: number; green?: boolean }
 
 export interface PlanetData {
   /** "EARTH - SOL" and the biome's words, kept for the minds' away wakes */
@@ -137,6 +143,10 @@ export interface PlanetData {
   gifts?: Gift[];
   /** the archive of the Observatory's watches (keep_watch in a day of life), oldest first, the last watch.json keep */
   archive?: ArchiveEntry[];
+  /** the printer lesson tracks of this world (lesson in a day of life), written only by the mind function */
+  lessons?: LessonRow[];
+  /** seeds in the warren's planters, by the planter's item id (plant / tend_plant in a day of life) */
+  plants?: Record<string, PlantRow>;
   /** the standing next work offered once every building here stands finished (the mind function): when, at how many */
   project?: { at: number; built: number };
   /** Who lives where in the town: copy id -> lot index, building id -> lot index (indexes into the town's lots) */
@@ -298,13 +308,16 @@ export interface Body { head: string; visor: string; torso: string; arms: string
 export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: 'solitary' | 'friendly' | 'clingy'; work: 'builder' | 'wanderer' | 'balanced'; bedtime: 'early' | 'late' | 'even'; risk: 'careful' | 'bold' }
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go' | 'travel' | 'vessel' | 'back' | 'press';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go' | 'travel' | 'vessel' | 'back' | 'press' | 'lesson' | 'sit' | 'plant' | 'tend';
   /** travel (a day of life): the star's id it flew to (`to` holds its name) */
   star?: string;
   /** gather (a day of life, applied to the store server side): material (the field below) and how much; go: where it went and why */
   n?: number; place?: string; why?: string;
   /** press (the away pass, server side): the stored iron pressed and the scrap it made */
   iron?: number; scrap?: number;
+  /** lesson: open / work / check, with whom, the step (did: what was done); sit: with whom, how many hours (place);
+   * plant: wild = the seed was found in the wilds */
+  act?: string; with?: string; step?: number; did?: string; hours?: number; wild?: boolean;
   /** journal: which journal (migration 0015); a private entry comes back without its body */
   scope?: 'public' | 'private';
   body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string; was?: string;

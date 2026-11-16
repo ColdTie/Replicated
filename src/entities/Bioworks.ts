@@ -480,6 +480,14 @@ export class Bioworks {
     return b ? { ...buildingDoor(b), top: b.y - b.h * 12 - roofHeight(b) - 6, dir: 1 } : null;
   }
 
+  /** Where the lesson board stands (src/entities/Lessons.ts): beside the Printworks' east wall, or a seeded bed's
+   * design stone; x is the board's left edge. */
+  get boardSpot(): Pt | null {
+    if (this.plinth) return { x: this.plinth.x + 12, y: this.plinth.y };
+    const b = this.scene.buildings?.list.find((x) => x.id === HOMEWORLD.goal && x.built && !x.vetoed);
+    return b ? { x: b.x + b.w * 8 + 22, y: b.y + 4 } : null;
+  }
+
   /** Where the design menu opens (the Printworks' door, or a seeded bed's design stone), once the Cems are awake. */
   get menuSpot(): Pt | null { const d = this.awake ? this.door : null; return d ? { x: d.x, y: d.y } : null; }
 
