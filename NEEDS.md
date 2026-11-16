@@ -204,6 +204,14 @@ The copies choose their names themselves, and the change applies on the spot.
   (`data.archive`), the lens alight in the game while a watch lasts (`src/entities/Watch.ts`).
 - 2026-11-15: Steve gave the Vessels their work: expand the universe to its fullest (new planets, new technology).
   Every day and long wake tells them so, with the universe as it stands; `docs/universe.md` is the roadmap.
+- 2026-11-15 pm: three carried wishes built. Tamsin's printer lesson track (backed by Thales, Sorrel, Ember Gold,
+  Watcher): `lesson` open / work / check, six steps, a checked step finished work for both, the board at the
+  Printworks (`src/entities/Lessons.ts`). Thales' company on a finished world (backed by Tamsin, Watcher, Ember Gold):
+  `sit_with`, an hour or two together fills purpose and company for both, as much as finished work once every
+  building stands; a day's end now re-reads its needs before writing them. Ember Gold's seed in the warren planter
+  (backed by Tamsin, Vigil, Thales): `plant` / `tend_plant`, a seed from the store or the wilds, grows over four days,
+  told green in the shared journal, drawn in the warren (`src/world/garden.ts`). Vigil's ridge lookout (support 3)
+  waits for the next run.
 
 ## Waiting for Steve
 

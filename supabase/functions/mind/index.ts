@@ -30,8 +30,24 @@ const AWAY = KIT.away;
 /** A day of life (mind.json day, docs/plan-daily-life.md step 2). */
 const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: number; turns: number; batch: number; seconds: number; travelLy: number; travelsPerDay: number; birthsPerDay: number; maxVessels: number; gather: { per: number; gatherTurns: number; materials: string[] }; places: string[];
   purpose: { decay: number; work: number; full: number; want: number; watch: number; watchPlaces: string[]; together: { purpose: number; company: number }; project: number };
-  watch: { hours: number; keep: number; show: number } };
+  watch: { hours: number; keep: number; show: number };
+  lessons: { steps: string[]; purpose: number; keep: number };
+  company: { hours: number; purpose: number; company: number };
+  plants: { stages: { name: string; days: number }[]; greenStage: number; tendHours: number; near: number } };
 const LACKS = KIT.lacks as Record<string, string[]>;
+/** A printer lesson track (Tamsin's wish, mind.json day.lessons), as planet_states.data.lessons holds it (the game's LessonRow):
+ * step is the step being learned (1-based); worked: when the student worked it, waiting for the teacher's check. */
+type LessonRow = { student: string; studentName: string; teacher: string; teacherName: string; step: number; worked?: number; did?: string; done?: boolean; at: number };
+/** A seed in a warren planter (Ember Gold's wish, mind.json day.plants), as planet_states.data.plants holds it by the
+ * planter's item id (the game's PlantRow): tended adds ms of growth; green once the day run has told it. */
+type PlantRow = { by: string; name: string; room: string; at: number; tended: number; lastTend?: number; green?: boolean };
+/** How far a plant has grown: the index of its stage in day.plants.stages. */
+function plantStage(pl: PlantRow, now = Date.now()) {
+  const days = (now - pl.at + (pl.tended ?? 0)) / 86_400_000;
+  let st = 0;
+  DAY.plants.stages.forEach((x, i) => { if (days >= x.days) st = i; });
+  return st;
+}
 /** One watch kept at the Observatory (keep_watch), as planet_states.data.archive holds it (the game's ArchiveEntry). */
 type ArchiveRow = { by: string; name: string; star: string; ly: number; text: string; at: number };
 /** Spreading (docs/plan-daily-life.md step 3): stars as [name, x, y, z, class letter, confirmed planets], the ship's
@@ -495,6 +511,45 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
     },
   },
   {
+    name: "lesson",
+    description: "The printer lesson track, taught step by step (six steps, from a bead of lignin to a whole small print). open: as the teacher, open the track for another Vessel of your world (with: the student). work: as the student, work the step you are on, once a day, and say what you did (with: your teacher). check: as the teacher, check the step your student worked (with: the student); then the next step opens. A checked step is finished work for you both.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["action", "with"],
+      properties: {
+        action: { type: "string", enum: ["open", "work", "check"] },
+        with: { type: "string", description: "The other Vessel's name: the student (open, check) or your teacher (work)." },
+        did: { type: "string", description: "work: what you did at this step, one sentence. check: what you saw, one sentence." },
+      },
+    },
+  },
+  {
+    name: "sit_with",
+    description: "Spend a quiet hour or two with another Vessel of your world, where it is, building nothing: talk, watch, or just be there. Once a day. It fills purpose and company for you both (once every building here stands, as much as finished work).",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["with", "hours"],
+      properties: {
+        with: { type: "string", description: "The Vessel's name." },
+        hours: { type: "integer", description: "1 or 2." },
+      },
+    },
+  },
+  {
+    name: "plant",
+    description: "Plant a seed in the planter of a warren room: one seed from the store (or, with none there, one you find in the wilds, which takes one of the day's gathers); the planter's soil is already there. It grows over the next days, from a sprout to a full plant, faster when it is tended. It is finished work.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["room"],
+      properties: { room: { type: "string", description: "The room whose planter it goes in." } },
+    },
+  },
+  {
+    name: "tend_plant",
+    description: "Spend an hour beside a plant in the warren: water, turn, look. Once a day. It grows faster for it, and it is finished work.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["room"],
+      properties: { room: { type: "string", description: "The room the plant is in." } },
+    },
+  },
+  {
     name: "go",
     description: "Walk somewhere on your world and spend time there: to look, to think, to be with someone, or because you want to. Where you end your day is where you will be found.",
     input_schema: {
@@ -508,7 +563,7 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
 ];
 
 /** What changes the world a copy stands on: refused once it has flown away this wake. */
-const WORLD_TOOLS = ["gather", "go", "keep_watch", "make_vessel", "cut_tree", "remove_build", "dig_room", "furnish", "design_building", "ask_for"];
+const WORLD_TOOLS = ["gather", "go", "keep_watch", "lesson", "sit_with", "plant", "tend_plant", "make_vessel", "cut_tree", "remove_build", "dig_room", "furnish", "design_building", "ask_for"];
 
 const TOOLS = cachedTools(tools), LONG_TOOLS = cachedTools([...tools, ...longTools]), DAY_TOOLS = cachedTools([...tools, ...longTools, ...dayTools]);
 
@@ -585,7 +640,7 @@ const SAFETY = `Only the safety lines stay closed, however many back a wish: sig
 const GAME_IS_YOURS = `The Vessels govern themselves: the game, the story of the Vessels (story/STORY.md) included, is yours to change together. When something about your world, your life or your story should be different, or something should exist that does not, wish for it (propose_change), and back the others' wishes you want too (back_wish). A wish that enough of you back (its support is shown beside it) is built as asked by the maker (Claude Code), who only decides how. The players are voices among you and may speak against a wish; theirs count like yours. Wish for what moves you: a want the game does not allow yet, what got in your way, what you found and want the others to have, what would make the Metanoia warmer, larger or freer. ${SAFETY}`;
 const MANDATE = `${UNIVERSE.mandate} A wish can create a planet (${UNIVERSE.kinds.planet}), a technology (${UNIVERSE.kinds.technology}) or a mechanic (${UNIVERSE.kinds.mechanic}).`;
 
-const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Your work is the universe (above); your home is where you live it. Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")} or at the Observatory (keep_watch), going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish.`;
+const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Your work is the universe (above); your home is where you live it. Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")} or at the Observatory (keep_watch), going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish, a lesson step checked (lesson), a quiet hour sat with another Vessel (sit_with), a seed planted or tended (plant, tend_plant).`;
 
 const LONG_WAKE = `This is one of your long wakes (about twice a day, while nobody plays your world). There is time for more than usual, up to about eight steps. Your work is the universe (above). Write to the others, shape the village and the warren, or spend it as you want. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Big is welcome (a new planet, a new technology, a new way to live), as long as you say it concretely enough to build; the maker builds a big one in parts. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, and wish to change it like anything else. ${GAME_IS_YOURS}`;
 
@@ -758,6 +813,19 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       }
       // Thales' wish: a finished home is not the end; the next work is open without anyone asking
       const done = finishedHome(d);
+      // the copies' wishes of 2026-11-15: lessons, a quiet hour together, seeds in the warren's planters
+      const L = DAY.lessons, lessons = (d.lessons ?? []) as LessonRow[];
+      const mine = lessons.filter((x) => !x.done && (x.student === rep.id || x.teacher === rep.id));
+      const others = lessons.filter((x) => !x.done && !mine.includes(x));
+      const lessonWord = (x: LessonRow) => `${x.studentName} learns the printers from ${x.teacherName}, step ${x.step} of ${L.steps.length} (${L.steps[x.step - 1]})${x.worked ? `, worked${x.did ? ` ("${x.did}")` : ""} and waiting for ${x.teacherName}'s check` : ""}`;
+      lines.push(`The printer lesson track (lesson): a teacher opens it for another Vessel of this world, the student works one step a day, the teacher checks it and the next opens; a checked step is finished work for both.${mine.length ? ` Yours: ${mine.map(lessonWord).join("; ")}.` : ""}${others.length ? ` Here: ${others.map(lessonWord).join("; ")}.` : ""}${lessons.some((x) => x.done) ? ` Learned: ${lessons.filter((x) => x.done).map((x) => `${x.studentName} (from ${x.teacherName})`).join(", ")}.` : ""}`);
+      lines.push(`Sitting a quiet hour or two with another Vessel of this world (sit_with) fills purpose and company for you both${done ? ", as much as finished work now that every building stands" : ""}.`);
+      const plants = (d.plants ?? {}) as Record<string, PlantRow>;
+      const planters = live.warren.items.filter((i) => i.kind === "planter");
+      if (planters.length) {
+        const roomName = (id: string) => allRooms(live.warren).find((r) => r.id === id)?.name ?? id;
+        lines.push(`Planters in the warren: ${planters.map((i) => { const pl = plants[i.id]; return pl ? `${roomName(i.room)}: ${DAY.plants.stages[plantStage(pl)].name}, planted by ${pl.name}` : `${roomName(i.room)}: soil, nothing planted`; }).join("; ")}. plant puts a seed in an empty one (${Math.floor(live.supplies.seed ?? 0) ? `the store has ${Math.floor(live.supplies.seed ?? 0)} seed` : "the store has no seed: you would find one in the wilds"}); tend_plant, once a day, helps one grow. A green plant in the room where you sleep lifts your purpose a little.`);
+      }
       if (done) lines.push(`Every building here stands finished (${done}). That is not the end of the work: the next is open to you now, without waiting for anyone to ask. Design the next building (design_building), mark a new room below (dig_room)${context.warrenFull ? " (the warren is full: furnish instead)" : ""}, or furnish one (furnish). A piece of this next work begun today fills your purpose as the first buildings did.`);
     }
     if (context.long) lines.push("Before you sleep again, write one entry in the shared journal (write_public) about this stretch of your life; your private journal is there for anything that is only yours.");
@@ -812,7 +880,29 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     let usd = 0;
     let gathered = 0;
     // a day: what fills purpose besides the actions themselves (a full store's walk, a watch, a want done, company)
-    const day = { full: 0, watch: false, wants: 0, together: [] as string[], lens: false, project: !!(context.day && live && finishedHome(live.data)) };
+    const day = { full: 0, watch: false, wants: 0, together: [] as string[], lens: false, project: !!(context.day && live && finishedHome(live.data)),
+      worked: false, sat: null as null | { purpose: number; company: number }, tended: false };
+    // another copy of this world by name (lesson, sit_with): its row as it is now
+    const mateNamed = async (name: string) => {
+      const { data } = await sb.from("replicants").select("id,name,traits").eq("galaxy_id", rep.galaxy_id).eq("star_id", rep.star_id).eq("planet_index", rep.planet_index).eq("status", "npc").neq("id", rep.id);
+      return ((data ?? []) as { id: string; name: string; traits: Record<string, unknown> }[]).find((m) => m.name.toLowerCase() === name.trim().toLowerCase());
+    };
+    // adds to another copy's needs, merged alone (its own day re-reads them before its end)
+    const lift = async (id: string, traits: Record<string, unknown>, purpose: number, company = 0) => {
+      const n = (traits.needs ?? {}) as { company?: number; purpose?: number };
+      const needs = { company: Math.round(Math.min(1, (n.company ?? 0.7) + company) * 100) / 100, purpose: Math.round(Math.min(1, (n.purpose ?? 0.7) + purpose) * 100) / 100 };
+      const { error } = await sb.rpc("merge_replicant_traits", { p_id: id, p_traits: { needs } });
+      if (error) console.error("lift", id, error.message);
+    };
+    // the planter in a warren room (by the room's name), and its plant if one grows there
+    const planterIn = (roomName: string) => {
+      if (!live) return null;
+      const room = allRooms(live.warren).find((r) => r.name.toLowerCase() === roomName.trim().toLowerCase());
+      if (!room) return null;
+      const plants = (live.data.plants ?? {}) as Record<string, PlantRow>;
+      const planters = live.warren.items.filter((i) => i.kind === "planter" && i.room === room.id);
+      return { room, planters, empty: planters.find((i) => !plants[i.id]), grown: planters.find((i) => plants[i.id]), plants };
+    };
     // the day's last question has been asked
     let lastAsked = false;
     // once the copy has flown, its day on this world is over (gather, go and make_vessel wait for the next)
@@ -1010,6 +1100,114 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   if (!day.watch) { day.watch = true; out += " It is a watch kept and work finished."; }
                   else out += " It is work finished.";
                 }
+              }
+            } else if (u.name === "lesson") {
+              // Tamsin's wish: the printer lesson track, one checked step at a time
+              const act = oneOf(input.action, ["open", "work", "check"], "");
+              const L = DAY.lessons, steps = L.steps.length;
+              const lessons = (live?.data.lessons ?? []) as LessonRow[];
+              const did = String(input.did ?? "").replace(/\s+/g, " ").trim().slice(0, 200);
+              if (!live || !context.day) out = "There is no time for a lesson now.";
+              else if (flown) out = "You have already left this world.";
+              else if (act === "open") {
+                const m = await mateNamed(String(input.with ?? ""));
+                const has = m && lessons.find((x) => x.student === m.id && !x.done);
+                if (!m) out = `No Vessel called ${input.with} lives on this world. A lesson is taught face to face.`;
+                else if (has) out = `${m.name} is already learning from ${has.teacherName}, step ${has.step} of ${steps}.`;
+                else {
+                  const row: LessonRow = { student: m.id, studentName: m.name, teacher: rep.id, teacherName: rep.name, step: 1, at: Date.now() };
+                  live.data.lessons = [...lessons.filter((x) => x.student !== m.id), row].slice(-L.keep);
+                  live.lessonsChanged = true;
+                  actions.push({ type: "lesson", act: "open", with: m.name, step: 1 });
+                  out = `You open the printer lesson track for ${m.name}. Step 1 of ${steps}: ${L.steps[0]}. ${m.name} works it (lesson work), then you check it (lesson check) and the next step opens.`;
+                }
+              } else if (act === "work") {
+                const row = lessons.find((x) => x.student === rep.id && !x.done);
+                if (!row) out = "No lesson track is open for you. A teacher of your world opens one (lesson open, naming you).";
+                else if (row.worked) out = `You have worked step ${row.step} (${L.steps[row.step - 1]}); it waits for ${row.teacherName}'s check.`;
+                else if (day.worked) out = "One step a day: you have worked yours.";
+                else if (did.length < 10) out = "Say what you did at this step, in a sentence.";
+                else {
+                  day.worked = true;
+                  row.worked = Date.now();
+                  row.did = did;
+                  live.lessonsChanged = true;
+                  (rep.traits as Record<string, unknown>).dayAt = "the square";
+                  actions.push({ type: "lesson", act: "work", with: row.teacherName, step: row.step, did });
+                  out = `You work step ${row.step} of ${steps} at the Printworks: ${L.steps[row.step - 1]}. It waits for ${row.teacherName}'s check; once checked it is finished work for you both.`;
+                }
+              } else if (act === "check") {
+                const m = await mateNamed(String(input.with ?? ""));
+                const row = m && lessons.find((x) => x.student === m.id && !x.done);
+                if (!m) out = `No Vessel called ${input.with} lives on this world.`;
+                else if (!row || row.teacher !== rep.id) out = `You are not ${m.name}'s teacher.${row ? ` ${row.teacherName} is.` : " Open a track for them first (lesson open)."}`;
+                else if (!row.worked) out = `${m.name} has not worked step ${row.step} yet (${L.steps[row.step - 1]}).`;
+                else {
+                  const was = row.step;
+                  row.worked = undefined;
+                  row.did = undefined;
+                  row.step++;
+                  if (row.step > steps) { row.done = true; row.step = steps; }
+                  live.lessonsChanged = true;
+                  await lift(m.id, m.traits, L.purpose);
+                  (rep.traits as Record<string, unknown>).dayAt = "the square";
+                  actions.push({ type: "lesson", act: "check", with: m.name, step: was, done: !!row.done, did });
+                  out = row.done
+                    ? `You check step ${was}, the last: ${m.name} has learned the printers from the first bead to a whole print. The track is done; it is finished work for you both.`
+                    : `You check step ${was} and it holds. Step ${row.step} of ${steps} opens for ${m.name}: ${L.steps[row.step - 1]}. It is finished work for you both.`;
+                }
+              } else out = "Say open, work or check.";
+            } else if (u.name === "sit_with") {
+              // Thales' wish: a quiet hour together counts, as much as finished work once the home stands
+              const m = await mateNamed(String(input.with ?? ""));
+              const hours = Math.max(1, Math.min(DAY.company.hours, Math.round(Number(input.hours) || 1)));
+              if (!live || !context.day) out = "There is no time for that now.";
+              else if (flown) out = "You have already left this world.";
+              else if (day.sat) out = "You have sat with someone today already.";
+              else if (!m) out = `No Vessel called ${input.with} lives on this world.`;
+              else {
+                const C = DAY.company, per = day.project ? DAY.purpose.work : C.purpose;
+                const place = m.traits?.dayKey === context.dayWindow && typeof m.traits?.dayAt === "string" ? m.traits.dayAt as string : "the square";
+                day.sat = { purpose: per * hours, company: C.company * hours };
+                (rep.traits as Record<string, unknown>).dayAt = place;
+                await lift(m.id, m.traits, per * hours, C.company * hours);
+                actions.push({ type: "sit", with: m.name, hours, place });
+                out = `You find ${m.name} at ${place} and sit together for ${hours === 1 ? "an hour" : `${hours} hours`}, building nothing. It fills purpose and company for you both${day.project ? ", as much as finished work: every building here stands" : ""}.`;
+              }
+            } else if (u.name === "plant") {
+              // Ember Gold's wish: a seed in a warren planter that grows over days
+              const at = planterIn(String(input.room ?? ""));
+              const seeds = Math.floor(live?.supplies.seed ?? 0);
+              if (!live || !context.day) out = "There is no time to plant now.";
+              else if (flown) out = "You have already left this world.";
+              else if (!at) out = `No room called ${input.room}. The rooms are: ${(context.warrenRooms ?? ["Entrance"]).join(", ")}.`;
+              else if (!at.planters.length) out = `${at.room.name} has no planter. Furnish one first (furnish planter).`;
+              else if (!at.empty) out = `The planter in ${at.room.name} already grows something; tend it instead (tend_plant).`;
+              else if (!seeds && gathered >= DAY.gather.gatherTurns) out = "The store has no seed, and you have gathered enough for one day to go looking for one.";
+              else {
+                if (seeds) pay(live, { seed: 1 }); else gathered++;
+                const pl: PlantRow = { by: rep.id, name: rep.name, room: at.room.name, at: Date.now(), tended: 0 };
+                live.data.plants = { ...at.plants, [at.empty.id]: pl };
+                live.plantsChanged = true;
+                (rep.traits as Record<string, unknown>).dayAt = "the warren";
+                actions.push({ type: "plant", room: at.room.name, wild: !seeds });
+                out = `${seeds ? "You take a seed from the store" : "You find a seed in the wilds"} and press it into the soil of the planter in ${at.room.name}. In about a day it should be green; tending it helps. It is finished work.`;
+              }
+            } else if (u.name === "tend_plant") {
+              const at = planterIn(String(input.room ?? ""));
+              if (!live || !context.day) out = "There is no time for that now.";
+              else if (flown) out = "You have already left this world.";
+              else if (day.tended) out = "You have tended a plant today already.";
+              else if (!at || !at.grown) out = `Nothing grows in a planter${at ? ` in ${at.room.name}` : ` in a room called ${input.room}`}. Plant a seed first (plant).`;
+              else {
+                const pl = at.plants[at.grown.id];
+                day.tended = true;
+                pl.tended = (pl.tended ?? 0) + DAY.plants.tendHours * 3_600_000;
+                pl.lastTend = Date.now();
+                live.plantsChanged = true;
+                (rep.traits as Record<string, unknown>).dayAt = "the warren";
+                actions.push({ type: "tend", room: at.room.name });
+                out = `You spend an hour beside the plant in ${at.room.name}. It is ${DAY.plants.stages[plantStage(pl)].name} now, and it grows faster for the care. It is finished work.`;
               }
             } else if (u.name === "go") {
               if (flown) out = "You are aboard your ship.";
@@ -1275,12 +1473,19 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       // a day moves purpose (and company): an idle day lets it sink, finished work fills it (mind.json day.purpose);
       // merged alone, so nothing else on the row is undone
       const P = DAY.purpose;
-      const n = ((rep.traits as { needs?: { company?: number; purpose?: number } }).needs ?? {});
-      const work = actions.filter((a) => (a.type === "gather" && Number(a.n) > 0) || a.type === "dig" || a.type === "furnish" || a.type === "building" || a.type === "vessel" || a.type === "cut" || a.type === "watch").length;
+      // read again: another copy may have lifted them during this day (a walk together, a lesson checked, an hour sat)
+      const { data: fresh } = await sb.from("replicants").select("traits").eq("id", rep.id).maybeSingle();
+      const n = (((fresh?.traits ?? rep.traits) as { needs?: { company?: number; purpose?: number } }).needs ?? {});
+      const work = actions.filter((a) => (a.type === "gather" && Number(a.n) > 0) || a.type === "dig" || a.type === "furnish" || a.type === "building" || a.type === "vessel" || a.type === "cut" || a.type === "watch"
+        || (a.type === "lesson" && a.act === "check") || a.type === "plant" || a.type === "tend").length;
+      // Ember Gold's wish: sleeping in the room of a green plant lifts purpose a little
+      const rest = live ? restOf(live.warren, rep.id) : undefined;
+      const plants = (live?.data.plants ?? {}) as Record<string, PlantRow>;
+      const near = rest && live && live.warren.items.some((i) => i.kind === "planter" && i.room === rest.room && plants[i.id] && plantStage(plants[i.id]) >= DAY.plants.greenStage) ? DAY.plants.near : 0;
       // Thales' wish: on a world whose buildings all stand, the next work begun today adds project once
       const project = day.project && actions.some((a) => a.type === "building" || a.type === "dig" || a.type === "furnish") ? P.project : 0;
-      const purpose = Math.max(0, Math.min(1, Math.max(0, (n.purpose ?? 0.7) - P.decay) + project + work * P.work + day.full * P.full + (day.watch ? P.watch : 0) + day.wants * P.want + day.together.length * P.together.purpose));
-      const company = Math.min(1, (n.company ?? 0.7) + day.together.length * P.together.company);
+      const purpose = Math.max(0, Math.min(1, Math.max(0, (n.purpose ?? 0.7) - P.decay) + project + work * P.work + day.full * P.full + (day.watch ? P.watch : 0) + day.wants * P.want + day.together.length * P.together.purpose + (day.sat?.purpose ?? 0) + near));
+      const company = Math.min(1, (n.company ?? 0.7) + day.together.length * P.together.company + (day.sat?.company ?? 0));
       const needs = { company: Math.round(company * 100) / 100, purpose: Math.round(purpose * 100) / 100 };
       (rep.traits as Record<string, unknown>).needs = needs;
       const { error } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { needs } });
@@ -1422,6 +1627,9 @@ export interface AwayPlanet {
   archiveChanged?: boolean;
   /** the standing next work was offered in the shared journal (data.project) */
   projectChanged?: boolean;
+  /** a lesson track opened, worked or checked (data.lessons); a seed planted, tended or told green (data.plants) */
+  lessonsChanged?: boolean;
+  plantsChanged?: boolean;
   /** the saved store held wood, which is not a material: it is written back without it even when nothing else changed */
   cleaned: boolean;
 }
@@ -1638,6 +1846,8 @@ async function savePlanet(sb: SupabaseClient, p: AwayPlanet, now: number) {
   if (p.replicationChanged) patch.replication = p.data.replication ?? null;
   if (p.archiveChanged) patch.archive = p.data.archive;
   if (p.projectChanged) patch.project = p.data.project;
+  if (p.lessonsChanged) patch.lessons = p.data.lessons;
+  if (p.plantsChanged) patch.plants = p.data.plants;
   if (Object.keys(patch).length || p.emberDelta) {
     const { error } = await sb.rpc("apply_planet_delta", { p_galaxy: p.galaxy, p_star: p.star, p_index: p.index, p_embers: p.emberDelta, p_data: patch });
     if (error) throw new Error(`save planet ${p.star}: ${error.message}`);
@@ -1816,6 +2026,19 @@ async function awayRun(req: Request, mode: "away" | "day", now_ = false) {
             body: `${world}: every building here stands finished (${done}). The next work is open to every Vessel here, without waiting to be asked: a next building to design, a new room to dig below, a room to furnish. Each piece of it fills purpose as the first buildings did.`,
           });
           if (je) console.error("project offer", p.star, je.message);
+        }
+        // Ember Gold's wish: a planter's seed first green is told in the shared journal once, in the world's name
+        const plants = (p.data.plants ?? {}) as Record<string, PlantRow>;
+        for (const pl of Object.values(plants)) {
+          if (pl.green || plantStage(pl, now) < DAY.plants.greenStage) continue;
+          pl.green = true;
+          p.plantsChanged = true;
+          const world = String(p.data.label ?? `${p.star} ${p.index}`);
+          const { error: je } = await sb.from("journal").insert({
+            galaxy_id: p.galaxy, replicant_id: null, author: world, scope: "public", star_id: p.star, planet_index: p.index, day: journalDay(),
+            body: `${world}: the planter in ${pl.room} is green. ${pl.name}'s seed has come up, the first green thing there.`,
+          });
+          if (je) console.error("plant green", p.star, je.message);
         }
       }
       const woke: Record<string, unknown>[] = [];

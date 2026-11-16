@@ -21,6 +21,7 @@ import { Controls } from '../input/Controls';
 import type { ReplicantSave, WarrenItem, WarrenRoom } from '../net/store';
 import { CAVE, GRID_H, GRID_W, allRooms, ladderTile, restOf, type ItemKind } from '../world/warren';
 import { paintWarren } from '../world/warrenPaint';
+import { plantPixels, plantStage } from '../world/garden';
 import { DEPTH, type PlanetScene } from './PlanetScene';
 
 type Pt = { x: number; y: number };
@@ -96,7 +97,7 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
   private nextAfterimage = 0;
   private stepTimer = 0;
   private copies = new Map<Npc, CopyView>();
-  private items = new Map<string, { sprite: Phaser.GameObjects.Sprite; light?: Light; glow?: Phaser.GameObjects.Image }>();
+  private items = new Map<string, { sprite: Phaser.GameObjects.Sprite; light?: Light; glow?: Phaser.GameObjects.Image; plant?: Phaser.GameObjects.Graphics }>();
   private solid = new Set<string>();
   private poolLights: Light[] = [];
   private ladder = { x: 0, y: 0 };
@@ -183,7 +184,7 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
       const by = this.host.npcs.find((n) => n.data.id === it.by);
       sprite.setTint(by?.trailColor ?? PALETTE[18]);
     }
-    const entry: { sprite: Phaser.GameObjects.Sprite; light?: Light; glow?: Phaser.GameObjects.Image } = { sprite };
+    const entry: { sprite: Phaser.GameObjects.Sprite; light?: Light; glow?: Phaser.GameObjects.Image; plant?: Phaser.GameObjects.Graphics } = { sprite };
     const l = (def as { light?: { radius: number; color: number; intensity: number; flicker?: number } }).light;
     if (l) {
       entry.light = this.lighting.add({ x, y: y - 9, radius: l.radius, color: PALETTE[l.color], intensity: animate ? 0 : l.intensity, flicker: l.flicker });
@@ -191,6 +192,15 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
       if (animate) { this.tweens.add({ targets: entry.light, intensity: l.intensity, duration: 600 }); this.tweens.add({ targets: entry.glow, alpha: 0.14, duration: 600 }); }
     }
     if (def.solid) this.solid.add(`${it.x},${it.y}`);
+    // a seed in the planter (Ember Gold's wish): a small leafy shape in the planter's own color, taller stage by stage
+    const pl = it.kind === 'planter' ? this.host.plants[it.id] : undefined;
+    if (pl) {
+      const leaf = it.tint !== undefined ? PALETTE[it.tint] : PALETTE[13];
+      const colors = [PALETTE[14], leaf, Phaser.Display.Color.ValueToColor(leaf).lighten(25).color, PALETTE[it.tint !== undefined ? 11 : 29]];
+      const g = this.add.graphics().setDepth(DEPTH.actors + y - 1);
+      for (const [dx, dy, role] of plantPixels(plantStage(pl))) { g.fillStyle(colors[role], 1); g.fillRect(x + dx, y - 9 - dy, 1, 1); }
+      entry.plant = g;
+    }
     this.items.set(it.id, entry);
     if (animate) { squash(this, sprite, 1.3, 0.7, 150); this.fx.dust(x, y, 6); sound.build(); }
   }

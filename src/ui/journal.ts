@@ -159,6 +159,9 @@ export interface JournalView {
   feelings?: Record<string, string>;
   /** surface buildings in words */
   buildings?: string[];
+  /** the printer lessons here and the warren's seeds, in words (the copies' days) */
+  lessons?: string[];
+  garden?: string[];
   /** the Observatory's archive here, oldest first (keep_watch) */
   archive?: { name: string; star: string; ly: number; text: string; at: number }[];
   /** the player's actions */
@@ -354,6 +357,14 @@ export function openJournal(v: JournalView) {
   if (v.buildings?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[2])}">BUILDINGS</h3>`);
     for (const line of v.buildings) pages.here.push(`<p>${esc(line.replace(/^- /, ''))}</p>`);
+  }
+  if (v.lessons?.length) {
+    pages.here.push(`<h3 style="color:${css(PALETTE[10])}">LESSONS</h3>`);
+    for (const line of v.lessons) pages.here.push(`<p>${esc(line)}</p>`);
+  }
+  if (v.garden?.length) {
+    pages.here.push(`<h3 style="color:${css(PALETTE[12])}">GROWING</h3>`);
+    for (const line of v.garden) pages.here.push(`<p>${esc(line)}</p>`);
   }
   if (v.archive?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[18])}">THE ARCHIVE</h3>`);

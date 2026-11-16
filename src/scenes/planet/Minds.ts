@@ -6,7 +6,8 @@ import TALK from '../../data/talk.json';
 import { session } from '../../core/session';
 import { Npc } from '../../entities/Npc';
 import { allRooms, describeWarren, restOf } from '../../world/warren';
-import type { AwayItem, MindContext, MindResult, ReplicantSummary } from '../../net/store';
+import type { AwayItem, LessonRow, MindContext, MindResult, PlantRow, ReplicantSummary } from '../../net/store';
+import { plantStage } from '../../world/garden';
 import { mailSeconds } from '../../world/galaxy';
 import type { PlanetScene } from '../PlanetScene';
 import { onPress } from '../../input/Controls';
@@ -89,6 +90,10 @@ export class Minds {
         else if (a.type === 'note') log(`${name} wrote itself a note`);
         else if (a.type === 'gather') log(`${name} gathered ${a.n ?? 'some'} ${a.material ?? 'supplies'}`);
         else if (a.type === 'go') log(`${name} went to ${a.place ?? 'somewhere'}`);
+        else if (a.type === 'sit') log(`${name} sat with ${a.with ?? 'a companion'} for ${a.hours === 1 ? 'an hour' : `${a.hours ?? 1} hours`}${a.place ? ` at ${a.place}` : ''}`);
+        else if (a.type === 'lesson') log(a.act === 'open' ? `${name} opened the printer lessons for ${a.with}` : a.act === 'work' ? `${name} worked printer lesson ${a.step} for ${a.with}` : `${name} checked ${a.with}'s printer lesson ${a.step}`);
+        else if (a.type === 'plant') log(`${name} planted a seed in the planter in ${a.room ?? 'the warren'}`);
+        else if (a.type === 'tend') log(`${name} tended the plant in ${a.room ?? 'the warren'}`);
         else if (a.type === 'travel') log(`${name} flew its ship to ${a.to ?? 'another star'}`);
         else if (a.type === 'vessel') log(`${name} began a new Vessel at the Replicator`);
         else if (a.type === 'back') log(`${name} backed a wish: ${a.detail ?? 'a change to the game'}`);
@@ -444,7 +449,7 @@ export class Minds {
     };
     openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.s.visit ? 0 : me.traits.sparks ?? 0, place: this.s.placeLabel,
       me: { id: me.id, name: me.name, star: this.s.planet.star, planet: this.s.planet.planetIndex }, all, copies: this.s.npcs.map((n) => n.data), journal: j, shared, feelings, actions, tab,
-      buildings: this.s.buildings.describe(nameOf), archive: this.s.archive, warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
+      buildings: this.s.buildings.describe(nameOf), archive: this.s.archive, lessons: lessonLines(this.s.lessons), garden: gardenLines(this.s.plants), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
   }
 
   /** The original writes to a Vessel: a letter that arrives at once on this world, after the light's delay from
@@ -507,4 +512,17 @@ export class Minds {
     this.mindLog.push({ t: this.mindClock, text: `${session.replicant?.name ?? 'the original'} gave ${npc.data.name} ${n} Ember` });
     this.nextWake.set(npc, Math.min(this.nextWake.get(npc) ?? Infinity, this.mindClock + 3000));
   }
+}
+
+/** The printer lessons here, for the journal's HERE page (Tamsin's wish). */
+function lessonLines(rows: LessonRow[]): string[] {
+  const steps = MIND.day.lessons.steps;
+  return rows.map((r) => r.done
+    ? `${r.studentName} learned the printers from ${r.teacherName}, all ${steps.length} steps.`
+    : `${r.studentName} learns the printers from ${r.teacherName}: step ${r.step} of ${steps.length}, ${steps[r.step - 1]}${r.worked ? ` (worked${r.did ? `: ${r.did}` : ''}; waiting for the check)` : ''}.`);
+}
+
+/** The seeds in the warren's planters, for the journal's HERE page (Ember Gold's wish). */
+function gardenLines(plants: Record<string, PlantRow>): string[] {
+  return Object.values(plants).map((p) => `In ${p.room}: ${MIND.day.plants.stages[plantStage(p)].name}, planted by ${p.name}.`);
 }
