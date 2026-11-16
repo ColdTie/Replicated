@@ -42,7 +42,10 @@
       "trees": 0.035,
       "towers": 0,
       "intro": "scan",
-      "lacks": ["copper", "quartz"],
+      "lacks": [
+        "copper",
+        "quartz"
+      ],
       "ground": [
         25,
         15,
@@ -233,6 +236,61 @@
       "wildlife": {
         "grazers": 0,
         "birds": 0,
+        "butterflies": 0
+      }
+    },
+    {
+      "id": "cinder",
+      "poles": {
+        "size": 0.12,
+        "colors": [
+          29,
+          30
+        ]
+      },
+      "name": "CINDER SOUNDING",
+      "subtitle": "WHERE THE DUNES SING",
+      "star": "gliese-884",
+      "planetIndex": 1,
+      "seed": 8841,
+      "accent": [
+        27,
+        28,
+        29
+      ],
+      "ambient": "a8886c",
+      "sky": [
+        "181425",
+        "3e2731",
+        "733e39",
+        "e4a672"
+      ],
+      "size": [
+        140,
+        100
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.72,
+      "ruins": 3,
+      "resourceNodes": 30,
+      "enemies": {
+        "skitter": 7,
+        "spitter": 4
+      },
+      "decorDensity": 0.08,
+      "sporeRate": 2.5,
+      "trees": 0,
+      "towers": 2,
+      "intro": "land",
+      "dayCycle": true,
+      "sunTint": "ffc890",
+      "gravity": 1,
+      "weather": false,
+      "ponds": 0,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 6,
         "butterflies": 0
       }
     }
