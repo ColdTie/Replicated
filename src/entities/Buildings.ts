@@ -51,9 +51,19 @@ export class Buildings {
       if (b.material === 'wood') { b.material = 'stone'; done = true; }
       if (!b.paid && b.cost && 'wood' in b.cost) { delete b.cost.wood; done = true; }
     }
+    // a building a day of life began while nobody played (the ridge lookout) takes the town's next free lot now
+    for (const b of this.list) {
+      if (!b.unplaced || b.vetoed) continue;
+      const i = lotForBuilding(scene.map.town, scene.townState);
+      if (i < 0) continue;
+      const at = buildingSpot(scene.map.town.lots[i]);
+      b.x = at.x; b.y = at.y; delete b.unplaced;
+      scene.townState.civic[b.id] = i; scene.markTown();
+      done = true;
+    }
     // a print whose time ran out while nobody was here stands finished
     for (const b of this.list) if (this.printed(b) && !b.built && !b.vetoed && this.fraction(b) >= 1) { b.built = true; b.progress = 1; done = true; }
-    for (const b of this.list) if (!b.vetoed) this.place(b, false);
+    for (const b of this.list) if (!b.vetoed && !b.unplaced) this.place(b, false);
     // written with the planet's next flush
     if (done && !scene.visit) scene.pending.buildings = structuredClone(this.list);
   }
