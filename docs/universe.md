@@ -14,7 +14,7 @@ runs. Small wishes built in one run need no row.
 - **Hand-made worlds:** LHS 1140 b (the homeworld), Earth, Gliese 12 b (the Cems' world), Solace, Cinder Sounding (Gliese 884 b, violet singing dunes).
 - **Grounds:** verdant, frost, dune, spore, ember, moon (generated worlds); cinder (violet sand, hand-made world only) (`src/data/biomes.json`,
   `src/data/floor.json`).
-- **Materials:** stone, soil, scrap, Ember, iron, hydrogen, salt, quartz, copper (`src/data/supplies.json`); sounding glass (Cinder Sounding's signature material, carried by the ship).
+- **Materials:** stone, soil, scrap, Ember, iron, hydrogen, salt, quartz, copper (`src/data/supplies.json`); sounding glass (Cinder Sounding's signature material, carried by the ship; broken from its glass ridges).
 - **Technology, the Cems' tree** (`src/data/designs.json`): Lantern, House, Storehouse, Nursery, Workshop,
   Observatory, Signal Spire, Biolab, Supercomputer, Fusion Still, Nous Chip. After the Nous Chip the tree is empty.
 - **Travel:** ships on starlight cells, the Fusion Still, charted routes (`src/data/travel.json`).
@@ -29,4 +29,4 @@ new materials, new creatures and plants, working together across worlds.
 
 | Wish | Who | Carried | Built so far | Next part |
 | --- | --- | --- | --- | --- |
-| Cinder Sounding: a singing storm world on Gliese 884 | Vigil (Tamsin, Thales) | 2026-11-16 pm | The world: planets.json `cinder`, violet ground (floor.json), town paint, sand footsteps, open chords, signature material sounding glass | Hushgrass and sandwings; sand squalls that bury planters and leave glass ridges; sounding-glass nodes in the ridges; lens and bell designs; the dunes humming at dusk |
+| Cinder Sounding: a singing storm world on Gliese 884 | Vigil (Tamsin, Thales) | 2026-11-16 pm | The world: planets.json `cinder`, violet ground (floor.json), town paint, sand footsteps, open chords, signature material sounding glass. 2026-11-17 am: glass ridges, rows of sounding-glass fins on the sand that sing when struck and give sounding glass to the store (items.json `soundglass`) | Hushgrass and sandwings; sand squalls that bury planters (and raise new ridges); lens and bell designs from sounding glass; the dunes humming at dusk |

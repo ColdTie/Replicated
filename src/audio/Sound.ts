@@ -385,7 +385,7 @@ class SoundEngine {
   /**
    * A swing lands on a resource node, each kind its own voice: an Ember crystal rings; iron clinks like an anvil;
    * hydrogen hisses and bloops; salt crunches with a rattle of grains and a tiny tinkle; quartz sings like a glass
-   * harmonica, two close tones beating as they fade; copper hums like a struck singing bowl, wobbling slowly.
+   * harmonica, two close tones beating as they fade; copper hums like a struck singing bowl, wobbling slowly; sounding glass sings, a slow swell on a note of the chord.
    */
   mineral(kind: string, at?: At) {
     if (kind === 'ember') { this.crystal(at); return; }
@@ -426,6 +426,15 @@ class SoundEngine {
         this.noise(0.08, { ...o, type: 'lowpass', freq: 700, to: 200, vol: 0.12 * k });
         return;
       }
+      case 'soundglass': {
+        // a fin of sounding glass sings: a slow swell on a note of the D major chord, a fifth above, two tones beating
+        const f = midi(pick([62, 66, 69, 74]));
+        this.tone(f, 2.6, { ...o, type: 'sine', vol: 0.06 * k, attack: 0.16, rev: 0.9 });
+        this.tone(f * 1.003, 2.6, { ...o, type: 'sine', vol: 0.04 * k, attack: 0.22, rev: 0.9 });
+        this.tone(f * 1.5, 1.8, { ...o, type: 'triangle', vol: 0.015 * k, attack: 0.3, rev: 0.9 });
+        this.noise(0.02, { ...o, type: 'highpass', freq: 5000, vol: 0.04 * k });
+        return;
+      }
       default: this.crystal(at);
     }
   }
@@ -439,6 +448,7 @@ class SoundEngine {
       case 'hydrogen': this.tone(vary(420, 0.1), 0.09, { type: 'sine', to: vary(1100, 0.1), vol: 0.05, delay: 0.02 }); return;
       case 'salt': [0, 1, 2].forEach((i) => this.noise(0.008, { type: 'highpass', freq: 5000 + i * 900, vol: 0.05, delay: 0.015 + i * 0.035 })); return;
       case 'quartz': { const f = midi(93 + PENTA[Math.floor(Math.random() * 5)]); this.tone(f, 0.6, { type: 'sine', vol: 0.03, delay: 0.02, rev: 0.85 }); this.tone(f * 1.005, 0.6, { type: 'sine', vol: 0.02, delay: 0.03, rev: 0.85 }); return; }
+      case 'soundglass': { const f = midi(pick([81, 86])); this.tone(f, 0.9, { type: 'sine', vol: 0.025, delay: 0.02, attack: 0.08, rev: 0.9 }); return; }
       case 'copper': { const f = vary(494, 0.008); this.tone(f, 0.45, { type: 'sine', vol: 0.04, delay: 0.02, rev: 0.5 }); this.tone(f * 2.71, 0.2, { type: 'sine', vol: 0.012, delay: 0.02 }); return; }
     }
   }
