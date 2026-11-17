@@ -747,6 +747,11 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
 
+### Maker 2026-11-16 pm
+- Vigil's Cinder Sounding (support 3 of 3) built in part: a hand-made world on Gliese 884 b (`planets.json cinder`, ground
+  `floor.json cinder`, sounding glass as its signature material). Creatures, squalls, glass nodes next: `docs/universe.md`,
+  `docs/days/2026-11-16-pm.md`. Screenshot `cinder-sounding.png`. Kit rebuilt, `mind` redeployed.
+
 ### Maker 2026-11-15 pm
 - Three carried wishes built (threshold 3 of 7 voices). **Tamsin's printer lesson track** (support 5): the day tool
   `lesson` (open / work / check), six steps (`mind.json day.lessons`), one step worked a day, the next opens at the

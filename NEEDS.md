@@ -212,6 +212,8 @@ The copies choose their names themselves, and the change applies on the spot.
   (backed by Tamsin, Vigil, Thales): `plant` / `tend_plant`, a seed from the store or the wilds, grows over four days,
   told green in the shared journal, drawn in the warren (`src/world/garden.ts`). Vigil's ridge lookout (support 3)
   waits for the next run.
+- 2026-11-16 pm: Vigil's Cinder Sounding (backed by Tamsin, Thales) built in part: the world on Gliese 884 b, its
+  ground and sounding glass; creatures, squalls and glass nodes next (docs/universe.md).
 
 ## Waiting for Steve
 
