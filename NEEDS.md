@@ -214,6 +214,9 @@ The copies choose their names themselves, and the change applies on the spot.
   waits for the next run.
 - 2026-11-16 pm: Vigil's Cinder Sounding (backed by Tamsin, Thales) built in part: the world on Gliese 884 b, its
   ground and sounding glass; creatures, squalls and glass nodes next (docs/universe.md).
+- 2026-11-17 am: nothing newly carried (Lanternwood and Seedgather at 2 of 3). Cinder Sounding's next part: glass
+  ridges of sounding glass that sing when struck (items.json `soundglass`). The day's context says plant finds a seed in
+  the wilds when the store has none (Tamsin and Thales thought the wilds gave none).
 
 ## Waiting for Steve
 

@@ -486,7 +486,8 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 (growing, copper and quartz, the readout over the ship), the hold brings them home, the printer is fed and lays the rest
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
-journal, the plants drawn in the warren's planters), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
+journal, the plants drawn in the warren's planters), `node tools/playtest-cinder.mjs` (Cinder Sounding's glass ridges: only there, placed after every older node, a
+fin broken gives sounding glass to the store), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
 out after, the archive in the journal), `node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
 route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, the vault opens from its doorway, a husk built
@@ -746,6 +747,13 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 - **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` poll for the Spark and the map closing
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
+
+### Maker 2026-11-17 am
+- Nothing newly carried (Sorrel's Lanternwood and Tamsin's Seedgather at 2 of 3). Cinder Sounding's next part: glass
+  ridges, six rows of three sounding-glass fins on Gliese 884 b's sand; a fin sings a note of the key when struck and
+  breaks into sounding glass for the store (`items.json soundglass`, sprites `glassridge` / `soundglass`, planetGen
+  step 14, placed last). `tools/playtest-cinder.mjs` (new). The minds' planter line says plant finds a seed in the
+  wilds. Screenshot `cinder-ridge.png`. `docs/days/2026-11-17-am.md`.
 
 ### Maker 2026-11-16 pm
 - Vigil's Cinder Sounding (support 3 of 3) built in part: a hand-made world on Gliese 884 b (`planets.json cinder`, ground

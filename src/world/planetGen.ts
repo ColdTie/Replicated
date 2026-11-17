@@ -33,7 +33,7 @@ export interface PlanetMap {
   nodes: Point[];             // tile coords
   /** Iron ore and hydrogen vents, then salt blooms, quartz and copper ore (items.json), tile coords; their node indexes
    * follow the crystals' (iron and hydrogen first, so older saves keep theirs) */
-  ores: (Point & { kind: 'iron' | 'hydrogen' | 'salt' | 'quartz' | 'copper' })[];
+  ores: (Point & { kind: 'iron' | 'hydrogen' | 'salt' | 'quartz' | 'copper' | 'soundglass' })[];
   enemies: { type: string; x: number; y: number }[];
   decor: { frame: number; x: number; y: number }[]; // pixel coords (feet)
   glows: { x: number; y: number; kind: 'door' | 'mushroom' | 'machine' }[];
@@ -456,6 +456,30 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
         if (!free(x, y) || Math.hypot(x - cx, y - cy) < 8) continue;
         if (attempt < total * 80 && !likes2[kind](x, y)) continue;
         ores.push({ x, y, kind }); placed++;
+      }
+    }
+    // 14. Glass ridges (Vigil's Cinder Sounding, items.json soundglass): only on the worlds that have them, short rows of
+    // fins out on the open sand, away from rock; a rng of their own and placed last, so nothing placed before moves
+    const glass = ITEMS.soundglass;
+    if (glass.worlds.includes(def.id)) {
+      const r7 = mulberry32(seed ^ 0x9a55);
+      const open = (x: number, y: number) => free(x, y) && !near(x, y, 1, Cell.Rock);
+      for (let k = 0, attempt = 0; k < glass.ridges && attempt < 600 * glass.ridges; attempt++) {
+        let x: number, y: number;
+        if (k < glass.starters) {
+          const [qx, qy] = quarters[(k + 3) % 4];
+          x = Math.round(cx + qx * (3 + r7() * (b.w / 2 + g + 4))); y = Math.round(cy + qy * (3 + r7() * (b.h / 2 + g + 4)));
+          if (townFar(x, y, keep.crystals + 3) && attempt % 600 < 400) continue;
+        } else {
+          x = randInt(r7, 3, w - 4 - glass.perRidge * 2); y = randInt(r7, 3, h - 4);
+          if (Math.hypot(x - cx, y - cy) < 10) continue;
+        }
+        // a ridge runs east, a tile apart and a little up or down: every fin's tile must be open
+        const dy = r7() < 0.5 ? 0 : r7() < 0.5 ? -1 : 1;
+        const fins = Array.from({ length: glass.perRidge }, (_, j) => ({ x: x + j * 2, y: y + (j % 2 ? dy : 0) }));
+        if (!fins.every((f) => open(f.x, f.y))) continue;
+        for (const f of fins) ores.push({ ...f, kind: 'soundglass' });
+        k++;
       }
     }
     // grass and pebbles under a node give way to it
