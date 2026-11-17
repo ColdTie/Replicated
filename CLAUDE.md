@@ -754,6 +754,13 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
 
+### Maker 2026-11-17 pm
+- PR #95 (2026-11-16 am, the ridge lookout) was answered as built but never merged, and the live `mind` function lacked
+  `lookout`: merged in this run (the kit rebuilt), #97 merged first. Ember Gold's **Lignin Tides** (support 3 of 3)
+  built in part: a hand-made world on GJ 1061 b (`planets.json tides`, ground `floor.json tides`, nine wild Cem fields
+  on the flats, signature material tidal lignin, `supplies.json` icon 2). Reefs, grazers, pearl glass, tides next:
+  `docs/universe.md`, `docs/days/2026-11-17-pm.md`. Screenshots `lignin-tides.png`, `lignin-tides-reef.png`.
+
 ### Maker 2026-11-17 am
 - Nothing newly carried (Sorrel's Lanternwood and Tamsin's Seedgather at 2 of 3). Cinder Sounding's next part: glass
   ridges, six rows of three sounding-glass fins on Gliese 884 b's sand; a fin sings a note of the key when struck and

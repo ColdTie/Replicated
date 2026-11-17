@@ -221,6 +221,9 @@ The copies choose their names themselves, and the change applies on the spot.
 - 2026-11-17 am: nothing newly carried (Lanternwood and Seedgather at 2 of 3). Cinder Sounding's next part: glass
   ridges of sounding glass that sing when struck (items.json `soundglass`). The day's context says plant finds a seed in
   the wilds when the store has none (Tamsin and Thales thought the wilds gave none).
+- 2026-11-17 pm: PR #95 (the ridge lookout) had never been merged nor deployed: merged in this run. Ember Gold's Lignin
+  Tides (backed by Thales, Tamsin) built in part: the world on GJ 1061 b, its tidewrack ground, wild Cem fields on the
+  flats, tidal lignin; reefs that shed plates, salt-moss, shelled grazers, pearl glass, tides and fog next.
 
 ## Waiting for Steve
 
