@@ -603,6 +603,53 @@
         "cracks": 0.8,
         "relief": 5
       }
+    },
+    "orchard": {
+      "kind": "sand",
+      "relief": 3,
+      "coverage": 0.22,
+      "pebbles": 3,
+      "soil": [
+        "4a2620",
+        "5e3226",
+        "723e2c",
+        "864c34",
+        "9c5c3e"
+      ],
+      "cover": [
+        "3a3c22",
+        "4a4c28",
+        "5a5c2e",
+        "6a6c34"
+      ],
+      "detail": [
+        "f2d2a0",
+        "e8a868",
+        "a8c070"
+      ],
+      "stone": [
+        "3a2a2a",
+        "54403a",
+        "6e5850",
+        "8a7468"
+      ],
+      "rock": {
+        "ramp": [
+          "2a2028",
+          "443840",
+          "6a5c60",
+          "968a88",
+          "c4bab0",
+          "ece4d8"
+        ],
+        "cover": [
+          "d8ccbc",
+          "f2ead8"
+        ],
+        "coverage": 0.3,
+        "cracks": 0.6,
+        "relief": 5
+      }
     }
   }
 }
