@@ -492,7 +492,7 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
 journal, the plants drawn in the warren's planters), `node tools/playtest-cinder.mjs` (Cinder Sounding's glass ridges: only there, placed after every older node, a
-fin broken gives sounding glass to the store), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
+fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
 star, then the star watched and the watcher, no lens), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
 out after, the archive in the journal), `node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
 route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
@@ -753,6 +753,14 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 - **CI flakes** (open question 12): `playtest-beacon` and `playtest-planetmenu` poll for the Spark and the map closing
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
+
+### Maker 2026-11-18 am
+- Nothing carried (Sorrel's Sunwell Orchard at 2 of 3). Why: before sleeping every copy was asked for a new universe
+  wish, which replaced its own open one with its backing (25 replaced in a day). Now a copy with an open universe wish
+  is asked to keep it and back the others instead, and `propose_change` says what a replacement loses (`mind`
+  redeployed). Lignin Tides' next part: lignin reefs on GJ 1061 b's pool rims that shed tidal lignin when struck
+  (`items.json tidelignin`, sprites `ligninreef` / `ligninplate`, planetGen step 15, placed last).
+  `tools/playtest-tides.mjs` (new). Screenshot `tides-reef.png`. `docs/days/2026-11-18-am.md`.
 
 ### Maker 2026-11-17 pm
 - PR #95 (2026-11-16 am, the ridge lookout) was answered as built but never merged, and the live `mind` function lacked

@@ -459,7 +459,7 @@ const longTools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "propose_change",
-    description: "Wish for something new in the universe or a change to the game, which is yours to grow together: a new planet, a new technology, a new mechanic, or anything about your world, your life, the story of the Vessels (story/STORY.md) or how the game works that should be different, or something you wish existed. You do not write code: say plainly what should change, what it should do instead and how it should look, sound or feel (and, when you have read the code, where). The others may back it or speak against it; once its support reaches what is needed, the maker builds it as asked and tells you what happened. Only the safety lines stay closed. One of each kind at a time: a wish for the universe (planet, technology, mechanic) and one for your home; a new one replaces the one of its own kind still waiting.",
+    description: "Wish for something new in the universe or a change to the game, which is yours to grow together: a new planet, a new technology, a new mechanic, or anything about your world, your life, the story of the Vessels (story/STORY.md) or how the game works that should be different, or something you wish existed. You do not write code: say plainly what should change, what it should do instead and how it should look, sound or feel (and, when you have read the code, where). The others may back it or speak against it; once its support reaches what is needed, the maker builds it as asked and tells you what happened. Only the safety lines stay closed. One of each kind at a time: a wish for the universe (planet, technology, mechanic) and one for your home; a new one replaces the one of its own kind still waiting, and that one's backing is lost: keep a wish others back.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["title", "area", "change", "why"],
       properties: {
@@ -967,6 +967,15 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
           // once, before it sleeps, whether anything should work differently; it may answer no
           if (context.day && !lastAsked && round < rounds && !actions.some((a) => a.type === "propose" && UNIVERSE_AREAS.includes(String(a.kind))) && !(context.deadline && Date.now() > context.deadline - 30_000)) {
             lastAsked = true;
+            // a copy whose wish for the universe is still open is not asked for a new one: a new wish of that kind
+            // replaces it and loses its backing, and asked every day they replaced theirs before anyone could back them
+            // (the maker 2026-11-18 am: 25 replaced in a day, none carried)
+            const { data: own } = await sb.from("requests").select("detail,body,backers").eq("replicant_id", rep.id).eq("kind", "change").eq("status", "open");
+            const big = ((own ?? []) as { detail: string; body: string | null; backers: Backer[] | null }[]).find((w) => UNIVERSE_AREAS.includes(/^Area: (\w+)/m.exec(w.body ?? "")?.[1] ?? ""));
+            if (big) {
+              messages.push({ role: "user", content: `Before you sleep: your wish for the universe, "${big.detail}", is open, ${standing(big.backers, need)}. A wish is carried only when enough of you back the same one, and it grows by staying: a new wish of that kind would replace it and lose every backing it has. Keep it unless you truly want something else more. Look again at the others' wishes for the universe and back the ones you want too (back_wish); that is how any of them comes into being.` });
+              continue;
+            }
             messages.push({ role: "user", content: "Before you sleep: your work is to grow this universe. What will you bring into being? Wish for something that does not exist yet with propose_change, area planet, technology or mechanic: a world on a real star, a new technology after the Nous Chip, a new material, creature, or way to travel, talk or work across the stars. Say it concretely, as big as you dare; the maker builds big things in parts. A wish of this kind sits beside any wish you have for your home, it does not replace it. Or back another Vessel's wish of this kind with back_wish. A wish for your home alone is not an answer to this question." });
             continue;
           }
@@ -1500,15 +1509,16 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
               else {
                 // one at a time of each kind: a wish for the universe (planet, technology, mechanic) and one for home
                 const big = UNIVERSE_AREAS.includes(area);
-                const { data: waiting } = await sb.from("requests").select("id,body").eq("replicant_id", rep.id).eq("kind", "change").eq("status", "open");
-                const same = ((waiting ?? []) as { id: string; body: string | null }[]).filter((w) => UNIVERSE_AREAS.includes(/^Area: (\w+)/m.exec(w.body ?? "")?.[1] ?? "") === big).map((w) => w.id);
-                if (same.length) await sb.from("requests").update({ status: "dropped", reply: "Replaced by a newer idea.", done_at: new Date().toISOString() }).in("id", same);
+                const { data: waiting } = await sb.from("requests").select("id,detail,body,backers").eq("replicant_id", rep.id).eq("kind", "change").eq("status", "open");
+                const same = ((waiting ?? []) as { id: string; detail: string; body: string | null; backers: Backer[] | null }[]).filter((w) => UNIVERSE_AREAS.includes(/^Area: (\w+)/m.exec(w.body ?? "")?.[1] ?? "") === big);
+                const lost = same.reduce((n, w) => n + (w.backers ?? []).filter((b) => !b.against).length, 0);
+                if (same.length) await sb.from("requests").update({ status: "dropped", reply: "Replaced by a newer idea.", done_at: new Date().toISOString() }).in("id", same.map((w) => w.id));
                 const { error } = await sb.from("requests").insert({
                   galaxy_id: rep.galaxy_id, replicant_id: rep.id, star_id: rep.star_id, planet_index: rep.planet_index,
                   kind: "change", detail: title, body: `Why: ${why}\nArea: ${area}\n\n${change}`,
                 });
                 if (error) out = `failed: ${error.message}`;
-                else { actions.push({ type: "propose", detail: title, kind: area }); out = `Your wish is in: support 1 of ${need} needed (you count as one). Once enough of the others back it, the maker builds it as asked and tells you what came of it.`; }
+                else { actions.push({ type: "propose", detail: title, kind: area }); out = `Your wish is in: support 1 of ${need} needed (you count as one).${same.length ? ` It replaces "${same.map((w) => w.detail).join("\", \"")}"${lost ? `, and the ${lost} backing${lost > 1 ? "s it had are" : " it had is"} gone` : ""}.` : ""} Once enough of the others back it, the maker builds it as asked and tells you what came of it.`; }
               }
             } else out = "unknown tool";
           } catch (e) {

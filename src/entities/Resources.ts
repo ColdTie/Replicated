@@ -7,9 +7,9 @@ import { flashWhite } from './Player';
 
 const EMBER = ITEMS.ember;
 
-/** What a node gives: an Ember crystal, iron ore, a hydrogen vent, a salt bloom, quartz, copper ore or a fin of a glass
- *  ridge (sounding glass, Cinder Sounding) (items.json). */
-export type NodeKind = 'ember' | 'iron' | 'hydrogen' | 'salt' | 'quartz' | 'copper' | 'soundglass';
+/** What a node gives: an Ember crystal, iron ore, a hydrogen vent, a salt bloom, quartz, copper ore, a fin of a glass
+ *  ridge (sounding glass, Cinder Sounding) or a lignin reef (tidal lignin, Lignin Tides) (items.json). */
+export type NodeKind = 'ember' | 'iron' | 'hydrogen' | 'salt' | 'quartz' | 'copper' | 'soundglass' | 'tidelignin';
 /** The kinds that go into the world's store (all but Ember, which has its own pool). */
 export type StoreKind = Exclude<NodeKind, 'ember'>;
 type NodeDef = { hits: number; perHit: number; onBreak: number; glow: number; spark: [number, number]; sprite: string; tinted: boolean };
@@ -21,7 +21,7 @@ const fromItems = (k: StoreKind): NodeDef => {
 export const NODE: Record<NodeKind, NodeDef> = {
   ember: { hits: EMBER.nodeHits, perHit: EMBER.nodeDropsPerHit, onBreak: EMBER.nodeDropsOnBreak, glow: PALETTE[9], spark: [PALETTE[10], PALETTE[11]], sprite: EMBER.nodeSprite, tinted: true },
   iron: fromItems('iron'), hydrogen: fromItems('hydrogen'), salt: fromItems('salt'), quartz: fromItems('quartz'), copper: fromItems('copper'),
-  soundglass: fromItems('soundglass'),
+  soundglass: fromItems('soundglass'), tidelignin: fromItems('tidelignin'),
 };
 /** Hard ones (metal and stone) shine less and glint now and then; salt and quartz glint and sparkle. */
 const HARD: NodeKind[] = ['iron', 'copper', 'salt', 'quartz'];

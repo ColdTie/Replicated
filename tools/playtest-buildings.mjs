@@ -34,10 +34,13 @@ try {
   if (!proposed) fail('no spot for the building');
   if (proposed && !proposed.approved) fail('a proposal still waits for the original\'s word');
   if (proposed && (proposed.material !== 'stone' || JSON.stringify(proposed.cost) !== JSON.stringify(COST))) fail(`the Watchtower does not cost its stone (${JSON.stringify(proposed.cost)})`);
-  await ev(() => { const s = window.__scene; s.supplies.stone = 10; s.npcs.forEach((n) => { n.state = 'idle'; n.until = 0; n.nextBuild = 0; }); });
   // every payment out of the store is noted: the building must be paid from it (copies dig and make beds meanwhile, so
-  // the store's count alone shows nothing)
-  await ev(() => { const s = window.__scene, pay = s.warren.pay.bind(s.warren); window.__paid = []; s.warren.pay = (c) => { window.__paid.push(JSON.stringify(c)); return pay(c); }; });
+  // the store's count alone shows nothing); noted from before the stone is there, in the same step, or a copy could
+  // pay in a frame between the two
+  await ev(() => {
+    const s = window.__scene, pay = s.warren.pay.bind(s.warren); window.__paid = []; s.warren.pay = (c) => { window.__paid.push(JSON.stringify(c)); return pay(c); };
+    s.supplies.stone = 10; s.npcs.forEach((n) => { n.state = 'idle'; n.until = 0; n.nextBuild = 0; });
+  });
 
   // 2. the journal has the original's word for a copy (talk, give) and no approve / veto; the copies pay and raise it
   await ev(async () => { await window.__scene.toggleJournal(); });

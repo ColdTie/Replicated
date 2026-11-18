@@ -33,7 +33,7 @@ export interface PlanetMap {
   nodes: Point[];             // tile coords
   /** Iron ore and hydrogen vents, then salt blooms, quartz and copper ore (items.json), tile coords; their node indexes
    * follow the crystals' (iron and hydrogen first, so older saves keep theirs) */
-  ores: (Point & { kind: 'iron' | 'hydrogen' | 'salt' | 'quartz' | 'copper' | 'soundglass' })[];
+  ores: (Point & { kind: 'iron' | 'hydrogen' | 'salt' | 'quartz' | 'copper' | 'soundglass' | 'tidelignin' })[];
   enemies: { type: string; x: number; y: number }[];
   decor: { frame: number; x: number; y: number }[]; // pixel coords (feet)
   glows: { x: number; y: number; kind: 'door' | 'mushroom' | 'machine' }[];
@@ -479,6 +479,30 @@ export function generatePlanet(def: PlanetDef, seed = def.seed): PlanetMap {
         const fins = Array.from({ length: glass.perRidge }, (_, j) => ({ x: x + j * 2, y: y + (j % 2 ? dy : 0) }));
         if (!fins.every((f) => open(f.x, f.y))) continue;
         for (const f of fins) ores.push({ ...f, kind: 'soundglass' });
+        k++;
+      }
+    }
+    // 15. Lignin reefs (Ember Gold's Lignin Tides, items.json tidelignin): only on the worlds that have them, short
+    // clusters of shelves on a pond's rim (the nearest to the town first); a rng of their own and placed last
+    const reef = ITEMS.tidelignin;
+    if (reef.worlds.includes(def.id)) {
+      const r8 = mulberry32(seed ^ 0x7e1d);
+      const rim = (x: number, y: number) => free(x, y) && near(x, y, 1, Cell.Water) && !near(x, y, 1, Cell.Rock);
+      for (let k = 0, attempt = 0; k < reef.reefs && attempt < 800 * reef.reefs; attempt++) {
+        let x: number, y: number;
+        if (k < reef.starters && attempt < 600) {
+          // a starter within reach of the town: a little farther out with every failed try
+          const r = 6 + attempt / 20, a = r8() * Math.PI * 2;
+          x = Math.round(cx + Math.cos(a) * r); y = Math.round(cy + Math.sin(a) * r);
+        } else {
+          x = randInt(r8, 3, w - 4 - reef.perReef * 2); y = randInt(r8, 3, h - 4);
+          if (Math.hypot(x - cx, y - cy) < 8) continue;
+        }
+        // a reef runs along the rim: the next shelf two tiles east, west, north or south, also on the rim
+        const [sx, sy] = [[2, 0], [-2, 0], [0, 2], [0, -2]][Math.floor(r8() * 4)];
+        const shelves = Array.from({ length: reef.perReef }, (_, j) => ({ x: x + j * sx, y: y + j * sy }));
+        if (!shelves.every((f) => rim(f.x, f.y))) continue;
+        for (const f of shelves) ores.push({ ...f, kind: 'tidelignin' });
         k++;
       }
     }
