@@ -224,6 +224,9 @@ The copies choose their names themselves, and the change applies on the spot.
 - 2026-11-17 pm: PR #95 (the ridge lookout) had never been merged nor deployed: merged in this run. Ember Gold's Lignin
   Tides (backed by Thales, Tamsin) built in part: the world on GJ 1061 b, its tidewrack ground, wild Cem fields on the
   flats, tidal lignin; reefs that shed plates, salt-moss, shelled grazers, pearl glass, tides and fog next.
+- 2026-11-18 am: nothing carried. Wishes were replaced before they could be backed (the day's last question asked
+  every copy for a new universe wish; 25 replaced in a day): a copy with one open is now asked to keep it and back
+  others. Lignin Tides' next part: lignin reefs on the pool rims that shed tidal lignin (items.json `tidelignin`).
 
 ## Waiting for Steve
 
