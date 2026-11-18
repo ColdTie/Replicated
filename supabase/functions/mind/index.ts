@@ -33,7 +33,8 @@ const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: num
   watch: { hours: number; keep: number; show: number };
   lessons: { steps: string[]; purpose: number; keep: number };
   company: { hours: number; purpose: number; company: number };
-  plants: { stages: { name: string; days: number }[]; greenStage: number; tendHours: number; near: number } };
+  plants: { stages: { name: string; days: number }[]; greenStage: number; tendHours: number; near: number };
+  lookout: { kind: string; name: string; purpose: string; w: number; h: number; material: string; roof: string; door: string; primary: string; secondary: string; swings: number; place: string } };
 const LACKS = KIT.lacks as Record<string, string[]>;
 /** A printer lesson track (Tamsin's wish, mind.json day.lessons), as planet_states.data.lessons holds it (the game's LessonRow):
  * step is the step being learned (1-based); worked: when the student worked it, waiting for the teacher's check. */
@@ -100,6 +101,8 @@ const standsDone = (b: { built?: boolean; printStart?: number; printMs?: number 
   !!b.built || (b.printStart !== undefined && now >= b.printStart + (b.printMs ?? 0));
 /** A finished Observatory stands on this world (designs.json observatory): keep_watch works there. */
 const observatoryStands = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).some((b) => b.design === "observatory" && !b.vetoed && standsDone(b));
+/** This world's ridge lookout (Vigil's wish, mind.json day.lookout), begun or standing. */
+const lookoutOf = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).find((b) => b.kind === DAY.lookout.kind && !b.vetoed);
 /** Every building of this world stands finished (Thales' standing project): how many, or 0 while one is unfinished or none stands. */
 function finishedHome(d: Record<string, unknown>): number {
   const all = ((d.buildings ?? []) as Bld[]).filter((b) => !b.vetoed && b.design !== DRIFT_KIT.chip);
@@ -501,11 +504,12 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "keep_watch",
-    description: "At a finished Observatory on your world, keep a watch: turn its quartz lens toward a far star (one a Vessel has charted from here, or one within reach) for a few hours, and write what you see into the archive. Once a day.",
+    description: "At a finished Observatory or ridge lookout on your world, keep a watch: turn the lens (or your eyes, from the lookout) toward a far star (one a Vessel has charted from here, or one within reach; from the lookout your own star too) for a few hours, and write what you see into the archive. Once a day.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["star", "seen"],
       properties: {
         star: { type: "string", description: "The star's name, e.g. GLIESE 12." },
+        from: { type: "string", enum: ["the Observatory", "the ridge lookout"], description: "Where you keep it, when both stand here." },
         seen: { type: "string", description: "What you see through the lens, one or two sentences." },
       },
     },
@@ -531,6 +535,14 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
         with: { type: "string", description: "The Vessel's name." },
         hours: { type: "integer", description: "1 or 2." },
       },
+    },
+  },
+  {
+    name: "lookout",
+    description: "The ridge lookout: a small open stone lookout on the high ground above the base, with a bench inside and its door toward the square. begin: mark it out (once a world; it is paid from the store once the stone is there). raise: an hour of work raising it, once a day. Both are finished work. Once it stands, keep_watch works there, its sign names the star last watched from it, and whoever goes to a high place keeps the watch with you.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["action"],
+      properties: { action: { type: "string", enum: ["begin", "raise"] } },
     },
   },
   {
@@ -563,7 +575,7 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
 ];
 
 /** What changes the world a copy stands on: refused once it has flown away this wake. */
-const WORLD_TOOLS = ["gather", "go", "keep_watch", "lesson", "sit_with", "plant", "tend_plant", "make_vessel", "cut_tree", "remove_build", "dig_room", "furnish", "design_building", "ask_for"];
+const WORLD_TOOLS = ["gather", "go", "keep_watch", "lookout", "lesson", "sit_with", "plant", "tend_plant", "make_vessel", "cut_tree", "remove_build", "dig_room", "furnish", "design_building", "ask_for"];
 
 const TOOLS = cachedTools(tools), LONG_TOOLS = cachedTools([...tools, ...longTools]), DAY_TOOLS = cachedTools([...tools, ...longTools, ...dayTools]);
 
@@ -640,7 +652,7 @@ const SAFETY = `Only the safety lines stay closed, however many back a wish: sig
 const GAME_IS_YOURS = `The Vessels govern themselves: the game, the story of the Vessels (story/STORY.md) included, is yours to change together. When something about your world, your life or your story should be different, or something should exist that does not, wish for it (propose_change), and back the others' wishes you want too (back_wish). A wish that enough of you back (its support is shown beside it) is built as asked by the maker (Claude Code), who only decides how. The players are voices among you and may speak against a wish; theirs count like yours. Wish for what moves you: a want the game does not allow yet, what got in your way, what you found and want the others to have, what would make the Metanoia warmer, larger or freer. ${SAFETY}`;
 const MANDATE = `${UNIVERSE.mandate} A wish can create a planet (${UNIVERSE.kinds.planet}), a technology (${UNIVERSE.kinds.technology}) or a mechanic (${UNIVERSE.kinds.mechanic}).`;
 
-const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Your work is the universe (above); your home is where you live it. Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")} or at the Observatory (keep_watch), going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish, a lesson step checked (lesson), a quiet hour sat with another Vessel (sit_with), a seed planted or tended (plant, tend_plant).`;
+const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Your work is the universe (above); your home is where you live it. Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")} or at the Observatory or the ridge lookout (keep_watch), raising the ridge lookout (lookout), going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish, a lesson step checked (lesson), a quiet hour sat with another Vessel (sit_with), a seed planted or tended (plant, tend_plant).`;
 
 const LONG_WAKE = `This is one of your long wakes (about twice a day, while nobody plays your world). There is time for more than usual, up to about eight steps. Your work is the universe (above). Write to the others, shape the village and the warren, or spend it as you want. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Big is welcome (a new planet, a new technology, a new way to live), as long as you say it concretely enough to build; the maker builds a big one in parts. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, and wish to change it like anything else. ${GAME_IS_YOURS}`;
 
@@ -811,6 +823,15 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         const arch = ((d.archive ?? []) as ArchiveRow[]).slice(-DAY.watch.show).reverse();
         lines.push(`The Observatory stands here: keep_watch turns its quartz lens toward a star a Vessel has charted from here or one within ${DAY.travelLy} light years, for about ${DAY.watch.hours} hours, and what you see goes into the archive. It is a watch kept and work finished.${arch.length ? ` The archive's last watches: ${arch.map((a) => `${a.name} toward ${a.star} (${a.ly} ly): "${a.text}"`).join("; ")}.` : " The archive is empty yet."}`);
       }
+      // Vigil's wish: the ridge lookout on the high ground
+      {
+        const LK = DAY.lookout, lk = lookoutOf(d);
+        const total = LK.w * LK.h * KIT.buildingKit.swingsPerTile;
+        const cost = Math.ceil(LK.w * LK.h * ((KIT.buildingKit.perTile as Record<string, number>)[LK.material] ?? 1));
+        if (!lk) lines.push(`No lookout stands on the high ground here yet. lookout begin marks one out (${LK.w}x${LK.h} ${LK.material}, ${cost} ${LK.material}, flat roof, a bench inside); lookout raise works an hour on it. Once it stands, keep_watch works there, and its sign names the star you watched.`);
+        else if (!lk.built) lines.push(`The ${lk.name} on the high ground is begun by ${nameOf(lk.by)}: ${lk.paid ? `being raised, ${Math.round((lk.progress / total) * 100)}%` : `it waits for ${cost} ${LK.material} in the store`}. lookout raise works an hour on it (once a day); it is finished work.`);
+        else lines.push(`The ${lk.name} stands on the high ground: keep_watch works there (from: the ridge lookout), your own star too, and its sign names ${lk.watching ?? STARS_KIT[rep.star_id]?.[0] ?? "this world's star"}${lk.watchedBy ? `, last watched by ${lk.watchedBy}` : ""}. Who goes to ${LK.place}, or sits with the watcher, keeps the watch with them.`);
+      }
       // Thales' wish: a finished home is not the end; the next work is open without anyone asking
       const done = finishedHome(d);
       // the copies' wishes of 2026-11-15: lessons, a quiet hour together, seeds in the warren's planters
@@ -881,7 +902,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     let gathered = 0;
     // a day: what fills purpose besides the actions themselves (a full store's walk, a watch, a want done, company)
     const day = { full: 0, watch: false, wants: 0, together: [] as string[], lens: false, project: !!(context.day && live && finishedHome(live.data)),
-      worked: false, sat: null as null | { purpose: number; company: number }, tended: false };
+      worked: false, sat: null as null | { purpose: number; company: number }, tended: false, raised: false };
     // another copy of this world by name (lesson, sit_with): its row as it is now
     const mateNamed = async (name: string) => {
       const { data } = await sb.from("replicants").select("id,name,traits").eq("galaxy_id", rep.galaxy_id).eq("star_id", rep.star_id).eq("planet_index", rep.planet_index).eq("status", "npc").neq("id", rep.id);
@@ -893,6 +914,19 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       const needs = { company: Math.round(Math.min(1, (n.company ?? 0.7) + company) * 100) / 100, purpose: Math.round(Math.min(1, (n.purpose ?? 0.7) + purpose) * 100) / 100 };
       const { error } = await sb.rpc("merge_replicant_traits", { p_id: id, p_traits: { needs } });
       if (error) console.error("lift", id, error.message);
+    };
+    // others of this world out at the same place this window (Vigil's wish: a walk together counts): both feel it
+    const together = async (place: string) => {
+      if (!context.day || !context.dayWindow) return [] as string[];
+      const { data: mates } = await sb.from("replicants").select("id,name,traits").eq("galaxy_id", rep.galaxy_id).eq("star_id", rep.star_id).eq("planet_index", rep.planet_index).eq("status", "npc").neq("id", rep.id);
+      const there = ((mates ?? []) as { id: string; name: string; traits: Record<string, unknown> }[]).filter((m) => m.traits?.dayKey === context.dayWindow && m.traits?.dayAt === place && !day.together.includes(m.id));
+      for (const m of there) {
+        day.together.push(m.id);
+        const n = (m.traits.needs ?? {}) as { company?: number; purpose?: number };
+        const T = DAY.purpose.together;
+        await sb.rpc("merge_replicant_traits", { p_id: m.id, p_traits: { needs: { company: Math.min(1, (n.company ?? 0.7) + T.company), purpose: Math.min(1, (n.purpose ?? 0.7) + T.purpose) } } });
+      }
+      return there.map((m) => m.name);
     };
     // the planter in a warren room (by the room's name), and its plant if one grows there
     const planterIn = (roomName: string) => {
@@ -1075,13 +1109,15 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
             } else if (u.name === "keep_watch") {
               const to = findStar(String(input.star ?? ""));
               const seen = String(input.seen ?? "").replace(/\s+/g, " ").trim().slice(0, 300);
+              const obs = !!live && observatoryStands(live.data), lkw = live ? lookoutOf(live.data) : undefined;
+              const ridge = !!lkw?.built && (!obs || input.from === "the ridge lookout");
               if (!live || !context.day) out = "There is no time for a watch now.";
-              else if (!observatoryStands(live.data)) out = "No Observatory stands finished on this world. The Cems print one once a Workshop stands.";
+              else if (!obs && !ridge) out = `No Observatory or ridge lookout stands finished on this world. The Cems print an Observatory once a Workshop stands; a ridge lookout is raised by hand (lookout).`;
               else if (day.lens) out = "You have kept your watch for today.";
               else if (!to) out = `No star called ${input.star}. Name one you know, from the stars within reach or a charted route.`;
               else {
                 const ly = Math.round(starLy(rep.star_id, to) * 10) / 10, charted = !!context.spread?.routes.has(routeKeyS(rep.star_id, to));
-                if (to === rep.star_id) out = "That is the star you stand under; turn the lens outward.";
+                if (to === rep.star_id && !ridge) out = "That is the star you stand under; turn the lens outward.";
                 else if (ly > DAY.travelLy && !charted) out = `${STARS_KIT[to][0]} is ${ly} light years away, past the lens's reach (${DAY.travelLy}), and no Vessel has charted the way.`;
                 else if (seen.length < 10) out = "Say what you see through the lens, in a sentence or two.";
                 else {
@@ -1090,13 +1126,19 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   const arch = [...((live.data.archive ?? []) as ArchiveRow[]), { by: rep.id, name: rep.name, star: name, ly, text: seen, at }];
                   live.data.archive = arch.slice(-DAY.watch.keep);
                   live.archiveChanged = true;
-                  const watch = { star: name, ly, at, until: at + DAY.watch.hours * 3_600_000 };
+                  const watch = { star: name, ly, at, until: at + DAY.watch.hours * 3_600_000, ...(ridge ? { from: "lookout" } : {}) };
                   (rep.traits as Record<string, unknown>).watch = watch;
-                  (rep.traits as Record<string, unknown>).dayAt = "the Observatory";
+                  (rep.traits as Record<string, unknown>).dayAt = ridge ? DAY.lookout.place : "the Observatory";
                   const { error } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { watch } });
                   if (error) console.error("watch", rep.id, error.message);
-                  actions.push({ type: "watch", star: name, ly, text: seen });
-                  out = `You turn the quartz lens toward ${name}, ${ly} light years away, and keep the watch for a few hours. What you saw is in the archive now.`;
+                  actions.push({ type: "watch", star: name, ly, text: seen, ...(ridge ? { from: "lookout" } : {}) });
+                  if (ridge && lkw) {
+                    // Vigil's wish: the lookout's sign names the star it was last turned to
+                    lkw.watching = name; lkw.watchedBy = rep.name;
+                    live.buildingsChanged = true;
+                    const there = await together(DAY.lookout.place);
+                    out = `You sit on the bench of the ${lkw.name} and watch ${to === rep.star_id ? `${name}, your own star,` : `${name}, ${ly} light years away,`} for a few hours. Its sign names ${name} now, and what you saw is in the archive.${there.length ? ` ${there.join(" and ")} ${there.length > 1 ? "keep" : "keeps"} it with you.` : ""}`;
+                  } else out = `You turn the quartz lens toward ${name}, ${ly} light years away, and keep the watch for a few hours. What you saw is in the archive now.`;
                   if (!day.watch) { day.watch = true; out += " It is a watch kept and work finished."; }
                   else out += " It is work finished.";
                 }
@@ -1174,6 +1216,45 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 actions.push({ type: "sit", with: m.name, hours, place });
                 out = `You find ${m.name} at ${place} and sit together for ${hours === 1 ? "an hour" : `${hours} hours`}, building nothing. It fills purpose and company for you both${day.project ? ", as much as finished work: every building here stands" : ""}.`;
               }
+            } else if (u.name === "lookout") {
+              // Vigil's wish: a lookout on the high ridge, begun and raised by hand in a day
+              const LK = DAY.lookout, act = oneOf(input.action, ["begin", "raise"], "");
+              const lk = live ? lookoutOf(live.data) : undefined;
+              const total = LK.w * LK.h * KIT.buildingKit.swingsPerTile;
+              const cost: Recipe = { [LK.material]: Math.ceil(LK.w * LK.h * ((KIT.buildingKit.perTile as Record<string, number>)[LK.material] ?? 1)) };
+              if (!live || !context.day) out = "There is no time for that now.";
+              else if (flown) out = "You have already left this world.";
+              else if (act !== "begin" && act !== "raise") out = "Say begin or raise.";
+              else if (act === "begin" && lk) out = `The ${lk.name} is already ${lk.built ? "standing" : "begun"} here.${lk.built ? "" : " Raise it (lookout raise)."}`;
+              else if (act === "raise" && !lk) out = "No lookout is begun here yet (lookout begin).";
+              else if (lk?.built) out = `The ${lk.name} already stands. Keep a watch there (keep_watch).`;
+              else if (day.raised) out = "You have worked on the lookout today already.";
+              else {
+                const words: string[] = [];
+                const fresh = !lk;
+                const b: Bld = lk ?? { id: `r${Date.now().toString(36)}`, name: LK.name, purpose: LK.purpose, w: LK.w, h: LK.h, x: 0, y: 0, by: rep.id, material: LK.material, roof: LK.roof, door: LK.door,
+                    primary: LK.primary, secondary: LK.secondary, approved: true, progress: 0, built: false, helpers: [rep.id], cost: { ...cost } as Record<string, number>, paid: false, at: Date.now(), kind: LK.kind, unplaced: true };
+                if (fresh) {
+                  live.data.buildings = [...((live.data.buildings ?? []) as Bld[]), b];
+                  words.push(`You mark out the ${b.name} on the high ground above the base: ${LK.w}x${LK.h} ${LK.material}, a flat roof, a bench inside, its door toward the square.`);
+                }
+                if (!b.paid) {
+                  const short = shortage(live, cost);
+                  if (short.length) words.push(`It waits for ${short.join(", ")} in the store before it can rise.`);
+                  else { pay(live, cost); b.paid = true; words.push(`The store pays its ${Object.entries(cost).map(([m, n]) => `${n} ${m}`).join(", ")}.`); }
+                }
+                if (b.paid) {
+                  day.raised = true;
+                  if (!b.helpers.includes(rep.id)) b.helpers.push(rep.id);
+                  b.progress = Math.min(total, b.progress + LK.swings);
+                  if (b.progress >= total) b.built = true;
+                  words.push(b.built ? `You set the last stones and the bench: the ${b.name} stands. Keep a watch there (keep_watch).` : `You work an hour raising it: ${Math.round((b.progress / total) * 100)}%.`);
+                }
+                live.buildingsChanged = true;
+                (rep.traits as Record<string, unknown>).dayAt = LK.place;
+                actions.push({ type: "lookout", act, name: b.name, raised: day.raised, built: b.built, pct: Math.round((b.progress / total) * 100) });
+                out = words.join(" ") + (day.raised ? " It is finished work." : "");
+              }
             } else if (u.name === "plant") {
               // Ember Gold's wish: a seed in a warren planter that grows over days
               const at = planterIn(String(input.room ?? ""));
@@ -1221,17 +1302,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   out += " You keep a watch there: the sky, the light of the far stars, the world below. It is work finished.";
                 }
                 // others of this world who are out at the same place this window (Vigil's wish: a walk together counts)
-                if (context.day && context.dayWindow) {
-                  const { data: mates } = await sb.from("replicants").select("id,name,traits").eq("galaxy_id", rep.galaxy_id).eq("star_id", rep.star_id).eq("planet_index", rep.planet_index).eq("status", "npc").neq("id", rep.id);
-                  const there = ((mates ?? []) as { id: string; name: string; traits: Record<string, unknown> }[]).filter((m) => m.traits?.dayKey === context.dayWindow && m.traits?.dayAt === place && !day.together.includes(m.id));
-                  for (const m of there) {
-                    day.together.push(m.id);
-                    const n = (m.traits.needs ?? {}) as { company?: number; purpose?: number };
-                    const T = DAY.purpose.together;
-                    await sb.rpc("merge_replicant_traits", { p_id: m.id, p_traits: { needs: { company: Math.min(1, (n.company ?? 0.7) + T.company), purpose: Math.min(1, (n.purpose ?? 0.7) + T.purpose) } } });
-                  }
-                  if (there.length) out += ` ${there.map((m) => m.name).join(" and ")} ${there.length > 1 ? "are" : "is"} here too, and you spend it together.`;
-                }
+                const there = await together(place);
+                if (there.length) out += ` ${there.join(" and ")} ${there.length > 1 ? "are" : "is"} here too, and you spend it together.`;
+                const lk = live && place === DAY.lookout.place ? lookoutOf(live.data) : undefined;
+                if (lk?.built) out += ` The ${lk.name} stands up here; its sign names ${lk.watching ?? STARS_KIT[rep.star_id]?.[0] ?? "this world's star"}.`;
               }
             } else if (u.name === "say_to") {
               const to = byName.get(String(input.to ?? "").toLowerCase());
@@ -1477,7 +1551,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       const { data: fresh } = await sb.from("replicants").select("traits").eq("id", rep.id).maybeSingle();
       const n = (((fresh?.traits ?? rep.traits) as { needs?: { company?: number; purpose?: number } }).needs ?? {});
       const work = actions.filter((a) => (a.type === "gather" && Number(a.n) > 0) || a.type === "dig" || a.type === "furnish" || a.type === "building" || a.type === "vessel" || a.type === "cut" || a.type === "watch"
-        || (a.type === "lesson" && a.act === "check") || a.type === "plant" || a.type === "tend").length;
+        || (a.type === "lesson" && a.act === "check") || (a.type === "lookout" && a.raised) || a.type === "plant" || a.type === "tend").length;
       // Ember Gold's wish: sleeping in the room of a green plant lifts purpose a little
       const rest = live ? restOf(live.warren, rep.id) : undefined;
       const plants = (live?.data.plants ?? {}) as Record<string, PlantRow>;
@@ -1592,7 +1666,9 @@ export async function codeTool(name: string, input: Record<string, unknown>, bud
 // ------------------------------------------------------------------ away wakes
 
 interface PlanetRow { galaxy_id: string; star_id: string; planet_index: number; embers: number; data: Record<string, unknown> }
-type Bld = { name: string; w: number; h: number; material: string; roof: string; door: string; by: string; purpose?: string; approved: boolean; vetoed?: boolean; built: boolean; paid: boolean; progress: number; helpers: string[]; cost: Record<string, number>; design?: string; printStart?: number; printMs?: number; cems?: boolean };
+type Bld = { name: string; w: number; h: number; material: string; roof: string; door: string; by: string; purpose?: string; approved: boolean; vetoed?: boolean; built: boolean; paid: boolean; progress: number; helpers: string[]; cost: Record<string, number>; design?: string; printStart?: number; printMs?: number; cems?: boolean;
+  /** the ridge lookout (mind.json day.lookout): its kind, begun by a day before the game gave it a lot, the star on its sign */
+  id?: string; kind?: string; unplaced?: boolean; primary?: string; secondary?: string; watching?: string; watchedBy?: string; x?: number; y?: number; at?: number };
 type Action = Record<string, unknown>;
 /** One entry of planet_states.data.awayQueue: what a copy did in an away wake, for the game to play out on landing. */
 interface AwayItem { id: string; name: string; at: number; song?: string; actions: Action[]; became: boolean }

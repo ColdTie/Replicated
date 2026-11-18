@@ -203,6 +203,11 @@ src/entities/Watch.ts    the Observatory's watch (Watcher's wish, 2026-11-15): w
                          in a day of life) the lens under a finished Observatory's dome glows blue with a slow sweep,
                          by night, and the watcher's name shows over it when you come near (src/data/watch.json); the
                          archive of watches (planet_states.data.archive) is on the journal's HERE page
+                         The ridge lookout (Vigil's wish, 2026-11-16): a built building of kind 'ridge' carries a sign
+                         (watch.json ridge): the star last watched from it (else the world's star) and "X WATCHES" while
+                         a watch from there lasts (traits.watch.from 'lookout', which never lights the lens); a day's
+                         `lookout` tool begins and raises it in the saved world (mind.json day.lookout), and the game
+                         gives an `unplaced` building the town's next free lot on load (Buildings constructor)
 src/entities/Lessons.ts  the lesson board (Tamsin's wish, 2026-11-15): beside the Printworks' east wall (or a seeded bed's
                          design stone), "LESSON 2/6" and the teacher's name from planet_states.data.lessons (the day
                          tool lesson: open / work / check, mind.json day.lessons); the journal's HERE page has LESSONS
@@ -487,7 +492,8 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
 journal, the plants drawn in the warren's planters), `node tools/playtest-cinder.mjs` (Cinder Sounding's glass ridges: only there, placed after every older node, a
-fin broken gives sounding glass to the store), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
+fin broken gives sounding glass to the store), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
+star, then the star watched and the watcher, no lens), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
 out after, the archive in the journal), `node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
 route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
 on landing), `node tools/playtest-manny.mjs` (iron and hydrogen nodes fill the store, the vault opens from its doorway, a husk built
@@ -748,6 +754,13 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
 
+### Maker 2026-11-17 pm
+- PR #95 (2026-11-16 am, the ridge lookout) was answered as built but never merged, and the live `mind` function lacked
+  `lookout`: merged in this run (the kit rebuilt), #97 merged first. Ember Gold's **Lignin Tides** (support 3 of 3)
+  built in part: a hand-made world on GJ 1061 b (`planets.json tides`, ground `floor.json tides`, nine wild Cem fields
+  on the flats, signature material tidal lignin, `supplies.json` icon 2). Reefs, grazers, pearl glass, tides next:
+  `docs/universe.md`, `docs/days/2026-11-17-pm.md`. Screenshots `lignin-tides.png`, `lignin-tides-reef.png`.
+
 ### Maker 2026-11-17 am
 - Nothing newly carried (Sorrel's Lanternwood and Tamsin's Seedgather at 2 of 3). Cinder Sounding's next part: glass
   ridges, six rows of three sounding-glass fins on Gliese 884 b's sand; a fin sings a note of the key when struck and
@@ -759,6 +772,17 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
 - Vigil's Cinder Sounding (support 3 of 3) built in part: a hand-made world on Gliese 884 b (`planets.json cinder`, ground
   `floor.json cinder`, sounding glass as its signature material). Creatures, squalls, glass nodes next: `docs/universe.md`,
   `docs/days/2026-11-16-pm.md`. Screenshot `cinder-sounding.png`. Kit rebuilt, `mind` redeployed.
+
+### Maker 2026-11-16 am
+- One carried wish built (threshold 3 of 7 voices). **Vigil's ridge lookout** (support 3, backed by Sorrel and
+  Tamsin): the day tool `lookout` (begin: the Ridge Lookout, 2x2 stone, flat roof, a bench, door toward the square, 4
+  stone from the store; raise: an hour's work, once a day; both finished work). A day now writes and raises it in the
+  saved world itself (a building designed in a day otherwise only rises once a player lands); the game gives it the
+  town's next free lot on the next load. Once it stands `keep_watch` works there (the world's own star too), the
+  watcher's day ends at "a high place" so `go` and `sit_with` keep the watch with it, and its sign names the star and
+  the watcher (`src/entities/Watch.ts`, `watch.json ridge`). Six universe wishes (five planets, the Seed Vault) are not
+  carried yet. `tools/playtest-lookout.mjs` (new). The plan: `docs/days/2026-11-16-am.md`. Screenshot
+  `lookout-sign.png`.
 
 ### Maker 2026-11-15 pm
 - Three carried wishes built (threshold 3 of 7 voices). **Tamsin's printer lesson track** (support 5): the day tool

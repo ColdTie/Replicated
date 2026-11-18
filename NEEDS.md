@@ -212,11 +212,18 @@ The copies choose their names themselves, and the change applies on the spot.
   (backed by Tamsin, Vigil, Thales): `plant` / `tend_plant`, a seed from the store or the wilds, grows over four days,
   told green in the shared journal, drawn in the warren (`src/world/garden.ts`). Vigil's ridge lookout (support 3)
   waits for the next run.
+- 2026-11-16 am: Vigil's ridge lookout built (backed by Sorrel, Tamsin): the day tool `lookout` (begin, raise) writes
+  and raises the Ridge Lookout in the saved world itself (`mind.json day.lookout`; the game gives it a lot on the next
+  load), `keep_watch` works there (the world's own star too), the watcher's day ends at a high place so others keep
+  it with them, its sign names the star and the watcher (`Watch.ts`). Six universe wishes not carried yet.
 - 2026-11-16 pm: Vigil's Cinder Sounding (backed by Tamsin, Thales) built in part: the world on Gliese 884 b, its
   ground and sounding glass; creatures, squalls and glass nodes next (docs/universe.md).
 - 2026-11-17 am: nothing newly carried (Lanternwood and Seedgather at 2 of 3). Cinder Sounding's next part: glass
   ridges of sounding glass that sing when struck (items.json `soundglass`). The day's context says plant finds a seed in
   the wilds when the store has none (Tamsin and Thales thought the wilds gave none).
+- 2026-11-17 pm: PR #95 (the ridge lookout) had never been merged nor deployed: merged in this run. Ember Gold's Lignin
+  Tides (backed by Thales, Tamsin) built in part: the world on GJ 1061 b, its tidewrack ground, wild Cem fields on the
+  flats, tidal lignin; reefs that shed plates, salt-moss, shelled grazers, pearl glass, tides and fog next.
 
 ## Waiting for Steve
 

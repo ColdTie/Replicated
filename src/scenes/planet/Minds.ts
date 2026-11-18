@@ -92,6 +92,7 @@ export class Minds {
         else if (a.type === 'go') log(`${name} went to ${a.place ?? 'somewhere'}`);
         else if (a.type === 'sit') log(`${name} sat with ${a.with ?? 'a companion'} for ${a.hours === 1 ? 'an hour' : `${a.hours ?? 1} hours`}${a.place ? ` at ${a.place}` : ''}`);
         else if (a.type === 'lesson') log(a.act === 'open' ? `${name} opened the printer lessons for ${a.with}` : a.act === 'work' ? `${name} worked printer lesson ${a.step} for ${a.with}` : `${name} checked ${a.with}'s printer lesson ${a.step}`);
+        else if (a.type === 'lookout') log(a.built ? `${name} finished raising the ${a.name ?? 'lookout'} on the high ground` : a.act === 'begin' ? `${name} marked out the ${a.name ?? 'lookout'} on the high ground` : `${name} worked on the ${a.name ?? 'lookout'}${a.pct !== undefined ? ` (${a.pct}%)` : ''}`);
         else if (a.type === 'plant') log(`${name} planted a seed in the planter in ${a.room ?? 'the warren'}`);
         else if (a.type === 'tend') log(`${name} tended the plant in ${a.room ?? 'the warren'}`);
         else if (a.type === 'travel') log(`${name} flew its ship to ${a.to ?? 'another star'}`);

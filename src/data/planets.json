@@ -293,6 +293,72 @@
         "birds": 6,
         "butterflies": 0
       }
+    },
+    {
+      "id": "tides",
+      "shy": true,
+      "poles": {
+        "size": 0.1,
+        "colors": [
+          21,
+          20
+        ]
+      },
+      "name": "LIGNIN TIDES",
+      "subtitle": "WHERE THE CEM REEFS GROW WILD",
+      "star": "gj-1061",
+      "planetIndex": 1,
+      "seed": 10611,
+      "accent": [
+        15,
+        14,
+        13
+      ],
+      "ambient": "8a7c9c",
+      "sky": [
+        "16142a",
+        "3a3458",
+        "8a6a9c",
+        "e0946a"
+      ],
+      "size": [
+        144,
+        106
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.82,
+      "ruins": 0,
+      "resourceNodes": 28,
+      "enemies": {},
+      "decorDensity": 0.05,
+      "sporeRate": 1.2,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        25,
+        15,
+        30
+      ],
+      "dayCycle": true,
+      "sunTint": "ffb48c",
+      "gravity": 0.9,
+      "weather": false,
+      "ponds": 16,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 5,
+        "butterflies": 0
+      },
+      "wildCems": {
+        "fields": 9,
+        "perField": [
+          4,
+          8
+        ],
+        "blooms": 2
+      }
     }
   ]
 }

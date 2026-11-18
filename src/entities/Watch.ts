@@ -3,17 +3,23 @@
 // sees into the archive (planet_states.data.archive). While a watch lasts (traits.watch.until) the village can see
 // it: a faint blue glow on the quartz under the dome and a slow sweep of light, at night, and the watcher's name over
 // the dome when you come near.
+// The ridge lookout (Vigil's wish, carried 2026-11-16): a built lookout of kind 'ridge' carries a sign, the star last
+// watched from it (else the world's own star) and, while a watch from there lasts, the watcher's name; read near it.
 import Phaser from 'phaser';
 import { PALETTE } from '../core/data';
 import WATCH from '../data/watch.json';
 import type { Light } from '../fx/Lighting';
 import type { PlanetScene } from '../scenes/PlanetScene';
 import { ink } from '../ui/ink';
+import { starById } from '../world/galaxy';
 
 interface Shown { id: string; light: Light; glow: Phaser.GameObjects.Image; beam: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.BitmapText; x: number; y: number }
 
+interface Sign { id: string; label: Phaser.GameObjects.BitmapText; x: number; y: number }
+
 export class Watch {
   private shown: Shown | null = null;
+  private sign: Sign | null = null;
   private nextCheck = 0;
   /** screenshots and playtests: a watcher staged without a day of life */
   staged: { name: string; until: number } | null = null;
@@ -26,9 +32,27 @@ export class Watch {
     let best: { name: string; star: string; at: number } | null = null;
     for (const n of this.s.npcs) {
       const w = n.data.traits.watch;
-      if (w && w.until > now && (!best || w.at > best.at)) best = { name: n.data.name, star: w.star, at: w.at };
+      if (w && w.from !== 'lookout' && w.until > now && (!best || w.at > best.at)) best = { name: n.data.name, star: w.star, at: w.at };
     }
     return best;
+  }
+
+  /** What the ridge lookout's sign says now: the star, and who watches from there. */
+  signText(now = Date.now()): string | null {
+    const b = this.ridge();
+    if (!b) return null;
+    const star = (b.watching ?? starById(this.s.planet.star)?.name ?? '').toUpperCase();
+    let who: { name: string; at: number } | null = null;
+    for (const n of this.s.npcs) {
+      const w = n.data.traits.watch;
+      if (w?.from === 'lookout' && w.until > now && (!who || w.at > who.at)) who = { name: n.data.name, at: w.at };
+    }
+    return who ? `${star}\n${who.name.toUpperCase()} WATCHES` : star;
+  }
+
+  /** The finished ridge lookout (the first one standing). */
+  private ridge() {
+    return this.s.buildings.list.find((b) => b.kind === WATCH.ridge.kind && b.built && !b.vetoed && !b.unplaced);
   }
 
   /** The finished Observatory the lens shows on (the first one standing). */
@@ -47,6 +71,12 @@ export class Watch {
       if (!who || !obs) this.hide();
       else if (!this.shown || this.shown.id !== obs.id) this.show(obs.id);
       if (this.shown && who) this.shown.label.setText(who.name.toUpperCase());
+      this.updateSign();
+    }
+    const sg = this.sign;
+    if (sg) {
+      const near = Math.hypot(s.player.x - sg.x, s.player.y - sg.y) < WATCH.ridge.labelRange;
+      sg.label.setAlpha(Phaser.Math.Linear(sg.label.alpha, near ? 0.95 : 0, 0.08));
     }
     const sh = this.shown;
     if (!sh) return;
@@ -76,6 +106,18 @@ export class Watch {
     const beam = s.add.graphics().setBlendMode(Phaser.BlendModes.ADD).setDepth(6100);
     const label = ink(s.add.bitmapText(at.x, at.y - 12, 'pixel', '').setTint(color).setOrigin(0.5, 1).setAlpha(0).setDepth(6200));
     this.shown = { id, light, glow, beam, label, x: at.x, y: at.y };
+  }
+
+  private updateSign() {
+    const b = this.ridge(), text = this.signText();
+    if (!b || !text) { this.sign?.label.destroy(); this.sign = null; return; }
+    if (!this.sign || this.sign.id !== b.id) {
+      this.sign?.label.destroy();
+      const y = b.y - b.h * 8 - WATCH.ridge.above;
+      const label = ink(this.s.add.bitmapText(b.x, y, 'pixel', '', undefined, 1).setTint(PALETTE[WATCH.ridge.color]).setOrigin(0.5, 1).setAlpha(0).setDepth(6200));
+      this.sign = { id: b.id, label, x: b.x, y: b.y };
+    }
+    this.sign.label.setText(text);
   }
 
   private hide() {

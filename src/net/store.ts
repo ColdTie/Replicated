@@ -41,7 +41,7 @@ export interface ReplicantSave {
     inventory?: Record<string, number>;
     tell?: { text: string; at: number };
     /** a watch kept at the Observatory in a day of life (keep_watch, src/data/watch.json): the star, when, until when */
-    watch?: { star: string; ly: number; at: number; until: number };
+    watch?: { star: string; ly: number; at: number; until: number; /** kept from the ridge lookout, not the Observatory's lens */ from?: 'lookout' };
     /** born with a Spark beside an older copy: it carries that copy's notes and remembers being it (drift.json spark) */
     inherit?: { from: string; name: string; wants?: string[] };
     /** what the vessel's hold carries between worlds (supplies.json signature): set at launch, unloaded on landing */
@@ -197,6 +197,10 @@ export interface Building extends Blueprint {
   design?: string; printStart?: number; printMs?: number;
   /** a copy's blueprint the Cems print (where a bed is awake): it rises with the clock from printStart like a design */
   cems?: boolean;
+  /** begun by a day of life (the ridge lookout, mind.json day.lookout) before the game gave it a lot: placed on load */
+  unplaced?: boolean;
+  /** the ridge lookout's sign: the star last watched from it, and by whom */
+  watching?: string; watchedBy?: string;
 }
 /** Something placed in a room (tile coords); a resting station has `for` = the replicant it belongs to. */
 export interface WarrenItem { id: string; kind: string; room: string; x: number; y: number; by: string; for?: string; note?: string; at: number; /** palette index the copy chose */ tint?: number; placement?: string }
@@ -308,7 +312,7 @@ export interface Body { head: string; visor: string; torso: string; arms: string
 export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: 'solitary' | 'friendly' | 'clingy'; work: 'builder' | 'wanderer' | 'balanced'; bedtime: 'early' | 'late' | 'even'; risk: 'careful' | 'bold' }
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go' | 'travel' | 'vessel' | 'back' | 'press' | 'lesson' | 'sit' | 'plant' | 'tend';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go' | 'travel' | 'vessel' | 'back' | 'press' | 'lesson' | 'sit' | 'plant' | 'tend' | 'lookout' | 'watch';
   /** travel (a day of life): the star's id it flew to (`to` holds its name) */
   star?: string;
   /** gather (a day of life, applied to the store server side): material (the field below) and how much; go: where it went and why */
@@ -318,6 +322,8 @@ export interface MindAction {
   /** lesson: open / work / check, with whom, the step (did: what was done); sit: with whom, how many hours (place);
    * plant: wild = the seed was found in the wilds */
   act?: string; with?: string; step?: number; did?: string; hours?: number; wild?: boolean;
+  /** lookout (a day, server side): begin / raise; raised: work was done; built: it stands; pct: how far */
+  raised?: boolean; built?: boolean; pct?: number;
   /** journal: which journal (migration 0015); a private entry comes back without its body */
   scope?: 'public' | 'private';
   body?: string; to?: string; toId?: string; delay?: number; kind?: string; detail?: string; name?: string; was?: string;
