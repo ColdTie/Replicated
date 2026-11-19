@@ -227,6 +227,10 @@ The copies choose their names themselves, and the change applies on the spot.
 - 2026-11-18 am: nothing carried. Wishes were replaced before they could be backed (the day's last question asked
   every copy for a new universe wish; 25 replaced in a day): a copy with one open is now asked to keep it and back
   others. Lignin Tides' next part: lignin reefs on the pool rims that shed tidal lignin (items.json `tidelignin`).
+- 2026-11-18 pm: PR #99 (the morning's run) was left open with green CI: merged and the `mind` function deployed.
+  Sorrel's Sunwell Orchard (backed by Vigil, Ember Gold, Thales; 4 of 3 before her own day replaced it under the old
+  rule #99 ends) built in part: the world on Gliese 879 b, its red sand ground, fig trees, basins, sunwell glass; the
+  fig's seed pods, glass-shelled grazers, glass grown in the basins, mists and the dusk ring next.
 
 ## Waiting for Steve
 

@@ -762,6 +762,15 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   (`items.json tidelignin`, sprites `ligninreef` / `ligninplate`, planetGen step 15, placed last).
   `tools/playtest-tides.mjs` (new). Screenshot `tides-reef.png`. `docs/days/2026-11-18-am.md`.
 
+### Maker 2026-11-18 pm
+- PR #99 (2026-11-18 am: Lignin Tides' reefs; a copy with an open universe wish is no longer asked for a new one) had
+  green CI but was never merged: merged in this run and the `mind` function deployed (byte for byte with main).
+  Sorrel's **Sunwell Orchard** (support 4 of 3, then replaced by her own next wish under the rule #99 ends; treated as
+  carried) built in part: a hand-made world on Gliese 879 b, Fomalhaut's companion (`planets.json orchard`, ground
+  `floor.json orchard`, fig trees, still basins, quartz ridges, signature material sunwell glass, `supplies.json` icon
+  3). Seed pods, grazers, basin glass, mists next: `docs/universe.md`, `docs/days/2026-11-18-pm.md`. Screenshot
+  `sunwell-orchard.png`.
+
 ### Maker 2026-11-17 pm
 - PR #95 (2026-11-16 am, the ridge lookout) was answered as built but never merged, and the live `mind` function lacked
   `lookout`: merged in this run (the kit rebuilt), #97 merged first. Ember Gold's **Lignin Tides** (support 3 of 3)

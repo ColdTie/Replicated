@@ -359,6 +359,64 @@
         ],
         "blooms": 2
       }
+    },
+    {
+      "id": "orchard",
+      "shy": true,
+      "poles": {
+        "size": 0.06,
+        "colors": [
+          3,
+          30
+        ]
+      },
+      "name": "SUNWELL ORCHARD",
+      "subtitle": "WHERE THE FIGS DRINK THE MIST",
+      "star": "gliese-879",
+      "planetIndex": 1,
+      "seed": 8791,
+      "accent": [
+        14,
+        13,
+        12
+      ],
+      "ambient": "b08c74",
+      "sky": [
+        "1e1424",
+        "4a2a34",
+        "a8583c",
+        "f2b46a"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.8,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.07,
+      "sporeRate": 1.5,
+      "trees": 0.035,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        5,
+        4,
+        3
+      ],
+      "dayCycle": true,
+      "sunTint": "ffbc84",
+      "gravity": 0.85,
+      "weather": false,
+      "ponds": 12,
+      "flowers": 0.015,
+      "wildlife": {
+        "grazers": 6,
+        "birds": 4,
+        "butterflies": 6
+      }
     }
   ]
 }
