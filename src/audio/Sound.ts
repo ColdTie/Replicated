@@ -66,9 +66,22 @@ export function parseMelody(notes: string): { deg: number | null; beats: number 
   return out;
 }
 
+/** 0.1 s of silence, 8 kHz 8-bit mono (unlockIos) */
+const SILENT_WAV = (() => {
+  const n = 800, b = new Uint8Array(44 + n), v = new DataView(b.buffer);
+  const str = (o: number, t: string) => { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true);
+  v.setUint16(34, 8, true); str(36, 'data'); v.setUint32(40, n, true); b.fill(128, 44);
+  let bin = ''; for (const x of b) bin += String.fromCharCode(x);
+  return 'data:audio/wav;base64,' + btoa(bin);
+})();
+
 class SoundEngine {
   ctx: AudioContext | null = null;
   private master!: GainNode;
+  /** the last node before the speakers (for level checks) */
+  private out!: AudioNode;
   private sfxBus!: GainNode;
   private musicBus!: GainNode;
   private ambienceBus!: GainNode;
@@ -96,13 +109,16 @@ class SoundEngine {
 
   constructor() {
     try { this.muted = localStorage.getItem('mute') === '1'; } catch { /* storage blocked */ }
-    const unlock = () => {
-      this.start();
-      if (this.ctx?.state === 'running') {
-        for (const ev of ['pointerdown', 'touchend', 'keydown']) window.removeEventListener(ev, unlock, true);
-      }
-    };
-    for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, unlock, true);
+    // Every gesture (re)starts the audio: the first one creates it, later ones bring it back after the browser
+    // suspended it (a tab in the background, a phone locked, iOS 'interrupted' by a call).
+    const unlock = () => this.start();
+    for (const ev of ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown']) {
+      window.addEventListener(ev, unlock, { capture: true, passive: true });
+    }
+    const wake = () => { if (document.visibilityState === 'visible' && this.ctx && this.ctx.state !== 'running') void this.ctx.resume().catch(() => {}); };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('focus', wake);
+    window.addEventListener('pageshow', wake);
   }
 
   /** Create or resume the audio context. Must run inside a user gesture the first time. */
@@ -115,12 +131,19 @@ class SoundEngine {
       if (nav.audioSession) try { nav.audioSession.type = 'playback'; } catch { /* older Safari */ }
       const ctx = new AC();
       this.ctx = ctx;
+      // master -> loudness (sound.json: the mix was built quiet, about -35 dBFS) -> a gentle compressor -> a limiter
+      const limiter = ctx.createDynamicsCompressor();
+      limiter.threshold.value = -2; limiter.knee.value = 0; limiter.ratio.value = 20; limiter.attack.value = 0.002; limiter.release.value = 0.1;
+      limiter.connect(ctx.destination);
+      this.out = limiter;
       const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -14; comp.ratio.value = 4;
-      comp.connect(ctx.destination);
+      comp.threshold.value = -20; comp.knee.value = 8; comp.ratio.value = 3; comp.attack.value = 0.01; comp.release.value = 0.25;
+      comp.connect(limiter);
+      const loud = ctx.createGain(); loud.gain.value = SOUND.loudness;
+      loud.connect(comp);
       this.master = ctx.createGain();
       this.master.gain.value = this.muted ? 0 : SOUND.master;
-      this.master.connect(comp);
+      this.master.connect(loud);
       this.sfxBus = ctx.createGain(); this.sfxBus.gain.value = SOUND.sfx; this.sfxBus.connect(this.master);
       this.duckNode = ctx.createGain(); this.duckNode.connect(this.master);
       this.musicBus = ctx.createGain(); this.musicBus.gain.value = SOUND.music; this.musicBus.connect(this.duckNode);
@@ -137,7 +160,23 @@ class SoundEngine {
       this.startMusic();
       this.applyPlace();
     }
-    if (this.ctx.state === 'suspended') void this.ctx.resume();
+    if (this.ctx.state !== 'running') void this.ctx.resume().catch(() => {});
+    this.unlockIos();
+  }
+
+  /**
+   * iOS (Safari and Chrome alike) routes Web Audio to the ringer: with the silent switch on it is silent. A media
+   * element playing inside a gesture moves the page to the playback session, so the game is heard like a video is.
+   */
+  private iosAudio: HTMLAudioElement | null = null;
+  private unlockIos() {
+    if (this.iosAudio) return;
+    try {
+      const a = new Audio(SILENT_WAV);
+      a.loop = true; a.setAttribute('playsinline', ''); a.volume = 0.01;
+      this.iosAudio = a;
+      void a.play().catch(() => { this.iosAudio = null; });
+    } catch { /* no media element */ }
   }
 
   setMuted(m: boolean) {

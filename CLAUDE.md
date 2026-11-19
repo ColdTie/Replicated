@@ -754,6 +754,13 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   instead of fixed sleeps a slow runner outran; `playtest-cemprint` holds the warren's chores and a lonely copy's seek
   while it waits for a copy to tend the bed (on the runner they came first). All three pass locally.
 
+### Session 31 (2026-11-19): the sound was too quiet to hear (Steve: "the sound is not playing ... on phone or pc")
+- Measured at the speakers: the mix ran at about -41 dBFS RMS idle and -30 in play, which reads as silence on laptop
+  and phone speakers. A makeup gain (`sound.json loudness` 5) now sits after master, into a gentle compressor and a
+  limiter: about -14 dBFS RMS in play, peaks under -2, no clipping. The audio also resumes on every gesture and when the
+  page is shown again (a tab switch, a locked phone), and a silent media element started in the first gesture lets iOS
+  play past the silent switch. Verified: build, typecheck, `playtest-sound`, `playtest`, levels in headless Chromium.
+
 ### Maker 2026-11-18 am
 - Nothing carried (Sorrel's Sunwell Orchard at 2 of 3). Why: before sleeping every copy was asked for a new universe
   wish, which replaced its own open one with its backing (25 replaced in a day). Now a copy with an open universe wish
