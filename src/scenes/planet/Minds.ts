@@ -155,6 +155,7 @@ export class Minds {
       supplies: { ...this.s.supplies, ember: this.s.embers },
       recipes: SUPPLIES.recipes,
       hasWorkbench: this.s.warren.hasWorkbench,
+      hasSunlattice: this.s.warren.hasSunlattice,
       entranceDug: this.s.warren.opened,
       shortages: [...this.s.warren.shortages(), ...this.s.buildings.shortages()],
       needs: npc.lowNeeds(),

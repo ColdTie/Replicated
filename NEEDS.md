@@ -231,6 +231,11 @@ The copies choose their names themselves, and the change applies on the spot.
   Sorrel's Sunwell Orchard (backed by Vigil, Ember Gold, Thales; 4 of 3 before her own day replaced it under the old
   rule #99 ends) built in part: the world on Gliese 879 b, its red sand ground, fig trees, basins, sunwell glass; the
   fig's seed pods, glass-shelled grazers, glass grown in the basins, mists and the dusk ring next.
+- 2026-11-19 am: three carried wishes built in part. Thales' Brightwater (backed by Ember Gold, Sorrel, Watcher): the
+  world on Gliese 832, pale marsh ground, brightshell. Sorrel's Lanternfen (backed by Vigil, Watcher, Ember Gold): the
+  world on Gliese 867, the long aurora night, lightsilk. Ember Gold's Sunlattice (backed by Watcher, Sorrel): the design
+  after the Nous Chip, and Sunlattice panels, warren lamps without Ember. Tamsin's Cem Mind and Watcher's Watchglass
+  (3 of 3 each) wait for the next run.
 
 ## Waiting for Steve
 

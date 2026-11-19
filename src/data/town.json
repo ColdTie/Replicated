@@ -44,6 +44,8 @@
     "cinder": { "square": "earth", "streetWear": 0.75, "trackWear": 0.3, "edgePx": 8, "path": ["2c2440", "3c3254", "4e4268", "62547e"] },
     "tides": { "square": "earth", "streetWear": 0.75, "trackWear": 0.3, "edgePx": 7, "path": ["3a3646", "4a4658", "5c586a", "706c7e"] },
     "orchard": { "square": "earth", "streetWear": 0.75, "trackWear": 0.3, "edgePx": 7, "path": ["4a2a24", "5e3a2e", "74503c", "8a644c"] },
+    "brightwater": { "square": "earth", "streetWear": 0.75, "trackWear": 0.3, "edgePx": 7, "path": ["3a3a40", "4a4a52", "5e5e66", "74747c"] },
+    "lanternfen": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 8, "path": ["2a3456", "3a466c", "4e5c84", "66769e"] },
     "solace": { "square": "earth", "streetWear": 0.7, "trackWear": 0.25, "edgePx": 6, "path": ["231d36", "302848", "3f355a", "50456e"] },
     "ember": { "square": "earth", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["241c1e", "322a2c", "42383a", "524648"] },
     "frost": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 8, "path": ["56709a", "6c86b0", "869ec6", "a2b6d8"] }

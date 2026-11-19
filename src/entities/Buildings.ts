@@ -237,6 +237,8 @@ export class Buildings {
     return out;
   }
   private builtOf(id: string) { return this.designsBuilt().get(id) ?? 0; }
+  /** A finished design of this kind stands on this world (a Sunlattice: warren panels can be furnished). */
+  stands(id: string) { return this.builtOf(id) > 0; }
   /** Every House lifts every Vessel's mood a little (designs.json gives). */
   get homeMood() { return Math.min(CAT.gives.houseMoodMax, this.builtOf('house') * CAT.gives.houseMood); }
   /** Every Storehouse holds more of each material. */

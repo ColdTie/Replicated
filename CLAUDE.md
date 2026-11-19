@@ -492,7 +492,7 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
 journal, the plants drawn in the warren's planters), `node tools/playtest-cinder.mjs` (Cinder Sounding's glass ridges: only there, placed after every older node, a
-fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
+fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
 star, then the star watched and the watcher, no lens), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
 out after, the archive in the journal), `node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
 route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
@@ -760,6 +760,17 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   limiter: about -14 dBFS RMS in play, peaks under -2, no clipping. The audio also resumes on every gesture and when the
   page is shown again (a tab switch, a locked phone), and a silent media element started in the first gesture lets iOS
   play past the silent switch. Verified: build, typecheck, `playtest-sound`, `playtest`, levels in headless Chromium.
+
+### Maker 2026-11-19 am
+- Five wishes carried (threshold 3 of 7); three built in part, most support first. Thales' **Brightwater** (4): a marsh
+  world of clear shallows on Gliese 832 (`planets.json brightwater`, ground `floor.json brightwater`, slow rains,
+  signature material brightshell, `supplies.json` icon 17). Sorrel's **Lanternfen** (4): a frost world on Gliese 867
+  under a long aurora night (`planets.json lanternfen`, one fixed light, silver frost ground, lightsilk, icon 18).
+  Ember Gold's **Sunlattice** (3): the design after the Nous Chip (`designs.json sunlattice`) and **Sunlattice panels**
+  (`warren.json items.panel`, `supplies.json recipes.panel` salt 2, quartz 1, `sunlattice: true`): a warren lamp
+  without Ember, only where a Sunlattice stands (`Warren.hasSunlattice`, `Buildings.stands`; the mind's `furnish`
+  and context). Tamsin's Cem Mind and Watcher's Watchglass wait for the next run. `tools/playtest-sunlattice.mjs`
+  (new). Screenshots `brightwater.png`, `lanternfen.png`, `design-sunlattice.png`. `docs/days/2026-11-19-am.md`.
 
 ### Maker 2026-11-18 am
 - Nothing carried (Sorrel's Sunwell Orchard at 2 of 3). Why: before sleeping every copy was asked for a new universe

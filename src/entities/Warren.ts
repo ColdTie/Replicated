@@ -119,6 +119,7 @@ export class Warren {
     const short: string[] = [];
     for (const [m, n] of Object.entries(recipe)) {
       if (m === 'bench') { if (n && !this.hasWorkbench) short.push('a workbench'); continue; }
+      if (m === 'sunlattice') { if (n && !this.hasSunlattice) short.push('a Sunlattice standing'); continue; }
       const have = m === 'ember' ? this.scene.embers : Math.floor(this.supplies[m] ?? 0);
       if (have < (n as number)) short.push(`${(n as number) - have} more ${m}`);
     }
@@ -135,10 +136,10 @@ export class Warren {
     this.scene.markSupplies();
   }
 
-  /** Lamps and murals in dug rooms: lamps stretch the copies' waking hours, murals lift their mood. */
+  /** Lamps (and Sunlattice panels) and murals in dug rooms: lamps stretch the copies' waking hours, murals lift their mood. */
   get lampCount() {
     const dug = new Set(['entrance', ...this.data.rooms.filter((r) => r.dug).map((r) => r.id)]);
-    return this.data.items.filter((i) => i.kind === 'lamp' && dug.has(i.room)).length;
+    return this.data.items.filter((i) => (i.kind === 'lamp' || i.kind === 'panel') && dug.has(i.room)).length;
   }
   get muralCount() {
     const dug = new Set(['entrance', ...this.data.rooms.filter((r) => r.dug).map((r) => r.id)]);
@@ -171,6 +172,9 @@ export class Warren {
     }
     return true;
   }
+
+  /** A finished Sunlattice stands on this world: Sunlattice panels can be furnished (supplies.json recipes.panel). */
+  get hasSunlattice() { return !!this.scene.buildings?.stands('sunlattice'); }
 
   get hasWorkbench() {
     const dug = new Set(['entrance', ...this.data.rooms.filter((r) => r.dug).map((r) => r.id)]);

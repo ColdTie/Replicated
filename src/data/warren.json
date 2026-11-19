@@ -1,6 +1,6 @@
 {
   "hatchDwellMs": 350,
-  "_doc": "hatchDwellMs: standing this long on the open hatch takes you down (a warm ring fills meanwhile); an attack press there goes at once, and walking or dashing across it never does. The warren: the underground base the copies design and dig beneath the village. grid = tiles (16 px) of the underground map; the Entrance (entrance w x h tiles, the ladder at its top) sits top center. Rooms come from the copies' dig_room tool: sizes in tiles, each takes digSwings hammer blows (swingMs apart) by the copy that goes down to dig it. furnish places items inside a dug room. rest: a copy with a resting station goes down when night is past nightFrom or everyMinutes after it last rested, and sleeps for minutes. maxRooms rooms, maxItemsPerRoom items each. items: sprite frame in tools/sprites/warren.json, where it stands in a room (back wall, side wall, corner, floor), the light it casts, whether it is solid.",
+  "_doc": "hatchDwellMs: standing this long on the open hatch takes you down (a warm ring fills meanwhile); an attack press there goes at once, and walking or dashing across it never does. The warren: the underground base the copies design and dig beneath the village. grid = tiles (16 px) of the underground map; the Entrance (entrance w x h tiles, the ladder at its top) sits top center. Rooms come from the copies' dig_room tool: sizes in tiles, each takes digSwings hammer blows (swingMs apart) by the copy that goes down to dig it. furnish places items inside a dug room. rest: a copy with a resting station goes down when night is past nightFrom or everyMinutes after it last rested, and sleeps for minutes. maxRooms rooms, maxItemsPerRoom items each. items: sprite frame in tools/sprites/warren.json, where it stands in a room (back wall, side wall, corner, floor), the light it casts, whether it is solid. panel: a Sunlattice panel (Ember Gold's wish, 2026-11-19), a lamp that costs no Ember, furnished only where a Sunlattice stands (supplies.json recipes.panel: sunlattice true).",
   "grid": [44, 34],
   "entrance": [5, 4],
   "sizes": { "small": [5, 4], "medium": [7, 5], "large": [10, 7] },
@@ -20,6 +20,7 @@
     "workbench": { "frame": 5, "place": "side", "light": { "radius": 34, "color": 9, "intensity": 0.6, "flicker": 0.3 }, "solid": true },
     "planter": { "frame": 6, "place": "floor", "light": { "radius": 40, "color": 12, "intensity": 0.5 }, "solid": true },
     "mural": { "frame": 7, "place": "back", "solid": false },
-    "crate": { "frame": 8, "place": "side", "solid": true }
+    "crate": { "frame": 8, "place": "side", "solid": true },
+    "panel": { "frame": 9, "place": "back", "light": { "radius": 74, "color": 11, "intensity": 0.85 }, "solid": false }
   }
 }

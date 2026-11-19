@@ -650,6 +650,113 @@
         "cracks": 0.6,
         "relief": 5
       }
+    },
+    "brightwater": {
+      "kind": "grass",
+      "relief": 5,
+      "coverage": 0.7,
+      "pebbles": 3,
+      "soil": [
+        "4a4640",
+        "5e5a4e",
+        "76705e",
+        "8e8870"
+      ],
+      "cover": [
+        "26443a",
+        "32583e",
+        "467444",
+        "628e50",
+        "86a862"
+      ],
+      "detail": [
+        "c8d894",
+        "a8c070",
+        "ece4c0",
+        "9ed8d0"
+      ],
+      "flowers": [
+        "ead4aa",
+        "f6757a",
+        "c0cbdc",
+        "fee761"
+      ],
+      "leaves": [
+        "6a6a3a",
+        "3e8948"
+      ],
+      "stone": [
+        "232a40",
+        "323b58",
+        "434e6e",
+        "56627f"
+      ],
+      "rock": {
+        "ramp": [
+          "1c1a2a",
+          "2c2a40",
+          "444262",
+          "646286",
+          "8a8aa8",
+          "b4b4c8"
+        ],
+        "cover": [
+          "3a6a44",
+          "5a8a52",
+          "86a862"
+        ],
+        "coverage": 0.4,
+        "cracks": 0.8,
+        "relief": 5
+      }
+    },
+    "lanternfen": {
+      "kind": "snow",
+      "relief": 7,
+      "coverage": 0.65,
+      "pebbles": 2,
+      "soil": [
+        "1e2440",
+        "2a3458",
+        "3a4870",
+        "4e6088"
+      ],
+      "cover": [
+        "6a7894",
+        "8492ae",
+        "a0acc4",
+        "bcc6d8",
+        "d8e0ec"
+      ],
+      "detail": [
+        "ffffff",
+        "c8f0e0",
+        "b8a8f0"
+      ],
+      "stone": [
+        "2a3658",
+        "3a4a70",
+        "4e6088",
+        "6a7ea2"
+      ],
+      "rock": {
+        "ramp": [
+          "161c38",
+          "24305a",
+          "384a7a",
+          "56709c",
+          "7e9cc0",
+          "b0d0e4"
+        ],
+        "cover": [
+          "c8e8f0",
+          "e4f4fa",
+          "f8fcff"
+        ],
+        "coverage": 0.5,
+        "cracks": 0.7,
+        "relief": 7
+      }
     }
   }
 }

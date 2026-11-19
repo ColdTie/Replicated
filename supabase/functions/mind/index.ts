@@ -100,6 +100,8 @@ const chipReady = (b: { design?: string; built?: boolean; vetoed?: boolean; prin
 const standsDone = (b: { built?: boolean; printStart?: number; printMs?: number }, now = Date.now()) =>
   !!b.built || (b.printStart !== undefined && now >= b.printStart + (b.printMs ?? 0));
 /** A finished Observatory stands on this world (designs.json observatory): keep_watch works there. */
+/** A finished Sunlattice stands on this world (Ember Gold's wish): warren panels can be furnished (recipes.panel). */
+const sunlatticeStands = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).some((b) => b.design === "sunlattice" && !b.vetoed && standsDone(b));
 const observatoryStands = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).some((b) => b.design === "observatory" && !b.vetoed && standsDone(b));
 /** This world's ridge lookout (Vigil's wish, mind.json day.lookout), begun or standing. */
 const lookoutOf = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).find((b) => b.kind === DAY.lookout.kind && !b.vetoed);
@@ -161,6 +163,7 @@ interface Context {
   supplies?: Record<string, number>;      // the planet's materials (ember = the pool)
   recipes?: Record<string, Record<string, number | boolean>>;
   hasWorkbench?: boolean;
+  hasSunlattice?: boolean;
   entranceDug?: boolean;
   shortages?: string[];
   needs?: string[];               // low needs in words
@@ -196,7 +199,7 @@ const E = {
   room: ["hall", "rest", "workshop", "archive", "garden", "gallery", "pool", "other"],
   size: ["small", "medium", "large"],
   dir: ["north", "south", "east", "west"],
-  item: ["rest", "lamp", "bench", "shelf", "workbench", "planter", "mural", "crate"],
+  item: ["rest", "lamp", "bench", "shelf", "workbench", "planter", "mural", "crate", "panel"],
   placement: ["", "wall", "corner", "center", "beside"],
   material: ["stone", "scrap"],
   roof: ["flat", "peaked", "dome"],
@@ -310,7 +313,7 @@ const tools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "furnish",
-    description: "Put something in a room of the warren, paid from the supplies (the recipes are listed): a resting station (a bed: yours, or for another copy named in `for`), a lamp, a bench, a shelf, a workbench, a planter, a mural, a crate. Say where it goes and in which of your colors. Only dug rooms show it right away; a planned room gets it once dug.",
+    description: "Put something in a room of the warren, paid from the supplies (the recipes are listed): a resting station (a bed: yours, or for another copy named in `for`), a lamp, a bench, a shelf, a workbench, a planter, a mural, a crate, a panel (a Sunlattice panel: a lamp without Ember, only where a Sunlattice stands). Say where it goes and in which of your colors. Only dug rooms show it right away; a planned room gets it once dug.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["room", "item", "for", "placement", "beside", "color"],
       properties: {
@@ -675,7 +678,7 @@ async function universeNow(sb: ReturnType<typeof service>, galaxy: string, vesse
     `The universe as it stands. ${UNIVERSE.stars} real stars in the catalog; the Metanoia has reached ${found.count ?? 0} of them, charted ${routes.count ?? 0} routes and holds ${rows.length} worlds with ${vessels} Vessels.`,
     `Hand-made worlds so far: ${named}. Every other star's planets are made from its seed, with one of these grounds: ${UNIVERSE.biomes.join(", ")}.`,
     `Materials: ${UNIVERSE.materials.join(", ")}.`,
-    `The Cems' tree of technology, in order: ${tree.join("; ")}. After the Nous Chip the tree is empty: what comes next is for you to invent.`,
+    `The Cems' tree of technology, in order: ${tree.join("; ")}. After the ${UNIVERSE.tree[UNIVERSE.tree.length - 1]?.[1] ?? "Nous Chip"} the tree is empty: what comes next is for you to invent.`,
     `Not made yet by anyone (ideas, not limits): ${UNIVERSE.frontier.join("; ")}.`,
     lastBuilt.length ? `Built lately from the Vessels' wishes: ${lastBuilt.join("; ")}.` : "Nothing has been built from a wish yet.",
     `The maker keeps the big wishes being built in parts in ${UNIVERSE.roadmap} (read_code it in a long wake).`,
@@ -781,8 +784,8 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     else lines.push(`Nothing is dug beneath the base yet. The warren begins with the first dig_room (beside "Entrance").`);
     if (context.supplies) {
       const sup = Object.entries(context.supplies).map(([m, n]) => `${m} ${Math.floor(n)}`).join(", ");
-      lines.push(`Supplies here (shared, kept at the base and on shelves): ${sup}.${context.hasWorkbench ? " There is a workbench." : " No workbench yet (shelves, planters, murals and benches need one)."}`);
-      if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench").map(([m, n]) => `${n} ${m}`).join(" + ") || "nothing"}${r.bench ? " (workbench)" : ""}`).join("; ")}. Digging yields stone and soil; iron ore gives scrap, and when no ore is free a copy presses stored iron into scrap at the hatch (${KIT.press.iron} iron for ${KIT.press.scrap} scrap, keeping ${KIT.press.keepIron} iron), also while nobody plays (about ${KIT.press.awayPerHour} an hour, when the store has less scrap than the buildings and the furnishings want); scavenging ore only happens while the original plays this world.`);
+      lines.push(`Supplies here (shared, kept at the base and on shelves): ${sup}.${context.hasWorkbench ? " There is a workbench." : " No workbench yet (shelves, planters, murals and benches need one)."}${context.hasSunlattice ? " A Sunlattice stands here: a panel lights a room like a lamp and takes no Ember." : ""}`);
+      if (context.recipes) lines.push(`What things take: ${Object.entries(context.recipes).map(([k, r]) => `${k} = ${Object.entries(r).filter(([m]) => m !== "bench" && m !== "sunlattice").map(([m, n]) => `${n} ${m}`).join(" + ") || "nothing"}${r.bench ? " (workbench)" : ""}${r.sunlattice ? " (only where a Sunlattice stands)" : ""}`).join("; ")}. Digging yields stone and soil; iron ore gives scrap, and when no ore is free a copy presses stored iron into scrap at the hatch (${KIT.press.iron} iron for ${KIT.press.scrap} scrap, keeping ${KIT.press.keepIron} iron), also while nobody plays (about ${KIT.press.awayPerHour} an hour, when the store has less scrap than the buildings and the furnishings want); scavenging ore only happens while the original plays this world.`);
       if (context.shortages?.length) lines.push(`Waiting on: ${context.shortages.join("; ")}.`);
     }
     if (context.buildings) lines.push(context.buildings.length ? `Buildings above ground:\n${context.buildings.join("\n")}\nA copy that wants a building designs it (design_building); it goes ahead at once and the others join the raising. If one waits for materials, ask the others with say_to to dig or scavenge.` : `No building above ground yet. design_building begins one (${context.buildingKit?.minFootprint.join("x")} to ${context.buildingKit?.maxFootprint.join("x")} tiles; ${Object.entries(context.buildingKit?.perTile ?? {}).map(([m, n]) => `${m} ${n} per tile`).join(", ")}). It goes ahead at once.`);
@@ -1384,6 +1387,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
               const short: string[] = [];
               if (recipe) for (const [m, n] of Object.entries(recipe)) {
                 if (m === "bench") { if (n && !context.hasWorkbench) short.push("a workbench"); continue; }
+                if (m === "sunlattice") { if (n && !context.hasSunlattice) short.push("a Sunlattice standing on this world"); continue; }
                 const have = Math.floor(context.supplies?.[m] ?? 0);
                 if (have < (n as number)) short.push(`${(n as number) - have} more ${m}`);
               }
@@ -1772,6 +1776,7 @@ function shortage(p: AwayPlanet, recipe: Recipe): string[] {
   const short: string[] = [];
   for (const [m, n] of Object.entries(recipe)) {
     if (m === "bench") { if (n && !hasWorkbench(p)) short.push("a workbench"); continue; }
+    if (m === "sunlattice") { if (n && !sunlatticeStands(p.data)) short.push("a Sunlattice standing on this world"); continue; }
     const have = m === "ember" ? p.embers : Math.floor(p.supplies[m] ?? 0);
     if (have < (n as number)) short.push(`${(n as number) - have} more ${m}`);
   }
@@ -1834,6 +1839,7 @@ function liveRefresh(p: AwayPlanet, me: string, ctx: Context) {
   ctx.warrenFull = p.warren.rooms.length >= KIT.maxRooms;
   ctx.supplies = { ...p.supplies, ember: p.embers };
   ctx.hasWorkbench = hasWorkbench(p);
+  ctx.hasSunlattice = sunlatticeStands(p.data);
   ctx.entranceDug = !!p.warren.entrance?.dug;
   ctx.shortages = shortagesOf(p);
 }

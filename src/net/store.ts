@@ -293,6 +293,8 @@ export interface MindContext {
   supplies: Record<string, number>;
   recipes: Record<string, Record<string, number | boolean>>;
   hasWorkbench: boolean;
+  /** a finished Sunlattice stands here: Sunlattice panels can be furnished */
+  hasSunlattice?: boolean;
   entranceDug: boolean;
   /** what waits on what ("the way down is not dug yet") */
   shortages: string[];
