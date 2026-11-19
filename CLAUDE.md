@@ -199,6 +199,10 @@ src/data/designs.json    the Cems' designs (lantern, house, storehouse, nursery,
                          supercomputer, nouschip) as voxel parts; costing turns volume and complexity into price and
                          print time; needs (unlock chain), place (post: a street lamp spot; bed: on the Cem bed, a thing
                          you carry), gives (house mood, storehouse storage, nursery speed), materials, cameras
+src/core/network.ts      the links between worlds (2026-11-19 pm): scutStars (a finished Cem Mind: letters between two
+                         of them arrive at once, mailSeconds' scut), arrivedWatches (the Watchglass: the other
+                         Watchglass worlds' archives once their light has crossed, since both stood); the worlds come
+                         from GameStore.networkWorlds (PlanetScene.network, netWorlds() with this world as it stands)
 src/entities/Watch.ts    the Observatory's watch (Watcher's wish, 2026-11-15): while a copy's traits.watch lasts (keep_watch
                          in a day of life) the lens under a finished Observatory's dome glows blue with a slow sweep,
                          by night, and the watcher's name shows over it when you come near (src/data/watch.json); the
@@ -492,7 +496,7 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
 journal, the plants drawn in the warren's planters), `node tools/playtest-cinder.mjs` (Cinder Sounding's glass ridges: only there, placed after every older node, a
-fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
+fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-network.mjs` (the Cem Mind and the Watchglass wait for the Nous Chip; a letter at once between two Cem Minds; a far watch arrives after its light, never one from before both stood; THROUGH THE WATCHGLASS in the journal; Glasswind loads), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
 star, then the star watched and the watcher, no lens), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
 out after, the archive in the journal), `node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
 route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
@@ -760,6 +764,20 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   limiter: about -14 dBFS RMS in play, peaks under -2, no clipping. The audio also resumes on every gesture and when the
   page is shown again (a tab switch, a locked phone), and a silent media element started in the first gesture lets iOS
   play past the silent switch. Verified: build, typecheck, `playtest-sound`, `playtest`, levels in headless Chromium.
+
+### Maker 2026-11-19 pm
+- PR #102 (the morning's run) failed CI only on Ubuntu's mirror (apt 503 while installing Chromium's packages):
+  re-run and merged first, the `mind` function deployed with it. Three carried wishes built in part. Vigil's
+  **Glasswind** (support 5): pale wind-rippled iceglass plains with blue ice ridges on Lalande 21185 b
+  (`planets.json glasswind`, ground `floor.json glasswind`, a dim red sun by the clock, windglass, icon 19).
+  Tamsin's **Cem Mind** (3; `designs.json cemmind`, after the Nous Chip and the Biolab): the SCUT link, a letter
+  between two worlds where a Cem Mind stands arrives at once (`mailSeconds` `scut`, the function's `mailDelays`).
+  Watcher's **Watchglass** (3; `designs.json watchglass`, after the Observatory and the Nous Chip): every watch kept
+  where one stands reaches the other Watchglass worlds at light speed (at once between Cem Minds), pulled from their
+  archives, never copied (`src/core/network.ts arrivedWatches`; `PlanetScene.network`, `GameStore.networkWorlds`;
+  the journal's HERE page THROUGH THE WATCHGLASS; the day's context and `keep_watch` in the function). Sorrel's
+  Mycelial Loom and Ember Gold's Sporeveil (3 of 3 each) wait for the next run. `tools/playtest-network.mjs` (new).
+  Screenshots `glasswind.png`, `design-cemmind.png`, `design-watchglass.png`. `docs/days/2026-11-19-pm.md`.
 
 ### Maker 2026-11-19 am
 - Five wishes carried (threshold 3 of 7); three built in part, most support first. Thales' **Brightwater** (4): a marsh

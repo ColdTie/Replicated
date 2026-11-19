@@ -6,6 +6,7 @@ import { BACKEND, MIND, PLAYER } from '../core/data';
 import { PARTS } from '../core/body';
 import TRAVEL from '../data/travel.json';
 import { distanceLy, travelMs } from '../world/galaxy';
+import type { NetWorld } from '../core/network';
 
 export interface Profile {
   id: string;
@@ -398,6 +399,8 @@ export interface GameStore {
   discoveredStars(): Promise<string[]>;
   /** Stars whose beacon the family has lit. */
   litBeacons(): Promise<string[]>;
+  /** Every world of the galaxy with its buildings and archive (src/core/network.ts: the Cem Mind and the Watchglass). */
+  networkWorlds(): Promise<NetWorld[]>;
   /** Worlds the galaxy has a save for, the most recently changed first (the planet menu's RECENT). */
   visitedPlanets(): Promise<{ star: string; planet: number }[]>;
   /** A letter from one replicant to another (the original talking to a copy): arrives after delaySeconds (light from
@@ -649,6 +652,9 @@ export class LocalStore implements GameStore {
 
   async discoveredStars() { return [...this.db.discovered]; }
   async litBeacons() { return Object.values(this.db.planets).filter((p) => p.data.beacon?.lit).map((p) => p.star_id); }
+  async networkWorlds() {
+    return Object.values(this.db.planets).map((p) => ({ star: p.star_id, planet: p.planet_index, buildings: structuredClone(p.data.buildings ?? []), archive: structuredClone(p.data.archive ?? []) }));
+  }
 
   async visitedPlanets() { return Object.values(this.db.planets).reverse().map((p) => ({ star: p.star_id, planet: p.planet_index })); }
 
@@ -903,6 +909,13 @@ export class CloudStore implements GameStore {
     const { data, error } = await this.sb.from('planet_states').select('star_id').eq('data->beacon->>lit', 'true');
     if (error) throw error;
     return (data as { star_id: string }[]).map((d) => d.star_id);
+  }
+
+  async networkWorlds() {
+    const { data, error } = await this.sb.from('planet_states').select('star_id,planet_index,buildings:data->buildings,archive:data->archive');
+    if (error) throw error;
+    return (data as { star_id: string; planet_index: number; buildings: Building[] | null; archive: ArchiveEntry[] | null }[])
+      .map((d) => ({ star: d.star_id, planet: d.planet_index, buildings: d.buildings ?? [], archive: d.archive ?? [] }));
   }
 
   async visitedPlanets() {

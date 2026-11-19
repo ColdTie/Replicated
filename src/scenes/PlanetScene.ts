@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
+import { arrivedWatches, scutStars, type NetWorld } from '../core/network';
 import SOUND_DATA from '../data/sound.json';
 import { sound, type Surface } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
-import { BACKEND, BEACON, BUILDINGS, ENEMIES, ITEMS, PALETTE, PLANETS, PLAYER, STRUCTURES, SUPPLIES, TOWN_SAFE_TILES, VILLAGE, WARREN, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
+import { BACKEND, BEACON, BUILDINGS, ENEMIES, ITEMS, MIND, PALETTE, PLANETS, PLAYER, STRUCTURES, SUPPLIES, TOWN_SAFE_TILES, VILLAGE, WARREN, hex, type HopperDef, type PlanetDef, type SkitterDef, type SpitterDef } from '../core/data';
 import { DRIFT, replicate, stat } from '../core/drift';
 import { session } from '../core/session';
 import { Base } from '../entities/Base';
@@ -41,7 +42,7 @@ import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
 import { COLLIDE_TILES, Cell, DECOR, TILE, generatePlanet, type PlanetMap } from '../world/planetGen';
 import { TOWN_TUNING, birthOrder, nextFreeLot, occupiedLots, type TownState } from '../world/town';
-import { BEACONS, planetFor, starById } from '../world/galaxy';
+import { BEACONS, mailSeconds, planetFor, starById } from '../world/galaxy';
 import { Departure } from './planet/Departure';
 import { Link } from './planet/Link';
 import { Homeworld } from './planet/Homeworld';
@@ -91,6 +92,17 @@ export class PlanetScene extends Phaser.Scene {
   beacon?: Beacon;
   guardian?: Guardian;
   litBeacons: string[] = [];
+  /** the galaxy's worlds for the Cem Mind's links and the Watchglass (src/core/network.ts), loaded with the world */
+  network: NetWorld[] = [];
+  /** the network with this world's buildings and archive as they stand now */
+  netWorlds(): NetWorld[] {
+    const here = { star: this.planet.star, planet: this.planet.planetIndex, buildings: this.buildings?.list ?? [], archive: this.archive };
+    return [...this.network.filter((w) => w.star !== here.star || w.planet !== here.planet), here];
+  }
+  /** How long a letter from here takes to a Vessel at that star (light speed, the beacon lattice, the Cem Minds). */
+  mailTo(star: string) { return mailSeconds(this.planet.star, star, this.litBeacons, MIND.mailSecondsPerLy, scutStars(this.netWorlds())); }
+  /** The watches that came here through the Watchglass (src/core/network.ts). */
+  sharedWatches() { return arrivedWatches({ star: this.planet.star, planet: this.planet.planetIndex }, this.netWorlds(), MIND.mailSecondsPerLy); }
   npcs: Npc[] = [];
   village!: Village;
   warren!: Warren;
@@ -231,7 +243,7 @@ export class PlanetScene extends Phaser.Scene {
     this.enemies = []; this.nodes = []; this.shards = []; this.spores = []; this.embers = 0; this.stopped = false; this.frozen = false;
     this.grazers = []; this.flocks = []; this.butterflies = undefined; this.bendables = new Map(); this.slow = 1;
     this.npcs = []; this.replicating = false; this.launching = false;
-    this.sparks = []; this.beacon = undefined; this.guardian = undefined; this.litBeacons = [];
+    this.sparks = []; this.beacon = undefined; this.guardian = undefined; this.litBeacons = []; this.network = [];
     // the scene object is reused between planets: drop the old player so update() waits for the new world
     this.player = undefined as unknown as Player;
     this.pending = { embers: 0, nodes: {} };
@@ -478,6 +490,7 @@ export class PlanetScene extends Phaser.Scene {
       }
     }
     session.store?.litBeacons().then((l) => { this.litBeacons = l; }).catch(() => undefined);
+    session.store?.networkWorlds().then((w) => { this.network = w; }).catch(() => undefined);
 
     // Player: a returning replicant appears where it was; a new one at the cradle's spot below the vessel
     const r = session.replicant;

@@ -532,6 +532,64 @@
         "birds": 3,
         "butterflies": 0
       }
+    },
+    {
+      "id": "glasswind",
+      "shy": true,
+      "poles": {
+        "size": 0.22,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "GLASSWIND",
+      "subtitle": "WHERE THE ARCHES SING",
+      "star": "lalande-21185",
+      "planetIndex": 1,
+      "seed": 4111,
+      "accent": [
+        18,
+        19,
+        28
+      ],
+      "ambient": "8a8ca8",
+      "sky": [
+        "141a34",
+        "2c3a5e",
+        "6a5a84",
+        "d89a8a"
+      ],
+      "size": [
+        144,
+        108
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.7,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.05,
+      "sporeRate": 4,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        20,
+        19,
+        28
+      ],
+      "dayCycle": true,
+      "sunTint": "ecdce6",
+      "gravity": 1,
+      "weather": false,
+      "ponds": 5,
+      "flowers": 0.005,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 5,
+        "butterflies": 0
+      }
     }
   ]
 }

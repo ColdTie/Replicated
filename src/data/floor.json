@@ -710,6 +710,23 @@
         "relief": 5
       }
     },
+    "glasswind": {
+      "kind": "sand",
+      "relief": 7,
+      "coverage": 0.6,
+      "pebbles": 2,
+      "soil": ["343c5c", "48527a", "5e6a92", "7884aa"],
+      "cover": ["8a96b4", "a2b0cc", "bcc8de", "d4def0", "eaf2fc"],
+      "detail": ["5e6a92", "f4fbff", "c8e8f4"],
+      "stone": ["3a4466", "4e5a80", "66749a", "8290b4"],
+      "rock": {
+        "ramp": ["2a3a5e", "3e5684", "5a7cac", "7ea4cc", "a8cce4", "d4ecf8"],
+        "cover": ["e4f4fc", "f8fcff"],
+        "coverage": 0.35,
+        "cracks": 0.5,
+        "relief": 8
+      }
+    },
     "lanternfen": {
       "kind": "snow",
       "relief": 7,

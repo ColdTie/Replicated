@@ -19,10 +19,11 @@ export const starById = (id: string) => BY_ID.get(id);
 /**
  * How long a letter takes between two stars, in seconds: light speed (mailSecondsPerLy), or at once along the beacon
  * lattice (beacon.json lattice): every letter once all four beacons are lit, else when both ends lie within its radius
- * of a lit beacon or of the Sun.
+ * of a lit beacon or of the Sun; or at once between two stars where a Cem Mind stands (scut, src/core/network.ts).
  */
-export function mailSeconds(from: string, to: string, lit: string[], perLy: number) {
+export function mailSeconds(from: string, to: string, lit: string[], perLy: number, scut: string[] = []) {
   if (from === to) return 0;
+  if (scut.includes(from) && scut.includes(to)) return 0;
   const lattice = lit.filter((b) => BEACONS.includes(b));
   if (lattice.length >= BEACONS.length) return 0;
   if (lattice.length) {

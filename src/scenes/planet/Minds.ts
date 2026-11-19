@@ -8,7 +8,6 @@ import { Npc } from '../../entities/Npc';
 import { allRooms, describeWarren, restOf } from '../../world/warren';
 import type { AwayItem, LessonRow, MindContext, MindResult, PlantRow, ReplicantSummary } from '../../net/store';
 import { plantStage } from '../../world/garden';
-import { mailSeconds } from '../../world/galaxy';
 import type { PlanetScene } from '../PlanetScene';
 import { onPress } from '../../input/Controls';
 import { TALK_GAP_MS, kitLists, quietMinds } from './shared';
@@ -131,7 +130,7 @@ export class Minds {
     const structures: Record<string, number> = {};
     for (const s of this.s.village.structures) structures[s.type] = (structures[s.type] ?? 0) + 1;
     const delays: Record<string, number> = {};
-    for (const r of this.everyone) delays[r.id] = mailSeconds(this.s.planet.star, r.star_id, this.s.litBeacons, MIND.mailSecondsPerLy);
+    for (const r of this.everyone) delays[r.id] = this.s.mailTo(r.star_id);
     const since = this.lastWake.get(npc) ?? -1;
     const me = session.replicant;
     const mine: Record<string, number> = {};
@@ -451,7 +450,7 @@ export class Minds {
     };
     openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.s.visit ? 0 : me.traits.sparks ?? 0, place: this.s.placeLabel,
       me: { id: me.id, name: me.name, star: this.s.planet.star, planet: this.s.planet.planetIndex }, all, copies: this.s.npcs.map((n) => n.data), journal: j, shared, feelings, actions, tab,
-      buildings: this.s.buildings.describe(nameOf), archive: this.s.archive, lessons: lessonLines(this.s.lessons), garden: gardenLines(this.s.plants), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
+      buildings: this.s.buildings.describe(nameOf), archive: this.s.archive, sharedWatches: this.s.sharedWatches(), lessons: lessonLines(this.s.lessons), garden: gardenLines(this.s.plants), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
   }
 
   /** The original writes to a Vessel: a letter that arrives at once on this world, after the light's delay from
@@ -463,7 +462,7 @@ export class Minds {
     if (!npc) {
       const far = this.everyone.find((r) => r.id === id);
       if (!far) return;
-      const delay = mailSeconds(this.s.planet.star, far.star_id, this.s.litBeacons, MIND.mailSecondsPerLy);
+      const delay = this.s.mailTo(far.star_id);
       try { await st.sendMessage(me, id, text.trim(), delay); } catch (e) { console.warn('letter failed', e); return; }
       this.mindLog.push({ t: this.mindClock, text: `${me.name} wrote to ${far.name}` });
       return;
