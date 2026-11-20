@@ -1,5 +1,5 @@
 {
- "_doc": "What the copies put in their warren (src/data/warren.json items): 0 resting station, 1 resting station lit (someone sleeps in it), 2 lantern, 3 bench, 4 shelf, 5 workbench, 6 planter, 7 mural (white takes the builder's trail color), 8 crate. 16x16, feet at the bottom row.",
+ "_doc": "What the copies put in their warren (src/data/warren.json items): 0 resting station, 1 resting station lit (someone sleeps in it), 2 lantern, 3 bench, 4 shelf, 5 workbench, 6 planter, 7 mural (white takes the builder's trail color), 8 crate, 9 Sunlattice panel (a lamp without Ember). 16x16, feet at the bottom row.",
  "size": [16, 16],
  "tinted": true,
  "legend": {
@@ -186,6 +186,24 @@
    "...kkkkkkkkkk...",
    "................",
    "................"
+  ],
+  [
+   "................",
+   "...kkkkkkkkkk...",
+   "...kLLLLLLLLk...",
+   "...kLyWyyWyLk...",
+   "...kLWyYYyWLk...",
+   "...kLyYWWYyLk...",
+   "...kLyYWWYyLk...",
+   "...kLWyYYyWLk...",
+   "...kLyWyyWyLk...",
+   "...kLyWyyWyLk...",
+   "...kLWyYYyWLk...",
+   "...kLyYWWYyLk...",
+   "...kLLLLLLLLk...",
+   "...kkkRrRrkkk...",
+   "....kRRrrRRk....",
+   "...kkkkkkkkkk..."
   ]
  ]
 }

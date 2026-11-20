@@ -179,7 +179,7 @@ export class WarrenScene extends Phaser.Scene implements WarrenView {
     if (!def) return;
     const x = it.x * 16 + 8, y = it.y * 16 + 16;
     const sprite = this.add.sprite(x, y, tex('warren', this.host.planet.id), def.frame).setOrigin(0.5, 1).setDepth(DEPTH.actors + y - 2);
-    if (it.tint !== undefined && !['lamp', 'planter', 'workbench'].includes(it.kind)) sprite.setTint(PALETTE[it.tint]);
+    if (it.tint !== undefined && !['lamp', 'planter', 'workbench', 'panel'].includes(it.kind)) sprite.setTint(PALETTE[it.tint]);
     else if (it.kind === 'mural') {
       const by = this.host.npcs.find((n) => n.data.id === it.by);
       sprite.setTint(by?.trailColor ?? PALETTE[18]);

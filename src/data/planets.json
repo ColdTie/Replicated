@@ -417,6 +417,121 @@
         "birds": 4,
         "butterflies": 6
       }
+    },
+    {
+      "id": "brightwater",
+      "shy": true,
+      "poles": {
+        "size": 0.14,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "BRIGHTWATER",
+      "subtitle": "WHERE THE SHALLOWS RUN CLEAR",
+      "star": "gliese-832",
+      "planetIndex": 1,
+      "seed": 8321,
+      "accent": [
+        16,
+        17,
+        18
+      ],
+      "ambient": "9a8c98",
+      "sky": [
+        "1a1430",
+        "3c2a56",
+        "8a4a6c",
+        "f0a466"
+      ],
+      "size": [
+        144,
+        108
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.8,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.1,
+      "sporeRate": 3,
+      "trees": 0.02,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        24,
+        21,
+        30
+      ],
+      "dayCycle": true,
+      "sunTint": "ffa478",
+      "gravity": 1,
+      "weather": true,
+      "ponds": 18,
+      "flowers": 0.03,
+      "wildlife": {
+        "grazers": 6,
+        "birds": 8,
+        "butterflies": 6
+      }
+    },
+    {
+      "id": "lanternfen",
+      "shy": true,
+      "poles": {
+        "size": 0.32,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "LANTERNFEN",
+      "subtitle": "WHERE THE NIGHT IS LONG",
+      "star": "gliese-867",
+      "planetIndex": 1,
+      "seed": 8671,
+      "accent": [
+        22,
+        21,
+        18
+      ],
+      "ambient": "5a6c9a",
+      "sky": [
+        "0a0c22",
+        "1c2450",
+        "2c5c6a",
+        "7ac8a0"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.76,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.07,
+      "sporeRate": 3.5,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        23,
+        22,
+        20
+      ],
+      "dayCycle": false,
+      "gravity": 0.95,
+      "weather": false,
+      "ponds": 14,
+      "flowers": 0.015,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 3,
+        "butterflies": 0
+      }
     }
   ]
 }
