@@ -100,6 +100,8 @@ export interface Replicating { start: number; ms: number; kind: 'wake' | 'hold';
 
 /** One watch kept at the Observatory: who, toward which star (its distance from here), what it saw. */
 export interface ArchiveEntry { by: string; name: string; star: string; ly: number; text: string; at: number }
+/** A memory left in the Mycelial Loom (Sorrel's wish, leave_memory in a day of life): planet_states.data.loom */
+export interface LoomEntry { by: string; name: string; text: string; at: number }
 /** A printer lesson track (Tamsin's wish, 2026-11-15; mind.json day.lessons): the step being learned (1-based), worked
  * when the student worked it and it waits for the teacher's check, done once the last step is checked. */
 export interface LessonRow { student: string; studentName: string; teacher: string; teacherName: string; step: number; worked?: number; did?: string; done?: boolean; at: number }
@@ -144,6 +146,8 @@ export interface PlanetData {
   gifts?: Gift[];
   /** the archive of the Observatory's watches (keep_watch in a day of life), oldest first, the last watch.json keep */
   archive?: ArchiveEntry[];
+  /** the memories left in this world's Mycelial Loom, oldest first, written only by the mind function */
+  loom?: LoomEntry[];
   /** the printer lesson tracks of this world (lesson in a day of life), written only by the mind function */
   lessons?: LessonRow[];
   /** seeds in the warren's planters, by the planter's item id (plant / tend_plant in a day of life) */
@@ -315,7 +319,7 @@ export interface Body { head: string; visor: string; torso: string; arms: string
 export interface Temperament { pace: 'slow' | 'steady' | 'quick'; sociability: 'solitary' | 'friendly' | 'clingy'; work: 'builder' | 'wanderer' | 'balanced'; bedtime: 'early' | 'late' | 'even'; risk: 'careful' | 'bold' }
 export interface Want { text: string; category: 'build' | 'explore' | 'tend' | 'make art' | 'care for others' | 'learn'; done: boolean; at: number }
 export interface MindAction {
-  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go' | 'travel' | 'vessel' | 'back' | 'press' | 'lesson' | 'sit' | 'plant' | 'tend' | 'lookout' | 'watch';
+  type: 'note' | 'mail' | 'request' | 'rename' | 'look' | 'melody' | 'demolish' | 'cut' | 'dig' | 'furnish' | 'become' | 'wants' | 'building' | 'tell' | 'propose' | 'journal' | 'gather' | 'go' | 'travel' | 'vessel' | 'back' | 'press' | 'lesson' | 'sit' | 'plant' | 'tend' | 'lookout' | 'watch' | 'memory';
   /** travel (a day of life): the star's id it flew to (`to` holds its name) */
   star?: string;
   /** gather (a day of life, applied to the store server side): material (the field below) and how much; go: where it went and why */

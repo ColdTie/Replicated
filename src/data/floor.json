@@ -710,6 +710,42 @@
         "relief": 5
       }
     },
+    "sillbrook": {
+      "kind": "grass",
+      "relief": 4,
+      "coverage": 0.65,
+      "pebbles": 2,
+      "soil": ["4a4a3e", "5e5c4a", "76725a", "8e8a6c"],
+      "cover": ["1e3e36", "2a5644", "3e7050", "5a8c5e", "7ea874"],
+      "detail": ["c8d8a0", "9ec08a", "e8f0d8", "a8e4dc"],
+      "flowers": ["ead4aa", "c0cbdc", "fee761", "a8e4dc"],
+      "leaves": ["6a7a4a", "3e8948"],
+      "stone": ["2a3640", "3a4a56", "4e606c", "647884"],
+      "rock": {
+        "ramp": ["1a2228", "2a363e", "3e4e58", "5a6c76", "7c8e96", "a8b8bc"],
+        "cover": ["3e7050", "5a8c5e", "7ea874"],
+        "coverage": 0.4,
+        "cracks": 0.7,
+        "relief": 4
+      }
+    },
+    "sporeveil": {
+      "kind": "spore",
+      "relief": 7,
+      "coverage": 0.7,
+      "pebbles": 1,
+      "soil": ["1e1416", "2c1e1e", "3c2a24", "4e382a"],
+      "cover": ["3a2422", "523226", "6e442a", "8a5a30", "a8743a"],
+      "detail": ["160e10", "d8a050", "feae34", "2ce8f5", "8ae8d0"],
+      "stone": ["2a2024", "3a2e30", "4c3e3e", "60504c"],
+      "rock": {
+        "ramp": ["160e10", "261a1a", "3a2826", "523a32", "6e5040", "8e6c54"],
+        "cover": ["8a5a30", "d8a050"],
+        "coverage": 0.35,
+        "cracks": 0.8,
+        "relief": 6
+      }
+    },
     "glasswind": {
       "kind": "sand",
       "relief": 7,

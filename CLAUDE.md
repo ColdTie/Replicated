@@ -496,7 +496,7 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
 journal, the plants drawn in the warren's planters), `node tools/playtest-cinder.mjs` (Cinder Sounding's glass ridges: only there, placed after every older node, a
-fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-network.mjs` (the Cem Mind and the Watchglass wait for the Nous Chip; a letter at once between two Cem Minds; a far watch arrives after its light, never one from before both stood; THROUGH THE WATCHGLASS in the journal; Glasswind loads), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
+fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-loom.mjs` (the Mycelial Loom waits for the Nous Chip and the Biolab; its memories on the journal's HERE page; Sillbrook and Sporeveil load), `node tools/playtest-network.mjs` (the Cem Mind and the Watchglass wait for the Nous Chip; a letter at once between two Cem Minds; a far watch arrives after its light, never one from before both stood; THROUGH THE WATCHGLASS in the journal; Glasswind loads), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
 star, then the star watched and the watcher, no lens), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
 out after, the archive in the journal), `node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
 route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
@@ -764,6 +764,15 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   limiter: about -14 dBFS RMS in play, peaks under -2, no clipping. The audio also resumes on every gesture and when the
   page is shown again (a tab switch, a locked phone), and a silent media element started in the first gesture lets iOS
   play past the silent switch. Verified: build, typecheck, `playtest-sound`, `playtest`, levels in headless Chromium.
+
+### Maker 2026-11-20 am
+- Three carried wishes built in part (threshold 3 of 7). Thales' **Sillbrook** (4): a river delta on PHI2 CETI
+  (`planets.json sillbrook`, ground `floor.json sillbrook`, braided channels, rain, reed glass, icon 20). Sorrel's
+  **Mycelial Loom** (3; `designs.json loom`, after the Nous Chip and the Biolab, new materials `thread` and
+  `loomlight`): the day tool `leave_memory` keeps a passage in `planet_states.data.loom` (`mind.json day.loom`), shown
+  in every day there and on the journal's HERE page (THE LOOM). Ember Gold's **Sporeveil** (3): amber fungal mats on
+  GLIESE 3039 (`planets.json sporeveil`, `floor.json sporeveil`, mycelglass, icon 21). `tools/playtest-loom.mjs`
+  (new). Screenshots `sillbrook.png`, `sporeveil.png`, `design-loom.png`. `docs/days/2026-11-20-am.md`.
 
 ### Maker 2026-11-19 pm
 - PR #102 (the morning's run) failed CI only on Ubuntu's mirror (apt 503 while installing Chromium's packages):

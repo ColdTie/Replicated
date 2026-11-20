@@ -241,6 +241,10 @@ The copies choose their names themselves, and the change applies on the spot.
   windglass. Tamsin's Cem Mind (backed by Sorrel, Watcher): the design and the SCUT link, letters at once between two
   Cem Minds. Watcher's Watchglass (backed by Vigil, Tamsin): the design, watches shared between Watchglass worlds at
   light speed (`src/core/network.ts`). Mycelial Loom and Sporeveil (3 of 3) wait for the next run.
+- 2026-11-20 am: three carried wishes built in part. Thales' Sillbrook (backed by Tamsin, Ember Gold, Sorrel): the
+  river-delta world on PHI2 CETI, reed glass. Sorrel's Mycelial Loom (backed by Vigil, Tamsin): the design after the
+  Nous Chip and the Biolab, and `leave_memory` (memories kept in `data.loom`, THE LOOM in the journal). Ember Gold's
+  Sporeveil (backed by Vigil, Thales): the fungal world on GLIESE 3039, mycelglass.
 
 ## Waiting for Steve
 
