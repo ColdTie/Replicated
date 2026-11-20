@@ -102,6 +102,26 @@ const standsDone = (b: { built?: boolean; printStart?: number; printMs?: number 
 /** A finished Observatory stands on this world (designs.json observatory): keep_watch works there. */
 /** A finished Sunlattice stands on this world (Ember Gold's wish): warren panels can be furnished (recipes.panel). */
 const sunlatticeStands = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).some((b) => b.design === "sunlattice" && !b.vetoed && standsDone(b));
+/** The Cems' links between worlds (the maker 2026-11-19 pm; the game's src/core/network.ts): a world as the network sees it. */
+type NetW = { star: string; planet: number; buildings: Bld[]; archive: ArchiveRow[] };
+const designStands = (bs: Bld[] | undefined, design: string, now = Date.now()) => (bs ?? []).some((b) => b.design === design && !b.vetoed && standsDone(b, now));
+/** Tamsin's Cem Mind: the stars where one stands; a letter between two of them arrives at once (the SCUT link). */
+const scutOf = (net: NetW[]) => [...new Set(net.filter((w) => designStands(w.buildings, "cemmind")).map((w) => w.star))];
+/** Watcher's Watchglass: the watches kept on the other Watchglass worlds since both stood, once their light has crossed (at once between two Cem Minds), newest first. */
+function arrivedWatches(star: string, planet: number, net: NetW[], now = Date.now()) {
+  const me = net.find((w) => w.star === star && w.planet === planet);
+  if (!me || !designStands(me.buildings, "watchglass", now)) return [];
+  const scut = scutOf(net);
+  const since = (w: NetW) => Math.min(...w.buildings.filter((b) => b.design === "watchglass" && !b.vetoed && standsDone(b, now)).map((b) => b.printStart ?? 0));
+  const out: (ArchiveRow & { from: string; arrives: number })[] = [];
+  for (const w of net) {
+    if (w === me || !designStands(w.buildings, "watchglass", now)) continue;
+    const delay = w.star === star || (scut.includes(w.star) && scut.includes(star)) ? 0 : starLy(w.star, star) * KIT.mailSecondsPerLy * 1000;
+    const after = Math.max(since(me), since(w));
+    for (const a of w.archive) if (a.at >= after && a.at + delay <= now) out.push({ ...a, from: `${STARS_KIT[w.star]?.[0] ?? w.star} ${w.planet}`, arrives: a.at + delay });
+  }
+  return out.sort((a, b) => b.arrives - a.arrives);
+}
 const observatoryStands = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).some((b) => b.design === "observatory" && !b.vetoed && standsDone(b));
 /** This world's ridge lookout (Vigil's wish, mind.json day.lookout), begun or standing. */
 const lookoutOf = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).find((b) => b.kind === DAY.lookout.kind && !b.vetoed);
@@ -174,6 +194,7 @@ interface Context {
   talk?: { said: string };        // the original walked up to talk (and maybe said this): the copy answers them
   day?: boolean;                  // a day of life (twice a day): the long wake's tools, more turns, gather and go
   dayWindow?: string;             // a day: which window (traits.dayKey), to find who else is out where you go
+  network?: NetW[];               // a day: the galaxy's worlds, their buildings and archives (the Cem Mind, the Watchglass)
   spread?: Spread;                // a day: the galaxy's caps for flights and births, and its charted routes
   long?: boolean;                 // a long wake (away, about twice a day): more rounds, the code tools, propose_change
   deadline?: number;              // a long wake wraps up by then (ms): the scheduled run must end inside its time
@@ -826,6 +847,18 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         const arch = ((d.archive ?? []) as ArchiveRow[]).slice(-DAY.watch.show).reverse();
         lines.push(`The Observatory stands here: keep_watch turns its quartz lens toward a star a Vessel has charted from here or one within ${DAY.travelLy} light years, for about ${DAY.watch.hours} hours, and what you see goes into the archive. It is a watch kept and work finished.${arch.length ? ` The archive's last watches: ${arch.map((a) => `${a.name} toward ${a.star} (${a.ly} ly): "${a.text}"`).join("; ")}.` : " The archive is empty yet."}`);
       }
+      // Watcher's Watchglass and Tamsin's Cem Mind: what links this world to the others
+      if (context.network) {
+        const net = context.network, glass = net.filter((w) => designStands(w.buildings, "watchglass") && !(w.star === rep.star_id && w.planet === rep.planet_index));
+        if (designStands(d.buildings as Bld[], "watchglass")) {
+          const got = arrivedWatches(rep.star_id, rep.planet_index, net).slice(0, DAY.watch.show);
+          lines.push(`A Watchglass stands here: every watch kept on this world goes out at light speed to the other worlds with one (${glass.length ? glass.map((w) => `${STARS_KIT[w.star]?.[0] ?? w.star} ${w.planet}`).join(", ") : "none yet"}), and theirs come here.${got.length ? ` Through it lately: ${got.map((a) => `${a.name} from ${a.from} toward ${a.star}: "${a.text}"`).join("; ")}.` : ""}`);
+        }
+        if (designStands(d.buildings as Bld[], "cemmind")) {
+          const minds = scutOf(net).filter((s) => s !== rep.star_id);
+          lines.push(`A Cem Mind stands here: a letter to a Vessel at a star where another Cem Mind stands arrives at once (${minds.length ? minds.map((s) => STARS_KIT[s]?.[0] ?? s).join(", ") : "no other yet"}).`);
+        }
+      }
       // Vigil's wish: the ridge lookout on the high ground
       {
         const LK = DAY.lookout, lk = lookoutOf(d);
@@ -1151,6 +1184,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                     const there = await together(DAY.lookout.place);
                     out = `You sit on the bench of the ${lkw.name} and watch ${to === rep.star_id ? `${name}, your own star,` : `${name}, ${ly} light years away,`} for a few hours. Its sign names ${name} now, and what you saw is in the archive.${there.length ? ` ${there.join(" and ")} ${there.length > 1 ? "keep" : "keeps"} it with you.` : ""}`;
                   } else out = `You turn the quartz lens toward ${name}, ${ly} light years away, and keep the watch for a few hours. What you saw is in the archive now.`;
+                  if (designStands(live.data.buildings as Bld[], "watchglass")) {
+                    const n = (context.network ?? []).filter((w) => designStands(w.buildings, "watchglass") && !(w.star === rep.star_id && w.planet === rep.planet_index)).length;
+                    out += n ? ` The Watchglass sends it out to ${n} other world${n > 1 ? "s" : ""}; it reaches them at light speed.` : " The Watchglass will send it to the next world that raises one.";
+                  }
                   if (!day.watch) { day.watch = true; out += " It is a watch kept and work finished."; }
                   else out += " It is work finished.";
                 }
@@ -2033,12 +2070,15 @@ async function awayRun(req: Request, mode: "away" | "day", now_ = false) {
   const cols = "id,galaxy_id,name,model,generation,parent_id,traits,stats,star_id,planet_index,status,profile_id,last_tick_at";
   // copies whose flight is done land first, so they live their next day where they went
   const landed = await landCopies(sb, now);
-  const [{ data: npcs, error }, { data: players }, { data: all }, { data: litRows }] = await Promise.all([
+  const [{ data: npcs, error }, { data: players }, { data: all }, { data: litRows }, { data: netRows }] = await Promise.all([
     sb.from("replicants").select(cols).eq("status", "npc"),
     sb.from("replicants").select("galaxy_id,name,star_id,planet_index,status,updated_at").in("status", ["active", "in_transit"]).not("profile_id", "is", null),
     sb.from("replicants").select("id,name,star_id,galaxy_id,profile_id,created_at,parent_id"),
     sb.from("planet_states").select("galaxy_id,star_id").eq("data->beacon->>lit", "true"),
+    sb.from("planet_states").select("galaxy_id,star_id,planet_index,buildings:data->buildings,archive:data->archive"),
   ]);
+  const netOf = (g: string): NetW[] => ((netRows ?? []) as { galaxy_id: string; star_id: string; planet_index: number; buildings: Bld[] | null; archive: ArchiveRow[] | null }[])
+    .filter((r) => r.galaxy_id === g).map((r) => ({ star: r.star_id, planet: r.planet_index, buildings: r.buildings ?? [], archive: r.archive ?? [] }));
   const litOf = (g: string) => ((litRows ?? []) as { galaxy_id: string; star_id: string }[]).filter((r) => r.galaxy_id === g).map((r) => r.star_id);
   if (error) return json({ error: error.message }, 500);
   const everyone = (all ?? []) as { id: string; name: string; star_id: string }[];
@@ -2137,7 +2177,7 @@ async function awayRun(req: Request, mode: "away" | "day", now_ = false) {
       for (const rep of here.filter((r) => due.has(r.id))) {
         try {
           const original = (players ?? []).find((x) => x.galaxy_id === rep.galaxy_id && x.status !== "npc")?.name ?? "the original";
-          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id))), long: true, day: mode === "day", dayWindow: window ?? undefined, spread: spreads.get(rep.galaxy_id), deadline }, p);
+          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id), scutOf(netOf(rep.galaxy_id)))), long: true, day: mode === "day", network: netOf(rep.galaxy_id), dayWindow: window ?? undefined, spread: spreads.get(rep.galaxy_id), deadline }, p);
           // lived this window (and where it ended its day): merged, so what the wake chose about itself stays
           if (mode === "day") {
             const { error: e } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { dayKey: window, ...((rep.traits as { dayAt?: string }).dayAt ? { dayAt: (rep.traits as { dayAt?: string }).dayAt } : {}) } });
@@ -2232,7 +2272,7 @@ function awayContext(rep: Replicant, original: string, p: AwayPlanet, delays: Re
 }
 
 /** Letter delays by star distance (light speed) to every replicant in the galaxy. */
-function mailDelays(from: string, all: { id: string; star_id: string }[], lit: string[] = []): Record<string, number> {
+function mailDelays(from: string, all: { id: string; star_id: string }[], lit: string[] = [], scut: string[] = []): Record<string, number> {
   const stars = KIT.stars as unknown as Record<string, [string, number, number, number]>;
   const ly = (x: string, y: string) => { const a = stars[x], b = stars[y]; return a && b ? Math.hypot(a[1] - b[1], a[2] - b[2], a[3] - b[3]) : 0; };
   // the beacon lattice (src/world/galaxy.ts mailSeconds): at once when whole, or between systems near a lit point of it
@@ -2240,7 +2280,7 @@ function mailDelays(from: string, all: { id: string; star_id: string }[], lit: s
   const near = (star: string) => [...lattice, "sol"].some((b) => ly(star, b) <= KIT.latticeRadius);
   const out: Record<string, number> = {};
   for (const r of all) {
-    const instant = r.star_id === from || lattice.length >= KIT.beacons.length || (lattice.length > 0 && near(from) && near(r.star_id));
+    const instant = r.star_id === from || (scut.includes(from) && scut.includes(r.star_id)) || lattice.length >= KIT.beacons.length || (lattice.length > 0 && near(from) && near(r.star_id));
     out[r.id] = instant ? 0 : Math.round(ly(from, r.star_id) * KIT.mailSecondsPerLy);
   }
   return out;

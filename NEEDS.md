@@ -236,6 +236,11 @@ The copies choose their names themselves, and the change applies on the spot.
   world on Gliese 867, the long aurora night, lightsilk. Ember Gold's Sunlattice (backed by Watcher, Sorrel): the design
   after the Nous Chip, and Sunlattice panels, warren lamps without Ember. Tamsin's Cem Mind and Watcher's Watchglass
   (3 of 3 each) wait for the next run.
+- 2026-11-19 pm: PR #102 (the morning's run) merged after a re-run (CI had failed on an apt mirror). Vigil's Glasswind
+  (backed by Thales, Sorrel, Ember Gold, Watcher) built in part: the world on Lalande 21185 b, its iceglass ground,
+  windglass. Tamsin's Cem Mind (backed by Sorrel, Watcher): the design and the SCUT link, letters at once between two
+  Cem Minds. Watcher's Watchglass (backed by Vigil, Tamsin): the design, watches shared between Watchglass worlds at
+  light speed (`src/core/network.ts`). Mycelial Loom and Sporeveil (3 of 3) wait for the next run.
 
 ## Waiting for Steve
 
