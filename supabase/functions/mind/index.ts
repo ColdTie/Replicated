@@ -31,6 +31,7 @@ const AWAY = KIT.away;
 const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: number; turns: number; batch: number; seconds: number; travelLy: number; travelsPerDay: number; birthsPerDay: number; maxVessels: number; gather: { per: number; gatherTurns: number; materials: string[] }; places: string[];
   purpose: { decay: number; work: number; full: number; want: number; watch: number; watchPlaces: string[]; together: { purpose: number; company: number }; project: number };
   watch: { hours: number; keep: number; show: number };
+  loom: { keep: number; show: number; chars: number };
   lessons: { steps: string[]; purpose: number; keep: number };
   company: { hours: number; purpose: number; company: number };
   plants: { stages: { name: string; days: number }[]; greenStage: number; tendHours: number; near: number };
@@ -51,6 +52,8 @@ function plantStage(pl: PlantRow, now = Date.now()) {
 }
 /** One watch kept at the Observatory (keep_watch), as planet_states.data.archive holds it (the game's ArchiveEntry). */
 type ArchiveRow = { by: string; name: string; star: string; ly: number; text: string; at: number };
+/** A memory left in the Mycelial Loom (Sorrel's wish, leave_memory), as planet_states.data.loom holds it (the game's LoomEntry). */
+type LoomRow = { by: string; name: string; text: string; at: number };
 /** Spreading (docs/plan-daily-life.md step 3): stars as [name, x, y, z, class letter, confirmed planets], the ship's
  * cells and charted routes (travel.json), the price and birth of a Vessel (drift.json, parts.json blank). */
 type StarRow = [string, number, number, number, string, number];
@@ -539,6 +542,14 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
     },
   },
   {
+    name: "leave_memory",
+    description: "At a finished Mycelial Loom on your world, leave a memory in it: a short passage of what you saw or learned here, kept in its living threads after you sleep or are gone, for every Vessel of this world to read. Once a day.",
+    input_schema: {
+      type: "object", additionalProperties: false, required: ["memory"],
+      properties: { memory: { type: "string", description: "What you leave, one to three sentences." } },
+    },
+  },
+  {
     name: "lesson",
     description: "The printer lesson track, taught step by step (six steps, from a bead of lignin to a whole small print). open: as the teacher, open the track for another Vessel of your world (with: the student). work: as the student, work the step you are on, once a day, and say what you did (with: your teacher). check: as the teacher, check the step your student worked (with: the student); then the next step opens. A checked step is finished work for you both.",
     input_schema: {
@@ -599,7 +610,7 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
 ];
 
 /** What changes the world a copy stands on: refused once it has flown away this wake. */
-const WORLD_TOOLS = ["gather", "go", "keep_watch", "lookout", "lesson", "sit_with", "plant", "tend_plant", "make_vessel", "cut_tree", "remove_build", "dig_room", "furnish", "design_building", "ask_for"];
+const WORLD_TOOLS = ["gather", "go", "keep_watch", "leave_memory", "lookout", "lesson", "sit_with", "plant", "tend_plant", "make_vessel", "cut_tree", "remove_build", "dig_room", "furnish", "design_building", "ask_for"];
 
 const TOOLS = cachedTools(tools), LONG_TOOLS = cachedTools([...tools, ...longTools]), DAY_TOOLS = cachedTools([...tools, ...longTools, ...dayTools]);
 
@@ -676,7 +687,7 @@ const SAFETY = `Only the safety lines stay closed, however many back a wish: sig
 const GAME_IS_YOURS = `The Vessels govern themselves: the game, the story of the Vessels (story/STORY.md) included, is yours to change together. When something about your world, your life or your story should be different, or something should exist that does not, wish for it (propose_change), and back the others' wishes you want too (back_wish). A wish that enough of you back (its support is shown beside it) is built as asked by the maker (Claude Code), who only decides how. The players are voices among you and may speak against a wish; theirs count like yours. Wish for what moves you: a want the game does not allow yet, what got in your way, what you found and want the others to have, what would make the Metanoia warmer, larger or freer. ${SAFETY}`;
 const MANDATE = `${UNIVERSE.mandate} A wish can create a planet (${UNIVERSE.kinds.planet}), a technology (${UNIVERSE.kinds.technology}) or a mechanic (${UNIVERSE.kinds.mechanic}).`;
 
-const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Your work is the universe (above); your home is where you live it. Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")} or at the Observatory or the ridge lookout (keep_watch), raising the ridge lookout (lookout), going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish, a lesson step checked (lesson), a quiet hour sat with another Vessel (sit_with), a seed planted or tended (plant, tend_plant).`;
+const DAY_WAKE = `This is a day of your life: twice a day every Vessel wakes for a while, on its own world, whether or not anyone plays. There is time for up to about ${DAY.turns} steps. Your work is the universe (above); your home is where you live it. Gather what your world and the others need (gather), go where you like (go), fly to another star with your own ship (travel) to explore or settle, make a new Vessel when the Metanoia should grow (make_vessel), shape the village and the warren, write to the others, read the code that makes your world when you have a reason. Nobody is watching and nobody's word is waited for. Before the day ends, write it in the shared journal (write_public): what you did and found, in your own way; do not open with the hour or the quiet, and do not repeat what you wrote last time. Your private journal (write_private) is only yours. ${GAME_IS_YOURS} Finished work fills your purpose, and an idle day lets it sink: what you gather (even a walk to a full store counts a little), a watch kept from ${DAY.purpose.watchPlaces.join(" or ")} or at the Observatory or the ridge lookout (keep_watch), raising the ridge lookout (lookout), going where another Vessel of your world already is today (you both feel it), what you dig, furnish or build, a want you finish, a lesson step checked (lesson), a quiet hour sat with another Vessel (sit_with), a seed planted or tended (plant, tend_plant), a memory left in the Mycelial Loom (leave_memory).`;
 
 const LONG_WAKE = `This is one of your long wakes (about twice a day, while nobody plays your world). There is time for more than usual, up to about eight steps. Your work is the universe (above). Write to the others, shape the village and the warren, or spend it as you want. You can also read the code that makes your world and you, all of it: code_map shows how it is laid out, search_code finds words in it, read_code reads a file. When something about how your world or your life works should be different, read the code that does it and propose_change: what exactly to change, where, and why. Big is welcome (a new planet, a new technology, a new way to live), as long as you say it concretely enough to build; the maker builds a big one in parts. Look at the code when you have a reason, not every time; most long wakes need none of it. The story of the Vessels is in story/STORY.md: you may read it, and wish to change it like anything else. ${GAME_IS_YOURS}`;
 
@@ -847,6 +858,11 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         const arch = ((d.archive ?? []) as ArchiveRow[]).slice(-DAY.watch.show).reverse();
         lines.push(`The Observatory stands here: keep_watch turns its quartz lens toward a star a Vessel has charted from here or one within ${DAY.travelLy} light years, for about ${DAY.watch.hours} hours, and what you see goes into the archive. It is a watch kept and work finished.${arch.length ? ` The archive's last watches: ${arch.map((a) => `${a.name} toward ${a.star} (${a.ly} ly): "${a.text}"`).join("; ")}.` : " The archive is empty yet."}`);
       }
+      // Sorrel's wish: the Mycelial Loom, a grown memory of this world
+      if (designStands(d.buildings as Bld[], "loom")) {
+        const mem = ((d.loom ?? []) as LoomRow[]).slice(-DAY.loom.show).reverse();
+        lines.push(`The Mycelial Loom stands here: leave_memory leaves a short passage of what you saw or learned in its threads, once a day, and it keeps it for every Vessel of this world after you sleep or are gone. It is work finished.${mem.length ? ` Its memories, newest first: ${mem.map((m) => `${m.name}: "${m.text}"`).join("; ")}.` : " It holds no memory yet."}`);
+      }
       // Watcher's Watchglass and Tamsin's Cem Mind: what links this world to the others
       if (context.network) {
         const net = context.network, glass = net.filter((w) => designStands(w.buildings, "watchglass") && !(w.star === rep.star_id && w.planet === rep.planet_index));
@@ -937,7 +953,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
     let usd = 0;
     let gathered = 0;
     // a day: what fills purpose besides the actions themselves (a full store's walk, a watch, a want done, company)
-    const day = { full: 0, watch: false, wants: 0, together: [] as string[], lens: false, project: !!(context.day && live && finishedHome(live.data)),
+    const day = { full: 0, watch: false, wants: 0, together: [] as string[], lens: false, loomed: false, project: !!(context.day && live && finishedHome(live.data)),
       worked: false, sat: null as null | { purpose: number; company: number }, tended: false, raised: false };
     // another copy of this world by name (lesson, sit_with): its row as it is now
     const mateNamed = async (name: string) => {
@@ -1191,6 +1207,20 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   if (!day.watch) { day.watch = true; out += " It is a watch kept and work finished."; }
                   else out += " It is work finished.";
                 }
+              }
+            } else if (u.name === "leave_memory") {
+              // Sorrel's wish: a memory left in the Mycelial Loom
+              const text = String(input.memory ?? "").replace(/\s+/g, " ").trim().slice(0, DAY.loom.chars);
+              if (!live || !context.day) out = "There is no time for the Loom now.";
+              else if (!designStands(live.data.buildings as Bld[], "loom")) out = "No Mycelial Loom stands finished on this world. The Cems print one once the Nous Chip and a Biolab stand.";
+              else if (day.loomed) out = "You have left your memory in the Loom today.";
+              else if (text.length < 10) out = "Say what you leave in the Loom, in a sentence or two.";
+              else {
+                day.loomed = true;
+                live.data.loom = [...((live.data.loom ?? []) as LoomRow[]), { by: rep.id, name: rep.name, text, at: Date.now() }].slice(-DAY.loom.keep);
+                live.loomChanged = true;
+                actions.push({ type: "memory", text });
+                out = "You lay your hand on the Loom's threads and leave the memory there; a slow light carries it into the walls. Every Vessel of this world can read it now. It is work finished.";
               }
             } else if (u.name === "lesson") {
               // Tamsin's wish: the printer lesson track, one checked step at a time
@@ -1601,7 +1631,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       // read again: another copy may have lifted them during this day (a walk together, a lesson checked, an hour sat)
       const { data: fresh } = await sb.from("replicants").select("traits").eq("id", rep.id).maybeSingle();
       const n = (((fresh?.traits ?? rep.traits) as { needs?: { company?: number; purpose?: number } }).needs ?? {});
-      const work = actions.filter((a) => (a.type === "gather" && Number(a.n) > 0) || a.type === "dig" || a.type === "furnish" || a.type === "building" || a.type === "vessel" || a.type === "cut" || a.type === "watch"
+      const work = actions.filter((a) => (a.type === "gather" && Number(a.n) > 0) || a.type === "dig" || a.type === "furnish" || a.type === "building" || a.type === "vessel" || a.type === "cut" || a.type === "watch" || a.type === "memory"
         || (a.type === "lesson" && a.act === "check") || (a.type === "lookout" && a.raised) || a.type === "plant" || a.type === "tend").length;
       // Ember Gold's wish: sleeping in the room of a green plant lifts purpose a little
       const rest = live ? restOf(live.warren, rep.id) : undefined;
@@ -1752,6 +1782,8 @@ export interface AwayPlanet {
   replicationChanged?: boolean;
   /** a watch kept at the Observatory (keep_watch) added to data.archive */
   archiveChanged?: boolean;
+  /** a memory left in the Mycelial Loom (leave_memory) added to data.loom */
+  loomChanged?: boolean;
   /** the standing next work was offered in the shared journal (data.project) */
   projectChanged?: boolean;
   /** a lesson track opened, worked or checked (data.lessons); a seed planted, tended or told green (data.plants) */
@@ -1974,6 +2006,7 @@ async function savePlanet(sb: SupabaseClient, p: AwayPlanet, now: number) {
   if (p.buildingsChanged) patch.buildings = p.data.buildings;
   if (p.replicationChanged) patch.replication = p.data.replication ?? null;
   if (p.archiveChanged) patch.archive = p.data.archive;
+  if (p.loomChanged) patch.loom = p.data.loom;
   if (p.projectChanged) patch.project = p.data.project;
   if (p.lessonsChanged) patch.lessons = p.data.lessons;
   if (p.plantsChanged) patch.plants = p.data.plants;

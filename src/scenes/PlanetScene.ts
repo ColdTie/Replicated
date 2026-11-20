@@ -36,7 +36,7 @@ import { Fx } from '../fx/Fx';
 import { Lighting } from '../fx/Lighting';
 import { vignetteFor } from '../fx/textures';
 import { Controls } from '../input/Controls';
-import type { ArchiveEntry, LessonRow, PlantRow, AwayItem, SeenState, Building, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
+import type { ArchiveEntry, LoomEntry, LessonRow, PlantRow, AwayItem, SeenState, Building, Gift, NodeState, PlanetData, PlanetSave, ReplicantSave, WarrenData } from '../net/store';
 import type { JournalTab } from '../ui/journal';
 import { paintGround } from '../world/groundPaint';
 import { paintRock } from '../world/rockPaint';
@@ -115,6 +115,8 @@ export class PlanetScene extends Phaser.Scene {
   watch!: Watch;
   /** the archive of the Observatory's watches (planet_states.data.archive), for the journal */
   archive: ArchiveEntry[] = [];
+  /** the Mycelial Loom's memories here (planet_states.data.loom), for the journal */
+  loom: LoomEntry[] = [];
   /** the printer lesson tracks and the warren's seeds (planet_states.data.lessons / plants, the copies' days) */
   lessons: LessonRow[] = [];
   plants: Record<string, PlantRow> = {};
@@ -465,6 +467,7 @@ export class PlanetScene extends Phaser.Scene {
     this.chips = new Chips(this);
     this.watch = new Watch(this);
     this.archive = save?.data.archive ?? [];
+    this.loom = save?.data.loom ?? [];
     this.lessons = save?.data.lessons ?? [];
     this.plants = save?.data.plants ?? {};
     this.lessonBoard = new Lessons(this);

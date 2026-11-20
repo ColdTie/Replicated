@@ -91,6 +91,7 @@ export class Minds {
         else if (a.type === 'go') log(`${name} went to ${a.place ?? 'somewhere'}`);
         else if (a.type === 'sit') log(`${name} sat with ${a.with ?? 'a companion'} for ${a.hours === 1 ? 'an hour' : `${a.hours ?? 1} hours`}${a.place ? ` at ${a.place}` : ''}`);
         else if (a.type === 'lesson') log(a.act === 'open' ? `${name} opened the printer lessons for ${a.with}` : a.act === 'work' ? `${name} worked printer lesson ${a.step} for ${a.with}` : `${name} checked ${a.with}'s printer lesson ${a.step}`);
+        else if (a.type === 'memory') log(`${name} left a memory in the Mycelial Loom`);
         else if (a.type === 'lookout') log(a.built ? `${name} finished raising the ${a.name ?? 'lookout'} on the high ground` : a.act === 'begin' ? `${name} marked out the ${a.name ?? 'lookout'} on the high ground` : `${name} worked on the ${a.name ?? 'lookout'}${a.pct !== undefined ? ` (${a.pct}%)` : ''}`);
         else if (a.type === 'plant') log(`${name} planted a seed in the planter in ${a.room ?? 'the warren'}`);
         else if (a.type === 'tend') log(`${name} tended the plant in ${a.room ?? 'the warren'}`);
@@ -450,7 +451,7 @@ export class Minds {
     };
     openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.s.visit ? 0 : me.traits.sparks ?? 0, place: this.s.placeLabel,
       me: { id: me.id, name: me.name, star: this.s.planet.star, planet: this.s.planet.planetIndex }, all, copies: this.s.npcs.map((n) => n.data), journal: j, shared, feelings, actions, tab,
-      buildings: this.s.buildings.describe(nameOf), archive: this.s.archive, sharedWatches: this.s.sharedWatches(), lessons: lessonLines(this.s.lessons), garden: gardenLines(this.s.plants), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
+      buildings: this.s.buildings.describe(nameOf), archive: this.s.archive, loom: this.s.loom, sharedWatches: this.s.sharedWatches(), lessons: lessonLines(this.s.lessons), garden: gardenLines(this.s.plants), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
   }
 
   /** The original writes to a Vessel: a letter that arrives at once on this world, after the light's delay from

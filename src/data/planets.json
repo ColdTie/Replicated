@@ -590,6 +590,122 @@
         "birds": 5,
         "butterflies": 0
       }
+    },
+    {
+      "id": "sillbrook",
+      "shy": true,
+      "poles": {
+        "size": 0.1,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "SILLBROOK",
+      "subtitle": "WHERE THE CHANNELS BRAID",
+      "star": "phi2-ceti",
+      "planetIndex": 1,
+      "seed": 9241,
+      "accent": [
+        15,
+        14,
+        18
+      ],
+      "ambient": "a4b4a8",
+      "sky": [
+        "10283a",
+        "24566a",
+        "68a8a8",
+        "dceedc"
+      ],
+      "size": [
+        148,
+        108
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.82,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.1,
+      "sporeRate": 2,
+      "trees": 0.012,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        15,
+        14,
+        13
+      ],
+      "dayCycle": true,
+      "sunTint": "fff2dc",
+      "gravity": 1,
+      "weather": true,
+      "ponds": 26,
+      "flowers": 0.02,
+      "wildlife": {
+        "grazers": 5,
+        "birds": 9,
+        "butterflies": 4
+      }
+    },
+    {
+      "id": "sporeveil",
+      "shy": true,
+      "poles": {
+        "size": 0.08,
+        "colors": [
+          3,
+          2
+        ]
+      },
+      "name": "SPOREVEIL",
+      "subtitle": "WHERE THE MATS GLOW",
+      "star": "gliese-3039",
+      "planetIndex": 1,
+      "seed": 3039,
+      "accent": [
+        27,
+        28,
+        18
+      ],
+      "ambient": "9a7c6a",
+      "sky": [
+        "1a1214",
+        "3e2620",
+        "8a562a",
+        "e8a650"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.78,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.12,
+      "sporeRate": 7,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        6,
+        5,
+        28
+      ],
+      "dayCycle": true,
+      "sunTint": "ffb47a",
+      "gravity": 1,
+      "weather": true,
+      "ponds": 8,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 3
+      }
     }
   ]
 }

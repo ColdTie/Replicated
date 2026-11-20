@@ -164,6 +164,8 @@ export interface JournalView {
   garden?: string[];
   /** the Observatory's archive here, oldest first (keep_watch) */
   archive?: { name: string; star: string; ly: number; text: string; at: number }[];
+  /** the Mycelial Loom's memories here, oldest first (leave_memory) */
+  loom?: { name: string; text: string; at: number }[];
   /** watches from the other Watchglass worlds that have reached this one (src/core/network.ts), newest first */
   sharedWatches?: { name: string; star: string; ly: number; text: string; arrives: number; fromStar: string; fromPlanet: number }[];
   /** the player's actions */
@@ -371,6 +373,10 @@ export function openJournal(v: JournalView) {
   if (v.archive?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[18])}">THE ARCHIVE</h3>`);
     for (const a of v.archive.slice(-8).reverse()) pages.here.push(`<p>${esc(a.name)} watched ${esc(a.star)}, ${a.ly < 10 ? a.ly.toFixed(1) : Math.round(a.ly)} ly: ${esc(a.text)}<small>${ago(new Date(a.at).toISOString())}</small></p>`);
+  }
+  if (v.loom?.length) {
+    pages.here.push(`<h3 style="color:${css(PALETTE[12])}">THE LOOM</h3>`);
+    for (const m of v.loom.slice(-8).reverse()) pages.here.push(`<p>${esc(m.name)}: ${esc(m.text)}<small>${ago(new Date(m.at).toISOString())}</small></p>`);
   }
   if (v.sharedWatches?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[18])}">THROUGH THE WATCHGLASS</h3>`);
