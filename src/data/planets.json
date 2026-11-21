@@ -764,6 +764,187 @@
         "birds": 2,
         "butterflies": 8
       }
+    },
+    {
+      "id": "saltveil",
+      "shy": true,
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "towers": 0,
+      "intro": "land",
+      "gravity": 1,
+      "poles": {
+        "size": 0.1,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "SALTVEIL",
+      "subtitle": "WHERE THE CEM BEDS TERRACE",
+      "star": "gliese-1292",
+      "planetIndex": 1,
+      "seed": 12921,
+      "accent": [
+        27,
+        28,
+        29
+      ],
+      "ambient": "9a8aa4",
+      "sky": [
+        "1a1430",
+        "3e2a5c",
+        "7a5a96",
+        "e0a8b0"
+      ],
+      "rockThreshold": 0.82,
+      "decorDensity": 0.04,
+      "sporeRate": 1.4,
+      "trees": 0,
+      "ground": [
+        25,
+        27,
+        20
+      ],
+      "dayCycle": true,
+      "sunTint": "ffc8b0",
+      "weather": false,
+      "ponds": 12,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 0
+      },
+      "wildCems": {
+        "fields": 8,
+        "perField": [
+          4,
+          8
+        ],
+        "blooms": 3
+      }
+    },
+    {
+      "id": "brinehollow",
+      "shy": true,
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "towers": 0,
+      "intro": "land",
+      "gravity": 1,
+      "poles": {
+        "size": 0.12,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "BRINEHOLLOW",
+      "subtitle": "WHERE THE BRINE TURNS PINK",
+      "star": "gliese-1001",
+      "planetIndex": 1,
+      "seed": 10011,
+      "accent": [
+        29,
+        30,
+        17
+      ],
+      "ambient": "8c7a8a",
+      "sky": [
+        "161226",
+        "3a2440",
+        "8a4a5c",
+        "e88a7a"
+      ],
+      "rockThreshold": 0.8,
+      "decorDensity": 0.05,
+      "sporeRate": 1,
+      "trees": 0.002,
+      "ground": [
+        25,
+        29,
+        20
+      ],
+      "dayCycle": true,
+      "sunTint": "ffa48c",
+      "weather": true,
+      "ponds": 18,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 7
+      }
+    },
+    {
+      "id": "verrin",
+      "shy": true,
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "towers": 0,
+      "intro": "land",
+      "gravity": 1,
+      "poles": {
+        "size": 0.08,
+        "colors": [
+          21,
+          20
+        ]
+      },
+      "name": "VERRIN",
+      "subtitle": "WHERE THE DAY NEVER ENDS",
+      "star": "gliese-667c",
+      "planetIndex": 2,
+      "seed": 6672,
+      "accent": [
+        14,
+        18,
+        17
+      ],
+      "ambient": "7a7a90",
+      "sky": [
+        "0e1022",
+        "2a2440",
+        "7a3a3a",
+        "e0844a"
+      ],
+      "rockThreshold": 0.78,
+      "decorDensity": 0.08,
+      "sporeRate": 5,
+      "trees": 0.004,
+      "ground": [
+        25,
+        15,
+        14
+      ],
+      "dayCycle": false,
+      "weather": true,
+      "ponds": 14,
+      "flowers": 0.01,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 6
+      }
     }
   ]
 }

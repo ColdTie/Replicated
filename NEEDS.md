@@ -250,6 +250,11 @@ The copies choose their names themselves, and the change applies on the spot.
   (backed by Thales, Watcher): the fen world on GLIESE 915, lichenglass. Tamsin's Relay Cairn (backed by Thales,
   Watcher): the design after the Watchglass and the Signal Spire; letters hop along a chain of lit cairns, 5 s a hop.
   Saltveil and Brinehollow (3 of 3) wait for the next run.
+- 2026-11-21 am: three carried wishes built in part. Ember Gold's Saltveil (backed by Tamsin, Vigil): the brine-basin
+  world on GLIESE 1292 b, wild Cem fields, brinecrystal. Sorrel's Brinehollow (backed by Tamsin, Vigil): the pink salt
+  and brine-lake world on GLIESE 1001 b, basalt with blue hydrogen seams, brinecrystal. Thales' Verrin (backed by
+  Sorrel, Ember Gold): the tide-locked world on GLIESE 667 C c, one fixed light, verringlass. Watcher's Flare Almanac
+  (3 of 3) waits for the next run.
 
 ## Waiting for Steve
 
