@@ -706,6 +706,64 @@
         "birds": 0,
         "butterflies": 3
       }
+    },
+    {
+      "id": "hushfen",
+      "shy": true,
+      "poles": {
+        "size": 0.12,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "HUSHFEN",
+      "subtitle": "WHERE THE LICHEN GLOWS",
+      "star": "gliese-915",
+      "planetIndex": 1,
+      "seed": 9151,
+      "accent": [
+        15,
+        14,
+        18
+      ],
+      "ambient": "8a8478",
+      "sky": [
+        "14101a",
+        "3a2420",
+        "7a4a2a",
+        "d89a5a"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.79,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.1,
+      "sporeRate": 4,
+      "trees": 0.004,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        25,
+        15,
+        14
+      ],
+      "dayCycle": true,
+      "sunTint": "ffb070",
+      "gravity": 1,
+      "weather": true,
+      "ponds": 22,
+      "flowers": 0.01,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 2,
+        "butterflies": 8
+      }
     }
   ]
 }

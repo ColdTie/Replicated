@@ -1,4 +1,4 @@
-import { PALETTE, SUPPLIES } from '../../core/data';
+import { MIND, PALETTE, SUPPLIES } from '../../core/data';
 import { session } from '../../core/session';
 import { planetFor, starById } from '../../world/galaxy';
 import type { PlanetScene } from '../PlanetScene';
@@ -97,7 +97,9 @@ export class Trade {
 
   /**
    * Launching for a world that lacks a material (planets.json lacks: the homeworld has no copper or quartz): the hold
-   * also takes up to signature.lacksHold of each from this store, for the store there.
+   * also takes up to signature.lacksHold of each from this store, for the store there. Where a finished Seedarc stands
+   * (Watcher's wish, designs.json seedarc) it also takes up to mind.json seedarc.carry living seed, for the planters
+   * of the world it lands on.
    */
   loadGoods(to: string, toPlanet: number) {
     const s = this.s, me = session.replicant, st = session.store;
@@ -110,6 +112,12 @@ export class Trade {
       items[m] = n;
       s.supplies[m] = Math.round(((s.supplies[m] ?? 0) - n) * 100) / 100;
       s.time.delayedCall(Object.keys(items).length * 250, () => s.flyMaterial(m, s.warren.hatch, s.vesselPos, 0));
+    }
+    const seeds = Math.min(MIND.seedarc.carry, Math.floor(s.supplies.seed ?? 0));
+    if (s.buildings?.stands('seedarc') && seeds >= 1 && !items.seed && `${to}:${toPlanet}` !== `${s.planet.star}:${s.planet.planetIndex}`) {
+      items.seed = seeds;
+      s.supplies.seed = Math.round(((s.supplies.seed ?? 0) - seeds) * 100) / 100;
+      s.time.delayedCall(Object.keys(items).length * 250, () => s.flyMaterial('seed', s.warren.hatch, s.vesselPos, 0));
     }
     if (!Object.keys(items).length) return;
     s.markSupplies();

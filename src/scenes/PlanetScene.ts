@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { arrivedWatches, scutStars, type NetWorld } from '../core/network';
+import { arrivedWatches, relayStars, scutStars, type NetWorld } from '../core/network';
 import SOUND_DATA from '../data/sound.json';
 import { sound, type Surface } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
@@ -99,8 +99,11 @@ export class PlanetScene extends Phaser.Scene {
     const here = { star: this.planet.star, planet: this.planet.planetIndex, buildings: this.buildings?.list ?? [], archive: this.archive };
     return [...this.network.filter((w) => w.star !== here.star || w.planet !== here.planet), here];
   }
-  /** How long a letter from here takes to a Vessel at that star (light speed, the beacon lattice, the Cem Minds). */
-  mailTo(star: string) { return mailSeconds(this.planet.star, star, this.litBeacons, MIND.mailSecondsPerLy, scutStars(this.netWorlds())); }
+  /** How long a letter from here takes to a Vessel at that star (light speed, the beacon lattice, the Cem Minds, the Relay Cairns). */
+  mailTo(star: string) {
+    const net = this.netWorlds();
+    return mailSeconds(this.planet.star, star, this.litBeacons, MIND.mailSecondsPerLy, scutStars(net), relayStars(net), MIND.relay.hopLy, MIND.relay.secondsPerHop);
+  }
   /** The watches that came here through the Watchglass (src/core/network.ts). */
   sharedWatches() { return arrivedWatches({ star: this.planet.star, planet: this.planet.planetIndex }, this.netWorlds(), MIND.mailSecondsPerLy); }
   npcs: Npc[] = [];

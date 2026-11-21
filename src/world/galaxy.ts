@@ -19,18 +19,39 @@ export const starById = (id: string) => BY_ID.get(id);
 /**
  * How long a letter takes between two stars, in seconds: light speed (mailSecondsPerLy), or at once along the beacon
  * lattice (beacon.json lattice): every letter once all four beacons are lit, else when both ends lie within its radius
- * of a lit beacon or of the Sun; or at once between two stars where a Cem Mind stands (scut, src/core/network.ts).
+ * of a lit beacon or of the Sun; or at once between two stars where a Cem Mind stands (scut, src/core/network.ts); or
+ * hop by hop along a chain of Relay Cairns (relay: the stars where one stands, mind.json relay), when that is sooner.
  */
-export function mailSeconds(from: string, to: string, lit: string[], perLy: number, scut: string[] = []) {
+export function mailSeconds(from: string, to: string, lit: string[], perLy: number, scut: string[] = [], relay: string[] = [], hopLy = 15, perHop = 5) {
   if (from === to) return 0;
   if (scut.includes(from) && scut.includes(to)) return 0;
+  const hops = relayHops(from, to, relay, hopLy);
   const lattice = lit.filter((b) => BEACONS.includes(b));
   if (lattice.length >= BEACONS.length) return 0;
   if (lattice.length) {
     const near = (star: string) => [...lattice, 'sol'].some((b) => distanceLy(star, b) <= BEACON.lattice.radius);
     if (near(from) && near(to)) return 0;
   }
-  return Math.round(distanceLy(from, to) * perLy);
+  const light = Math.round(distanceLy(from, to) * perLy);
+  return hops === null ? light : Math.min(light, hops * perHop);
+}
+
+/** Tamsin's Relay Cairn: how many hops a letter takes from one cairn star to another, each hop no longer than hopLy
+ * light years and landing on a cairn star; null when either end has none or no chain joins them. */
+export function relayHops(from: string, to: string, relay: string[], hopLy: number): number | null {
+  if (!relay.includes(from) || !relay.includes(to)) return null;
+  const seen = new Map<string, number>([[from, 0]]);
+  const queue = [from];
+  while (queue.length) {
+    const at = queue.shift()!;
+    if (at === to) return seen.get(at)!;
+    for (const next of relay) {
+      if (seen.has(next) || distanceLy(at, next) > hopLy) continue;
+      seen.set(next, seen.get(at)! + 1);
+      queue.push(next);
+    }
+  }
+  return null;
 }
 
 export function distanceLy(a: string, b: string) {

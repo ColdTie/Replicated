@@ -729,6 +729,25 @@
         "relief": 4
       }
     },
+    "hushfen": {
+      "kind": "grass",
+      "relief": 3,
+      "coverage": 0.6,
+      "pebbles": 1,
+      "soil": ["141614", "1e221e", "2a2e28", "363a30"],
+      "cover": ["3a4a3c", "56664e", "74846a", "9aa88a", "bcc8a8"],
+      "detail": ["8ae8d0", "2ce8f5", "c8f0e0", "5ac8a0"],
+      "flowers": ["c8f0e0", "8ae8d0"],
+      "leaves": ["56664e", "74846a"],
+      "stone": ["262a2c", "363c3e", "4a5052", "626a6a"],
+      "rock": {
+        "ramp": ["14181a", "22282a", "343c3e", "4c5656", "687474", "8e9a96"],
+        "cover": ["8ae8d0", "5ac8a0", "74846a"],
+        "coverage": 0.45,
+        "cracks": 0.6,
+        "relief": 5
+      }
+    },
     "sporeveil": {
       "kind": "spore",
       "relief": 7,

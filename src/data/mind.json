@@ -5,6 +5,8 @@
   "staggerMs": 15000,
   "wakeMinutes": 6,
   "mailSecondsPerLy": 60,
+  "relay": { "_doc": "Tamsin's Relay Cairn (designs.json cairn, the maker 2026-11-20 pm): two stars where a finished cairn stands hear each other within hopLy light years; a letter between two stars joined by a chain of them takes secondsPerHop for every hop (src/world/galaxy.ts relayHops), when that is sooner than light", "hopLy": 15, "secondsPerHop": 5 },
+  "seedarc": { "_doc": "Watcher's Seedarc (designs.json seedarc, the maker 2026-11-20 pm): a ship launching from a world where a finished one stands takes up to carry seed from its store to the store of the world it lands on (src/scenes/planet/Trade.ts loadGoods); a copy's own flight is the next part", "carry": 2 },
   "bubbleMs": 7000,
   "bubbleScale": 0.9,
   "model": "claude-haiku-5-5",
