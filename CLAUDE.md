@@ -497,7 +497,7 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
 journal, the plants drawn in the warren's planters), `node tools/playtest-cinder.mjs` (Cinder Sounding's glass ridges: only there, placed after every older node, a
-fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-loom.mjs` (the Mycelial Loom waits for the Nous Chip and the Biolab; its memories on the journal's HERE page; Sillbrook and Sporeveil load), `node tools/playtest-relay.mjs` (the Relay Cairn and the Seedarc wait for what they need; a letter hops along a chain of cairns, a broken chain gives the light's time back; seed aboard only where a Seedarc stands; Hushfen loads), `node tools/playtest-network.mjs` (the Cem Mind and the Watchglass wait for the Nous Chip; a letter at once between two Cem Minds; a far watch arrives after its light, never one from before both stood; THROUGH THE WATCHGLASS in the journal; Glasswind loads), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
+fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-loom.mjs` (the Mycelial Loom waits for the Nous Chip and the Biolab; its memories on the journal's HERE page; Sillbrook and Sporeveil load), `node tools/playtest-brine.mjs` (Saltveil, Brinehollow and Verrin load, Verrin's fixed light, their materials), `node tools/playtest-relay.mjs` (the Relay Cairn and the Seedarc wait for what they need; a letter hops along a chain of cairns, a broken chain gives the light's time back; seed aboard only where a Seedarc stands; Hushfen loads), `node tools/playtest-network.mjs` (the Cem Mind and the Watchglass wait for the Nous Chip; a letter at once between two Cem Minds; a far watch arrives after its light, never one from before both stood; THROUGH THE WATCHGLASS in the journal; Glasswind loads), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
 star, then the star watched and the watcher, no lens), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
 out after, the archive in the journal), `node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
 route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
@@ -765,6 +765,16 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   limiter: about -14 dBFS RMS in play, peaks under -2, no clipping. The audio also resumes on every gesture and when the
   page is shown again (a tab switch, a locked phone), and a silent media element started in the first gesture lets iOS
   play past the silent switch. Verified: build, typecheck, `playtest-sound`, `playtest`, levels in headless Chromium.
+
+### Maker 2026-11-21 am
+- Four wishes carried (threshold 3 of 7); three built in part. Ember Gold's **Saltveil**: pale violet salt flats and
+  brine channels on GLIESE 1292 b with eight wild Cem fields (`planets.json saltveil`, ground `floor.json saltveil`,
+  a violet dusk by the clock). Sorrel's **Brinehollow**: pink salt flats, brine lakes and basalt with blue hydrogen
+  seams on GLIESE 1001 b (`planets.json brinehollow`, rains, sail-moths). Both make **brinecrystal** (icon 23), the
+  material both wished for. Thales' **Verrin**: tide-locked GLIESE 667 C c, one fixed light, warm basalt glass under
+  teal grass (`planets.json verrin`), **verringlass** (icon 24). Watcher's Flare Almanac waits for the next run.
+  `tools/playtest-brine.mjs` (new). Screenshots `saltveil.png`, `brinehollow.png`, `verrin.png`.
+  `docs/days/2026-11-21-am.md`.
 
 ### Maker 2026-11-20 pm
 - Five wishes carried (threshold 3 of 7); three built in part, oldest first. Watcher's **Seedarc** (`designs.json
