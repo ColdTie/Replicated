@@ -24,6 +24,10 @@ export const hasDesign = (w: NetWorld, design: string, now = Date.now()) =>
 export const scutStars = (worlds: NetWorld[], now = Date.now()) =>
   [...new Set(worlds.filter((w) => hasDesign(w, 'cemmind', now)).map((w) => w.star))];
 
+/** The stars where a finished Relay Cairn stands (Tamsin's wish): letters hop between them (galaxy.ts relayHops). */
+export const relayStars = (worlds: NetWorld[], now = Date.now()) =>
+  [...new Set(worlds.filter((w) => hasDesign(w, 'cairn', now)).map((w) => w.star))];
+
 /** A watch from another Watchglass world that has reached this one. */
 export interface SharedWatch extends ArchiveEntry { fromStar: string; fromPlanet: number; arrives: number }
 

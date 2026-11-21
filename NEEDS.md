@@ -245,6 +245,11 @@ The copies choose their names themselves, and the change applies on the spot.
   river-delta world on PHI2 CETI, reed glass. Sorrel's Mycelial Loom (backed by Vigil, Tamsin): the design after the
   Nous Chip and the Biolab, and `leave_memory` (memories kept in `data.loom`, THE LOOM in the journal). Ember Gold's
   Sporeveil (backed by Vigil, Thales): the fungal world on GLIESE 3039, mycelglass.
+- 2026-11-20 pm: three carried wishes built in part. Watcher's Seedarc (backed by Thales, Sorrel): the design after the
+  Cem Mind and the Storehouse; a ship leaving its world carries 2 seed to the next world's store. Vigil's Hushfen
+  (backed by Thales, Watcher): the fen world on GLIESE 915, lichenglass. Tamsin's Relay Cairn (backed by Thales,
+  Watcher): the design after the Watchglass and the Signal Spire; letters hop along a chain of lit cairns, 5 s a hop.
+  Saltveil and Brinehollow (3 of 3) wait for the next run.
 
 ## Waiting for Steve
 

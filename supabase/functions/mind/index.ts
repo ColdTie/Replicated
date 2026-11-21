@@ -110,6 +110,24 @@ type NetW = { star: string; planet: number; buildings: Bld[]; archive: ArchiveRo
 const designStands = (bs: Bld[] | undefined, design: string, now = Date.now()) => (bs ?? []).some((b) => b.design === design && !b.vetoed && standsDone(b, now));
 /** Tamsin's Cem Mind: the stars where one stands; a letter between two of them arrives at once (the SCUT link). */
 const scutOf = (net: NetW[]) => [...new Set(net.filter((w) => designStands(w.buildings, "cemmind")).map((w) => w.star))];
+/** Tamsin's Relay Cairn: the stars where one stands; a letter hops along a chain of them (the game's galaxy.ts relayHops). */
+const relayOf = (net: NetW[]) => [...new Set(net.filter((w) => designStands(w.buildings, "cairn")).map((w) => w.star))];
+const RELAY = KIT.relay as { hopLy: number; secondsPerHop: number };
+function relayHops(from: string, to: string, relay: string[]): number | null {
+  if (!relay.includes(from) || !relay.includes(to)) return null;
+  const seen = new Map<string, number>([[from, 0]]);
+  const queue = [from];
+  while (queue.length) {
+    const at = queue.shift()!;
+    if (at === to) return seen.get(at)!;
+    for (const next of relay) {
+      if (seen.has(next) || starLy(at, next) > RELAY.hopLy) continue;
+      seen.set(next, seen.get(at)! + 1);
+      queue.push(next);
+    }
+  }
+  return null;
+}
 /** Watcher's Watchglass: the watches kept on the other Watchglass worlds since both stood, once their light has crossed (at once between two Cem Minds), newest first. */
 function arrivedWatches(star: string, planet: number, net: NetW[], now = Date.now()) {
   const me = net.find((w) => w.star === star && w.planet === planet);
@@ -873,6 +891,13 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         if (designStands(d.buildings as Bld[], "cemmind")) {
           const minds = scutOf(net).filter((s) => s !== rep.star_id);
           lines.push(`A Cem Mind stands here: a letter to a Vessel at a star where another Cem Mind stands arrives at once (${minds.length ? minds.map((s) => STARS_KIT[s]?.[0] ?? s).join(", ") : "no other yet"}).`);
+        }
+        if (designStands(d.buildings as Bld[], "cairn")) {
+          const cairns = relayOf(net).filter((s) => s !== rep.star_id), joined = cairns.filter((s) => relayHops(rep.star_id, s, relayOf(net)) !== null);
+          lines.push(`A Relay Cairn stands here: it hears any lit cairn within ${RELAY.hopLy} light years, and a letter to a star joined to this one by a chain of cairns hops along it, ${RELAY.secondsPerHop} seconds a hop (${cairns.length ? `cairns at ${cairns.map((s) => STARS_KIT[s]?.[0] ?? s).join(", ")}; joined to here: ${joined.length ? joined.map((s) => STARS_KIT[s]?.[0] ?? s).join(", ") : "none yet"}` : "no other cairn yet"}). A cairn printed on a world between two cairns joins them.`);
+        }
+        if (designStands(d.buildings as Bld[], "seedarc")) {
+          lines.push(`A Seedarc stands here: a ship that leaves this world carries up to ${(KIT.seedarc as { carry: number }).carry} seed from the store to the store of the world it lands on, for its planters.`);
         }
       }
       // Vigil's wish: the ridge lookout on the high ground
@@ -2210,7 +2235,7 @@ async function awayRun(req: Request, mode: "away" | "day", now_ = false) {
       for (const rep of here.filter((r) => due.has(r.id))) {
         try {
           const original = (players ?? []).find((x) => x.galaxy_id === rep.galaxy_id && x.status !== "npc")?.name ?? "the original";
-          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id), scutOf(netOf(rep.galaxy_id)))), long: true, day: mode === "day", network: netOf(rep.galaxy_id), dayWindow: window ?? undefined, spread: spreads.get(rep.galaxy_id), deadline }, p);
+          const res = await wakeCopy(sb, rep, { ...awayContext(rep, original, p, mailDelays(rep.star_id, everyone, litOf(rep.galaxy_id), scutOf(netOf(rep.galaxy_id)), relayOf(netOf(rep.galaxy_id)))), long: true, day: mode === "day", network: netOf(rep.galaxy_id), dayWindow: window ?? undefined, spread: spreads.get(rep.galaxy_id), deadline }, p);
           // lived this window (and where it ended its day): merged, so what the wake chose about itself stays
           if (mode === "day") {
             const { error: e } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { dayKey: window, ...((rep.traits as { dayAt?: string }).dayAt ? { dayAt: (rep.traits as { dayAt?: string }).dayAt } : {}) } });
@@ -2305,7 +2330,7 @@ function awayContext(rep: Replicant, original: string, p: AwayPlanet, delays: Re
 }
 
 /** Letter delays by star distance (light speed) to every replicant in the galaxy. */
-function mailDelays(from: string, all: { id: string; star_id: string }[], lit: string[] = [], scut: string[] = []): Record<string, number> {
+function mailDelays(from: string, all: { id: string; star_id: string }[], lit: string[] = [], scut: string[] = [], relay: string[] = []): Record<string, number> {
   const stars = KIT.stars as unknown as Record<string, [string, number, number, number]>;
   const ly = (x: string, y: string) => { const a = stars[x], b = stars[y]; return a && b ? Math.hypot(a[1] - b[1], a[2] - b[2], a[3] - b[3]) : 0; };
   // the beacon lattice (src/world/galaxy.ts mailSeconds): at once when whole, or between systems near a lit point of it
@@ -2314,7 +2339,8 @@ function mailDelays(from: string, all: { id: string; star_id: string }[], lit: s
   const out: Record<string, number> = {};
   for (const r of all) {
     const instant = r.star_id === from || (scut.includes(from) && scut.includes(r.star_id)) || lattice.length >= KIT.beacons.length || (lattice.length > 0 && near(from) && near(r.star_id));
-    out[r.id] = instant ? 0 : Math.round(ly(from, r.star_id) * KIT.mailSecondsPerLy);
+    const hops = instant ? null : relayHops(from, r.star_id, relay);
+    out[r.id] = instant ? 0 : Math.min(Math.round(ly(from, r.star_id) * KIT.mailSecondsPerLy), hops === null ? Infinity : hops * RELAY.secondsPerHop);
   }
   return out;
 }

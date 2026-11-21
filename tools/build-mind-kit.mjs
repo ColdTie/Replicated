@@ -41,6 +41,7 @@ const out = {
     swingsPerTile: BUILDINGS.swingsPerTile,
   },
   mailSecondsPerLy: MIND.mailSecondsPerLy,
+  relay: { hopLy: MIND.relay.hopLy, secondsPerHop: MIND.relay.secondsPerHop }, seedarc: { carry: MIND.seedarc.carry },
   beacons: STARS.beacons, latticeRadius: BEACON.lattice.radius,
   away: MIND.away,
   journal: MIND.journal,
