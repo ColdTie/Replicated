@@ -52,6 +52,7 @@ const out = {
   // Watcher's Flare Almanac: the stars whose temper is not steady (the game's galaxy.ts starTemper), and the spare cell
   almanac: { extraCells: MIND.almanac.extraCells, tempers: Object.fromEntries(STARS.stars.map((s) => [s.id, temperOf(s.cls)]).filter(([, t]) => t !== 'steady')) },
   tether: { costShare: MIND.tether.costShare },
+  tidewhisper: { pulseHours: MIND.tidewhisper.pulseHours }, lightbed: { perHour: MIND.lightbed.perHour },
   beacons: STARS.beacons, latticeRadius: BEACON.lattice.radius,
   away: MIND.away,
   journal: MIND.journal,

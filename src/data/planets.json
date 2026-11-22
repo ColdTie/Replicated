@@ -1006,6 +1006,64 @@
         "birds": 5,
         "butterflies": 3
       }
+    },
+    {
+      "id": "stillwater",
+      "shy": true,
+      "poles": {
+        "size": 0.26,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "STILLWATER",
+      "subtitle": "WHERE THE ICE KEEPS WARM",
+      "star": "gliese-2021",
+      "planetIndex": 1,
+      "seed": 20211,
+      "accent": [
+        13,
+        12,
+        9
+      ],
+      "ambient": "6a7488",
+      "sky": [
+        "0e1222",
+        "28304a",
+        "6a5a5a",
+        "e0a070"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.8,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.08,
+      "sporeRate": 2.5,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        23,
+        22,
+        20
+      ],
+      "dayCycle": true,
+      "sunTint": "e4d4cc",
+      "gravity": 0.95,
+      "weather": true,
+      "ponds": 24,
+      "flowers": 0.006,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 2,
+        "butterflies": 0
+      }
     }
   ]
 }

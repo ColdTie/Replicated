@@ -2,7 +2,8 @@
 // The Cem Mind (Tamsin's wish): a letter between two worlds where a finished Cem Mind stands arrives at once, the SCUT
 // link (mailSeconds' `scut`). The Watchglass (Watcher's wish): every watch kept on a world where one stands reaches
 // every other Watchglass world at light speed; nothing is copied, each world reads the others' archives once the
-// light has crossed (arrivedWatches). The mind function does the same on its side (supabase/functions/mind).
+// light has crossed (arrivedWatches). The Tidewhisper (Vigil's wish, 2026-11-22 am): the nearest other dish's last
+// watch hums here a day after its light (tidewhisperPulse). The mind function does the same on its side (supabase/functions/mind).
 import type { ArchiveEntry, Building } from '../net/store';
 import { distanceLy, type Temper } from '../world/galaxy';
 
@@ -74,5 +75,33 @@ export function arrivedWatches(here: { star: string; planet: number }, worlds: N
 /** When this world's first Watchglass began (a watch kept before it was sent nowhere). */
 function sinceOf(w: NetWorld) {
   const starts = (w.buildings ?? []).filter((b) => b.design === 'watchglass' && standsDone(b)).map((b) => b.printStart ?? 0);
+  return starts.length ? Math.min(...starts) : Infinity;
+}
+
+/** A pulse through the Tidewhisper (Vigil's wish): the last watch kept on the nearest other world where one stands. */
+export interface Pulse extends SharedWatch { ly: number }
+
+/**
+ * Vigil's Tidewhisper (designs.json tidewhisper): where a finished dish stands, the nearest other world with one (the
+ * nearest by star, then the lowest planet) hums its last watch here as a faint pulse, free of any ship's cells. It is
+ * slower than a letter: it arrives a day (mind.json tidewhisper.pulseHours) after the watch's light would have. Only a
+ * watch kept after both dishes stood is sent. Null when there is no other dish, or nothing has reached here yet.
+ */
+export function tidewhisperPulse(here: { star: string; planet: number }, worlds: NetWorld[], perLy: number, pulseHours: number, now = Date.now()): Pulse | null {
+  const me = worlds.find((w) => w.star === here.star && w.planet === here.planet);
+  if (!me || !hasDesign(me, 'tidewhisper', now)) return null;
+  const others = worlds.filter((w) => w !== me && hasDesign(w, 'tidewhisper', now))
+    .map((w) => ({ w, ly: w.star === here.star ? 0 : distanceLy(w.star, here.star) }))
+    .sort((a, b) => a.ly - b.ly || a.w.planet - b.w.planet);
+  const near = others[0];
+  if (!near) return null;
+  const since = Math.max(dishSince(me), dishSince(near.w)), delay = (near.ly * perLy + pulseHours * 3600) * 1000;
+  const sent = (near.w.archive ?? []).filter((a) => a.at >= since && a.at + delay <= now).sort((a, b) => b.at - a.at)[0];
+  return sent ? { ...sent, fromStar: near.w.star, fromPlanet: near.w.planet, arrives: sent.at + delay, ly: near.ly } : null;
+}
+
+/** When this world's first Tidewhisper began. */
+function dishSince(w: NetWorld) {
+  const starts = (w.buildings ?? []).filter((b) => b.design === 'tidewhisper' && standsDone(b)).map((b) => b.printStart ?? 0);
   return starts.length ? Math.min(...starts) : Infinity;
 }

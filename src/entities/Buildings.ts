@@ -236,7 +236,8 @@ export class Buildings {
     for (const b of this.list) if (b.design && b.built && !b.vetoed) out.set(b.design, (out.get(b.design) ?? 0) + 1);
     return out;
   }
-  private builtOf(id: string) { return this.designsBuilt().get(id) ?? 0; }
+  /** How many finished designs of this kind stand on this world (Lightbeds: lignin by the clock). */
+  builtOf(id: string) { return this.designsBuilt().get(id) ?? 0; }
   /** A finished design of this kind stands on this world (a Sunlattice: warren panels can be furnished). */
   stands(id: string) { return this.builtOf(id) > 0; }
   /** Every House lifts every Vessel's mood a little (designs.json gives). */
