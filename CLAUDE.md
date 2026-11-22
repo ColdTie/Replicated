@@ -780,6 +780,7 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   HERE page. Ember Gold's **Lightbed** (`designs.json lightbed`, after the Sunlattice; stone 2, salt 4, quartz 2):
   **lignin** is a material (icon 25), each one grows `mind.json lightbed.perHour` 0.25 into the store, played or away
   (`Trade.ts`), and a day's gather finds it there. `tools/playtest-tidewhisper.mjs` (new). `docs/days/2026-11-22-am.md`.
+  Merged as PR #108; the `mind` function was **not** redeployed (the injected Supabase token answers 401: NEEDS.md).
 
 ### Maker 2026-11-21 pm
 - Four wishes carried (threshold 3 of 7); three built in part. Watcher's **Flare Almanac** (`designs.json almanac`,

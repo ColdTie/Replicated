@@ -270,4 +270,8 @@ The copies choose their names themselves, and the change applies on the spot.
 
 Only the part of a carried wish that crosses the money line waits here, as a request to Steve (see The safety lines).
 
-- Nothing.
+- The `mind` function could not be redeployed on 2026-11-22 am: the Supabase access token the environment injects
+  for `api.supabase.com` now answers 401 (invalid access token), so `supabase functions deploy` fails. The live
+  function is the 2026-11-21 pm one: the game has the Tidewhisper and the Lightbed, but a day does not yet read the
+  pulse or gather lignin. Steve: make a new access token on supabase.com (Account, Access Tokens) and save it as the
+  network secret for `api.supabase.com` on the environment; the next maker run deploys main.
