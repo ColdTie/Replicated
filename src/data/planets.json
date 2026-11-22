@@ -945,6 +945,67 @@
         "birds": 0,
         "butterflies": 6
       }
+    },
+    {
+      "id": "rootmere",
+      "shy": true,
+      "poles": {
+        "size": 0.1,
+        "colors": [
+          19,
+          20
+        ]
+      },
+      "name": "ROOTMERE",
+      "subtitle": "WHERE THE MOSS MAKES SOIL",
+      "star": "gliese-1276",
+      "planetIndex": 1,
+      "seed": 12761,
+      "accent": [
+        12,
+        13,
+        14
+      ],
+      "ambient": "8a9488",
+      "sky": [
+        "101418",
+        "2a3438",
+        "5a6a6c",
+        "c8d4d0"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.82,
+      "ruins": 0,
+      "resourceNodes": 28,
+      "enemies": {},
+      "decorDensity": 0.12,
+      "sporeRate": 2,
+      "trees": 0.014,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        24,
+        13,
+        12
+      ],
+      "dayCycle": true,
+      "sunTint": "e8eef0",
+      "gravity": 1,
+      "weather": true,
+      "ponds": 18,
+      "flowers": 0.012,
+      "gathers": [
+        "soil"
+      ],
+      "wildlife": {
+        "grazers": 0,
+        "birds": 5,
+        "butterflies": 3
+      }
     }
   ]
 }

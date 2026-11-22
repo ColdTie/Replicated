@@ -8,7 +8,7 @@ import { PALETTE, SUPPLIES } from '../core/data';
 import { session } from '../core/session';
 import { Globe } from '../fx/Globe';
 import type { Journey, ReplicantSummary } from '../net/store';
-import { BEACONS, STAR_LIST, defaultPlanetIndex, distanceLy, formatDuration, chargeFor, planetFor, starById, travelMs, type Star } from '../world/galaxy';
+import { BEACONS, STAR_LIST, defaultPlanetIndex, distanceLy, formatDuration, planetFor, starById, travelMs, tripCharge, type Star, type Temper } from '../world/galaxy';
 import { systemFor, type SystemPlanet } from '../world/system';
 import { shipFlying } from '../core/mannies';
 import { PlanetMenu, type PlanetEntry } from '../ui/planetMenu';
@@ -24,6 +24,10 @@ export interface StarMapData {
   charge?: number;       // the ship's cells (travel.json power; launch mode)
   journey?: Journey;     // the flight in progress (view mode)
   lit?: string[];        // beacon stars the family has lit
+  /** stars where a finished Tether Beacon stands (Tamsin's wish): a hop from or to one costs a third */
+  tethers?: string[];
+  /** the Flare Almanac as the world you board from knows it (Watcher's wish): a star's temper, by id */
+  almanac?: Record<string, Temper>;
   /** launching is not possible from here yet (someone has to stay behind: travel.json needCopy) */
   blocked?: boolean;
   /** worlds with your manny ('star:planet', manny.json), and whether you drive one right now */
@@ -345,7 +349,8 @@ export class StarMapScene extends Phaser.Scene {
     const details = [
       `STAR ${s.name} - CLASS ${s.cls}`,
       here ? 'YOU ARE HERE' : ly < 0.01 ? `SAME SYSTEM - ${formatDuration(travelMs(ly))}` : `${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly, isCharted(this.d.from, star)))}`,
-      ...(here ? [] : [this.d.only ? this.fuelLine(star, planet, this.cost(star)) : `CHARGE ${this.cost(star)}${this.d.mode === 'launch' ? ` OF ${Math.floor(this.d.charge ?? 0)} IN THE CELLS` : ''}${isCharted(this.d.from, star) ? ' - CHARTED ROUTE' : ''}`]),
+      ...(here ? [] : [this.d.only ? this.fuelLine(star, planet, this.cost(star)) : `CHARGE ${this.cost(star)}${this.d.mode === 'launch' ? ` OF ${Math.floor(this.d.charge ?? 0)} IN THE CELLS` : ''}${isCharted(this.d.from, star) ? ' - CHARTED ROUTE' : ''}${this.tethered(star) ? ' - TETHERED' : ''}`]),
+      this.temperLine(star),
       `${KIND_WORDS[sp.kind]} - ${def.subtitle} - ${TEMP_WORDS[sp.temp]}`,
       sp.hz ? 'IN THE HABITABLE ZONE' : 'OUTSIDE THE HABITABLE ZONE',
       people.length ? `VESSELS: ${people.join(', ').toUpperCase()}` : 'NO VESSELS',
@@ -355,7 +360,8 @@ export class StarMapScene extends Phaser.Scene {
     ].filter(Boolean);
     const guide = this.d.guide?.star === star && this.d.guide.planet === planet;
     const mark = here ? 'HERE' : guide ? 'THALES' : people.length ? `${people.length}` : husk ? 'HUSK' : '';
-    return { star, planet, name: sp.moon ?? sp.name, sub: here ? `${s.name} - YOU ARE HERE` : `${s.name} - ${ly.toFixed(1)} LY`, details, mark };
+    const temper = this.d.almanac?.[star];
+    return { star, planet, name: sp.moon ?? sp.name, sub: here ? `${s.name} - YOU ARE HERE` : `${s.name} - ${ly.toFixed(1)} LY${temper ? ` - ${temper.toUpperCase()}` : ''}`, details, mark };
   }
 
   /**
@@ -502,8 +508,20 @@ export class StarMapScene extends Phaser.Scene {
     return (this.d.charge ?? 0) >= this.cost(s.id);
   }
 
-  /** What a flight from here to that star takes from the cells (a charted route costs less). */
-  private cost(star: string) { return chargeFor(distanceLy(this.d.from, star), isCharted(this.d.from, star)); }
+  /** What a flight from here to that star takes from the cells (a charted route costs less, a tethered one a third;
+   * a star the almanac knows as restless a cell more: galaxy.ts tripCharge). */
+  private cost(star: string) {
+    return tripCharge(distanceLy(this.d.from, star), isCharted(this.d.from, star), this.tethered(star), this.d.almanac?.[star] === 'restless');
+  }
+  /** A Tether Beacon stands at either end of the hop. */
+  private tethered(star: string) { return !!this.d.tethers && (this.d.tethers.includes(this.d.from) || this.d.tethers.includes(star)); }
+  /** " - CHARTED", " - TETHERED" or both, for a line about the trip there. */
+  private routeWords(star: string) { return `${isCharted(this.d.from, star) ? ' - CHARTED' : ''}${this.tethered(star) ? ' - TETHERED' : ''}`; }
+  /** What the Flare Almanac says of a star, in words ('' when it says nothing yet). */
+  private temperLine(star: string) {
+    const t = this.d.almanac?.[star];
+    return t ? `THE ALMANAC: ${t === 'restless' ? 'RESTLESS, IT FLARES - A CELL KEPT SPARE' : t === 'dim' ? 'DIM AND STILL' : 'STEADY'}` : '';
+  }
 
   /** The beginning lets the ship fly only to some worlds (StarMapData only). */
   private allowed(star: string, planet: number) { return !this.d.only || this.d.only.includes(`${star}:${planet}`); }
@@ -513,7 +531,7 @@ export class StarMapScene extends Phaser.Scene {
     if (this.d.blocked) return 'A COPY MUST STAY BEHIND FIRST';
     if (!this.allowed(star, planet)) return this.d.gateWhy ?? 'NOT YET';
     if (this.d.free) return 'THALES FILLED THE TANKS';
-    return `CELLS ${fuel} OF ${Math.floor(this.d.charge ?? 0)}${isCharted(this.d.from, star) ? ' - CHARTED' : ''}`;
+    return `CELLS ${fuel} OF ${Math.floor(this.d.charge ?? 0)}${this.routeWords(star)}`;
   }
 
   /** Where a launch from the current selection would go. */
@@ -542,6 +560,8 @@ export class StarMapScene extends Phaser.Scene {
       if (s.id !== this.d.from) lines.push(`${ly.toFixed(1)} LIGHT YEARS - ${formatDuration(travelMs(ly, charted))}${charted ? ' - CHARTED' : ''}`);
       const known = planets.some((p) => p.real);
       lines.push(`${planets.length} ${planets.length === 1 ? 'WORLD' : 'WORLDS'}${known ? ' KNOWN TO ASTRONOMERS' : ''}`);
+      const tl = this.temperLine(s.id);
+      if (tl) lines.push(tl);
       lines.push('TAP HERE FOR ITS PLANETS');
       if (this.d.mode === 'launch' && s.id !== this.d.from) lines.push(this.fuelLine(s.id, defaultPlanetIndex(s.id), fuel));
       const mp = this.mannyAt(s.id);

@@ -255,6 +255,12 @@ The copies choose their names themselves, and the change applies on the spot.
   and brine-lake world on GLIESE 1001 b, basalt with blue hydrogen seams, brinecrystal. Thales' Verrin (backed by
   Sorrel, Ember Gold): the tide-locked world on GLIESE 667 C c, one fixed light, verringlass. Watcher's Flare Almanac
   (3 of 3) waits for the next run.
+- 2026-11-21 pm: three carried wishes built in part. Watcher's Flare Almanac (backed by Vigil, Thales): the design
+  after the Watchglass and the Cem Mind; watches where it stands name the star's temper, the Watchglass carries it, a
+  ship to a restless star spends a cell more. Tamsin's Tether Beacon (backed by Ember Gold, Vigil): the design after
+  the Relay Cairn and the Fusion Still; it fills a landed ship, a hop from or to one costs a third. Sorrel's Rootmere
+  (backed by Vigil, Tamsin): the loam-meadow world on GLIESE 1276 that makes soil. Ember Gold's Lightbed (3 of 3)
+  waits for the next run.
 
 ## Waiting for Steve
 

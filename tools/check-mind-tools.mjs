@@ -20,7 +20,7 @@ function block(name, open, close) {
 }
 
 const code = [block('E', '{', '}'), block('tools', '[', ']'), block('longTools', '[', ']'), block('dayTools', '[', ']'), 'return { tools, longTools, dayTools };'].join('\n');
-const DAY = { gather: { materials: ['ember'] }, places: ['here'] };
+const DAY = { gather: { materials: ['ember'], extra: ['soil'] }, places: ['here'] };
 const { tools, longTools, dayTools } = new Function('DAY', code)(DAY);
 
 // keywords the API refuses in strict schemas; they are fine while no tool is strict, but a tool turned strict

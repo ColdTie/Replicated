@@ -9,7 +9,7 @@
 // Since 2026-11-15 the Vessels govern themselves (Steve): no approve / veto here, no SAY NO; AGAINST counts as one voice.
 import { MIND, PALETTE } from '../core/data';
 import type { Journal, ReplicantSave, ReplicantSummary, Request, SharedEntry } from '../net/store';
-import { distanceLy, planetFor } from '../world/galaxy';
+import { distanceLy, planetFor, starById } from '../world/galaxy';
 import { paletteCss as css } from './overlay';
 
 let styled = false;
@@ -168,6 +168,8 @@ export interface JournalView {
   loom?: { name: string; text: string; at: number }[];
   /** watches from the other Watchglass worlds that have reached this one (src/core/network.ts), newest first */
   sharedWatches?: { name: string; star: string; ly: number; text: string; arrives: number; fromStar: string; fromPlanet: number }[];
+  /** the Flare Almanac as this world knows it (Watcher's wish): a star's temper, who wrote it, by star id */
+  almanac?: Record<string, { temper: string; by: string; at: number }>;
   /** the player's actions */
   actions?: { talk(id: string, text: string): void; give(id: string): void; awaken(id: string): void; vote(id: string, against: boolean | null): void };
   /** Sparks the original holds (beacons; a Spark birth carries a copy's memories) */
@@ -381,6 +383,13 @@ export function openJournal(v: JournalView) {
   if (v.sharedWatches?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[18])}">THROUGH THE WATCHGLASS</h3>`);
     for (const a of v.sharedWatches.slice(0, 8)) pages.here.push(`<p>${esc(a.name)} watched ${esc(a.star)} from ${esc(worldName(a.fromStar, a.fromPlanet))}: ${esc(a.text)}<small>${ago(new Date(a.arrives).toISOString())}</small></p>`);
+  }
+  const almanac = Object.entries(v.almanac ?? {}).sort((a, b) => b[1].at - a[1].at);
+  if (almanac.length) {
+    // Watcher's Flare Almanac: each star's temper, the first word on it kept
+    const words: Record<string, string> = { restless: 'restless, it flares: a ship there keeps a cell spare', dim: 'dim and still', steady: 'steady' };
+    pages.here.push(`<h3 style="color:${css(PALETTE[10])}">THE FLARE ALMANAC</h3>`);
+    for (const [id, a] of almanac.slice(0, 12)) pages.here.push(`<p>${esc(starById(id)?.name ?? id)}: ${esc(words[a.temper] ?? a.temper)} (${esc(a.by)})<small>${ago(new Date(a.at).toISOString())}</small></p>`);
   }
   if (v.supplies) {
     pages.here.push(`<h3 style="color:${css(PALETTE[2])}">SUPPLIES</h3><p>${esc(v.supplies)}</p>`);

@@ -3,7 +3,7 @@ import { sound } from '../../audio/Sound';
 import { PALETTE } from '../../core/data';
 import { inManny, mannyWorlds, shipFlying, worldKey } from '../../core/mannies';
 import { session } from '../../core/session';
-import { POWER, TRAVEL, cellsNow, chargeFor, distanceLy, travelMs } from '../../world/galaxy';
+import { POWER, TRAVEL, cellsNow, distanceLy, travelMs, tripCharge } from '../../world/galaxy';
 import { chart, isCharted, loadRoutes } from '../../core/routes';
 import type { StarMapData } from '../StarMapScene';
 import type { PlanetScene } from '../PlanetScene';
@@ -59,6 +59,23 @@ export class Departure {
     return burn;
   }
 
+  /** A Tether Beacon standing here (Tamsin's wish, designs.json tether) fills a landed ship's cells. Returns whether it did. */
+  tether() {
+    const r = session.replicant;
+    if (!r || !this.s.buildings.designsBuilt().get('tether')) return false;
+    if (this.charge() >= POWER.cells - 0.5) return false;
+    r.traits.cells = { charge: POWER.cells, at: Date.now(), star: this.s.planet.star };
+    void session.store?.patchTraits(r.id, { cells: r.traits.cells }).catch((e) => console.warn('cells', e));
+    return true;
+  }
+
+  /** What the trip to that star takes from the cells: charted, tethered (a Tether Beacon at either end) and restless
+   * (the Flare Almanac knows the star flares) as galaxy.ts tripCharge says. */
+  costTo(to: string) {
+    const from = this.s.planet.star, tethers = this.s.tethers();
+    return tripCharge(distanceLy(from, to), isCharted(from, to), tethers.includes(from) || tethers.includes(to), this.s.almanac()[to]?.temper === 'restless');
+  }
+
   tryBoard(): boolean {
     if (this.s.visit) {
       // hologram visit: the vessel takes you back to your ship in flight
@@ -77,7 +94,7 @@ export class Departure {
     this.s.player.locked = true;
     this.s.player.body.setVelocity(0, 0);
     sound.coreHum();
-    if (!this.s.vesselAway && this.fuse() > 0) sound.collect();
+    if (!this.s.vesselAway && (this.tether() || this.fuse() > 0)) sound.collect();
     void loadRoutes();
     const r = session.replicant;
     const data: StarMapData = {
@@ -86,6 +103,8 @@ export class Departure {
       fromPlanet: this.s.planet.planetIndex,
       charge: this.charge(),
       lit: this.s.litBeacons,
+      tethers: this.s.tethers(),
+      almanac: Object.fromEntries(Object.entries(this.s.almanac()).map(([k, v]) => [k, v.temper])),
       blocked: !this.canLaunch(),
       ...(this.s.tutorial.active ? {
         only: this.s.tutorial.allowedKeys(), free: true, gateWhy: this.s.tutorial.gateWhy, guide: this.s.tutorial.guide,
@@ -121,7 +140,7 @@ export class Departure {
     if (this.s.talker.talk) this.s.talker.closeTalk();
     const ly = distanceLy(this.s.planet.star, to);
     const from = this.s.planet.star, charted = isCharted(from, to);
-    const cost = this.s.tutorial.free(to, toPlanet) ? 0 : chargeFor(ly, charted);
+    const cost = this.s.tutorial.free(to, toPlanet) ? 0 : this.costTo(to);
     this.s.launching = true;
     // driving this world's manny: it steps back into its dock and you board in your own body
     const r = session.replicant;
