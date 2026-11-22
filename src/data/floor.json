@@ -729,6 +729,40 @@
         "relief": 4
       }
     },
+    "dimfall": {
+      "kind": "regolith",
+      "relief": 7,
+      "coverage": 0.45,
+      "pebbles": 4,
+      "soil": ["140e16", "1e1620", "2a1e2a", "3a2834"],
+      "cover": ["5a4848", "7a6058", "9a7a68", "bc9a80", "dcc0a0"],
+      "detail": ["f08a4a", "feae34", "c0cbdc"],
+      "stone": ["1e1620", "2c2030", "3c2c3e", "4e3c4e"],
+      "rock": {
+        "ramp": ["0c080e", "18101a", "261a28", "382838", "4e3a4a", "6a5262"],
+        "cover": ["c0cbdc", "e4ecf4"],
+        "coverage": 0.25,
+        "cracks": 0.9,
+        "relief": 7
+      }
+    },
+    "thawmere": {
+      "kind": "snow",
+      "relief": 6,
+      "coverage": 0.75,
+      "pebbles": 1,
+      "soil": ["101828", "1a2a40", "264060", "3a5a80"],
+      "cover": ["7c8eac", "98aac6", "b4c4dc", "d0dcec", "eaf0f8"],
+      "detail": ["ffffff", "9fe6f5", "2ce8f5", "f77622"],
+      "stone": ["1a2236", "242e48", "323e5c", "46546e"],
+      "rock": {
+        "ramp": ["06080e", "0e121c", "181e2c", "242c40", "343e58", "4a5878"],
+        "cover": ["2ce8f5", "9fe6f5", "eaf0f8"],
+        "coverage": 0.3,
+        "cracks": 0.8,
+        "relief": 7
+      }
+    },
     "stillwater": {
       "kind": "snow",
       "relief": 5,
