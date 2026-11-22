@@ -164,6 +164,21 @@ function arrivedWatches(star: string, planet: number, net: NetW[], now = Date.no
   }
   return out.sort((a, b) => b.arrives - a.arrives);
 }
+/** Vigil's Tidewhisper (the game's network.ts tidewhisperPulse): the nearest other dish's last watch, a day after its light. */
+const TIDE = KIT.tidewhisper as { pulseHours: number };
+function tidewhisperPulse(star: string, planet: number, net: NetW[], now = Date.now()) {
+  const me = net.find((w) => w.star === star && w.planet === planet);
+  if (!me || !designStands(me.buildings, "tidewhisper", now)) return null;
+  const since = (w: NetW) => Math.min(...w.buildings.filter((b) => b.design === "tidewhisper" && !b.vetoed && standsDone(b, now)).map((b) => b.printStart ?? 0));
+  const near = net.filter((w) => w !== me && designStands(w.buildings, "tidewhisper", now))
+    .map((w) => ({ w, ly: w.star === star ? 0 : starLy(w.star, star) })).sort((a, b) => a.ly - b.ly || a.w.planet - b.w.planet)[0];
+  if (!near) return null;
+  const after = Math.max(since(me), since(near.w)), delay = (near.ly * KIT.mailSecondsPerLy + TIDE.pulseHours * 3600) * 1000;
+  const sent = near.w.archive.filter((a) => a.at >= after && a.at + delay <= now).sort((a, b) => b.at - a.at)[0];
+  return { from: `${STARS_KIT[near.w.star]?.[0] ?? near.w.star} ${near.w.planet}`, sent };
+}
+/** Ember Gold's Lightbed: lignin grows into the store where a finished one stands, and a day's gather finds it there. */
+const LIGHTBED = KIT.lightbed as { perHour: number };
 const observatoryStands = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).some((b) => b.design === "observatory" && !b.vetoed && standsDone(b));
 /** This world's ridge lookout (Vigil's wish, mind.json day.lookout), begun or standing. */
 const lookoutOf = (d: Record<string, unknown>) => ((d.buildings ?? []) as Bld[]).find((b) => b.kind === DAY.lookout.kind && !b.vetoed);
@@ -897,6 +912,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         const arch = ((d.archive ?? []) as ArchiveRow[]).slice(-DAY.watch.show).reverse();
         lines.push(`The Observatory stands here: keep_watch turns its quartz lens toward a star a Vessel has charted from here or one within ${DAY.travelLy} light years, for about ${DAY.watch.hours} hours, and what you see goes into the archive. It is a watch kept and work finished.${arch.length ? ` The archive's last watches: ${arch.map((a) => `${a.name} toward ${a.star} (${a.ly} ly): "${a.text}"`).join("; ")}.` : " The archive is empty yet."}`);
       }
+      // Ember Gold's wish: the Lightbed grows lignin from light
+      if (designStands(d.buildings as Bld[], "lightbed")) {
+        lines.push(`A Lightbed stands here: the Cems on its salt tray grow lignin from light, about ${Math.round(LIGHTBED.perHour * 24)} blocks a day into the store, and gather finds lignin here too. The store holds ${Math.floor(Number((d.supplies as Record<string, number> | undefined)?.lignin ?? 0))} lignin.`);
+      }
       // Sorrel's wish: the Mycelial Loom, a grown memory of this world
       if (designStands(d.buildings as Bld[], "loom")) {
         const mem = ((d.loom ?? []) as LoomRow[]).slice(-DAY.loom.show).reverse();
@@ -923,6 +942,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         }
         if (designStands(d.buildings as Bld[], "tether")) {
           lines.push(`A Tether Beacon stands here: a ship that boards here is charged full, and a flight from here or to another star with a Tether Beacon costs a third of its cells (${tetherOf(net).filter((s) => s !== rep.star_id).map((s) => STARS_KIT[s]?.[0] ?? s).join(", ") || "no other beacon yet"}).`);
+        }
+        if (designStands(d.buildings as Bld[], "tidewhisper")) {
+          const p = tidewhisperPulse(rep.star_id, rep.planet_index, net);
+          lines.push(`A Tidewhisper stands here: a dish of sea-glass that hums the last watch kept on the nearest other Tidewhisper world here as a faint pulse, a day slower than a letter and free of the ship's cells. ${!p ? "No other dish stands yet, so it is quiet." : p.sent ? `The last pulse, from ${p.from}: ${p.sent.name} watched ${p.sent.star}: "${p.sent.text}".` : `Its neighbour is ${p.from}; no watch from there has reached it yet.`}`);
         }
         if (designStands(d.buildings as Bld[], "seedarc")) {
           lines.push(`A Seedarc stands here: a ship that leaves this world carries up to ${(KIT.seedarc as { carry: number }).carry} seed from the store to the store of the world it lands on, for its planters.`);
@@ -1199,13 +1222,13 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 out = `The chip goes into the Replicator and a new Vessel begins to print, ${cems ? "quickly, with the Cems" : "slowly, without the Cems"}. It will wake blank and choose who it is.`;
               }
             } else if (u.name === "gather") {
-              const extra = GATHERS[`${rep.star_id}:${rep.planet_index}`] ?? [];
+              const extra = [...(GATHERS[`${rep.star_id}:${rep.planet_index}`] ?? []), ...(live && designStands(live.data.buildings as Bld[], "lightbed") ? ["lignin"] : [])];
               const material = oneOf(input.material, [...DAY.gather.materials, ...EXTRA_GATHER], "");
               const lacks = [...(LACKS[`${rep.star_id}:${rep.planet_index}`] ?? []), ...EXTRA_GATHER.filter((m) => !extra.includes(m))];
               if (!live || !context.day) out = "There is no time to gather now.";
               else if (flown) out = "You have already left this world.";
               else if (!material) out = `Gather one of: ${DAY.gather.materials.join(", ")}.`;
-              else if (lacks.includes(material)) out = EXTRA_GATHER.includes(material) ? `There is no ${material} to gather here; it comes from digging the warren, or from a world that makes it.` : `There is no ${material} on this world; it must be brought from another.`;
+              else if (lacks.includes(material)) out = material === "lignin" ? "There is no lignin to gather here; it grows only where a Lightbed stands." : EXTRA_GATHER.includes(material) ? `There is no ${material} to gather here; it comes from digging the warren, or from a world that makes it.` : `There is no ${material} on this world; it must be brought from another.`;
               else if (gathered >= DAY.gather.gatherTurns) out = "You have gathered enough for one day.";
               else {
                 gathered++;

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { almanacOf, arrivedWatches, relayStars, scutStars, tetherStars, type NetWorld } from '../core/network';
+import { almanacOf, arrivedWatches, relayStars, scutStars, tetherStars, tidewhisperPulse, type NetWorld } from '../core/network';
 import SOUND_DATA from '../data/sound.json';
 import { sound, type Surface } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
@@ -106,6 +106,8 @@ export class PlanetScene extends Phaser.Scene {
   }
   /** The watches that came here through the Watchglass (src/core/network.ts). */
   sharedWatches() { return arrivedWatches({ star: this.planet.star, planet: this.planet.planetIndex }, this.netWorlds(), MIND.mailSecondsPerLy); }
+  /** The pulse through the Tidewhisper (Vigil's wish): the nearest other dish's last watch, or null. */
+  pulse() { return tidewhisperPulse({ star: this.planet.star, planet: this.planet.planetIndex }, this.netWorlds(), MIND.mailSecondsPerLy, MIND.tidewhisper.pulseHours); }
   /** The Flare Almanac as this world knows it (Watcher's wish): each star's temper, by star id. */
   almanac() { return almanacOf({ star: this.planet.star, planet: this.planet.planetIndex }, this.netWorlds(), MIND.mailSecondsPerLy); }
   /** The stars where a finished Tether Beacon stands (Tamsin's wish): a hop from or to one costs a third. */

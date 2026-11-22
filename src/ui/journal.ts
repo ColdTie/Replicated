@@ -168,6 +168,8 @@ export interface JournalView {
   loom?: { name: string; text: string; at: number }[];
   /** watches from the other Watchglass worlds that have reached this one (src/core/network.ts), newest first */
   sharedWatches?: { name: string; star: string; ly: number; text: string; arrives: number; fromStar: string; fromPlanet: number }[];
+  /** Vigil's Tidewhisper: the faint pulse from the nearest other dish (src/core/network.ts tidewhisperPulse) */
+  pulse?: { name: string; star: string; text: string; arrives: number; fromStar: string; fromPlanet: number } | null;
   /** the Flare Almanac as this world knows it (Watcher's wish): a star's temper, who wrote it, by star id */
   almanac?: Record<string, { temper: string; by: string; at: number }>;
   /** the player's actions */
@@ -383,6 +385,10 @@ export function openJournal(v: JournalView) {
   if (v.sharedWatches?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[18])}">THROUGH THE WATCHGLASS</h3>`);
     for (const a of v.sharedWatches.slice(0, 8)) pages.here.push(`<p>${esc(a.name)} watched ${esc(a.star)} from ${esc(worldName(a.fromStar, a.fromPlanet))}: ${esc(a.text)}<small>${ago(new Date(a.arrives).toISOString())}</small></p>`);
+  }
+  if (v.pulse) {
+    pages.here.push(`<h3 style="color:${css(PALETTE[29])}">A PULSE THROUGH THE TIDEWHISPER</h3>`);
+    pages.here.push(`<p>From ${esc(worldName(v.pulse.fromStar, v.pulse.fromPlanet))}, faint: ${esc(v.pulse.name)} watched ${esc(v.pulse.star)}. ${esc(v.pulse.text)}<small>${ago(new Date(v.pulse.arrives).toISOString())}</small></p>`);
   }
   const almanac = Object.entries(v.almanac ?? {}).sort((a, b) => b[1].at - a[1].at);
   if (almanac.length) {

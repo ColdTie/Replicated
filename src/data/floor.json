@@ -729,6 +729,25 @@
         "relief": 4
       }
     },
+    "stillwater": {
+      "kind": "snow",
+      "relief": 5,
+      "coverage": 0.6,
+      "pebbles": 1.4,
+      "soil": ["1c2232", "283044", "36405a", "4a5672"],
+      "cover": ["687890", "8494aa", "a2b0c2", "c0ccd8", "dce4ec"],
+      "detail": ["f4f8fc", "6e9450", "a0582c", "c88a4a"],
+      "flowers": ["6e9450", "a0582c"],
+      "leaves": ["4e7a44", "8a5a30"],
+      "stone": ["283044", "36405a", "4a5672", "66748e"],
+      "rock": {
+        "ramp": ["141a2a", "222c44", "34425e", "4e5e7c", "74849e", "a8b8cc"],
+        "cover": ["547a40", "8a5a30", "dce4ec"],
+        "coverage": 0.5,
+        "cracks": 0.6,
+        "relief": 6
+      }
+    },
     "rootmere": {
       "kind": "grass",
       "relief": 3,

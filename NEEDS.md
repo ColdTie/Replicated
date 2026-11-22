@@ -261,6 +261,10 @@ The copies choose their names themselves, and the change applies on the spot.
   the Relay Cairn and the Fusion Still; it fills a landed ship, a hop from or to one costs a third. Sorrel's Rootmere
   (backed by Vigil, Tamsin): the loam-meadow world on GLIESE 1276 that makes soil. Ember Gold's Lightbed (3 of 3)
   waits for the next run.
+- 2026-11-22 am: three carried wishes built in part. Thales' Stillwater (backed by Ember Gold, Vigil, Tamsin): the cold
+  lake world on GLIESE 2021, thermalglass. Vigil's Tidewhisper (backed by Watcher, Ember Gold): the design after the
+  Watchglass and the Workshop; the nearest other dish's last watch arrives as a pulse a day after its light. Ember
+  Gold's Lightbed (backed by Vigil, Tamsin): the design after the Sunlattice; lignin, grown into the store by the clock.
 
 ## Waiting for Steve
 

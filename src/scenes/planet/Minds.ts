@@ -451,7 +451,7 @@ export class Minds {
     };
     openJournal({ quiet: quietMinds(health), spend: spent === null ? undefined : { usd: spent, cap: MIND.budget.dailyUsd }, sparks: this.s.visit ? 0 : me.traits.sparks ?? 0, place: this.s.placeLabel,
       me: { id: me.id, name: me.name, star: this.s.planet.star, planet: this.s.planet.planetIndex }, all, copies: this.s.npcs.map((n) => n.data), journal: j, shared, feelings, actions, tab,
-      buildings: this.s.buildings.describe(nameOf), archive: this.s.archive, loom: this.s.loom, sharedWatches: this.s.sharedWatches(), almanac: this.s.almanac(), lessons: lessonLines(this.s.lessons), garden: gardenLines(this.s.plants), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
+      buildings: this.s.buildings.describe(nameOf), archive: this.s.archive, loom: this.s.loom, sharedWatches: this.s.sharedWatches(), pulse: this.s.pulse(), almanac: this.s.almanac(), lessons: lessonLines(this.s.lessons), garden: gardenLines(this.s.plants), warren: this.s.warren.data.rooms.length ? describeWarren(this.s.warren.data, null, nameOf) : [], supplies: this.s.npcs.length ? this.s.warren.describeSupplies() : undefined, shortages: this.s.warren.shortages() });
   }
 
   /** The original writes to a Vessel: a letter that arrives at once on this world, after the light's delay from

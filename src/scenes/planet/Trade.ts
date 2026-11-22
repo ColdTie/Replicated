@@ -17,7 +17,7 @@ export class Trade {
   /** live winnings not yet a whole unit */
   private owed = 0;
 
-  reset() { this.owed = 0; }
+  reset() { this.owed = 0; this.grown = 0; }
 
   /** This world's own material. */
   get own(): string { return (SIG.byWorld as Record<string, string>)[this.s.planet.id] ?? 'regolith'; }
@@ -32,16 +32,37 @@ export class Trade {
     return Math.min(SIG.importMoodMax, kinds * SIG.importMood);
   }
 
-  /** What the copies won of it while nobody was here. */
+  /** What the copies won of it while nobody was here, and what the Lightbeds grew. */
   accrueAway(hours: number) {
     const n = Math.floor(hours * SIG.perCopyHour * this.s.npcs.filter((c) => !c.blank).length);
     if (n > 0) this.s.warren.add(this.own, n);
+    const g = Math.floor(hours * MIND.lightbed.perHour * this.lightbeds);
+    if (g > 0) {
+      this.s.warren.add('lignin', g);
+      this.s.mindLog.push({ t: this.s.mindClock, text: `The Lightbed grew ${g} lignin while you were away` });
+    }
   }
+
+  /** Ember Gold's Lightbed (designs.json lightbed): how many finished ones stand here; each grows lignin by the clock. */
+  get lightbeds() { return this.s.buildings?.builtOf('lightbed') ?? 0; }
+
+  /** lignin grown live and not yet a whole block */
+  private grown = 0;
 
   /** While you play: now and then a copy brings a piece of it to the store. */
   update(dt: number) {
     const s = this.s;
     if (s.shot || s.visit) return;
+    const beds = this.lightbeds;
+    if (beds) {
+      this.grown += (dt / 3_600_000) * MIND.lightbed.perHour * beds;
+      if (this.grown >= 1) {
+        this.grown -= 1;
+        const bed = s.buildings.list.find((b) => b.design === 'lightbed' && b.built && !b.vetoed);
+        const from = bed ? { x: bed.x, y: bed.y - 8 } : s.warren.hatch;
+        s.flyMaterial('lignin', from, s.warren.hatch, 1);
+      }
+    }
     const workers = s.npcs.filter((c) => !c.blank && !c.below);
     if (!workers.length) return;
     this.owed += (dt / 3_600_000) * SIG.perCopyHour * workers.length;

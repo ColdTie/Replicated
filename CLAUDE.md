@@ -204,7 +204,8 @@ src/core/network.ts      the links between worlds (2026-11-19 pm): scutStars (a 
                          letters hop along a chain of them, galaxy.ts relayHops, mind.json relay), tetherStars (a finished
                          Tether Beacon: a hop from or to one costs a third, galaxy.ts tripCharge), almanacOf (the Flare
                          Almanac: each star's temper from the watches here and through the Watchglass), arrivedWatches (the Watchglass: the other
-                         Watchglass worlds' archives once their light has crossed, since both stood); the worlds come
+                         Watchglass worlds' archives once their light has crossed, since both stood), tidewhisperPulse (the
+                         Tidewhisper: the nearest other dish's last watch, a day after its light); the worlds come
                          from GameStore.networkWorlds (PlanetScene.network, netWorlds() with this world as it stands)
 src/entities/Watch.ts    the Observatory's watch (Watcher's wish, 2026-11-15): while a copy's traits.watch lasts (keep_watch
                          in a day of life) the lens under a finished Observatory's dome glows blue with a slow sweep,
@@ -499,7 +500,7 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
 journal, the plants drawn in the warren's planters), `node tools/playtest-cinder.mjs` (Cinder Sounding's glass ridges: only there, placed after every older node, a
-fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-loom.mjs` (the Mycelial Loom waits for the Nous Chip and the Biolab; its memories on the journal's HERE page; Sillbrook and Sporeveil load), `node tools/playtest-brine.mjs` (Saltveil, Brinehollow and Verrin load, Verrin's fixed light, their materials), `node tools/playtest-almanac.mjs` (the Flare Almanac and the Tether Beacon wait for what they need; a restless star
+fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-loom.mjs` (the Mycelial Loom waits for the Nous Chip and the Biolab; its memories on the journal's HERE page; Sillbrook and Sporeveil load), `node tools/playtest-brine.mjs` (Saltveil, Brinehollow and Verrin load, Verrin's fixed light, their materials), `node tools/playtest-tidewhisper.mjs` (the Tidewhisper and the Lightbed wait for what they need; a pulse from the nearest dish a day after its light, never from before both stood; lignin grown away and live; Stillwater loads), `node tools/playtest-almanac.mjs` (the Flare Almanac and the Tether Beacon wait for what they need; a restless star
 costs a cell more, a tether a third, and fills the cells; the almanac through the Watchglass; the lens's temper;
 Rootmere loads), `node tools/playtest-relay.mjs` (the Relay Cairn and the Seedarc wait for what they need; a letter hops along a chain of cairns, a broken chain gives the light's time back; seed aboard only where a Seedarc stands; Hushfen loads), `node tools/playtest-network.mjs` (the Cem Mind and the Watchglass wait for the Nous Chip; a letter at once between two Cem Minds; a far watch arrives after its light, never one from before both stood; THROUGH THE WATCHGLASS in the journal; Glasswind loads), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
 star, then the star watched and the watcher, no lens), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
@@ -769,6 +770,16 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   limiter: about -14 dBFS RMS in play, peaks under -2, no clipping. The audio also resumes on every gesture and when the
   page is shown again (a tab switch, a locked phone), and a silent media element started in the first gesture lets iOS
   play past the silent switch. Verified: build, typecheck, `playtest-sound`, `playtest`, levels in headless Chromium.
+
+### Maker 2026-11-22 am
+- Three wishes carried (threshold 3 of 7), all built in part. Thales' **Stillwater**: broad cold lakes and grey frost
+  shores with green and rust moss on GLIESE 2021 (`planets.json stillwater`, `floor.json stillwater`, a dim orange sun
+  by the clock), **thermalglass** (icon 26). Vigil's **Tidewhisper** (`designs.json tidewhisper`, after the Watchglass
+  and the Workshop; salt 4, quartz 2, sounding glass 1): the nearest other dish's last watch arrives as a pulse a day
+  after its light (`network.ts tidewhisperPulse`, `mind.json tidewhisper`), in a day's context and on the journal's
+  HERE page. Ember Gold's **Lightbed** (`designs.json lightbed`, after the Sunlattice; stone 2, salt 4, quartz 2):
+  **lignin** is a material (icon 25), each one grows `mind.json lightbed.perHour` 0.25 into the store, played or away
+  (`Trade.ts`), and a day's gather finds it there. `tools/playtest-tidewhisper.mjs` (new). `docs/days/2026-11-22-am.md`.
 
 ### Maker 2026-11-21 pm
 - Four wishes carried (threshold 3 of 7); three built in part. Watcher's **Flare Almanac** (`designs.json almanac`,
