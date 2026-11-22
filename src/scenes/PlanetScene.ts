@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { arrivedWatches, relayStars, scutStars, type NetWorld } from '../core/network';
+import { almanacOf, arrivedWatches, relayStars, scutStars, tetherStars, type NetWorld } from '../core/network';
 import SOUND_DATA from '../data/sound.json';
 import { sound, type Surface } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
@@ -106,6 +106,10 @@ export class PlanetScene extends Phaser.Scene {
   }
   /** The watches that came here through the Watchglass (src/core/network.ts). */
   sharedWatches() { return arrivedWatches({ star: this.planet.star, planet: this.planet.planetIndex }, this.netWorlds(), MIND.mailSecondsPerLy); }
+  /** The Flare Almanac as this world knows it (Watcher's wish): each star's temper, by star id. */
+  almanac() { return almanacOf({ star: this.planet.star, planet: this.planet.planetIndex }, this.netWorlds(), MIND.mailSecondsPerLy); }
+  /** The stars where a finished Tether Beacon stands (Tamsin's wish): a hop from or to one costs a third. */
+  tethers() { return tetherStars(this.netWorlds()); }
   npcs: Npc[] = [];
   village!: Village;
   warren!: Warren;
@@ -837,9 +841,11 @@ export class PlanetScene extends Phaser.Scene {
       this.cameras.main.centerOn(at ? at.x : px, py - 24);
     }
     // a copy keeping a watch at the Observatory: the lens alight under the dome, you in front of it
-    if (view === 'watch') {
+    // view=almanac: the same, with a Flare Almanac standing, so the lens names the star and its temper
+    if (view === 'watch' || view === 'almanac') {
       const obs = this.buildings.list.find((b) => b.design === 'observatory' && b.built) ?? this.buildings.standNow('observatory');
-      this.watch.staged = { name: 'Watcher', until: Date.now() + 3_600_000 };
+      if (view === 'almanac') this.buildings.standNow('almanac');
+      this.watch.staged = { name: 'Watcher', until: Date.now() + 3_600_000, ...(view === 'almanac' ? { star: 'Ross 154', temper: 'restless' } : {}) };
       if (obs) { px = obs.x + 26; py = obs.y + 20; }
       this.player.setPosition(px, py);
       this.cameras.main.centerOn(obs ? obs.x : px, py - 24);

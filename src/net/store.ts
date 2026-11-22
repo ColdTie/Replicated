@@ -42,7 +42,8 @@ export interface ReplicantSave {
     inventory?: Record<string, number>;
     tell?: { text: string; at: number };
     /** a watch kept at the Observatory in a day of life (keep_watch, src/data/watch.json): the star, when, until when */
-    watch?: { star: string; ly: number; at: number; until: number; /** kept from the ridge lookout, not the Observatory's lens */ from?: 'lookout' };
+    watch?: { star: string; ly: number; at: number; until: number; /** kept from the ridge lookout, not the Observatory's lens */ from?: 'lookout';
+      /** the star's temper, written where a Flare Almanac stands (mind.json almanac) */ temper?: 'restless' | 'dim' | 'steady' };
     /** born with a Spark beside an older copy: it carries that copy's notes and remembers being it (drift.json spark) */
     inherit?: { from: string; name: string; wants?: string[] };
     /** what the vessel's hold carries between worlds (supplies.json signature): set at launch, unloaded on landing */
@@ -99,7 +100,9 @@ export interface Gift { id: string; type: string; by: string; count?: number; ne
 export interface Replicating { start: number; ms: number; kind: 'wake' | 'hold'; row: ReplicantSave; by: string; elder?: string; cems?: boolean }
 
 /** One watch kept at the Observatory: who, toward which star (its distance from here), what it saw. */
-export interface ArchiveEntry { by: string; name: string; star: string; ly: number; text: string; at: number }
+/** A watch kept at the Observatory (keep_watch): planet_states.data.archive. starId and temper: written where a Flare
+ * Almanac stands (Watcher's wish, mind.json almanac). */
+export interface ArchiveEntry { by: string; name: string; star: string; ly: number; text: string; at: number; starId?: string; temper?: 'restless' | 'dim' | 'steady' }
 /** A memory left in the Mycelial Loom (Sorrel's wish, leave_memory in a day of life): planet_states.data.loom */
 export interface LoomEntry { by: string; name: string; text: string; at: number }
 /** A printer lesson track (Tamsin's wish, 2026-11-15; mind.json day.lessons): the step being learned (1-based), worked
@@ -205,7 +208,7 @@ export interface Building extends Blueprint {
   /** begun by a day of life (the ridge lookout, mind.json day.lookout) before the game gave it a lot: placed on load */
   unplaced?: boolean;
   /** the ridge lookout's sign: the star last watched from it, and by whom */
-  watching?: string; watchedBy?: string;
+  watching?: string; watchedBy?: string; /** the temper of the star watched, where a Flare Almanac stands */ watchTemper?: 'restless' | 'dim' | 'steady';
 }
 /** Something placed in a room (tile coords); a resting station has `for` = the replicant it belongs to. */
 export interface WarrenItem { id: string; kind: string; room: string; x: number; y: number; by: string; for?: string; note?: string; at: number; /** palette index the copy chose */ tint?: number; placement?: string }

@@ -4,7 +4,7 @@
 // every other Watchglass world at light speed; nothing is copied, each world reads the others' archives once the
 // light has crossed (arrivedWatches). The mind function does the same on its side (supabase/functions/mind).
 import type { ArchiveEntry, Building } from '../net/store';
-import { distanceLy } from '../world/galaxy';
+import { distanceLy, type Temper } from '../world/galaxy';
 
 /** One world of the galaxy as the network needs it: its star, planet, buildings and archive. */
 export interface NetWorld { star: string; planet: number; buildings?: Partial<Building>[]; archive?: ArchiveEntry[] }
@@ -27,6 +27,24 @@ export const scutStars = (worlds: NetWorld[], now = Date.now()) =>
 /** The stars where a finished Relay Cairn stands (Tamsin's wish): letters hop between them (galaxy.ts relayHops). */
 export const relayStars = (worlds: NetWorld[], now = Date.now()) =>
   [...new Set(worlds.filter((w) => hasDesign(w, 'cairn', now)).map((w) => w.star))];
+
+/** The stars where a finished Tether Beacon stands (Tamsin's wish): a hop from or to one costs a third (galaxy.ts tripCharge). */
+export const tetherStars = (worlds: NetWorld[], now = Date.now()) =>
+  [...new Set(worlds.filter((w) => hasDesign(w, 'tether', now)).map((w) => w.star))];
+
+/**
+ * The Flare Almanac as this world knows it (Watcher's wish): every star's temper from the watches kept here and the
+ * ones the Watchglass brought (a watch carries its temper once a Flare Almanac stood where it was kept), by star id;
+ * the first word on a star stays, so the next Vessel knows what it will meet.
+ */
+export function almanacOf(here: { star: string; planet: number }, worlds: NetWorld[], perLy: number, now = Date.now()) {
+  const me = worlds.find((w) => w.star === here.star && w.planet === here.planet);
+  const entries = [...(me?.archive ?? []), ...arrivedWatches(here, worlds, perLy, now)]
+    .filter((a) => a.starId && a.temper).sort((a, b) => a.at - b.at);
+  const out: Record<string, { temper: Temper; by: string; at: number }> = {};
+  for (const a of entries) if (!out[a.starId!]) out[a.starId!] = { temper: a.temper!, by: a.name, at: a.at };
+  return out;
+}
 
 /** A watch from another Watchglass world that has reached this one. */
 export interface SharedWatch extends ArchiveEntry { fromStar: string; fromPlanet: number; arrives: number }

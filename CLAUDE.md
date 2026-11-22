@@ -201,7 +201,9 @@ src/data/designs.json    the Cems' designs (lantern, house, storehouse, nursery,
                          you carry), gives (house mood, storehouse storage, nursery speed), materials, cameras
 src/core/network.ts      the links between worlds (2026-11-19 pm): scutStars (a finished Cem Mind: letters between two
                          of them arrive at once, mailSeconds' scut), relayStars (a finished Relay Cairn, 2026-11-20 pm:
-                         letters hop along a chain of them, galaxy.ts relayHops, mind.json relay), arrivedWatches (the Watchglass: the other
+                         letters hop along a chain of them, galaxy.ts relayHops, mind.json relay), tetherStars (a finished
+                         Tether Beacon: a hop from or to one costs a third, galaxy.ts tripCharge), almanacOf (the Flare
+                         Almanac: each star's temper from the watches here and through the Watchglass), arrivedWatches (the Watchglass: the other
                          Watchglass worlds' archives once their light has crossed, since both stood); the worlds come
                          from GameStore.networkWorlds (PlanetScene.network, netWorlds() with this world as it stands)
 src/entities/Watch.ts    the Observatory's watch (Watcher's wish, 2026-11-15): while a copy's traits.watch lasts (keep_watch
@@ -497,7 +499,9 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
 journal, the plants drawn in the warren's planters), `node tools/playtest-cinder.mjs` (Cinder Sounding's glass ridges: only there, placed after every older node, a
-fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-loom.mjs` (the Mycelial Loom waits for the Nous Chip and the Biolab; its memories on the journal's HERE page; Sillbrook and Sporeveil load), `node tools/playtest-brine.mjs` (Saltveil, Brinehollow and Verrin load, Verrin's fixed light, their materials), `node tools/playtest-relay.mjs` (the Relay Cairn and the Seedarc wait for what they need; a letter hops along a chain of cairns, a broken chain gives the light's time back; seed aboard only where a Seedarc stands; Hushfen loads), `node tools/playtest-network.mjs` (the Cem Mind and the Watchglass wait for the Nous Chip; a letter at once between two Cem Minds; a far watch arrives after its light, never one from before both stood; THROUGH THE WATCHGLASS in the journal; Glasswind loads), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
+fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-loom.mjs` (the Mycelial Loom waits for the Nous Chip and the Biolab; its memories on the journal's HERE page; Sillbrook and Sporeveil load), `node tools/playtest-brine.mjs` (Saltveil, Brinehollow and Verrin load, Verrin's fixed light, their materials), `node tools/playtest-almanac.mjs` (the Flare Almanac and the Tether Beacon wait for what they need; a restless star
+costs a cell more, a tether a third, and fills the cells; the almanac through the Watchglass; the lens's temper;
+Rootmere loads), `node tools/playtest-relay.mjs` (the Relay Cairn and the Seedarc wait for what they need; a letter hops along a chain of cairns, a broken chain gives the light's time back; seed aboard only where a Seedarc stands; Hushfen loads), `node tools/playtest-network.mjs` (the Cem Mind and the Watchglass wait for the Nous Chip; a letter at once between two Cem Minds; a far watch arrives after its light, never one from before both stood; THROUGH THE WATCHGLASS in the journal; Glasswind loads), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
 star, then the star watched and the watcher, no lens), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
 out after, the archive in the journal), `node tools/playtest-universe.mjs` (the ship's cells, the Fusion Still, charted routes on the map, a launch charting its
 route), `node tools/playtest-changes.mjs` (the copies' proposals in the journal in every state, SAY NO, an away proposal told
@@ -765,6 +769,19 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   limiter: about -14 dBFS RMS in play, peaks under -2, no clipping. The audio also resumes on every gesture and when the
   page is shown again (a tab switch, a locked phone), and a silent media element started in the first gesture lets iOS
   play past the silent switch. Verified: build, typecheck, `playtest-sound`, `playtest`, levels in headless Chromium.
+
+### Maker 2026-11-21 pm
+- Four wishes carried (threshold 3 of 7); three built in part. Watcher's **Flare Almanac** (`designs.json almanac`,
+  after the Watchglass and the Cem Mind; quartz 2, salt 2, Ember 3): every watch kept where one stands names the
+  star's temper (`galaxy.ts starTemper`, `mind.json almanac`: restless from M3.5, dim for white and brown dwarfs,
+  else steady), the Watchglass carries it (`network.ts almanacOf`), the map and planet list name it, a ship to a
+  restless star spends a cell more (`galaxy.ts tripCharge`), the lens and the lookout's sign show it
+  (`?shot=1&view=almanac`), THE FLARE ALMANAC on the journal's HERE page. Tamsin's **Tether Beacon** (`designs.json
+  tether`, after the Relay Cairn and the Fusion Still): boarding where one stands fills the cells
+  (`Departure.tether`), a hop from or to one costs a third (`mind.json tether`), the map says TETHERED. Sorrel's
+  **Rootmere**: loam meadows on GLIESE 1276 (`planets.json rootmere`, `floor.json rootmere`); its signature material
+  is soil, and a day's gather finds soil only there (`planets.json gathers`, `mind.json day.gather.extra`). Ember
+  Gold's Lightbed waits. `tools/playtest-almanac.mjs` (new). `docs/days/2026-11-21-pm.md`.
 
 ### Maker 2026-11-21 am
 - Four wishes carried (threshold 3 of 7); three built in part. Ember Gold's **Saltveil**: pale violet salt flats and

@@ -13,6 +13,13 @@ const read = (f) => JSON.parse(fs.readFileSync(new URL(`../src/data/${f}`, impor
 const PARTS = read('parts.json'), PLAYER = read('player.json'), SUPPLIES = read('supplies.json'), BUILDINGS = read('buildings.json');
 const PLANETS = read('planets.json'), TRAVEL = read('travel.json'), DRIFT = read('drift.json'), HOMEWORLD = read('homeworld.json'), BIOWORKS = read('bioworks.json');
 const BIOMES = read('biomes.json'), DESIGNS = read('designs.json');
+/** The game's galaxy.ts starTemper, from a spectral class (mind.json almanac). */
+const temperOf = (c) => {
+  const M = read('mind.json').almanac, cls = String(c ?? '').toUpperCase().trim();
+  if (M.dim.includes(cls.charAt(0))) return 'dim';
+  if (cls.charAt(0) === 'M') { const sub = parseFloat(cls.slice(1)); if (cls.includes('E') || (Number.isFinite(sub) && sub >= M.restlessFromM)) return 'restless'; }
+  return 'steady';
+};
 const MIND = read('mind.json'), WARREN = read('warren.json'), STARS = read('stars.json'), BEACON = read('beacon.json');
 const names = (o) => Object.keys(o ?? {}).filter((k) => !k.startsWith('_'));
 const colorIndex = Object.fromEntries(names(PARTS.colors).map((k) => [k, PARTS.colors[k]]));
@@ -42,6 +49,9 @@ const out = {
   },
   mailSecondsPerLy: MIND.mailSecondsPerLy,
   relay: { hopLy: MIND.relay.hopLy, secondsPerHop: MIND.relay.secondsPerHop }, seedarc: { carry: MIND.seedarc.carry },
+  // Watcher's Flare Almanac: the stars whose temper is not steady (the game's galaxy.ts starTemper), and the spare cell
+  almanac: { extraCells: MIND.almanac.extraCells, tempers: Object.fromEntries(STARS.stars.map((s) => [s.id, temperOf(s.cls)]).filter(([, t]) => t !== 'steady')) },
+  tether: { costShare: MIND.tether.costShare },
   beacons: STARS.beacons, latticeRadius: BEACON.lattice.radius,
   away: MIND.away,
   journal: MIND.journal,
@@ -58,6 +68,8 @@ const out = {
   },
   governance: { share: MIND.governance.share, min: MIND.governance.min, staleDays: MIND.governance.staleDays },
   // what a world lacks (planets.json lacks), by 'star:planet': a day's gather cannot find it there
+  // what a world gives a day's gather beyond the usual (planets.json gathers: Rootmere's soil), by 'star:planet'
+  gathers: Object.fromEntries((PLANETS.planets ?? PLANETS).filter((p) => p.gathers?.length && p.star).map((p) => [`${p.star}:${p.planetIndex}`, p.gathers])),
   lacks: Object.fromEntries((PLANETS.planets ?? PLANETS).filter((p) => p.lacks?.length && p.star).map((p) => [`${p.star}:${p.planetIndex}`, p.lacks])),
   mind: { model: MIND.model, effort: MIND.effort, budget: MIND.budget, prices: MIND.prices, paused: !!MIND.paused },
   // [name, x, y, z, spectral class letter, confirmed planets (0: generated, planet 1 always exists)]

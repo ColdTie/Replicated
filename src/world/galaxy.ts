@@ -3,7 +3,7 @@ import BEACON from '../data/beacon.json';
 import BIOMES from '../data/biomes.json';
 import STARS from '../data/stars.json';
 import TRAVEL from '../data/travel.json';
-import { PLANETS, hex, type PlanetDef } from '../core/data';
+import { MIND, PLANETS, hex, type PlanetDef } from '../core/data';
 import { rgb } from '../fx/textures';
 import { planetAt, systemFor, type CatalogPlanet } from './system';
 
@@ -98,6 +98,24 @@ export function cellsNow(cells: Cells | null | undefined, now = Date.now()) {
 /** What a trip takes from the cells: a fifth on a charted route (travel.json routes). */
 export const chargeFor = (ly: number, charted = false) =>
   Math.ceil((TRAVEL.power.base + TRAVEL.power.perLy * ly) * (charted ? TRAVEL.routes.costShare : 1));
+/** What the Flare Almanac writes of a star (Watcher's wish, mind.json almanac): restless (a late red dwarf, flaring in
+ * bursts), dim (a white or brown dwarf, still) or steady. */
+export type Temper = 'restless' | 'dim' | 'steady';
+export function starTemper(id: string): Temper {
+  const cls = (starById(id)?.cls ?? '').toUpperCase().trim();
+  if (MIND.almanac.dim.includes(cls.charAt(0))) return 'dim';
+  if (cls.charAt(0) === 'M') {
+    const sub = parseFloat(cls.slice(1));
+    if (cls.includes('E') || (Number.isFinite(sub) && sub >= MIND.almanac.restlessFromM)) return 'restless';
+  }
+  return 'steady';
+}
+/** What a trip takes from the cells: chargeFor, a third of it (mind.json tether) when a Tether Beacon stands at
+ * either end, and a cell or so more for a star the almanac knows as restless. */
+export function tripCharge(ly: number, charted: boolean, tethered = false, restless = false) {
+  const base = chargeFor(ly, charted);
+  return (tethered ? Math.ceil(base * MIND.tether.costShare) : base) + (restless ? MIND.almanac.extraCells : 0);
+}
 /** A route between two stars, the same either way round. */
 export const routeKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 

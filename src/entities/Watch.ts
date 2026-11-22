@@ -17,24 +17,33 @@ interface Shown { id: string; light: Light; glow: Phaser.GameObjects.Image; beam
 
 interface Sign { id: string; label: Phaser.GameObjects.BitmapText; x: number; y: number }
 
+/** The Flare Almanac's words for a star's temper (mind.json almanac). */
+const TEMPER_WORDS: Record<string, string> = { restless: 'RESTLESS', dim: 'DIM AND STILL', steady: 'STEADY' };
+
 export class Watch {
   private shown: Shown | null = null;
   private sign: Sign | null = null;
   private nextCheck = 0;
   /** screenshots and playtests: a watcher staged without a day of life */
-  staged: { name: string; until: number } | null = null;
+  staged: { name: string; until: number; star?: string; temper?: string } | null = null;
 
   constructor(private s: PlanetScene) {}
 
   /** Who keeps a watch here now (the latest to begin one), or null. */
-  watcher(now = Date.now()): { name: string; star?: string } | null {
-    if (this.staged && this.staged.until > now) return { name: this.staged.name };
-    let best: { name: string; star: string; at: number } | null = null;
+  watcher(now = Date.now()): { name: string; star?: string; temper?: string } | null {
+    if (this.staged && this.staged.until > now) return { name: this.staged.name, star: this.staged.star, temper: this.staged.temper };
+    let best: { name: string; star: string; temper?: string; at: number } | null = null;
     for (const n of this.s.npcs) {
       const w = n.data.traits.watch;
-      if (w && w.from !== 'lookout' && w.until > now && (!best || w.at > best.at)) best = { name: n.data.name, star: w.star, at: w.at };
+      if (w && w.from !== 'lookout' && w.until > now && (!best || w.at > best.at)) best = { name: n.data.name, star: w.star, temper: w.temper, at: w.at };
     }
     return best;
+  }
+
+  /** The lens's words: who watches, and, where a Flare Almanac stands (Watcher's wish), the star and its temper. */
+  lensText(who: { name: string; star?: string; temper?: string }) {
+    if (!who.temper || !who.star) return who.name.toUpperCase();
+    return `${who.name.toUpperCase()}\n${who.star.toUpperCase()}\n${TEMPER_WORDS[who.temper] ?? who.temper.toUpperCase()}`;
   }
 
   /** What the ridge lookout's sign says now: the star, and who watches from there. */
@@ -47,7 +56,8 @@ export class Watch {
       const w = n.data.traits.watch;
       if (w?.from === 'lookout' && w.until > now && (!who || w.at > who.at)) who = { name: n.data.name, at: w.at };
     }
-    return who ? `${star}\n${who.name.toUpperCase()} WATCHES` : star;
+    const temper = b.watchTemper ? `\n${TEMPER_WORDS[b.watchTemper]}` : '';
+    return who ? `${star}${temper}\n${who.name.toUpperCase()} WATCHES` : `${star}${temper}`;
   }
 
   /** The finished ridge lookout (the first one standing). */
@@ -70,7 +80,7 @@ export class Watch {
       const obs = who ? this.observatory() : undefined;
       if (!who || !obs) this.hide();
       else if (!this.shown || this.shown.id !== obs.id) this.show(obs.id);
-      if (this.shown && who) this.shown.label.setText(who.name.toUpperCase());
+      if (this.shown && who) this.shown.label.setText(this.lensText(who));
       this.updateSign();
     }
     const sg = this.sign;
@@ -104,7 +114,7 @@ export class Watch {
     const light = s.lighting.add({ x: at.x, y: at.y, radius: WATCH.light.radius, color, intensity: 0, flicker: 0.05 });
     const glow = s.add.image(at.x, at.y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(color).setScale(WATCH.glow.scale).setAlpha(0).setDepth(6100);
     const beam = s.add.graphics().setBlendMode(Phaser.BlendModes.ADD).setDepth(6100);
-    const label = ink(s.add.bitmapText(at.x, at.y - 12, 'pixel', '').setTint(color).setOrigin(0.5, 1).setAlpha(0).setDepth(6200));
+    const label = ink(s.add.bitmapText(at.x, at.y - 12, 'pixel', '', undefined, 1).setTint(color).setOrigin(0.5, 1).setAlpha(0).setDepth(6200));
     this.shown = { id, light, glow, beam, label, x: at.x, y: at.y };
   }
 

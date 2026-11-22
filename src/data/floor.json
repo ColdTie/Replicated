@@ -729,6 +729,25 @@
         "relief": 4
       }
     },
+    "rootmere": {
+      "kind": "grass",
+      "relief": 3,
+      "coverage": 0.68,
+      "pebbles": 0.6,
+      "soil": ["1a140e", "2a2016", "3a2e20", "4a3c2a"],
+      "cover": ["2e4a2a", "3e5e34", "547a40", "6e9450", "92b068"],
+      "detail": ["a8c878", "6e9450", "c8b88a", "8a6a44"],
+      "flowers": ["e8eef0", "c8d4d0"],
+      "leaves": ["3e5e34", "547a40"],
+      "stone": ["2a2620", "3a342c", "4e463a", "665c4c"],
+      "rock": {
+        "ramp": ["16120e", "241e18", "362e24", "4a4032", "625646", "7e705c"],
+        "cover": ["547a40", "6e9450", "3e5e34"],
+        "coverage": 0.55,
+        "cracks": 0.4,
+        "relief": 4
+      }
+    },
     "hushfen": {
       "kind": "grass",
       "relief": 3,

@@ -15,7 +15,7 @@
     "dusk": [[47, 54, 59, 62], [43, 50, 55, 59], [40, 47, 52, 55], [42, 49, 54, 57]],
     "still": [[50, 57, 62, 64], [47, 54, 57, 62], [43, 50, 54, 57], [45, 52, 57, 59]]
   },
-  "worldMood": { "homeworld": "home", "earth": "home", "verdant": "home", "cemworld": "open", "dune": "open", "ember": "dusk", "spore": "dusk", "solace": "dusk", "cinder": "open", "tides": "open", "orchard": "home", "brightwater": "home", "lanternfen": "still", "glasswind": "open", "sillbrook": "home", "sporeveil": "dusk", "hushfen": "still", "saltveil": "dusk", "brinehollow": "open", "verrin": "dusk", "frost": "still", "moon": "still", "space": "still", "default": "home" },
+  "worldMood": { "homeworld": "home", "earth": "home", "verdant": "home", "cemworld": "open", "dune": "open", "ember": "dusk", "spore": "dusk", "solace": "dusk", "cinder": "open", "tides": "open", "orchard": "home", "brightwater": "home", "lanternfen": "still", "glasswind": "open", "sillbrook": "home", "sporeveil": "dusk", "hushfen": "still", "rootmere": "home", "saltveil": "dusk", "brinehollow": "open", "verrin": "dusk", "frost": "still", "moon": "still", "space": "still", "default": "home" },
   "duck": 0.35,
   "duckSeconds": 0.25,
   "space": {
@@ -32,6 +32,7 @@
     "verdant": { "wind": { "freq": 900, "q": 0.6, "vol": 0.03, "lfo": 0.11 }, "event": "leaves", "every": 5 },
     "brightwater": { "wind": { "freq": 760, "q": 0.6, "vol": 0.03, "lfo": 0.07 }, "event": "leaves", "every": 6 },
     "sillbrook": { "wind": { "freq": 820, "q": 0.6, "vol": 0.03, "lfo": 0.06 }, "event": "leaves", "every": 6 },
+    "rootmere": { "wind": { "freq": 460, "q": 0.6, "vol": 0.026, "lfo": 0.04 }, "drone": { "freq": 36.71, "vol": 0.014 }, "event": "bubble", "every": 11 },
     "hushfen": { "wind": { "freq": 520, "q": 0.7, "vol": 0.022, "lfo": 0.05 }, "drone": { "freq": 36.71, "vol": 0.014 }, "event": "bubble", "every": 9 },
     "saltveil": { "wind": { "freq": 1200, "q": 1.2, "vol": 0.04, "lfo": 0.05 }, "drone": { "freq": 36.71, "vol": 0.014 }, "event": "crust", "every": 5 },
     "brinehollow": { "wind": { "freq": 700, "q": 0.5, "vol": 0.045, "lfo": 0.08 }, "drone": { "freq": 55, "vol": 0.016 }, "event": "crust", "every": 6 },

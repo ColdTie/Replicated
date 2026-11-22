@@ -46,6 +46,7 @@
     "orchard": { "square": "earth", "streetWear": 0.75, "trackWear": 0.3, "edgePx": 7, "path": ["4a2a24", "5e3a2e", "74503c", "8a644c"] },
     "brightwater": { "square": "earth", "streetWear": 0.75, "trackWear": 0.3, "edgePx": 7, "path": ["3a3a40", "4a4a52", "5e5e66", "74747c"] },
     "sillbrook": { "square": "earth", "streetWear": 0.75, "trackWear": 0.3, "edgePx": 7, "path": ["4a4a40", "5c5a4e", "706e60", "868474"] },
+    "rootmere": { "square": "earth", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["2a2016", "3a2e20", "4a3c2a", "5e4e38"] },
     "hushfen": { "square": "earth", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["262a26", "343a32", "464c42", "5a6054"] },
     "saltveil": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["5a4e6a", "6e6282", "847898", "9a8eae"] },
     "brinehollow": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["6a5058", "80646c", "967a82", "ac9098"] },

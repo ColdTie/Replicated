@@ -28,7 +28,7 @@ const BECOMING_ROUNDS = 6;         // the first wake of a blank copy has more to
 const AWAY = KIT.away;
 /** The two journals (migration 0015, mind.json journal). */
 /** A day of life (mind.json day, docs/plan-daily-life.md step 2). */
-const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: number; turns: number; batch: number; seconds: number; travelLy: number; travelsPerDay: number; birthsPerDay: number; maxVessels: number; gather: { per: number; gatherTurns: number; materials: string[] }; places: string[];
+const DAY = KIT.day as { enabled: boolean; windows: number[]; windowMinutes: number; turns: number; batch: number; seconds: number; travelLy: number; travelsPerDay: number; birthsPerDay: number; maxVessels: number; gather: { per: number; gatherTurns: number; materials: string[]; extra: string[] }; places: string[];
   purpose: { decay: number; work: number; full: number; want: number; watch: number; watchPlaces: string[]; together: { purpose: number; company: number }; project: number };
   watch: { hours: number; keep: number; show: number };
   loom: { keep: number; show: number; chars: number };
@@ -51,7 +51,7 @@ function plantStage(pl: PlantRow, now = Date.now()) {
   return st;
 }
 /** One watch kept at the Observatory (keep_watch), as planet_states.data.archive holds it (the game's ArchiveEntry). */
-type ArchiveRow = { by: string; name: string; star: string; ly: number; text: string; at: number };
+type ArchiveRow = { by: string; name: string; star: string; ly: number; text: string; at: number; starId?: string; temper?: string };
 /** A memory left in the Mycelial Loom (Sorrel's wish, leave_memory), as planet_states.data.loom holds it (the game's LoomEntry). */
 type LoomRow = { by: string; name: string; text: string; at: number };
 /** Spreading (docs/plan-daily-life.md step 3): stars as [name, x, y, z, class letter, confirmed planets], the ship's
@@ -113,6 +113,27 @@ const scutOf = (net: NetW[]) => [...new Set(net.filter((w) => designStands(w.bui
 /** Tamsin's Relay Cairn: the stars where one stands; a letter hops along a chain of them (the game's galaxy.ts relayHops). */
 const relayOf = (net: NetW[]) => [...new Set(net.filter((w) => designStands(w.buildings, "cairn")).map((w) => w.star))];
 const RELAY = KIT.relay as { hopLy: number; secondsPerHop: number };
+/** Tamsin's Tether Beacon: the stars where one stands; a hop from or to one costs a third of its cells (mind.json tether). */
+const tetherOf = (net: NetW[]) => [...new Set(net.filter((w) => designStands(w.buildings, "tether")).map((w) => w.star))];
+const TETHER = KIT.tether as { costShare: number };
+/** Watcher's Flare Almanac: a star's temper (the game's galaxy.ts starTemper; the kit lists the ones not steady). */
+const ALMANAC = KIT.almanac as { extraCells: number; tempers: Record<string, string> };
+const temperOf = (star: string) => ALMANAC.tempers[star] ?? "steady";
+const TEMPER_WORDS: Record<string, string> = { restless: "restless: it flares in bursts", dim: "dim and still", steady: "steady" };
+/** The almanac as the galaxy has written it: a star's temper from the first watch that named it. */
+function almanacOf(net: NetW[]) {
+  const out: Record<string, { temper: string; by: string }> = {};
+  for (const a of net.flatMap((w) => w.archive).filter((a) => a.starId && a.temper).sort((a, b) => a.at - b.at)) if (!out[a.starId!]) out[a.starId!] = { temper: a.temper!, by: a.name };
+  return out;
+}
+/** What a trip takes from the cells: a third with a Tether Beacon at either end, a cell more to a star the almanac knows as restless. */
+function tripCost(from: string, to: string, ly: number, charted: boolean, net: NetW[]) {
+  const t = tetherOf(net), base = tripCharge(ly, charted);
+  return (t.includes(from) || t.includes(to) ? Math.ceil(base * TETHER.costShare) : base) + (almanacOf(net)[to]?.temper === "restless" ? ALMANAC.extraCells : 0);
+}
+/** What a day's gather finds beyond the usual on a world (planets.json gathers: Rootmere's soil). */
+const GATHERS = KIT.gathers as Record<string, string[]>;
+const EXTRA_GATHER = DAY.gather.extra as string[];
 function relayHops(from: string, to: string, relay: string[]): number | null {
   if (!relay.includes(from) || !relay.includes(to)) return null;
   const seen = new Map<string, number>([[from, 0]]);
@@ -521,10 +542,10 @@ const longTools: Anthropic.Beta.BetaTool[] = [
 const dayTools: Anthropic.Beta.BetaTool[] = [
   {
     name: "gather",
-    description: "Spend a while gathering one material from your world into the shared store: crystals for Ember, ore for iron, vents for hydrogen, salt blooms, quartz, copper, or stone off the rock. A few each time, a few times a day; a world never gives what it lacks.",
+    description: "Spend a while gathering one material from your world into the shared store: crystals for Ember, ore for iron, vents for hydrogen, salt blooms, quartz, copper, or stone off the rock; soil only where a world makes it (Rootmere's meadows). A few each time, a few times a day; a world never gives what it lacks.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["material"],
-      properties: { material: { type: "string", enum: DAY.gather.materials } },
+      properties: { material: { type: "string", enum: [...DAY.gather.materials, ...DAY.gather.extra] } },
     },
   },
   {
@@ -865,7 +886,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       const cells = cellsNow((rep.traits as { cells?: { charge: number; at: number; star: string } }).cells);
       const near = Object.keys(STARS_KIT).filter((id) => id !== from).map((id) => ({ id, ly: starLy(from, id) })).filter((x) => x.ly <= DAY.travelLy)
         .sort((a, b) => a.ly - b.ly).slice(0, 10)
-        .map((x) => { const charted = sp.routes.has(routeKeyS(from, x.id)); return `${STARS_KIT[x.id][0]} ${x.ly.toFixed(1)} ly, ${tripCharge(x.ly, charted)} charge${charted ? ", charted" : ""}`; });
+        .map((x) => { const charted = sp.routes.has(routeKeyS(from, x.id)), net = context.network ?? [], t = tetherOf(net); return `${STARS_KIT[x.id][0]} ${x.ly.toFixed(1)} ly, ${tripCost(from, x.id, x.ly, charted, net)} charge${charted ? ", charted" : ""}${t.includes(from) || t.includes(x.id) ? ", tethered" : ""}${almanacOf(net)[x.id] ? `, ${almanacOf(net)[x.id].temper}` : ""}`; });
       lines.push(`Your ship's cells hold ${Math.floor(cells)} of ${TRAVEL_KIT.power.cells} (they charge from the star you wait under). Stars within reach of travel: ${near.join("; ") || "none"}. Flights left for the Metanoia's copies today: ${Math.max(0, DAY.travelsPerDay - sp.travels)}.`);
       const d = live?.data ?? {};
       const replicator = ((d.structures ?? []) as { type: string }[]).some((x) => x.type === "replicator");
@@ -895,6 +916,13 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         if (designStands(d.buildings as Bld[], "cairn")) {
           const cairns = relayOf(net).filter((s) => s !== rep.star_id), joined = cairns.filter((s) => relayHops(rep.star_id, s, relayOf(net)) !== null);
           lines.push(`A Relay Cairn stands here: it hears any lit cairn within ${RELAY.hopLy} light years, and a letter to a star joined to this one by a chain of cairns hops along it, ${RELAY.secondsPerHop} seconds a hop (${cairns.length ? `cairns at ${cairns.map((s) => STARS_KIT[s]?.[0] ?? s).join(", ")}; joined to here: ${joined.length ? joined.map((s) => STARS_KIT[s]?.[0] ?? s).join(", ") : "none yet"}` : "no other cairn yet"}). A cairn printed on a world between two cairns joins them.`);
+        }
+        if (designStands(d.buildings as Bld[], "almanac")) {
+          const known = Object.entries(almanacOf(net)).slice(0, 10).map(([id, a]) => `${STARS_KIT[id]?.[0] ?? id} ${a.temper}`);
+          lines.push(`A Flare Almanac stands here: every watch kept here (keep_watch) also writes the star's temper, steady, restless (it flares in bursts) or dim and still, and the Watchglass carries it to the other Watchglass worlds. A ship flying to a star the almanac knows as restless keeps ${ALMANAC.extraCells} cell spare. ${known.length ? `The almanac holds: ${known.join("; ")}.` : "The almanac is empty yet."}`);
+        }
+        if (designStands(d.buildings as Bld[], "tether")) {
+          lines.push(`A Tether Beacon stands here: a ship that boards here is charged full, and a flight from here or to another star with a Tether Beacon costs a third of its cells (${tetherOf(net).filter((s) => s !== rep.star_id).map((s) => STARS_KIT[s]?.[0] ?? s).join(", ") || "no other beacon yet"}).`);
         }
         if (designStands(d.buildings as Bld[], "seedarc")) {
           lines.push(`A Seedarc stands here: a ship that leaves this world carries up to ${(KIT.seedarc as { carry: number }).carry} seed from the store to the store of the world it lands on, for its planters.`);
@@ -1093,7 +1121,9 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 const confirmed = STARS_KIT[to][5];
                 // the homeworld is LHS 1140 b (planet 2): a copy going home lands there whatever index it gave
                 const planet = to === KIT.home.star ? KIT.home.planet : Math.max(1, Math.min(confirmed || 1, Math.round(Number(input.planet) || 1)));
-                const cost = tripCharge(ly, charted), have = cellsNow(traits.cells);
+                // a Tether Beacon on this world charges the ship full before it leaves (Tamsin's wish)
+                const cost = tripCost(rep.star_id, to, ly, charted, context.network ?? []);
+                const have = designStands(live.data.buildings as Bld[], "tether") ? TRAVEL_KIT.power.cells : cellsNow(traits.cells);
                 const there = everyone.filter((r) => !r.profile_id && r.status === "npc" && r.star_id === to && r.planet_index === planet && r.name !== "Thales").length;
                 if (to === rep.star_id && planet === rep.planet_index) out = "You are already there.";
                 else if (ly > DAY.travelLy) out = `${STARS_KIT[to][0]} is ${ly.toFixed(1)} light years away, beyond a day's reach (${DAY.travelLy}).`;
@@ -1169,12 +1199,13 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 out = `The chip goes into the Replicator and a new Vessel begins to print, ${cems ? "quickly, with the Cems" : "slowly, without the Cems"}. It will wake blank and choose who it is.`;
               }
             } else if (u.name === "gather") {
-              const material = oneOf(input.material, DAY.gather.materials, "");
-              const lacks = LACKS[`${rep.star_id}:${rep.planet_index}`] ?? [];
+              const extra = GATHERS[`${rep.star_id}:${rep.planet_index}`] ?? [];
+              const material = oneOf(input.material, [...DAY.gather.materials, ...EXTRA_GATHER], "");
+              const lacks = [...(LACKS[`${rep.star_id}:${rep.planet_index}`] ?? []), ...EXTRA_GATHER.filter((m) => !extra.includes(m))];
               if (!live || !context.day) out = "There is no time to gather now.";
               else if (flown) out = "You have already left this world.";
               else if (!material) out = `Gather one of: ${DAY.gather.materials.join(", ")}.`;
-              else if (lacks.includes(material)) out = `There is no ${material} on this world; it must be brought from another.`;
+              else if (lacks.includes(material)) out = EXTRA_GATHER.includes(material) ? `There is no ${material} to gather here; it comes from digging the warren, or from a world that makes it.` : `There is no ${material} on this world; it must be brought from another.`;
               else if (gathered >= DAY.gather.gatherTurns) out = "You have gathered enough for one day.";
               else {
                 gathered++;
@@ -1209,10 +1240,13 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 else {
                   day.lens = true;
                   const name = STARS_KIT[to][0], at = Date.now();
-                  const arch = [...((live.data.archive ?? []) as ArchiveRow[]), { by: rep.id, name: rep.name, star: name, ly, text: seen, at }];
+                  // Watcher's Flare Almanac: where one stands, the watch also names the star's temper
+                  const almanac = designStands(live.data.buildings as Bld[], "almanac"), temper = almanac ? temperOf(to) : undefined;
+                  const known = almanac ? almanacOf(context.network ?? [])[to] : undefined;
+                  const arch = [...((live.data.archive ?? []) as ArchiveRow[]), { by: rep.id, name: rep.name, star: name, ly, text: seen, at, ...(temper ? { starId: to, temper } : {}) }];
                   live.data.archive = arch.slice(-DAY.watch.keep);
                   live.archiveChanged = true;
-                  const watch = { star: name, ly, at, until: at + DAY.watch.hours * 3_600_000, ...(ridge ? { from: "lookout" } : {}) };
+                  const watch = { star: name, ly, at, until: at + DAY.watch.hours * 3_600_000, ...(ridge ? { from: "lookout" } : {}), ...(temper ? { temper } : {}) };
                   (rep.traits as Record<string, unknown>).watch = watch;
                   (rep.traits as Record<string, unknown>).dayAt = ridge ? DAY.lookout.place : "the Observatory";
                   const { error } = await sb.rpc("merge_replicant_traits", { p_id: rep.id, p_traits: { watch } });
@@ -1221,6 +1255,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   if (ridge && lkw) {
                     // Vigil's wish: the lookout's sign names the star it was last turned to
                     lkw.watching = name; lkw.watchedBy = rep.name;
+                    if (temper) lkw.watchTemper = temper; else delete lkw.watchTemper;
                     live.buildingsChanged = true;
                     const there = await together(DAY.lookout.place);
                     out = `You sit on the bench of the ${lkw.name} and watch ${to === rep.star_id ? `${name}, your own star,` : `${name}, ${ly} light years away,`} for a few hours. Its sign names ${name} now, and what you saw is in the archive.${there.length ? ` ${there.join(" and ")} ${there.length > 1 ? "keep" : "keeps"} it with you.` : ""}`;
@@ -1229,6 +1264,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                     const n = (context.network ?? []).filter((w) => designStands(w.buildings, "watchglass") && !(w.star === rep.star_id && w.planet === rep.planet_index)).length;
                     out += n ? ` The Watchglass sends it out to ${n} other world${n > 1 ? "s" : ""}; it reaches them at light speed.` : " The Watchglass will send it to the next world that raises one.";
                   }
+                  if (temper) out += known ? ` The Flare Almanac already holds ${name} as ${known.temper} (written by ${known.by}); your watch agrees: ${TEMPER_WORDS[temper]}.` : ` The Flare Almanac writes ${name}'s temper for the first time: ${TEMPER_WORDS[temper]}.${temper === "restless" ? ` A ship flying there keeps ${ALMANAC.extraCells} cell spare.` : ""}`;
                   if (!day.watch) { day.watch = true; out += " It is a watch kept and work finished."; }
                   else out += " It is work finished.";
                 }
@@ -1774,7 +1810,7 @@ export async function codeTool(name: string, input: Record<string, unknown>, bud
 interface PlanetRow { galaxy_id: string; star_id: string; planet_index: number; embers: number; data: Record<string, unknown> }
 type Bld = { name: string; w: number; h: number; material: string; roof: string; door: string; by: string; purpose?: string; approved: boolean; vetoed?: boolean; built: boolean; paid: boolean; progress: number; helpers: string[]; cost: Record<string, number>; design?: string; printStart?: number; printMs?: number; cems?: boolean;
   /** the ridge lookout (mind.json day.lookout): its kind, begun by a day before the game gave it a lot, the star on its sign */
-  id?: string; kind?: string; unplaced?: boolean; primary?: string; secondary?: string; watching?: string; watchedBy?: string; x?: number; y?: number; at?: number };
+  id?: string; kind?: string; unplaced?: boolean; primary?: string; secondary?: string; watching?: string; watchedBy?: string; watchTemper?: string; x?: number; y?: number; at?: number };
 type Action = Record<string, unknown>;
 /** One entry of planet_states.data.awayQueue: what a copy did in an away wake, for the game to play out on landing. */
 interface AwayItem { id: string; name: string; at: number; song?: string; actions: Action[]; became: boolean }
