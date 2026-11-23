@@ -797,6 +797,40 @@
         "relief": 7
       }
     },
+    "lanternmere": {
+      "kind": "salt",
+      "relief": 4,
+      "coverage": 0.4,
+      "pebbles": 3,
+      "soil": ["1a1820", "2a2630", "3c3640", "524a52", "6c6260"],
+      "cover": ["2a2418", "3e3420", "5a4a28", "7a6430", "a08a40"],
+      "detail": ["feae34", "fee761", "f4f0c8"],
+      "stone": ["24222c", "34303c", "46424e", "5a5664"],
+      "rock": {
+        "ramp": ["0e0c14", "1a1822", "2a2632", "3c3846", "524c5c", "6e6878"],
+        "cover": ["5a4a28", "7a6430", "a08a40"],
+        "coverage": 0.35,
+        "cracks": 0.7,
+        "relief": 5
+      }
+    },
+    "saltglint": {
+      "kind": "salt",
+      "relief": 3,
+      "coverage": 0.3,
+      "pebbles": 1,
+      "soil": ["9aa0b0", "c0c6d2", "dce2ea", "eef2f6", "ffffff"],
+      "cover": ["2a2834", "3e3a4a", "565062", "f0a0b0", "9ad0a0"],
+      "detail": ["ffffff", "c8f0f4", "9fe6f5"],
+      "stone": ["3a3646", "524c5e", "6c667a", "8a849a"],
+      "rock": {
+        "ramp": ["0c0c14", "181822", "26262f", "363642", "4a4a58", "605e70"],
+        "cover": ["dce2ea", "ffffff"],
+        "coverage": 0.3,
+        "cracks": 0.85,
+        "relief": 6
+      }
+    },
     "thawmere": {
       "kind": "snow",
       "relief": 6,

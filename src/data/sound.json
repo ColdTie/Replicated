@@ -15,7 +15,7 @@
     "dusk": [[47, 54, 59, 62], [43, 50, 55, 59], [40, 47, 52, 55], [42, 49, 54, 57]],
     "still": [[50, 57, 62, 64], [47, 54, 57, 62], [43, 50, 54, 57], [45, 52, 57, 59]]
   },
-  "worldMood": { "homeworld": "home", "earth": "home", "verdant": "home", "cemworld": "open", "dune": "open", "ember": "dusk", "spore": "dusk", "solace": "dusk", "cinder": "open", "tides": "open", "orchard": "home", "brightwater": "home", "lanternfen": "still", "glasswind": "open", "sillbrook": "home", "sporeveil": "dusk", "hushfen": "still", "rootmere": "home", "stillwater": "still", "dimfall": "dusk", "quillfall": "dusk", "murrowfell": "still", "glimmerfield": "open", "thawmere": "still", "saltveil": "dusk", "brinehollow": "open", "verrin": "dusk", "frost": "still", "moon": "still", "space": "still", "default": "home" },
+  "worldMood": { "homeworld": "home", "earth": "home", "verdant": "home", "cemworld": "open", "dune": "open", "ember": "dusk", "spore": "dusk", "solace": "dusk", "cinder": "open", "tides": "open", "orchard": "home", "brightwater": "home", "lanternfen": "still", "glasswind": "open", "sillbrook": "home", "sporeveil": "dusk", "hushfen": "still", "rootmere": "home", "stillwater": "still", "dimfall": "dusk", "lanternmere": "home", "saltglint": "open", "quillfall": "dusk", "murrowfell": "still", "glimmerfield": "open", "thawmere": "still", "saltveil": "dusk", "brinehollow": "open", "verrin": "dusk", "frost": "still", "moon": "still", "space": "still", "default": "home" },
   "duck": 0.35,
   "duckSeconds": 0.25,
   "space": {
@@ -23,7 +23,7 @@
     "panPx": 220,
     "reverb": { "open": { "seconds": 1.8, "send": 0.25 }, "cave": { "seconds": 3.8, "send": 0.6 }, "vault": { "seconds": 1.2, "send": 0.32 } }
   },
-  "footsteps": { "homeworld": "snow", "cemworld": "salt", "frost": "snow", "dune": "sand", "ember": "stone", "moon": "stone", "solace": "stone", "cinder": "sand", "tides": "salt", "orchard": "sand", "lanternfen": "snow", "stillwater": "snow", "thawmere": "snow", "dimfall": "stone", "quillfall": "sand", "murrowfell": "stone", "glimmerfield": "salt", "glasswind": "sand", "sporeveil": "grass", "hushfen": "grass", "saltveil": "salt", "brinehollow": "salt", "verrin": "stone", "default": "grass" },
+  "footsteps": { "homeworld": "snow", "cemworld": "salt", "frost": "snow", "dune": "sand", "ember": "stone", "moon": "stone", "solace": "stone", "cinder": "sand", "tides": "salt", "orchard": "sand", "lanternfen": "snow", "stillwater": "snow", "thawmere": "snow", "dimfall": "stone", "lanternmere": "salt", "saltglint": "salt", "quillfall": "sand", "murrowfell": "stone", "glimmerfield": "salt", "glasswind": "sand", "sporeveil": "grass", "hushfen": "grass", "saltveil": "salt", "brinehollow": "salt", "verrin": "stone", "default": "grass" },
   "iceNearWater": ["homeworld", "frost"],
   "beds": {
     "homeworld": { "wind": { "freq": 520, "q": 0.7, "vol": 0.05, "lfo": 0.07 }, "drone": { "freq": 36.71, "vol": 0.03 }, "event": "creak", "every": 7 },
@@ -35,6 +35,8 @@
     "quillfall": { "wind": { "freq": 700, "q": 0.6, "vol": 0.034, "lfo": 0.09 }, "drone": { "freq": 61.74, "vol": 0.012 }, "event": "bubble", "every": 7 },
     "murrowfell": { "wind": { "freq": 480, "q": 0.8, "vol": 0.04, "lfo": 0.05 }, "drone": { "freq": 36.71, "vol": 0.018 }, "event": "creak", "every": 9 },
     "glimmerfield": { "wind": { "freq": 900, "q": 0.6, "vol": 0.022, "lfo": 0.04 }, "drone": { "freq": 55.0, "vol": 0.012 }, "event": "bubble", "every": 12 },
+    "lanternmere": { "wind": { "freq": 700, "q": 0.8, "vol": 0.03, "lfo": 0.03 }, "drone": { "freq": 36.71, "vol": 0.014 }, "event": "drip", "every": 9 },
+    "saltglint": { "wind": { "freq": 1300, "q": 1.3, "vol": 0.042, "lfo": 0.06 }, "drone": { "freq": 55, "vol": 0.013 }, "event": "crust", "every": 5 },
     "dimfall": { "wind": { "freq": 600, "q": 0.7, "vol": 0.03, "lfo": 0.04 }, "drone": { "freq": 61.74, "vol": 0.014 }, "event": "creak", "every": 12 },
     "thawmere": { "wind": { "freq": 820, "q": 0.9, "vol": 0.034, "lfo": 0.03 }, "drone": { "freq": 36.71, "vol": 0.016 }, "event": "bubble", "every": 8 },
     "stillwater": { "wind": { "freq": 900, "q": 0.9, "vol": 0.036, "lfo": 0.03 }, "drone": { "freq": 36.71, "vol": 0.016 }, "event": "creak", "every": 10 },

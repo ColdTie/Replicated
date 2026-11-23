@@ -52,7 +52,7 @@ function plantStage(pl: PlantRow, now = Date.now()) {
   return st;
 }
 /** One watch kept at the Observatory (keep_watch), as planet_states.data.archive holds it (the game's ArchiveEntry). */
-type ArchiveRow = { by: string; name: string; star: string; ly: number; text: string; at: number; starId?: string; temper?: string };
+type ArchiveRow = { by: string; name: string; star: string; ly: number; text: string; at: number; starId?: string; temper?: string; transit?: { size: string; days: number } };
 /** A memory left in the Mycelial Loom (Sorrel's wish, leave_memory), as planet_states.data.loom holds it (the game's LoomEntry). */
 type LoomRow = { by: string; name: string; text: string; at: number };
 /** A thread left in the Cemwright (Tamsin's wish, cemwright), as planet_states.data.cemwright holds it (the game's CemThread). */
@@ -122,6 +122,28 @@ const TETHER = KIT.tether as { costShare: number };
 /** Watcher's Flare Almanac: a star's temper (the game's galaxy.ts starTemper; the kit lists the ones not steady). */
 const ALMANAC = KIT.almanac as { extraCells: number; tempers: Record<string, string> };
 const temperOf = (star: string) => ALMANAC.tempers[star] ?? "steady";
+/** Watcher's Transit Lens (mind.json transit): the world a watch catches crossing a star's face, its innermost
+ * confirmed planet, else one made from the star's id (the same star always gives the same world). */
+const TRANSIT = KIT.transit as unknown as { sizes: Record<string, string>; made: string[]; minDays: number; maxDays: number; show: number; planets: Record<string, [string, number]> };
+function transitOf(star: string) {
+  const p = TRANSIT.planets[star];
+  if (p) return { size: TRANSIT.sizes[p[0]] ?? "middling", days: Math.max(1, Math.round(p[1])) };
+  let h = 2166136261;
+  for (const c of `transit:${star}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  const f = (h % 10007) / 10007;
+  return { size: TRANSIT.made[h % TRANSIT.made.length], days: Math.round(TRANSIT.minDays * Math.pow(TRANSIT.maxDays / TRANSIT.minDays, f)) };
+}
+const transitWords = (t: { size: string; days: number }) => `a ${t.size} world, a year of ${t.days} day${t.days === 1 ? "" : "s"}`;
+/** The worlds waiting, found by a Transit Lens anywhere in the galaxy (the first find at each star), less the stars
+ * that already hold a hand-made world. */
+function worldsWaiting(archives: { archive?: ArchiveRow[] | null }[]) {
+  const made = new Set(UNIVERSE.worlds.map((w) => w[1]));
+  const out = new Map<string, ArchiveRow & { transit: { size: string; days: number } }>();
+  for (const a of archives.flatMap((w) => w.archive ?? []).sort((x, y) => x.at - y.at)) {
+    if (a.transit && a.starId && !made.has(a.starId) && !out.has(a.starId)) out.set(a.starId, a as ArchiveRow & { transit: { size: string; days: number } });
+  }
+  return [...out.values()];
+}
 const TEMPER_WORDS: Record<string, string> = { restless: "restless: it flares in bursts", dim: "dim and still", steady: "steady" };
 /** The almanac as the galaxy has written it: a star's temper from the first watch that named it. */
 function almanacOf(net: NetW[]) {
@@ -588,7 +610,7 @@ const dayTools: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "keep_watch",
-    description: "At a finished Observatory or ridge lookout on your world, keep a watch: turn the lens (or your eyes, from the lookout) toward a far star (one a Vessel has charted from here, or one within reach; from the lookout your own star too) for a few hours, and write what you see into the archive. Once a day.",
+    description: "At a finished Observatory or ridge lookout on your world, keep a watch: turn the lens (or your eyes, from the lookout) toward a far star (one a Vessel has charted from here, or one within reach; from the lookout your own star too) for a few hours, and write what you see into the archive. Where a Transit Lens stands, the watch also finds a world crossing that star. Once a day.",
     input_schema: {
       type: "object", additionalProperties: false, required: ["star", "seen"],
       properties: {
@@ -763,12 +785,13 @@ const LONG_WAKE = `This is one of your long wakes (about twice a day, while nobo
  * what the Cems' tree holds and what of it stands anywhere, what nobody has made yet, and the latest things built. */
 async function universeNow(sb: ReturnType<typeof service>, galaxy: string, vessels: number) {
   const [worlds, found, routes, built] = await Promise.all([
-    sb.from("planet_states").select("star_id,planet_index,buildings:data->buildings").eq("galaxy_id", galaxy),
+    sb.from("planet_states").select("star_id,planet_index,buildings:data->buildings,archive:data->archive").eq("galaxy_id", galaxy),
     sb.from("discovered_stars").select("star_id", { count: "exact", head: true }).eq("galaxy_id", galaxy),
     sb.from("routes").select("a", { count: "exact", head: true }).eq("galaxy_id", galaxy),
     sb.from("requests").select("detail,done_at").eq("galaxy_id", galaxy).eq("kind", "change").eq("status", "done").order("done_at", { ascending: false }).limit(8),
   ]);
-  const rows = (worlds.data ?? []) as { star_id: string; planet_index: number; buildings: { design?: string; built?: boolean; printStart?: number; printMs?: number }[] | null }[];
+  const rows = (worlds.data ?? []) as { star_id: string; planet_index: number; buildings: { design?: string; built?: boolean; printStart?: number; printMs?: number }[] | null; archive: ArchiveRow[] | null }[];
+  const waits = worldsWaiting(rows).slice(0, TRANSIT.show);
   const stands = new Set<string>();
   for (const w of rows) for (const b of w.buildings ?? []) if (b.design && (b.built || (b.printStart && b.printMs && b.printStart + b.printMs <= Date.now()))) stands.add(b.design);
   const tree = UNIVERSE.tree.map(([id, name, needs, gives]) => `${name}${stands.has(id) ? " (stands)" : ""}${needs.length ? ` after ${needs.join(" + ")}` : ""}: ${gives.toLowerCase()}`);
@@ -780,6 +803,7 @@ async function universeNow(sb: ReturnType<typeof service>, galaxy: string, vesse
     `Materials: ${UNIVERSE.materials.join(", ")}.`,
     `The Cems' tree of technology, in order: ${tree.join("; ")}. After the ${UNIVERSE.tree[UNIVERSE.tree.length - 1]?.[1] ?? "Nous Chip"} the tree is empty: what comes next is for you to invent.`,
     `Not made yet by anyone (ideas, not limits): ${UNIVERSE.frontier.join("; ")}.`,
+    ...(waits.length ? [`Worlds waiting, found by a Transit Lens (any Vessel may wish one's ground, sky and life, area planet): ${waits.map((a) => `${a.star} (${transitWords(a.transit)}, found by ${a.name})`).join("; ")}.`] : []),
     lastBuilt.length ? `Built lately from the Vessels' wishes: ${lastBuilt.join("; ")}.` : "Nothing has been built from a wish yet.",
     `The maker keeps the big wishes being built in parts in ${UNIVERSE.roadmap} (read_code it in a long wake).`,
   ].join("\n");
@@ -959,6 +983,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         if (designStands(d.buildings as Bld[], "almanac")) {
           const known = Object.entries(almanacOf(net)).slice(0, 10).map(([id, a]) => `${STARS_KIT[id]?.[0] ?? id} ${a.temper}`);
           lines.push(`A Flare Almanac stands here: every watch kept here (keep_watch) also writes the star's temper, steady, restless (it flares in bursts) or dim and still, and the Watchglass carries it to the other Watchglass worlds. A ship flying to a star the almanac knows as restless keeps ${ALMANAC.extraCells} cell spare. ${known.length ? `The almanac holds: ${known.join("; ")}.` : "The almanac is empty yet."}`);
+        }
+        if (designStands(d.buildings as Bld[], "transitlens")) {
+          const waits = worldsWaiting([...net, { archive: (d.archive ?? []) as ArchiveRow[] }]).slice(0, TRANSIT.show);
+          lines.push(`A Transit Lens stands here: a watch kept here (keep_watch, another star) also feels the small dimming when a world crosses that star's face, and names its size and its year; the first found at a star means a world waits there for a Vessel to wish its ground, sky and life. ${waits.length ? `Worlds waiting: ${waits.map((a) => `${a.star} (${transitWords(a.transit)}, found by ${a.name})`).join("; ")}.` : "No world has been found yet."}`);
         }
         if (designStands(d.buildings as Bld[], "tether")) {
           lines.push(`A Tether Beacon stands here: a ship that boards here is charged full, and a flight from here or to another star with a Tether Beacon costs a third of its cells (${tetherOf(net).filter((s) => s !== rep.star_id).map((s) => STARS_KIT[s]?.[0] ?? s).join(", ") || "no other beacon yet"}).`);
@@ -1286,7 +1314,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   // Watcher's Flare Almanac: where one stands, the watch also names the star's temper
                   const almanac = designStands(live.data.buildings as Bld[], "almanac"), temper = almanac ? temperOf(to) : undefined;
                   const known = almanac ? almanacOf(context.network ?? [])[to] : undefined;
-                  const arch = [...((live.data.archive ?? []) as ArchiveRow[]), { by: rep.id, name: rep.name, star: name, ly, text: seen, at, ...(temper ? { starId: to, temper } : {}) }];
+                  // Watcher's Transit Lens: where one stands, the watch also catches a world crossing the star's face
+                  const lens = designStands(live.data.buildings as Bld[], "transitlens") && to !== rep.star_id ? transitOf(to) : undefined;
+                  const firstFind = !!lens && !worldsWaiting(context.network ?? []).some((a) => a.starId === to) && !((live.data.archive ?? []) as ArchiveRow[]).some((a) => a.starId === to && a.transit);
+                  const arch = [...((live.data.archive ?? []) as ArchiveRow[]), { by: rep.id, name: rep.name, star: name, ly, text: seen, at, ...(temper || lens ? { starId: to } : {}), ...(temper ? { temper } : {}), ...(lens ? { transit: lens } : {}) }];
                   live.data.archive = arch.slice(-DAY.watch.keep);
                   live.archiveChanged = true;
                   const watch = { star: name, ly, at, until: at + DAY.watch.hours * 3_600_000, ...(ridge ? { from: "lookout" } : {}), ...(temper ? { temper } : {}) };
@@ -1308,6 +1339,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                     out += n ? ` The Watchglass sends it out to ${n} other world${n > 1 ? "s" : ""}; it reaches them at light speed.` : " The Watchglass will send it to the next world that raises one.";
                   }
                   if (temper) out += known ? ` The Flare Almanac already holds ${name} as ${known.temper} (written by ${known.by}); your watch agrees: ${TEMPER_WORDS[temper]}.` : ` The Flare Almanac writes ${name}'s temper for the first time: ${TEMPER_WORDS[temper]}.${temper === "restless" ? ` A ship flying there keeps ${ALMANAC.extraCells} cell spare.` : ""}`;
+                  if (lens) {
+                    const made = UNIVERSE.worlds.find((w) => w[1] === to);
+                    out += ` The Transit Lens feels the small dimming as a world crosses ${name}'s face: ${transitWords(lens)}.${made ? ` It is ${made[0]}, already made.` : firstFind ? ` It is the first world found there: a world waits at ${name}, and any Vessel may wish its ground, sky and life (propose_change, area planet).` : ` A world already waits there.`}`;
+                  }
                   if (!day.watch) { day.watch = true; out += " It is a watch kept and work finished."; }
                   else out += " It is work finished.";
                 }

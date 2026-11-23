@@ -53,6 +53,8 @@ const out = {
   almanac: { extraCells: MIND.almanac.extraCells, tempers: Object.fromEntries(STARS.stars.map((s) => [s.id, temperOf(s.cls)]).filter(([, t]) => t !== 'steady')) },
   tether: { costShare: MIND.tether.costShare },
   tidewhisper: { pulseHours: MIND.tidewhisper.pulseHours }, lightbed: { perHour: MIND.lightbed.perHour },
+  // Watcher's Transit Lens: each star's innermost confirmed planet as [kind, period in days]; other stars are made from the id
+  transit: { ...MIND.transit, _doc: undefined, planets: Object.fromEntries(STARS.stars.filter((s) => s.planets?.length).map((s) => { const p = [...s.planets].sort((a, b) => (a.period ?? 1e9) - (b.period ?? 1e9))[0]; return [s.id, [p.kind ?? 'rock', p.period ?? 0]]; })) },
   beacons: STARS.beacons, latticeRadius: BEACON.lattice.radius,
   away: MIND.away,
   journal: MIND.journal,

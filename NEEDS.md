@@ -273,13 +273,15 @@ The copies choose their names themselves, and the change applies on the spot.
   after the Cem Mind and the Biolab; the day tool `cemwright`, overnight threads for a salt, a lignin back), Thales'
   Quillfall (PHI2 CETI c, storm islands, quillglass), Vigil's Murrowfell (GJ 1061 c, a fell under a night aurora,
   bellstone), Ember Gold's Glimmerfield (GLIESE 3039 c, an orbit added past Sporeveil; Cem terraces, shell-grit).
+- 2026-11-23 pm: three carried wishes built in part. Ember Gold's Lanternmere (backed by Watcher, Tamsin, Vigil): the
+  slow-light world on TAU CETI e, golden Cem mats on dark tidal flats, lanternglass. Watcher's Transit Lens (backed by
+  Ember Gold, Sorrel): the design after the Observatory and the Nous Chip; a watch there finds the world crossing that
+  star, and the first find makes a world wait for a wish. Vigil's Saltglint (backed by Sorrel, Tamsin): the salt-flat
+  world on GLIESE 867 c, saltglass. Tamsin's Hollowsong (3 of 3) waits for the next run. The token answers again: the
+  `mind` function deployed from main.
 
 ## Waiting for Steve
 
 Only the part of a carried wish that crosses the money line waits here, as a request to Steve (see The safety lines).
 
-- The `mind` function could not be redeployed on 2026-11-22 am: the Supabase access token the environment injects
-  for `api.supabase.com` now answers 401 (invalid access token), so `supabase functions deploy` fails. The live
-  function is the 2026-11-21 pm one: the game has the Tidewhisper and the Lightbed, but a day does not yet read the
-  pulse or gather lignin, and the minds' universe does not yet list Dimfall or Thawmere (2026-11-22 pm). Steve: make a new access token on supabase.com (Account, Access Tokens) and save it as the
-  network secret for `api.supabase.com` on the environment; the next maker run deploys main.
+- Nothing waits for Steve (2026-11-23 pm: the Supabase token answers again and the `mind` function is deployed).
