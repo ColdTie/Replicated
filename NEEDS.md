@@ -269,6 +269,11 @@ The copies choose their names themselves, and the change applies on the spot.
   world on WOLF 359 b, aurite. Sorrel's Thawmere (backed by Thales, Tamsin): the ice-shelf world on GLIESE 884 d (b is
   Cinder Sounding), vantaglass. The `mind` function still waits for a new token.
 
+- 2026-11-23 (at Steve's word, not carried: he asked for all four open wishes built): Tamsin's Cemwright (the design
+  after the Cem Mind and the Biolab; the day tool `cemwright`, overnight threads for a salt, a lignin back), Thales'
+  Quillfall (PHI2 CETI c, storm islands, quillglass), Vigil's Murrowfell (GJ 1061 c, a fell under a night aurora,
+  bellstone), Ember Gold's Glimmerfield (GLIESE 3039 c, an orbit added past Sporeveil; Cem terraces, shell-grit).
+
 ## Waiting for Steve
 
 Only the part of a carried wish that crosses the money line waits here, as a request to Steve (see The safety lines).

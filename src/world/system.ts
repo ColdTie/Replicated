@@ -3,6 +3,7 @@
 // giant you land on one of its moons.
 import BIOMES from '../data/biomes.json';
 import STARS from '../data/stars.json';
+import WORLDS from '../data/planets.json';
 
 export type PlanetKind = 'rock' | 'super' | 'neptune' | 'giant';
 export type Temp = 'hot' | 'warm' | 'cold';
@@ -110,6 +111,13 @@ export function systemFor(starId: string): SystemPlanet[] {
     for (let i = 0; i < n; i++) {
       const kind = pick<PlanetKind>(r(), [['rock', 4], ['super', 3], ['neptune', 1.5], ['giant', 1.5]]);
       entries.push({ letter: String.fromCharCode(98 + i), kind, period: Math.round(period * 10) / 10 });
+      period *= 1.7 + r() * 1.1;
+    }
+    // a hand-made world placed past the generated planets (Glimmerfield on Gliese 3039, 2026-11-23) adds rocky orbits
+    // outward to it, so the map shows it; the generated planets before it stay as they were
+    const past = Math.max(0, ...WORLDS.planets.filter((w) => w.star === star.id).map((w) => w.planetIndex ?? 0));
+    while (entries.length < past) {
+      entries.push({ letter: String.fromCharCode(98 + entries.length), kind: 'rock', period: Math.round(period * 10) / 10 });
       period *= 1.7 + r() * 1.1;
     }
   }

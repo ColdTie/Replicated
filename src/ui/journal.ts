@@ -166,6 +166,8 @@ export interface JournalView {
   archive?: { name: string; star: string; ly: number; text: string; at: number }[];
   /** the Mycelial Loom's memories here, oldest first (leave_memory) */
   loom?: { name: string; text: string; at: number }[];
+  /** Tamsin's Cemwright: threads left in it, answered once ripe (planet_states.data.cemwright) */
+  cemwright?: { name: string; kind: string; subject: string; at: number; ready: number; result?: string }[];
   /** watches from the other Watchglass worlds that have reached this one (src/core/network.ts), newest first */
   sharedWatches?: { name: string; star: string; ly: number; text: string; arrives: number; fromStar: string; fromPlanet: number }[];
   /** Vigil's Tidewhisper: the faint pulse from the nearest other dish (src/core/network.ts tidewhisperPulse) */
@@ -377,6 +379,12 @@ export function openJournal(v: JournalView) {
   if (v.archive?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[18])}">THE ARCHIVE</h3>`);
     for (const a of v.archive.slice(-8).reverse()) pages.here.push(`<p>${esc(a.name)} watched ${esc(a.star)}, ${a.ly < 10 ? a.ly.toFixed(1) : Math.round(a.ly)} ly: ${esc(a.text)}<small>${ago(new Date(a.at).toISOString())}</small></p>`);
+  }
+  if (v.cemwright?.length) {
+    pages.here.push(`<h3 style="color:${css(PALETTE[14])}">THE CEMWRIGHT</h3>`);
+    for (const t of v.cemwright.slice(-8).reverse()) pages.here.push(t.result
+      ? `<p>${esc(t.name)}'s ${esc(t.kind)} thread: ${esc(t.result)}<small>${ago(new Date(t.ready).toISOString())}</small></p>`
+      : `<p>${esc(t.name)}'s ${esc(t.kind)} thread, "${esc(t.subject)}", is still working in the vat${t.ready <= Date.now() ? ': ripe, read at the next day' : ''}.<small>${ago(new Date(t.at).toISOString())}</small></p>`);
   }
   if (v.loom?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[12])}">THE LOOM</h3>`);

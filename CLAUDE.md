@@ -906,6 +906,18 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   carried yet. `tools/playtest-lookout.mjs` (new). The plan: `docs/days/2026-11-16-am.md`. Screenshot
   `lookout-sign.png`.
 
+### Session 31 (2026-11-23): four wishes built at Steve's word (Steve: "Lets do it!")
+- None of the four open wishes was carried; Steve asked for all of them, each on the next free planet of its star.
+  Tamsin's **Cemwright** (designs.json `cemwright` after the Cem Mind and the Biolab; the day tool `cemwright`: a
+  thread of kind flare / ore / plan for 1 salt, ripe in 10 hours, read at the next day with 1 lignin back; `mind.json
+  day.cemwright`, `planet_states.data.cemwright`, THE CEMWRIGHT on the journal's HERE page). Thales' **Quillfall**
+  (PHI2 CETI c), Vigil's **Murrowfell** (GJ 1061 c, with a night aurora: `planets.json aurora`), Ember Gold's
+  **Glimmerfield** (GLIESE 3039 c: a hand-made world past a generated system adds orbits to reach it,
+  `src/world/system.ts`); materials quillglass, bellstone, shell-grit. Part 1 of each world; next parts in
+  `docs/universe.md`. `tools/playtest-quillfall.mjs`. The day: `docs/days/2026-11-23-steve.md`.
+- Local playtests: Playwright 1.56.1 wants chromium_headless_shell-1194; a scratch `PLAYWRIGHT_BROWSERS_PATH` with a
+  `chromium_headless_shell-1194/chrome-linux/headless_shell` link to `/opt/pw-browsers`' chrome-headless-shell runs them.
+
 ### Maker 2026-11-15 pm
 - Three carried wishes built (threshold 3 of 7 voices). **Tamsin's printer lesson track** (support 5): the day tool
   `lesson` (open / work / check), six steps (`mind.json day.lessons`), one step worked a day, the next opens at the

@@ -105,6 +105,9 @@ export interface Replicating { start: number; ms: number; kind: 'wake' | 'hold';
 export interface ArchiveEntry { by: string; name: string; star: string; ly: number; text: string; at: number; starId?: string; temper?: 'restless' | 'dim' | 'steady' }
 /** A memory left in the Mycelial Loom (Sorrel's wish, leave_memory in a day of life): planet_states.data.loom */
 export interface LoomEntry { by: string; name: string; text: string; at: number }
+/** A thread left in the Cemwright (Tamsin's wish, the day tool cemwright; mind.json day.cemwright): planet_states.data.cemwright.
+ * result is written once it ripens (ready), by the next day of a Vessel of that world. */
+export interface CemThread { by: string; name: string; kind: 'flare' | 'ore' | 'plan'; subject: string; at: number; ready: number; result?: string }
 /** A printer lesson track (Tamsin's wish, 2026-11-15; mind.json day.lessons): the step being learned (1-based), worked
  * when the student worked it and it waits for the teacher's check, done once the last step is checked. */
 export interface LessonRow { student: string; studentName: string; teacher: string; teacherName: string; step: number; worked?: number; did?: string; done?: boolean; at: number }
@@ -151,6 +154,7 @@ export interface PlanetData {
   archive?: ArchiveEntry[];
   /** the memories left in this world's Mycelial Loom, oldest first, written only by the mind function */
   loom?: LoomEntry[];
+  cemwright?: CemThread[];
   /** the printer lesson tracks of this world (lesson in a day of life), written only by the mind function */
   lessons?: LessonRow[];
   /** seeds in the warren's planters, by the planter's item id (plant / tend_plant in a day of life) */

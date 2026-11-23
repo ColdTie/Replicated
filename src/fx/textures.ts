@@ -154,6 +154,27 @@ export function rgb(c: number): [number, number, number] {
 }
 
 /** Tileable soft diagonal light shafts for daytime sunbeams. */
+/** Murrowfell's aurora (planets.json aurora): soft curtains hanging from a slow wave, streaked, fading downward; white,
+ * tinted where it is drawn. Banded and dithered like the sky. */
+export function makeAurora(scene: Phaser.Scene, key = 'aurora', w = 256, h = 120) {
+  canvasTexture(scene, key, w, h, (img) => {
+    for (let x = 0; x < w; x++) {
+      const k = (Math.PI * 2) / w;
+      const top = 14 + 9 * Math.sin(x * k * 2) + 5 * Math.sin(x * k * 5 + 1.3);
+      const streak = 0.55 + 0.45 * Math.sin(x * k * 23) * Math.sin(x * k * 7 + 0.4);
+      for (let y = 0; y < h; y++) {
+        const d = y - top;
+        let v = d < 0 ? Math.max(0, 1 + d / 4) : Math.max(0, 1 - d / 70);
+        v *= streak * (1 - y / h);
+        const q = Math.min(1, Math.floor(v * 5 + dither(x, y)) / 5);
+        const i = (y * w + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(q * 255);
+      }
+    }
+  });
+}
+
 export function makeRays(scene: Phaser.Scene, key = 'rays', size = 256) {
   canvasTexture(scene, key, size, size, (img) => {
     const shafts = [[20, 22], [70, 10], [110, 30], [170, 14], [205, 24]];
