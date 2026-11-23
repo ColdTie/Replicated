@@ -729,6 +729,57 @@
         "relief": 4
       }
     },
+    "quillfall": {
+      "kind": "spore",
+      "relief": 6,
+      "coverage": 0.6,
+      "pebbles": 3,
+      "soil": ["0c0e14", "161a24", "222838", "30384a"],
+      "cover": ["143428", "1e4a32", "2a5e3c", "3e7a48", "5a9a5a"],
+      "detail": ["c8a8d0", "2ce8f5", "eaf8ff", "63c74d"],
+      "stone": ["161a24", "222838", "30384a", "424c62"],
+      "rock": {
+        "ramp": ["06080c", "0e1118", "181c28", "262c3c", "384056", "52607a"],
+        "cover": ["9fe6f5", "dff4ff"],
+        "coverage": 0.3,
+        "cracks": 0.9,
+        "relief": 7
+      }
+    },
+    "murrowfell": {
+      "kind": "snow",
+      "relief": 8,
+      "coverage": 0.45,
+      "pebbles": 4,
+      "soil": ["1a1626", "2a2438", "3a3250", "4e4466"],
+      "cover": ["5a5470", "6e6886", "8680a0", "a29cba", "c4c0d8"],
+      "detail": ["eae8f8", "8ae8b0", "63c74d"],
+      "stone": ["2a2438", "3a3250", "4e4466", "665c80"],
+      "rock": {
+        "ramp": ["0e0c16", "1a1626", "2a2438", "3e3652", "564e70", "766e92"],
+        "cover": ["c4c0d8", "eae8f8"],
+        "coverage": 0.35,
+        "cracks": 0.85,
+        "relief": 8
+      }
+    },
+    "glimmerfield": {
+      "kind": "salt",
+      "relief": 4,
+      "coverage": 0.55,
+      "pebbles": 1,
+      "soil": ["6a4a36", "8a6448", "b08860", "d8b488", "f4dcb4"],
+      "cover": ["4a5a2a", "5e7232", "7a8c3a", "a0a84a", "c8c060"],
+      "detail": ["ffffff", "feae34", "fee761", "2ce8f5"],
+      "stone": ["5a4434", "745a44", "927458", "b09070"],
+      "rock": {
+        "ramp": ["2a1c16", "402c20", "5a402e", "7a5a40", "a07c58", "c8a47c"],
+        "cover": ["f4dcb4", "fff4dc"],
+        "coverage": 0.45,
+        "cracks": 0.7,
+        "relief": 5
+      }
+    },
     "dimfall": {
       "kind": "regolith",
       "relief": 7,

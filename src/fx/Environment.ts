@@ -6,7 +6,7 @@ import { DAYCYCLE, PALETTE, hex, type PlanetDef } from '../core/data';
 import LIGHT from '../data/light.json';
 import type { Atmosphere } from './Atmosphere';
 import type { Light, Lighting } from './Lighting';
-import { makeRays, makeWeatherBits, rgb } from './textures';
+import { makeAurora, makeRays, makeWeatherBits, rgb } from './textures';
 import { MAX_W, MIN_W, onScreenSize } from '../core/viewport';
 
 interface Firefly { x: number; y: number; vx: number; vy: number; phase: number; light?: Light; dot: Phaser.GameObjects.Image }
@@ -46,6 +46,8 @@ export class Environment {
   private hour: number;
   private fixedHour: boolean;
   private rays?: Phaser.GameObjects.TileSprite;
+  /** a night aurora over the world (planets.json aurora: Murrowfell), screen-fixed, faded in by the night */
+  private aurora?: Phaser.GameObjects.TileSprite;
   private sun?: Phaser.GameObjects.Rectangle;
   private fireflies: Firefly[] = [];
   private rain?: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -77,6 +79,11 @@ export class Environment {
 
     makeRays(scene);
     makeWeatherBits(scene);
+    if (planet.aurora) {
+      if (!scene.textures.exists('aurora')) makeAurora(scene);
+      this.aurora = scene.add.tileSprite(0, 0, w, 120, 'aurora').setOrigin(0).setScrollFactor(0)
+        .setBlendMode(Phaser.BlendModes.ADD).setDepth(6108).setTint(PALETTE[planet.aurora.color]).setAlpha(0);
+    }
     this.rays = scene.add.tileSprite(0, 0, w, h, 'rays').setOrigin(0).setScrollFactor(0)
       .setBlendMode(Phaser.BlendModes.ADD).setDepth(6110).setAlpha(0);
 
@@ -189,6 +196,10 @@ export class Environment {
       this.rays.tilePositionY = cam.scrollY * 0.6;
     }
     this.rain?.setPosition(cam.scrollX, cam.scrollY);
+    if (this.aurora && this.planet.aurora) {
+      this.aurora.setAlpha(this.planet.aurora.alpha * this.night * this.night * (1 - this.rainLevel * 0.8));
+      this.aurora.tilePositionX = cam.scrollX * 0.05 + this.t * 2.2;
+    }
 
     // Lightning, only at night while it rains
     if (this.flash && this.rainLevel > 0.8 && this.night > 0.6 && this.t > this.nextThunder) {

@@ -1179,6 +1179,192 @@
         "birds": 0,
         "butterflies": 0
       }
+    },
+    {
+      "id": "quillfall",
+      "shy": true,
+      "poles": {
+        "size": 0.08,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "QUILLFALL",
+      "subtitle": "WHERE THE STORMS MAKE GLASS",
+      "star": "phi2-ceti",
+      "planetIndex": 2,
+      "seed": 9242,
+      "accent": [
+        14,
+        13,
+        12
+      ],
+      "ambient": "7a8aa0",
+      "sky": [
+        "0e1420",
+        "26304c",
+        "5a3a6a",
+        "c8a8d0"
+      ],
+      "size": [
+        148,
+        108
+      ],
+      "islandRadius": 0.86,
+      "rockThreshold": 0.8,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.08,
+      "sporeRate": 4,
+      "trees": 0.01,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        24,
+        14,
+        13
+      ],
+      "dayCycle": true,
+      "sunTint": "fff4d8",
+      "gravity": 0.95,
+      "weather": true,
+      "ponds": 36,
+      "flowers": 0.006,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 7,
+        "butterflies": 0
+      }
+    },
+    {
+      "id": "murrowfell",
+      "shy": true,
+      "poles": {
+        "size": 0.3,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "MURROWFELL",
+      "subtitle": "WHERE THE STONES RING",
+      "star": "gj-1061",
+      "planetIndex": 2,
+      "seed": 10612,
+      "accent": [
+        27,
+        22,
+        21
+      ],
+      "ambient": "6a6684",
+      "sky": [
+        "080a16",
+        "1a1a34",
+        "3c2c4c",
+        "d08a5a"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.7,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.06,
+      "sporeRate": 1.5,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        23,
+        22,
+        21
+      ],
+      "dayCycle": true,
+      "sunTint": "e8b496",
+      "gravity": 1.05,
+      "weather": true,
+      "ponds": 14,
+      "flowers": 0.003,
+      "aurora": {
+        "color": 12,
+        "alpha": 0.5
+      },
+      "wildlife": {
+        "grazers": 3,
+        "birds": 2,
+        "butterflies": 0
+      }
+    },
+    {
+      "id": "glimmerfield",
+      "shy": true,
+      "poles": {
+        "size": 0.12,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "GLIMMERFIELD",
+      "subtitle": "WHERE THE LIGHT LAYS DOWN",
+      "star": "gliese-3039",
+      "planetIndex": 2,
+      "seed": 30392,
+      "accent": [
+        9,
+        10,
+        11
+      ],
+      "ambient": "a8907c",
+      "sky": [
+        "1a1420",
+        "4a3040",
+        "b0704a",
+        "f0c890"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.84,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.05,
+      "sporeRate": 2.5,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        31,
+        30,
+        2
+      ],
+      "dayCycle": true,
+      "sunTint": "ffd4a0",
+      "gravity": 0.9,
+      "weather": true,
+      "ponds": 18,
+      "flowers": 0,
+      "wildCems": {
+        "fields": 10,
+        "perField": [
+          5,
+          9
+        ],
+        "blooms": 3
+      },
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 4
+      }
     }
   ]
 }
