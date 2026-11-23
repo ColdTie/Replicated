@@ -1064,6 +1064,121 @@
         "birds": 2,
         "butterflies": 0
       }
+    },
+    {
+      "id": "dimfall",
+      "shy": true,
+      "poles": {
+        "size": 0.18,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "DIMFALL",
+      "subtitle": "WHERE THE DUSK STAYS",
+      "star": "wolf-359",
+      "planetIndex": 1,
+      "seed": 3591,
+      "accent": [
+        0,
+        9,
+        10
+      ],
+      "ambient": "7a5a64",
+      "sky": [
+        "100a16",
+        "34182a",
+        "8a3a2c",
+        "f08a4a"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.76,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.07,
+      "sporeRate": 6,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        24,
+        6,
+        5
+      ],
+      "dayCycle": false,
+      "gravity": 1.05,
+      "weather": false,
+      "ponds": 6,
+      "flowers": 0.004,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 8
+      }
+    },
+    {
+      "id": "thawmere",
+      "shy": true,
+      "poles": {
+        "size": 0.4,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "THAWMERE",
+      "subtitle": "WHERE THE ICE BREATHES",
+      "star": "gliese-884",
+      "planetIndex": 3,
+      "seed": 8843,
+      "accent": [
+        16,
+        17,
+        18
+      ],
+      "ambient": "66708c",
+      "sky": [
+        "0a0e1e",
+        "1e2a46",
+        "4e4a6a",
+        "e0904e"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.78,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.06,
+      "sporeRate": 3,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        23,
+        22,
+        21
+      ],
+      "dayCycle": true,
+      "sunTint": "e8d8cc",
+      "gravity": 0.9,
+      "weather": true,
+      "ponds": 28,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 0
+      }
     }
   ]
 }
