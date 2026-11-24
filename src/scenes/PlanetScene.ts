@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { almanacOf, arrivedWatches, relayStars, scutStars, tetherStars, tidewhisperPulse, type NetWorld } from '../core/network';
+import { almanacOf, arrivedWatches, orreryOf, relayStars, scutStars, tetherStars, tidewhisperPulse, wayhollowRoads, type NetWorld } from '../core/network';
+import { chart, isCharted, loadRoutes } from '../core/routes';
 import SOUND_DATA from '../data/sound.json';
 import { sound, type Surface } from '../audio/Sound';
 import { anim, tex } from '../core/assets';
@@ -112,6 +113,21 @@ export class PlanetScene extends Phaser.Scene {
   almanac() { return almanacOf({ star: this.planet.star, planet: this.planet.planetIndex }, this.netWorlds(), MIND.mailSecondsPerLy); }
   /** The stars where a finished Tether Beacon stands (Tamsin's wish): a hop from or to one costs a third. */
   tethers() { return tetherStars(this.netWorlds()); }
+  /** Watcher's Orrery: the worlds the Transit Lens found, from here and through the Watchglass, where one stands here. */
+  orrery() {
+    if (!this.buildings?.designsBuilt().get('orrery')) return [];
+    return orreryOf([...(this.archive ?? []), ...this.sharedWatches()], MIND.orrery);
+  }
+  /** Vigil's Wayhollow: a ship is here, so the roads from this star to every other Wayhollow star are charted. Returns
+   * the stars newly joined. */
+  async chartWayhollows() {
+    const me = session.replicant;
+    if (!me || this.shot || this.visit) return [];
+    await loadRoutes();
+    const to = wayhollowRoads(this.planet.star, this.netWorlds(), isCharted);
+    for (const s of to) chart(this.planet.star, s, me.id);
+    return to;
+  }
   npcs: Npc[] = [];
   village!: Village;
   warren!: Warren;
@@ -505,7 +521,7 @@ export class PlanetScene extends Phaser.Scene {
       }
     }
     session.store?.litBeacons().then((l) => { this.litBeacons = l; }).catch(() => undefined);
-    session.store?.networkWorlds().then((w) => { this.network = w; }).catch(() => undefined);
+    session.store?.networkWorlds().then((w) => { this.network = w; return this.chartWayhollows(); }).catch(() => undefined);
 
     // Player: a returning replicant appears where it was; a new one at the cradle's spot below the vessel
     const r = session.replicant;

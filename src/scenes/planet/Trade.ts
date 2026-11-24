@@ -17,7 +17,7 @@ export class Trade {
   /** live winnings not yet a whole unit */
   private owed = 0;
 
-  reset() { this.owed = 0; this.grown = 0; }
+  reset() { this.owed = 0; this.grown = 0; this.pressed = 0; }
 
   /** This world's own material. */
   get own(): string { return (SIG.byWorld as Record<string, string>)[this.s.planet.id] ?? 'regolith'; }
@@ -41,6 +41,25 @@ export class Trade {
       this.s.warren.add('lignin', g);
       this.s.mindLog.push({ t: this.s.mindClock, text: `The Lightbed grew ${g} lignin while you were away` });
     }
+    const k = this.keep(Math.floor(hours * MIND.lightkeep.perHour * this.lightkeeps));
+    if (k > 0) this.s.mindLog.push({ t: this.s.mindClock, text: `The Lightkeep pressed ${k} lignin into kept light while you were away` });
+  }
+
+  /** Ember Gold's Lightkeep (designs.json lightkeep): how many finished ones stand here. */
+  get lightkeeps() { return this.s.buildings?.builtOf('lightkeep') ?? 0; }
+
+  /** lignin pressed live and not yet a whole block */
+  private pressed = 0;
+
+  /** Presses up to n of the store's lignin into kept light (lightlignin), never past mind.json lightkeep.hold blocks
+   * a Lightkeep. Returns how many blocks were made. */
+  keep(n: number) {
+    const s = this.s, room = MIND.lightkeep.hold * this.lightkeeps - Math.floor(s.supplies.lightlignin ?? 0);
+    const m = Math.min(n, room, Math.floor(s.supplies.lignin ?? 0));
+    if (m <= 0) return 0;
+    const got = s.warren.add('lightlignin', m);
+    if (got > 0) { s.supplies.lignin -= got; s.markSupplies(); }
+    return got;
   }
 
   /** Ember Gold's Lightbed (designs.json lightbed): how many finished ones stand here; each grows lignin by the clock. */
@@ -62,6 +81,10 @@ export class Trade {
         const from = bed ? { x: bed.x, y: bed.y - 8 } : s.warren.hatch;
         s.flyMaterial('lignin', from, s.warren.hatch, 1);
       }
+    }
+    if (this.lightkeeps) {
+      this.pressed += (dt / 3_600_000) * MIND.lightkeep.perHour * this.lightkeeps;
+      if (this.pressed >= 1) { this.pressed -= 1; this.keep(1); }
     }
     const workers = s.npcs.filter((c) => !c.blank && !c.below);
     if (!workers.length) return;

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { sound } from '../../audio/Sound';
-import { PALETTE } from '../../core/data';
+import { MIND, PALETTE } from '../../core/data';
 import { inManny, mannyWorlds, shipFlying, worldKey } from '../../core/mannies';
 import { session } from '../../core/session';
 import { POWER, TRAVEL, cellsNow, distanceLy, travelMs, tripCharge } from '../../world/galaxy';
@@ -59,6 +59,21 @@ export class Departure {
     return burn;
   }
 
+  /** Ember Gold's Lightkeep standing here (designs.json lightkeep): a ship short of full spends kept light, each block
+   * mind.json lightkeep.cells cells, before the Fusion Still burns hydrogen. Returns how many blocks it spent. */
+  keptLight() {
+    const r = session.replicant;
+    if (!r || !this.s.buildings.designsBuilt().get('lightkeep')) return 0;
+    const have = this.charge(), room = POWER.cells - have, per = MIND.lightkeep.cells;
+    const spend = Math.min(Math.floor(this.s.supplies.lightlignin ?? 0), Math.floor(room / per + 0.5));
+    if (room < 1 || spend <= 0) return 0;
+    this.s.supplies.lightlignin -= spend;
+    this.s.markSupplies();
+    r.traits.cells = { charge: Math.min(POWER.cells, have + spend * per), at: Date.now(), star: this.s.planet.star };
+    void session.store?.patchTraits(r.id, { cells: r.traits.cells }).catch((e) => console.warn('cells', e));
+    return spend;
+  }
+
   /** A Tether Beacon standing here (Tamsin's wish, designs.json tether) fills a landed ship's cells. Returns whether it did. */
   tether() {
     const r = session.replicant;
@@ -94,7 +109,7 @@ export class Departure {
     this.s.player.locked = true;
     this.s.player.body.setVelocity(0, 0);
     sound.coreHum();
-    if (!this.s.vesselAway && (this.tether() || this.fuse() > 0)) sound.collect();
+    if (!this.s.vesselAway && (this.tether() || this.keptLight() + this.fuse() > 0)) sound.collect();
     void loadRoutes();
     const r = session.replicant;
     const data: StarMapData = {
