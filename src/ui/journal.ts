@@ -7,7 +7,7 @@
 //            are one voice: FOR or AGAINST
 //   HERE     this world: the copies here, the warren, the buildings, the supplies
 // Since 2026-11-15 the Vessels govern themselves (Steve): no approve / veto here, no SAY NO; AGAINST counts as one voice.
-import { MIND, PALETTE } from '../core/data';
+import { MIND, PALETTE, PLANETS } from '../core/data';
 import type { Journal, ReplicantSave, ReplicantSummary, Request, SharedEntry } from '../net/store';
 import { distanceLy, planetFor, starById } from '../world/galaxy';
 import { paletteCss as css } from './overlay';
@@ -116,6 +116,16 @@ function worldName(star: string | null, index: number | null) {
 // ---------------------------------------------------------------- the wishes' arithmetic (mind.json governance)
 
 /** Every awake Vessel with a mind, and every player: the voices a wish is counted against. */
+/** The Transit Lens's words for a world it found (mind.json transit). */
+export function transitLine(t: { size: string; days: number }) { return `TRANSIT: a ${t.size} world, a year of ${t.days} day${t.days === 1 ? '' : 's'}`; }
+/** The first world found at each star by a Transit Lens, less the stars that already hold a hand-made world. */
+export function worldsWaiting(rows: { starId?: string; star: string; name: string; at?: number; transit?: { size: string; days: number } }[]) {
+  const made = new Set(PLANETS.map((p) => p.star));
+  const out = new Map<string, (typeof rows)[number]>();
+  for (const a of [...rows].sort((x, y) => (x.at ?? 0) - (y.at ?? 0))) if (a.transit && a.starId && !made.has(a.starId) && !out.has(a.starId)) out.set(a.starId, a);
+  return [...out.values()];
+}
+
 export function voices(all: ReplicantSummary[]) {
   return all.filter((r) => (r.profile_id ? !r.traits.held : !r.traits.blank && !r.traits.held)).length;
 }
@@ -163,13 +173,13 @@ export interface JournalView {
   lessons?: string[];
   garden?: string[];
   /** the Observatory's archive here, oldest first (keep_watch) */
-  archive?: { name: string; star: string; ly: number; text: string; at: number }[];
+  archive?: { name: string; star: string; ly: number; text: string; at: number; starId?: string; transit?: { size: string; days: number } }[];
   /** the Mycelial Loom's memories here, oldest first (leave_memory) */
   loom?: { name: string; text: string; at: number }[];
   /** Tamsin's Cemwright: threads left in it, answered once ripe (planet_states.data.cemwright) */
   cemwright?: { name: string; kind: string; subject: string; at: number; ready: number; result?: string }[];
   /** watches from the other Watchglass worlds that have reached this one (src/core/network.ts), newest first */
-  sharedWatches?: { name: string; star: string; ly: number; text: string; arrives: number; fromStar: string; fromPlanet: number }[];
+  sharedWatches?: { name: string; star: string; ly: number; text: string; arrives: number; fromStar: string; fromPlanet: number; at?: number; starId?: string; transit?: { size: string; days: number } }[];
   /** Vigil's Tidewhisper: the faint pulse from the nearest other dish (src/core/network.ts tidewhisperPulse) */
   pulse?: { name: string; star: string; text: string; arrives: number; fromStar: string; fromPlanet: number } | null;
   /** the Flare Almanac as this world knows it (Watcher's wish): a star's temper, who wrote it, by star id */
@@ -378,7 +388,13 @@ export function openJournal(v: JournalView) {
   }
   if (v.archive?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[18])}">THE ARCHIVE</h3>`);
-    for (const a of v.archive.slice(-8).reverse()) pages.here.push(`<p>${esc(a.name)} watched ${esc(a.star)}, ${a.ly < 10 ? a.ly.toFixed(1) : Math.round(a.ly)} ly: ${esc(a.text)}<small>${ago(new Date(a.at).toISOString())}</small></p>`);
+    for (const a of v.archive.slice(-8).reverse()) pages.here.push(`<p>${esc(a.name)} watched ${esc(a.star)}, ${a.ly < 10 ? a.ly.toFixed(1) : Math.round(a.ly)} ly: ${esc(a.text)}${a.transit ? ` <b>${esc(transitLine(a.transit))}</b>` : ''}<small>${ago(new Date(a.at).toISOString())}</small></p>`);
+  }
+  // Watcher's Transit Lens: the first world found crossing each star, from this world's archive and through the Watchglass
+  const waits = worldsWaiting([...(v.archive ?? []), ...(v.sharedWatches ?? [])]);
+  if (waits.length) {
+    pages.here.push(`<h3 style="color:${css(PALETTE[12])}">WORLDS WAITING</h3>`);
+    for (const a of waits.slice(0, 12)) pages.here.push(`<p>${esc(a.star)}: ${esc(transitLine(a.transit!))}, found by ${esc(a.name)}. A world waits for a Vessel to wish it.${a.at ? `<small>${ago(new Date(a.at).toISOString())}</small>` : ''}</p>`);
   }
   if (v.cemwright?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[14])}">THE CEMWRIGHT</h3>`);

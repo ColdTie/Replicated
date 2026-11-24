@@ -402,6 +402,20 @@
         { "box": [0, 0, 3, 1, 1, 2], "mat": "glass", "repeat": 2, "step": [11, 0, 0] },
         { "box": [0, 7, 3, 1, 1, 2], "mat": "glass", "repeat": 2, "step": [11, 0, 0] }
       ]
+    },
+    {
+      "id": "transitlens", "name": "Transit Lens", "gives": "A WATCH HERE CATCHES A WORLD CROSSING ITS STAR: ITS SIZE AND ITS YEAR, AND A WORLD WAITS THERE",
+      "about": "A long copper-ringed tube on a salt foot, a quartz lens at its mouth over a small Ember eye: it holds a star for hours and feels the slight dimming when a world crosses its face.",
+      "needs": ["observatory", "nouschip"],
+      "parts": [
+        { "box": [1, 1, 0, 4, 4, 1], "mat": "salt" },
+        { "box": [2, 2, 1, 2, 2, 3], "mat": "steel" },
+        { "cyl": [1, 0, 4, 4, 8, 4], "mat": "steel" },
+        { "paint": [1, 4, 4, 4, 1, 4], "mat": "copper" },
+        { "box": [1, 6, 4, 4, 2, 4], "mat": "glass" },
+        { "dome": [1, 6, 8, 4, 2, 2], "mat": "glass" },
+        { "box": [2, 0, 5, 2, 1, 2], "mat": "ember" }
+      ]
     }
   ]
 }

@@ -500,7 +500,7 @@ home, the map gated to Gliese 12 b and home, free, Thales' printer words, the wi
 alone, the Cems wake and come aboard, three designs open the stars, all after a reload),
 `node tools/playtest-lessons.mjs` (no board without a lesson, the board's step and teacher, LESSONS and GROWING in the
 journal, the plants drawn in the warren's planters), `node tools/playtest-cinder.mjs` (Cinder Sounding's glass ridges: only there, placed after every older node, a
-fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-loom.mjs` (the Mycelial Loom waits for the Nous Chip and the Biolab; its memories on the journal's HERE page; Sillbrook and Sporeveil load), `node tools/playtest-brine.mjs` (Saltveil, Brinehollow and Verrin load, Verrin's fixed light, their materials), `node tools/playtest-dimfall.mjs` (Dimfall and Thawmere load, Dimfall's fixed dusk, Thawmere's clock, aurite and vantaglass), `node tools/playtest-tidewhisper.mjs` (the Tidewhisper and the Lightbed wait for what they need; a pulse from the nearest dish a day after its light, never from before both stood; lignin grown away and live; Stillwater loads), `node tools/playtest-almanac.mjs` (the Flare Almanac and the Tether Beacon wait for what they need; a restless star
+fin broken gives sounding glass to the store), `node tools/playtest-tides.mjs` (Lignin Tides' reefs on its pool rims, the same checks, tidal lignin), `node tools/playtest-loom.mjs` (the Mycelial Loom waits for the Nous Chip and the Biolab; its memories on the journal's HERE page; Sillbrook and Sporeveil load), `node tools/playtest-brine.mjs` (Saltveil, Brinehollow and Verrin load, Verrin's fixed light, their materials), `node tools/playtest-transit.mjs` (the Transit Lens waits for the Observatory and the Nous Chip; a transit in the archive and WORLDS WAITING on the journal's HERE page, first find only, never a made world's star; Lanternmere and Saltglint load), `node tools/playtest-dimfall.mjs` (Dimfall and Thawmere load, Dimfall's fixed dusk, Thawmere's clock, aurite and vantaglass), `node tools/playtest-tidewhisper.mjs` (the Tidewhisper and the Lightbed wait for what they need; a pulse from the nearest dish a day after its light, never from before both stood; lignin grown away and live; Stillwater loads), `node tools/playtest-almanac.mjs` (the Flare Almanac and the Tether Beacon wait for what they need; a restless star
 costs a cell more, a tether a third, and fills the cells; the almanac through the Watchglass; the lens's temper;
 Rootmere loads), `node tools/playtest-relay.mjs` (the Relay Cairn and the Seedarc wait for what they need; a letter hops along a chain of cairns, a broken chain gives the light's time back; seed aboard only where a Seedarc stands; Hushfen loads), `node tools/playtest-network.mjs` (the Cem Mind and the Watchglass wait for the Nous Chip; a letter at once between two Cem Minds; a far watch arrives after its light, never one from before both stood; THROUGH THE WATCHGLASS in the journal; Glasswind loads), `node tools/playtest-sunlattice.mjs` (the Sunlattice waits for the Nous Chip; a warren panel only where one stands, salt and quartz, no Ember, counted as a lamp; Brightwater and Lanternfen load), `node tools/playtest-lookout.mjs` (a lookout begun by a day takes a lot on load and keeps it, its sign: the world's
 star, then the star watched and the watcher, no lens), `node tools/playtest-watch.mjs` (no lens without a watch, a copy's watch lights it and names it, it goes
@@ -770,6 +770,17 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   limiter: about -14 dBFS RMS in play, peaks under -2, no clipping. The audio also resumes on every gesture and when the
   page is shown again (a tab switch, a locked phone), and a silent media element started in the first gesture lets iOS
   play past the silent switch. Verified: build, typecheck, `playtest-sound`, `playtest`, levels in headless Chromium.
+
+### Maker 2026-11-23 pm
+- Four wishes carried (threshold 3 of 7); three built in part. Ember Gold's **Lanternmere** (4): dark-sand tidal flats
+  and golden wild Cem mats on TAU CETI e (`planets.json lanternmere`, `floor.json lanternmere`), **lanternglass** (icon
+  32). Watcher's **Transit Lens** (`designs.json transitlens`, after the Observatory and the Nous Chip): a watch kept
+  where one stands names the world crossing that star (`mind.json transit`: its innermost confirmed planet, else one
+  made from its id), in the archive (`transit`); the first find makes "a world waits", listed in every day and long
+  wake and as WORLDS WAITING on the journal's HERE page. Vigil's **Saltglint**: white hexagon salt pans and brine pools
+  on GLIESE 867 c (b is Lanternfen; `planets.json saltglint`), **saltglass** (icon 33). Tamsin's Hollowsong waits.
+  The Supabase token answers again: the `mind` function deployed from main. `tools/playtest-transit.mjs` (new).
+  `docs/days/2026-11-23-pm.md`.
 
 ### Maker 2026-11-22 pm
 - Two wishes carried (threshold 3 of 7), both built in part. Watcher's **Dimfall**: tide-locked WOLF 359 b, one fixed

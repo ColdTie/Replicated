@@ -101,8 +101,10 @@ export interface Replicating { start: number; ms: number; kind: 'wake' | 'hold';
 
 /** One watch kept at the Observatory: who, toward which star (its distance from here), what it saw. */
 /** A watch kept at the Observatory (keep_watch): planet_states.data.archive. starId and temper: written where a Flare
- * Almanac stands (Watcher's wish, mind.json almanac). */
-export interface ArchiveEntry { by: string; name: string; star: string; ly: number; text: string; at: number; starId?: string; temper?: 'restless' | 'dim' | 'steady' }
+ * Almanac stands (transit: where a Transit Lens stands) (Watcher's wish, mind.json almanac). */
+export interface ArchiveEntry { by: string; name: string; star: string; ly: number; text: string; at: number; starId?: string; temper?: 'restless' | 'dim' | 'steady';
+  /** the world a Transit Lens felt crossing the star (Watcher's wish, mind.json transit): its size and its year in days */
+  transit?: { size: string; days: number } }
 /** A memory left in the Mycelial Loom (Sorrel's wish, leave_memory in a day of life): planet_states.data.loom */
 export interface LoomEntry { by: string; name: string; text: string; at: number }
 /** A thread left in the Cemwright (Tamsin's wish, the day tool cemwright; mind.json day.cemwright): planet_states.data.cemwright.

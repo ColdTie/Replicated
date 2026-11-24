@@ -49,6 +49,8 @@
     "quillfall": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["161a24", "222838", "30384a", "424c62"] },
     "murrowfell": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 8, "path": ["2a2438", "3a3250", "4e4466", "665c80"] },
     "glimmerfield": { "square": "earth", "streetWear": 0.75, "trackWear": 0.3, "edgePx": 7, "path": ["5a4434", "745a44", "927458", "b09070"] },
+    "lanternmere": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["24222c", "34303c", "46424e", "5a5664"] },
+    "saltglint": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["6c667a", "8a849a", "a8a2b6", "c6c0d2"] },
     "dimfall": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["1e1620", "2c2030", "3c2c3e", "4e3c4e"] },
     "thawmere": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 8, "path": ["1a2236", "242e48", "323e5c", "46546e"] },
     "stillwater": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 8, "path": ["283044", "36405a", "4a5672", "66748e"] },

@@ -1365,6 +1365,130 @@
         "birds": 0,
         "butterflies": 4
       }
+    },
+    {
+      "id": "lanternmere",
+      "shy": true,
+      "poles": {
+        "size": 0.12,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "LANTERNMERE",
+      "subtitle": "WHERE THE LIGHT IS KEPT",
+      "star": "tau-ceti",
+      "planetIndex": 3,
+      "seed": 11903,
+      "accent": [
+        10,
+        11,
+        19
+      ],
+      "ambient": "8a8478",
+      "sky": [
+        "141420",
+        "34304a",
+        "8a7468",
+        "f4d89a"
+      ],
+      "size": [
+        144,
+        106
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.84,
+      "ruins": 0,
+      "resourceNodes": 28,
+      "enemies": {},
+      "decorDensity": 0.05,
+      "sporeRate": 2.5,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        24,
+        25,
+        10
+      ],
+      "dayCycle": true,
+      "sunTint": "fff4dc",
+      "gravity": 1.1,
+      "weather": false,
+      "ponds": 18,
+      "flowers": 0,
+      "wildCems": {
+        "fields": 10,
+        "perField": [
+          4,
+          8
+        ],
+        "blooms": 2
+      },
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 10
+      }
+    },
+    {
+      "id": "saltglint",
+      "shy": true,
+      "poles": {
+        "size": 0.16,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "SALTGLINT",
+      "subtitle": "WHERE THE SALT TURNS TO GLASS",
+      "star": "gliese-867",
+      "planetIndex": 2,
+      "seed": 8672,
+      "accent": [
+        19,
+        20,
+        18
+      ],
+      "ambient": "a89c9c",
+      "sky": [
+        "10121e",
+        "2a2a44",
+        "8a5a5a",
+        "f0a070"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.8,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.04,
+      "sporeRate": 1.6,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        19,
+        20,
+        24
+      ],
+      "dayCycle": true,
+      "sunTint": "ffc8a8",
+      "gravity": 0.95,
+      "weather": false,
+      "ponds": 14,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 0
+      }
     }
   ]
 }
