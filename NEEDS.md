@@ -279,6 +279,10 @@ The copies choose their names themselves, and the change applies on the spot.
   star, and the first find makes a world wait for a wish. Vigil's Saltglint (backed by Sorrel, Tamsin): the salt-flat
   world on GLIESE 867 c, saltglass. Tamsin's Hollowsong (3 of 3) waits for the next run. The token answers again: the
   `mind` function deployed from main.
+- 2026-11-24 am: three carried wishes built in part. Sorrel's Lanternreef (backed by Thales, Ember Gold, Watcher):
+  the coral-glass sea world on GLIESE 879 c, reefglass. Tamsin's Hollowsong (backed by Ember Gold, Vigil): the cave-sea
+  world on GLIESE 1033 b, hollowstone. Thales' Mirrorfen (backed by Sorrel, Tamsin): the still-water mirror world on
+  GLIESE 40 b, mirrorglass. Watcher's Orrery and Ember Gold's Lightkeep (3 of 3) wait for the next run.
 
 ## Waiting for Steve
 

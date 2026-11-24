@@ -831,6 +831,56 @@
         "relief": 6
       }
     },
+    "lanternreef": {
+      "kind": "basalt",
+      "relief": 5,
+      "coverage": 0.4,
+      "pebbles": 2,
+      "soil": ["0c1018", "141c28", "1c2838", "263448"],
+      "cover": ["1a3a44", "24505a", "2e6a70", "3c8a88"],
+      "detail": ["124e89", "0099db", "2ce8f5", "9fe6f5", "eaffff"],
+      "stone": ["161c26", "222a36", "2e3848", "3e4a5c"],
+      "rock": {
+        "ramp": ["06080e", "0e1420", "182030", "243044", "344258", "4a5a72"],
+        "seams": ["124e89", "0099db", "2ce8f5", "9fe6f5"],
+        "cracks": 0,
+        "relief": 6
+      }
+    },
+    "hollowsong": {
+      "kind": "regolith",
+      "relief": 6,
+      "coverage": 0.45,
+      "pebbles": 4,
+      "soil": ["8a8a84", "a4a49c", "bebcb2", "d6d4ca"],
+      "cover": ["3e4a3c", "4e5c4a", "62705a", "7a8a70", "94a488"],
+      "detail": ["c0cbdc", "8b9bb4"],
+      "stone": ["5a5e62", "72767a", "8c9094", "a8acae"],
+      "rock": {
+        "ramp": ["14161c", "22262e", "343a44", "4a525e", "646e7a", "848e98"],
+        "cover": ["4e5c4a", "62705a"],
+        "coverage": 0.3,
+        "cracks": 0.9,
+        "relief": 8
+      }
+    },
+    "mirrorfen": {
+      "kind": "spore",
+      "relief": 3,
+      "coverage": 0.65,
+      "pebbles": 1,
+      "soil": ["0a0c10", "12161c", "1c2228", "262e34"],
+      "cover": ["2a3a30", "3a4e3c", "4e6448", "687c56", "8a9a6a"],
+      "detail": ["fee761", "eaf8ff", "c0cbdc", "9fe6f5"],
+      "stone": ["1a1e24", "262c34", "343c46", "46505c"],
+      "rock": {
+        "ramp": ["06080a", "0e1216", "181e24", "242c34", "343e48", "4a5662"],
+        "cover": ["c0cbdc", "eaf8ff"],
+        "coverage": 0.3,
+        "cracks": 0.6,
+        "relief": 5
+      }
+    },
     "thawmere": {
       "kind": "snow",
       "relief": 6,

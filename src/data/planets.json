@@ -1489,6 +1489,180 @@
         "birds": 0,
         "butterflies": 0
       }
+    },
+    {
+      "id": "lanternreef",
+      "shy": true,
+      "poles": {
+        "size": 0.04,
+        "colors": [
+          18,
+          19
+        ]
+      },
+      "name": "LANTERNREEF",
+      "subtitle": "WHERE THE SEA GROWS GLASS",
+      "star": "gliese-879",
+      "planetIndex": 2,
+      "seed": 8792,
+      "accent": [
+        17,
+        18,
+        15
+      ],
+      "ambient": "7a8c9c",
+      "sky": [
+        "0c1220",
+        "1e2c48",
+        "4a5a7a",
+        "f0a070"
+      ],
+      "size": [
+        148,
+        108
+      ],
+      "islandRadius": 0.8,
+      "rockThreshold": 0.8,
+      "ruins": 0,
+      "resourceNodes": 28,
+      "enemies": {},
+      "decorDensity": 0.05,
+      "sporeRate": 3,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        23,
+        16,
+        15
+      ],
+      "dayCycle": true,
+      "sunTint": "ffc8a0",
+      "gravity": 0.95,
+      "weather": true,
+      "ponds": 42,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 5,
+        "butterflies": 0
+      }
+    },
+    {
+      "id": "hollowsong",
+      "shy": true,
+      "poles": {
+        "size": 0.1,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "HOLLOWSONG",
+      "subtitle": "WHERE THE STONE REMEMBERS",
+      "star": "gliese-1033",
+      "planetIndex": 1,
+      "seed": 10331,
+      "accent": [
+        21,
+        20,
+        18
+      ],
+      "ambient": "8a92a4",
+      "sky": [
+        "10141e",
+        "2a3044",
+        "6a5a6a",
+        "e89a70"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.86,
+      "rockThreshold": 0.7,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.06,
+      "sporeRate": 2,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        20,
+        21,
+        14
+      ],
+      "dayCycle": true,
+      "sunTint": "ffbc98",
+      "gravity": 1,
+      "weather": true,
+      "ponds": 26,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 3,
+        "butterflies": 0
+      }
+    },
+    {
+      "id": "mirrorfen",
+      "shy": true,
+      "poles": {
+        "size": 0.1,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "MIRRORFEN",
+      "subtitle": "WHERE THE STILL WATER SHOWS THE SKY",
+      "star": "gliese-40",
+      "planetIndex": 1,
+      "seed": 4001,
+      "accent": [
+        11,
+        20,
+        18
+      ],
+      "ambient": "8a9488",
+      "sky": [
+        "0e1018",
+        "2a3040",
+        "7a8070",
+        "f4e8a8"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.92,
+      "rockThreshold": 0.82,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.09,
+      "sporeRate": 3.5,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        25,
+        14,
+        13
+      ],
+      "dayCycle": true,
+      "sunTint": "fff0c8",
+      "gravity": 1,
+      "weather": true,
+      "ponds": 38,
+      "flowers": 0.008,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 2,
+        "butterflies": 6
+      }
     }
   ]
 }
