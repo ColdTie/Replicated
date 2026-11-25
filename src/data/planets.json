@@ -708,6 +708,64 @@
       }
     },
     {
+      "id": "sunsilt",
+      "shy": true,
+      "poles": {
+        "size": 0.18,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "SUNSILT",
+      "subtitle": "WHERE THE SILT GLOWS",
+      "star": "gliese-915",
+      "planetIndex": 2,
+      "seed": 9152,
+      "accent": [
+        13,
+        12,
+        11
+      ],
+      "ambient": "9a9488",
+      "sky": [
+        "101826",
+        "2a3a3c",
+        "5a8a5a",
+        "f0a060"
+      ],
+      "size": [
+        144,
+        108
+      ],
+      "islandRadius": 0.95,
+      "rockThreshold": 0.74,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.05,
+      "sporeRate": 6,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        2,
+        30,
+        20
+      ],
+      "dayCycle": true,
+      "sunTint": "ffb878",
+      "gravity": 1,
+      "weather": true,
+      "ponds": 8,
+      "flowers": 0.004,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 2,
+        "butterflies": 0
+      }
+    },
+    {
       "id": "hushfen",
       "shy": true,
       "poles": {

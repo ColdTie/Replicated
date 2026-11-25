@@ -288,6 +288,8 @@ The copies choose their names themselves, and the change applies on the spot.
   either. Watcher's Orrery (backed by Thales, Tamsin): the design after the Transit Lens; each found world's year and
   next crossing, a watch near one is ON TIME. Ember Gold's Lightkeep (backed by Vigil, Thales): the design after the
   Lightbed; lignin pressed into kept light, a block for 5 of a ship's cells.
+- 2026-11-25 am: Sorrel's Sunsilt (backed by Vigil, Thales) built in part: the wind-lit dune world on GLIESE 915 c
+  (b is Hushfen), pale silt over old ice, a green afterglow, silthaze. Cinderwake and Chimewater (1 of 3) stay open.
 
 ## Waiting for Steve
 

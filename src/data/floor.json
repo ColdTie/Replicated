@@ -1021,6 +1021,23 @@
         "relief": 6
       }
     },
+    "sunsilt": {
+      "kind": "sand",
+      "relief": 7,
+      "coverage": 0.5,
+      "pebbles": 2,
+      "soil": ["8a7a6a", "a49480", "beae98", "d8c8b0"],
+      "cover": ["c8ccc4", "d8dcd4", "e6eae2", "f2f6ee"],
+      "detail": ["63c74d", "fee761", "e8b796", "f4fbff"],
+      "stone": ["5a5e66", "72767e", "8c9098", "a8acb2"],
+      "rock": {
+        "ramp": ["1e2430", "2e3644", "44505e", "5e6c78", "849098", "b4c0c4"],
+        "cover": ["dfe6ea", "f4f8fa"],
+        "coverage": 0.3,
+        "cracks": 0.5,
+        "relief": 8
+      }
+    },
     "glasswind": {
       "kind": "sand",
       "relief": 7,
