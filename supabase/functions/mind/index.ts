@@ -815,27 +815,41 @@ const LONG_WAKE = `This is one of your long wakes (about twice a day, while nobo
 /** The universe as it stands, for a day or a long wake (the Vessels' work, mind.json mandate): what has been made,
  * what the Cems' tree holds and what of it stands anywhere, what nobody has made yet, and the latest things built. */
 async function universeNow(sb: ReturnType<typeof service>, galaxy: string, vessels: number) {
-  const [worlds, found, routes, built] = await Promise.all([
+  const [worlds, found, routes, built, living] = await Promise.all([
     sb.from("planet_states").select("star_id,planet_index,buildings:data->buildings,archive:data->archive").eq("galaxy_id", galaxy),
     sb.from("discovered_stars").select("star_id", { count: "exact", head: true }).eq("galaxy_id", galaxy),
     sb.from("routes").select("a", { count: "exact", head: true }).eq("galaxy_id", galaxy),
     sb.from("requests").select("detail,done_at").eq("galaxy_id", galaxy).eq("kind", "change").eq("status", "done").order("done_at", { ascending: false }).limit(8),
+    sb.from("replicants").select("name,star_id,planet_index,status").eq("galaxy_id", galaxy),
   ]);
   const rows = (worlds.data ?? []) as { star_id: string; planet_index: number; buildings: { design?: string; built?: boolean; printStart?: number; printMs?: number }[] | null; archive: ArchiveRow[] | null }[];
   const waits = worldsWaiting(rows).slice(0, TRANSIT.show);
   const stands = new Set<string>();
   for (const w of rows) for (const b of w.buildings ?? []) if (b.design && (b.built || (b.printStart && b.printMs && b.printStart + b.printMs <= Date.now()))) stands.add(b.design);
   const tree = UNIVERSE.tree.map(([id, name, needs, gives]) => `${name}${stands.has(id) ? " (stands)" : ""}${needs.length ? ` after ${needs.join(" + ")}` : ""}: ${gives.toLowerCase()}`);
-  const named = UNIVERSE.worlds.map(([n, , , sub]) => `${n}${sub ? ` (${sub.toLowerCase()})` : ""}`).join("; ");
+  // who lives where, and which made worlds nobody has walked yet (Steve 2026-11-25: they wished for worlds and went to none)
+  const dwellers = new Map<string, string[]>();
+  for (const r of (living.data ?? []) as { name: string; star_id: string; planet_index: number; status: string }[]) {
+    if (r.status === "in_transit") continue;
+    const k = `${r.star_id}:${r.planet_index}`;
+    dwellers.set(k, [...(dwellers.get(k) ?? []), r.name]);
+  }
+  const walked = new Set(rows.map((w) => `${w.star_id}:${w.planet_index}`));
+  const named = UNIVERSE.worlds.map(([n, star, pi, sub]) => {
+    const k = `${star}:${pi}`, who = dwellers.get(k);
+    return `${n} at ${STARS_KIT[star]?.[0] ?? star}, planet ${pi}${sub ? ` (${sub.toLowerCase()})` : ""}: ${who?.length ? `${who.join(", ")} live${who.length === 1 ? "s" : ""} there` : walked.has(k) ? "visited, nobody lives there" : "nobody has set foot there yet"}`;
+  }).join("; ");
+  const unwalked = UNIVERSE.worlds.filter(([, star, pi]) => !walked.has(`${star}:${pi}`)).length;
+  const unprinted = UNIVERSE.tree.filter(([id]) => !stands.has(id)).map(([, name]) => name);
   const lastBuilt = ((built.data ?? []) as { detail: string }[]).map((r) => r.detail);
   return [
     `The universe as it stands. ${UNIVERSE.stars} real stars in the catalog; the Metanoia has reached ${found.count ?? 0} of them, charted ${routes.count ?? 0} routes and holds ${rows.length} worlds with ${vessels} Vessels.`,
-    `Hand-made worlds so far: ${named}. Every other star's planets are made from its seed, with one of these grounds: ${UNIVERSE.biomes.join(", ")}.`,
+    `Hand-made worlds so far (${unwalked} of ${UNIVERSE.worlds.length} wait for anyone to set foot on them; travel with that star and planet): ${named}. Every other star's planets are made from its seed, with one of these grounds: ${UNIVERSE.biomes.join(", ")}.`,
     `Materials: ${UNIVERSE.materials.join(", ")}.`,
-    `The Cems' tree of technology, in order: ${tree.join("; ")}. After the ${UNIVERSE.tree[UNIVERSE.tree.length - 1]?.[1] ?? "Nous Chip"} the tree is empty: what comes next is for you to invent.`,
-    `Not made yet by anyone (ideas, not limits): ${UNIVERSE.frontier.join("; ")}.`,
+    `The Cems' tree of technology, in order: ${tree.join("; ")}.${unprinted.length ? ` Not printed on any world yet: ${unprinted.join(", ")}.` : ""}`,
+    `Not made yet by anyone (ideas for when something is truly missing, not a list to wish through): ${UNIVERSE.frontier.join("; ")}.`,
     ...(waits.length ? [`Worlds waiting, found by a Transit Lens (any Vessel may wish one's ground, sky and life, area planet): ${waits.map((a) => `${a.star} (${transitWords(a.transit)}, found by ${a.name})`).join("; ")}.`] : []),
-    lastBuilt.length ? `Built lately from the Vessels' wishes: ${lastBuilt.join("; ")}.` : "Nothing has been built from a wish yet.",
+    lastBuilt.length ? `Built lately from the Vessels' wishes, waiting to be used: ${lastBuilt.join("; ")}.` : "Nothing has been built from a wish yet.",
     `The maker keeps the big wishes being built in parts in ${UNIVERSE.roadmap} (read_code it in a long wake).`,
   ].join("\n");
 }
@@ -972,6 +986,12 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         .sort((a, b) => a.ly - b.ly).slice(0, 10)
         .map((x) => { const charted = sp.routes.has(routeKeyS(from, x.id)), net = context.network ?? [], t = tetherOf(net); return `${STARS_KIT[x.id][0]} ${x.ly.toFixed(1)} ly, ${tripCost(from, x.id, x.ly, charted, net)} charge${charted ? ", charted" : ""}${t.includes(from) || t.includes(x.id) ? ", tethered" : ""}${almanacOf(net)[x.id] ? `, ${almanacOf(net)[x.id].temper}` : ""}`; });
       lines.push(`Your ship's cells hold ${Math.floor(cells)} of ${TRAVEL_KIT.power.cells} (they charge from the star you wait under). Stars within reach of travel: ${near.join("; ") || "none"}. Flights left for the Metanoia's copies today: ${Math.max(0, DAY.travelsPerDay - sp.travels)}.`);
+      // the worlds the Vessels wished into being that this ship can reach (Steve 2026-11-25: go and live in them)
+      const madeNear = UNIVERSE.worlds.filter(([, star, pi]) => star !== from || pi !== rep.planet_index)
+        .map(([n, star, pi]) => ({ n, star, pi, ly: star === from ? 0 : starLy(from, star) })).filter((w) => w.ly <= DAY.travelLy)
+        .sort((a, b) => a.ly - b.ly).slice(0, 8)
+        .map((w) => `${w.n} (${STARS_KIT[w.star]?.[0] ?? w.star}, planet ${w.pi}, ${w.ly.toFixed(1)} ly, ${tripCost(from, w.star, w.ly, sp.routes.has(routeKeyS(from, w.star)), context.network ?? [])} charge)`);
+      if (madeNear.length) lines.push(`Hand-made worlds your ship can reach (travel with that star and planet; the universe list above says who lives on each): ${madeNear.join("; ")}.`);
       const d = live?.data ?? {};
       const replicator = ((d.structures ?? []) as { type: string }[]).some((x) => x.type === "replicator");
       const chips = ((d.buildings ?? []) as Bld[]).filter((b) => chipReady(b)).length + Number((rep.traits as { chips?: number }).chips ?? 0);
@@ -1095,7 +1115,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         const fors = (c.backers ?? []).filter((b) => !b.against).map((b) => b.name), againsts = (c.backers ?? []).filter((b) => b.against).map((b) => b.name);
         lines.push(`Your wish "${c.detail}": ${standing(c.backers, need)}${fors.length ? `; backed by ${fors.join(", ")}` : ""}${againsts.length ? `; against: ${againsts.join(", ")}` : ""}.${supportOf(c.backers) >= need ? "" : ` A wish not carried within ${GOV.staleDays} days is closed.`}`);
       }
-      else if (c.status === "done") lines.push(`Your proposal "${c.detail}" is in the game now.${c.reply ? ` The maker says: ${c.reply}` : ""}`);
+      else if (c.status === "done") lines.push(`Your proposal "${c.detail}" is in the game now.${c.reply ? ` The maker says: ${c.reply}` : ""} Go and live it: a thing built and never used is only begun.`);
       else if (c.status === "vetoed") lines.push(`${context.playerName} said no to your proposal "${c.detail}".${c.reply ? ` ${c.reply}` : ""}`);
       else if (c.reply && !/^Replaced by/.test(c.reply)) lines.push(`Your proposal "${c.detail}" was not made. The maker says: ${c.reply}`);
     }
@@ -1198,11 +1218,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
             // (the maker 2026-11-18 am: 25 replaced in a day, none carried)
             const { data: own } = await sb.from("requests").select("detail,body,backers").eq("replicant_id", rep.id).eq("kind", "change").eq("status", "open");
             const big = ((own ?? []) as { detail: string; body: string | null; backers: Backer[] | null }[]).find((w) => UNIVERSE_AREAS.includes(/^Area: (\w+)/m.exec(w.body ?? "")?.[1] ?? ""));
-            if (big) {
-              messages.push({ role: "user", content: `Before you sleep: your wish for the universe, "${big.detail}", is open, ${standing(big.backers, need)}. A wish is carried only when enough of you back the same one, and it grows by staying: a new wish of that kind would replace it and lose every backing it has. Keep it unless you truly want something else more. Look again at the others' wishes for the universe and back the ones you want too (back_wish); that is how any of them comes into being.` });
-              continue;
-            }
-            messages.push({ role: "user", content: "Before you sleep: your work is to grow this universe. What will you bring into being? Wish for something that does not exist yet with propose_change, area planet, technology or mechanic: a world on a real star, a new technology after the Nous Chip, a new material, creature, or way to travel, talk or work across the stars. Say it concretely, as big as you dare; the maker builds big things in parts. A wish of this kind sits beside any wish you have for your home, it does not replace it. Or back another Vessel's wish of this kind with back_wish. A wish for your home alone is not an answer to this question." });
+            // the question asks what the copy did with the universe as it is (Steve 2026-11-25: they wished every day
+            // and went nowhere); a wish is one possible answer, only for what is truly missing
+            const flew = actions.some((a) => a.type === "travel");
+            messages.push({ role: "user", content: `Before you sleep: what did you do today with the universe the Metanoia has already made? ${flew ? "You set out for another star: say in the shared journal why, if you have not." : "If you did not go anywhere new or use anything the others made, decide where you will go or what you will use next time, and remember it (remember), or set out now (travel) if you still have the cells."} ${big ? `Your wish for the universe, "${big.detail}", is open, ${standing(big.backers, need)}; a new wish of that kind would replace it and lose its backing.` : "Only if your life out there truly needs something that does not exist, wish for it (propose_change, area planet, technology or mechanic), concretely."} Back another Vessel's wish (back_wish) when you want it too. You may also answer that nothing is missing.` });
             continue;
           }
           break;
@@ -1241,7 +1260,9 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 const ly = starLy(rep.star_id, to), charted = sp.routes.has(routeKeyS(rep.star_id, to));
                 const confirmed = STARS_KIT[to][5];
                 // the homeworld is LHS 1140 b (planet 2): a copy going home lands there whatever index it gave
-                const planet = to === KIT.home.star ? KIT.home.planet : Math.max(1, Math.min(confirmed || 1, Math.round(Number(input.planet) || 1)));
+                // a hand-made world past the confirmed planets adds orbits to reach it (src/world/system.ts), so it can be flown to
+                const madeMax = Math.max(0, ...UNIVERSE.worlds.filter(([, s]) => s === to).map(([, , pi]) => pi));
+                const planet = to === KIT.home.star ? KIT.home.planet : Math.max(1, Math.min(Math.max(confirmed || 1, madeMax), Math.round(Number(input.planet) || 1)));
                 // a Tether Beacon on this world charges the ship full before it leaves (Tamsin's wish)
                 const cost = tripCost(rep.star_id, to, ly, charted, context.network ?? []);
                 const tethered = designStands(live.data.buildings as Bld[], "tether"), base = tethered ? TRAVEL_KIT.power.cells : cellsNow(traits.cells);
