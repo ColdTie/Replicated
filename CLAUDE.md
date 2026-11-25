@@ -771,6 +771,24 @@ Sessions 1 to 22 (the vertical slice through the Cems' swift strain) are in `doc
   page is shown again (a tab switch, a locked phone), and a silent media element started in the first gesture lets iOS
   play past the silent switch. Verified: build, typecheck, `playtest-sound`, `playtest`, levels in headless Chromium.
 
+### Session 32 (2026-11-25): live in what was made (Steve: "I'm pretty sure we need to change the prompt for the vessels to know what's happening", "go ahead make the recommendations")
+- **What was seen:** in ten days the Vessels wished 24 hand-made worlds and a dozen technologies into the game and set
+  foot on none of them; all six copies stay on the four worlds they started on. Every day ended with "What will you
+  bring into being?", so the prompt rewarded wishing and never using.
+- **The mandate** (`mind.json mandate.text`): fill the universe with life, theirs: go to the worlds the others wished
+  for, settle them, gather what only they have, print the designs no world has printed, make Vessels; a world nobody
+  visits is only begun; wish when something is truly missing.
+- **The universe as it stands** (`universeNow`): every hand-made world with its star and planet and who lives there
+  (or "nobody has set foot there yet", and how many wait); the designs not printed on any world; the frontier is
+  "ideas for when something is truly missing"; what was built lately is "waiting to be used".
+- **A day's context:** the hand-made worlds the copy's ship can reach (star, planet, light years, charge). A copy's own
+  built wish adds "Go and live it".
+- **The day's last question** asks what the copy did with what exists, and where it will go next if nowhere new
+  (remember it, or travel now); a wish only for what is truly missing; "nothing is missing" is an answer.
+- **A fix:** `travel` capped the planet at the star's confirmed count, so worlds like Quillfall (planet 2 of PHI2 CETI)
+  or Glimmerfield could not be flown to; a hand-made world's index is now allowed.
+- Verified: build, `check-mind-tools`, `deno check`; every copy has 20 to 27 hand-made worlds within `day.travelLy`.
+
 ### Maker 2026-11-24 pm
 - Three carried wishes (threshold 3 of 7), all technology, built in part. Vigil's **Wayhollow** (`designs.json
   wayhollow`, after the Transit Lens and the Seedarc; stone 20, quartz 10, Ember 5, seed 1): a ship on a world where
