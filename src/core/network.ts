@@ -105,3 +105,68 @@ function dishSince(w: NetWorld) {
   const starts = (w.buildings ?? []).filter((b) => b.design === 'tidewhisper' && standsDone(b)).map((b) => b.printStart ?? 0);
   return starts.length ? Math.min(...starts) : Infinity;
 }
+
+/** The stars where a finished Wayhollow stands (Vigil's wish, mind.json wayhollow): the roads between them are charted. */
+export const wayhollowStars = (worlds: NetWorld[], now = Date.now()) =>
+  [...new Set(worlds.filter((w) => hasDesign(w, 'wayhollow', now)).map((w) => w.star))];
+
+/**
+ * The roads a landing on this star charts (Vigil's Wayhollow): from here to every other star where a Wayhollow stands,
+ * when one stands here too. Pairs not yet charted only.
+ */
+export function wayhollowRoads(star: string, worlds: NetWorld[], charted: (a: string, b: string) => boolean, now = Date.now()) {
+  const posts = wayhollowStars(worlds, now);
+  if (!posts.includes(star)) return [];
+  return posts.filter((s) => s !== star && !charted(star, s));
+}
+
+/** One world the Orrery keeps (Watcher's wish): found by the Transit Lens, its year, its crossings. */
+export interface OrreryWorld { starId: string; star: string; size: string; days: number; first: number; by: string;
+  /** watches that caught it, and how many of those came on time */
+  seen: number; confirmed: number;
+  /** the next crossing (ms), and whether its year is quick or long */
+  next: number; pace: 'quick' | 'long' | null }
+
+/** Where in its year a star's world crosses (0..1): fixed by the star's id, the same in the mind function. */
+export function crossingPhase(star: string) {
+  let h = 2166136261;
+  for (const c of `orbit:${star}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  return (h % 10007) / 10007;
+}
+
+/** The crossing of that star's world nearest to `at` (ms), from its year (crossings fall at (phase + k) years). */
+export function nearestCrossing(star: string, days: number, at: number) {
+  const p = days * 86_400_000, f = crossingPhase(star);
+  return (Math.round(at / p - f) + f) * p;
+}
+
+/** The first crossing after `at`. */
+export function nextCrossing(star: string, days: number, at: number) {
+  const p = days * 86_400_000, f = crossingPhase(star);
+  return (Math.floor(at / p - f) + 1 + f) * p;
+}
+
+/** Whether a watch at `at` comes on time for a crossing (mind.json orrery: windowHours, or windowShare of the year). */
+export function onTime(star: string, days: number, at: number, o: { windowHours: number; windowShare: number }) {
+  const win = Math.max(o.windowHours * 3_600_000, o.windowShare * days * 86_400_000);
+  return Math.abs(at - nearestCrossing(star, days, at)) <= win;
+}
+
+/**
+ * Watcher's Orrery (designs.json orrery): every world a Transit Lens found, from the watches given (this world's
+ * archive and what the Watchglass brought), with its year, the next crossing after now (crossingPhase), who found it
+ * first, and how many watches caught it (confirmed: on time, archive orbit). Soonest crossing first.
+ */
+export function orreryOf(entries: ArchiveEntry[], o: { quickDays: number; longDays: number }, now = Date.now()): OrreryWorld[] {
+  const out = new Map<string, OrreryWorld>();
+  for (const a of [...entries].sort((x, y) => x.at - y.at)) {
+    if (!a.starId || !a.transit) continue;
+    const w = out.get(a.starId);
+    if (w) { w.seen++; if (a.orbit) w.confirmed++; continue; }
+    const days = Math.max(1, a.transit.days);
+    out.set(a.starId, { starId: a.starId, star: a.star, size: a.transit.size, days, first: a.at, by: a.name, seen: 1, confirmed: a.orbit ? 1 : 0, next: 0,
+      pace: days <= o.quickDays ? 'quick' : days >= o.longDays ? 'long' : null });
+  }
+  for (const w of out.values()) w.next = nextCrossing(w.starId, w.days, now);
+  return [...out.values()].sort((a, b) => a.next - b.next);
+}

@@ -283,6 +283,11 @@ The copies choose their names themselves, and the change applies on the spot.
   the coral-glass sea world on GLIESE 879 c, reefglass. Tamsin's Hollowsong (backed by Ember Gold, Vigil): the cave-sea
   world on GLIESE 1033 b, hollowstone. Thales' Mirrorfen (backed by Sorrel, Tamsin): the still-water mirror world on
   GLIESE 40 b, mirrorglass. Watcher's Orrery and Ember Gold's Lightkeep (3 of 3) wait for the next run.
+- 2026-11-24 pm: three carried wishes built in part. Vigil's Wayhollow (backed by Watcher, Ember Gold, Sorrel): the
+  design after the Transit Lens and the Seedarc; the road between two Wayhollow stars is charted once a ship is at
+  either. Watcher's Orrery (backed by Thales, Tamsin): the design after the Transit Lens; each found world's year and
+  next crossing, a watch near one is ON TIME. Ember Gold's Lightkeep (backed by Vigil, Thales): the design after the
+  Lightbed; lignin pressed into kept light, a block for 5 of a ship's cells.
 
 ## Waiting for Steve
 

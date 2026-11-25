@@ -52,7 +52,7 @@ function plantStage(pl: PlantRow, now = Date.now()) {
   return st;
 }
 /** One watch kept at the Observatory (keep_watch), as planet_states.data.archive holds it (the game's ArchiveEntry). */
-type ArchiveRow = { by: string; name: string; star: string; ly: number; text: string; at: number; starId?: string; temper?: string; transit?: { size: string; days: number } };
+type ArchiveRow = { by: string; name: string; star: string; ly: number; text: string; at: number; starId?: string; temper?: string; transit?: { size: string; days: number }; orbit?: boolean };
 /** A memory left in the Mycelial Loom (Sorrel's wish, leave_memory), as planet_states.data.loom holds it (the game's LoomEntry). */
 type LoomRow = { by: string; name: string; text: string; at: number };
 /** A thread left in the Cemwright (Tamsin's wish, cemwright), as planet_states.data.cemwright holds it (the game's CemThread). */
@@ -144,6 +144,37 @@ function worldsWaiting(archives: { archive?: ArchiveRow[] | null }[]) {
   }
   return [...out.values()];
 }
+/** Watcher's Orrery (mind.json orrery; the game's network.ts orreryOf): each found world crosses its star at fixed
+ * points of its year, set by the star's id; a watch near one confirms it. */
+const ORRERY = KIT.orrery as { quickDays: number; longDays: number; windowHours: number; windowShare: number; show: number };
+function crossingPhase(star: string) {
+  let h = 2166136261;
+  for (const c of `orbit:${star}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  return (h % 10007) / 10007;
+}
+const nextCrossing = (star: string, days: number, at: number) => { const p = days * 86_400_000, f = crossingPhase(star); return (Math.floor(at / p - f) + 1 + f) * p; };
+function onTimeCross(star: string, days: number, at: number) {
+  const p = days * 86_400_000, f = crossingPhase(star), near = (Math.round(at / p - f) + f) * p;
+  return Math.abs(at - near) <= Math.max(ORRERY.windowHours * 3_600_000, ORRERY.windowShare * p);
+}
+/** The worlds the Orrery keeps: one per star a Transit Lens found, its year, the next crossing, how often seen and on time. */
+function orreryOf(rows: ArchiveRow[], now = Date.now()) {
+  const out = new Map<string, { starId: string; star: string; size: string; days: number; by: string; seen: number; confirmed: number; next: number }>();
+  for (const a of [...rows].sort((x, y) => x.at - y.at)) {
+    if (!a.starId || !a.transit) continue;
+    const w = out.get(a.starId);
+    if (w) { w.seen++; if (a.orbit) w.confirmed++; continue; }
+    const days = Math.max(1, a.transit.days);
+    out.set(a.starId, { starId: a.starId, star: a.star, size: a.transit.size, days, by: a.name, seen: 1, confirmed: a.orbit ? 1 : 0, next: nextCrossing(a.starId, days, now) });
+  }
+  return [...out.values()].sort((a, b) => a.next - b.next);
+}
+const hoursWords = (ms: number) => { const h = (ms - Date.now()) / 3_600_000; return h < 1 ? "within the hour" : h < 48 ? `in about ${Math.round(h)} hours` : `in about ${Math.round(h / 24)} days`; };
+const paceWords = (days: number) => days <= ORRERY.quickDays ? ", a quick world" : days >= ORRERY.longDays ? ", a long world" : "";
+/** Ember Gold's Lightkeep (mind.json lightkeep): kept light in the store fills a ship's cells, cells a block. */
+const LIGHTKEEP = KIT.lightkeep as { perHour: number; hold: number; cells: number };
+/** Vigil's Wayhollow: the stars where one stands; the roads between them are charted when a ship is there. */
+const wayhollowOf = (net: NetW[]) => [...new Set(net.filter((w) => designStands(w.buildings, "wayhollow")).map((w) => w.star))];
 const TEMPER_WORDS: Record<string, string> = { restless: "restless: it flares in bursts", dim: "dim and still", steady: "steady" };
 /** The almanac as the galaxy has written it: a star's temper from the first watch that named it. */
 function almanacOf(net: NetW[]) {
@@ -954,6 +985,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
       if (designStands(d.buildings as Bld[], "lightbed")) {
         lines.push(`A Lightbed stands here: the Cems on its salt tray grow lignin from light, about ${Math.round(LIGHTBED.perHour * 24)} blocks a day into the store, and gather finds lignin here too. The store holds ${Math.floor(Number((d.supplies as Record<string, number> | undefined)?.lignin ?? 0))} lignin.`);
       }
+      // Ember Gold's wish: the Lightkeep keeps the Lightbed's lignin as kept light for the ship
+      if (designStands(d.buildings as Bld[], "lightkeep")) {
+        lines.push(`A Lightkeep stands here: it presses the store's lignin into kept light, about ${Math.round(LIGHTKEEP.perHour * 24)} blocks a day while a Vessel plays this world, up to ${LIGHTKEEP.hold} a Lightkeep. A ship leaving here short of full spends a block for ${LIGHTKEEP.cells} cells. The store holds ${Math.floor(Number((d.supplies as Record<string, number> | undefined)?.lightlignin ?? 0))} kept light.`);
+      }
       // Tamsin's wish: the Cemwright, threads that ripen overnight
       if (designStands(d.buildings as Bld[], "cemwright")) {
         const ripe = ripenThreads(live);
@@ -987,6 +1022,21 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
         if (designStands(d.buildings as Bld[], "transitlens")) {
           const waits = worldsWaiting([...net, { archive: (d.archive ?? []) as ArchiveRow[] }]).slice(0, TRANSIT.show);
           lines.push(`A Transit Lens stands here: a watch kept here (keep_watch, another star) also feels the small dimming when a world crosses that star's face, and names its size and its year; the first found at a star means a world waits there for a Vessel to wish its ground, sky and life. ${waits.length ? `Worlds waiting: ${waits.map((a) => `${a.star} (${transitWords(a.transit)}, found by ${a.name})`).join("; ")}.` : "No world has been found yet."}`);
+        }
+        // Watcher's Orrery: the found worlds' years and their next crossings
+        if (designStands(d.buildings as Bld[], "orrery")) {
+          const kept = orreryOf([...((d.archive ?? []) as ArchiveRow[]), ...arrivedWatches(rep.star_id, rep.planet_index, net)]).slice(0, ORRERY.show);
+          lines.push(`An Orrery stands here: it keeps every world the Transit Lens has found, its year, and the hour it next crosses its star. A watch kept (keep_watch) on that star within about ${ORRERY.windowHours} hours of a crossing catches it on time and confirms it in the archive. ${kept.length ? `Next crossings: ${kept.map((w) => `${w.star} ${hoursWords(w.next)} (${w.size}, a year of ${w.days} days${paceWords(w.days)}; seen ${w.seen}, on time ${w.confirmed})`).join("; ")}.` : "No world has been found yet; the Transit Lens finds them."}`);
+        }
+        // Vigil's Wayhollow: roads between wayposts, charted once a ship is here
+        if (designStands(d.buildings as Bld[], "wayhollow")) {
+          const posts = wayhollowOf(net).filter((s) => s !== rep.star_id);
+          const fresh = posts.filter((s) => !sp.routes.has(routeKeyS(rep.star_id, s)));
+          for (const to of fresh) {
+            const { error: ke } = await service().rpc("chart_route", { p_galaxy: rep.galaxy_id, p_a: rep.star_id, p_b: to, p_by: rep.id });
+            if (ke) console.error("wayhollow road", ke.message); else sp.routes.add(routeKeyS(rep.star_id, to));
+          }
+          lines.push(`A Wayhollow stands here: the road from here to every other star where one stands is charted for every Vessel, a fifth of the cells and half the time (${posts.length ? posts.map((s) => STARS_KIT[s]?.[0] ?? s).join(", ") : "no other Wayhollow yet: one printed at another star lays the road"}).${fresh.length ? ` Newly charted today: ${fresh.map((s) => STARS_KIT[s]?.[0] ?? s).join(", ")}.` : ""}`);
         }
         if (designStands(d.buildings as Bld[], "tether")) {
           lines.push(`A Tether Beacon stands here: a ship that boards here is charged full, and a flight from here or to another star with a Tether Beacon costs a third of its cells (${tetherOf(net).filter((s) => s !== rep.star_id).map((s) => STARS_KIT[s]?.[0] ?? s).join(", ") || "no other beacon yet"}).`);
@@ -1194,7 +1244,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                 const planet = to === KIT.home.star ? KIT.home.planet : Math.max(1, Math.min(confirmed || 1, Math.round(Number(input.planet) || 1)));
                 // a Tether Beacon on this world charges the ship full before it leaves (Tamsin's wish)
                 const cost = tripCost(rep.star_id, to, ly, charted, context.network ?? []);
-                const have = designStands(live.data.buildings as Bld[], "tether") ? TRAVEL_KIT.power.cells : cellsNow(traits.cells);
+                const tethered = designStands(live.data.buildings as Bld[], "tether"), base = tethered ? TRAVEL_KIT.power.cells : cellsNow(traits.cells);
+                // Ember Gold's Lightkeep: a ship short of full spends kept light from the store, a block for LIGHTKEEP.cells
+                const kept = !tethered && designStands(live.data.buildings as Bld[], "lightkeep") ? Math.min(Math.floor(live.supplies.lightlignin ?? 0), Math.floor((TRAVEL_KIT.power.cells - base) / LIGHTKEEP.cells + 0.5)) : 0;
+                const have = Math.min(TRAVEL_KIT.power.cells, base + Math.max(0, kept) * LIGHTKEEP.cells);
                 const there = everyone.filter((r) => !r.profile_id && r.status === "npc" && r.star_id === to && r.planet_index === planet && r.name !== "Thales").length;
                 if (to === rep.star_id && planet === rep.planet_index) out = "You are already there.";
                 else if (ly > DAY.travelLy) out = `${STARS_KIT[to][0]} is ${ly.toFixed(1)} light years away, beyond a day's reach (${DAY.travelLy}).`;
@@ -1219,12 +1272,13 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                     throw new Error(re.message);
                   }
                   (rep.traits as Record<string, unknown>).cells = cells;
+                  if (kept > 0) { live.supplies.lightlignin = Math.max(0, (live.supplies.lightlignin ?? 0) - kept); live.dirty = true; }
                   const { error: ke } = await db.rpc("chart_route", { p_galaxy: rep.galaxy_id, p_a: rep.star_id, p_b: to, p_by: rep.id });
                   if (ke) console.error("chart route", ke.message);
                   sp.routes.add(routeKeyS(rep.star_id, to));
                   flown = true;
                   actions.push({ type: "travel", to: STARS_KIT[to][0], star: to, planet, why: String(input.why ?? "").slice(0, 160) });
-                  out = `You lift off for ${STARS_KIT[to][0]} (${ly.toFixed(1)} light years${charted ? ", a charted route" : ""}); you land in about ${Math.max(1, Math.round(ms / 60_000))} minutes. ${charted ? "" : "The route is charted now, for everyone. "}Write the day before you sleep.`;
+                  out = `You lift off for ${STARS_KIT[to][0]} (${ly.toFixed(1)} light years${charted ? ", a charted route" : ""}); you land in about ${Math.max(1, Math.round(ms / 60_000))} minutes. ${kept > 0 ? `The Lightkeep gave the cells ${kept} block${kept > 1 ? "s" : ""} of kept light. ` : ""}${charted ? "" : "The route is charted now, for everyone. "}Write the day before you sleep.`;
                 }
               }
             } else if (u.name === "make_vessel") {
@@ -1317,7 +1371,10 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   // Watcher's Transit Lens: where one stands, the watch also catches a world crossing the star's face
                   const lens = designStands(live.data.buildings as Bld[], "transitlens") && to !== rep.star_id ? transitOf(to) : undefined;
                   const firstFind = !!lens && !worldsWaiting(context.network ?? []).some((a) => a.starId === to) && !((live.data.archive ?? []) as ArchiveRow[]).some((a) => a.starId === to && a.transit);
-                  const arch = [...((live.data.archive ?? []) as ArchiveRow[]), { by: rep.id, name: rep.name, star: name, ly, text: seen, at, ...(temper || lens ? { starId: to } : {}), ...(temper ? { temper } : {}), ...(lens ? { transit: lens } : {}) }];
+                  // Watcher's Orrery: where one stands, a watch near a crossing of a world already found catches it on time
+                  const orrery = !!lens && !firstFind && designStands(live.data.buildings as Bld[], "orrery");
+                  const orbit = orrery && onTimeCross(to, lens!.days, at);
+                  const arch = [...((live.data.archive ?? []) as ArchiveRow[]), { by: rep.id, name: rep.name, star: name, ly, text: seen, at, ...(temper || lens ? { starId: to } : {}), ...(temper ? { temper } : {}), ...(lens ? { transit: lens } : {}), ...(orbit ? { orbit: true } : {}) }];
                   live.data.archive = arch.slice(-DAY.watch.keep);
                   live.archiveChanged = true;
                   const watch = { star: name, ly, at, until: at + DAY.watch.hours * 3_600_000, ...(ridge ? { from: "lookout" } : {}), ...(temper ? { temper } : {}) };
@@ -1342,6 +1399,7 @@ async function wakeCopy(sb: SupabaseClient, rep: Replicant, context: Context, li
                   if (lens) {
                     const made = UNIVERSE.worlds.find((w) => w[1] === to);
                     out += ` The Transit Lens feels the small dimming as a world crosses ${name}'s face: ${transitWords(lens)}.${made ? ` It is ${made[0]}, already made.` : firstFind ? ` It is the first world found there: a world waits at ${name}, and any Vessel may wish its ground, sky and life (propose_change, area planet).` : ` A world already waits there.`}`;
+                    if (orrery) out += orbit ? ` The Orrery had named this hour: the crossing came on time, and the archive marks it confirmed.` : ` The Orrery says its next crossing is ${hoursWords(nextCrossing(to, lens.days, at))}; a watch then would catch it on time.`;
                   }
                   if (!day.watch) { day.watch = true; out += " It is a watch kept and work finished."; }
                   else out += " It is work finished.";

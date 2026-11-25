@@ -8,6 +8,7 @@
 //   HERE     this world: the copies here, the warren, the buildings, the supplies
 // Since 2026-11-15 the Vessels govern themselves (Steve): no approve / veto here, no SAY NO; AGAINST counts as one voice.
 import { MIND, PALETTE, PLANETS } from '../core/data';
+import type { OrreryWorld } from '../core/network';
 import type { Journal, ReplicantSave, ReplicantSummary, Request, SharedEntry } from '../net/store';
 import { distanceLy, planetFor, starById } from '../world/galaxy';
 import { paletteCss as css } from './overlay';
@@ -126,6 +127,14 @@ export function worldsWaiting(rows: { starId?: string; star: string; name: strin
   return [...out.values()];
 }
 
+/** "in 3 hours", "in 2 days": how long until a time to come. */
+function until(at: number) {
+  const h = (at - Date.now()) / 3_600_000;
+  if (h < 1) return 'within the hour';
+  if (h < 48) return `in ${Math.round(h)} hour${Math.round(h) === 1 ? '' : 's'}`;
+  return `in ${Math.round(h / 24)} days`;
+}
+
 export function voices(all: ReplicantSummary[]) {
   return all.filter((r) => (r.profile_id ? !r.traits.held : !r.traits.blank && !r.traits.held)).length;
 }
@@ -173,7 +182,7 @@ export interface JournalView {
   lessons?: string[];
   garden?: string[];
   /** the Observatory's archive here, oldest first (keep_watch) */
-  archive?: { name: string; star: string; ly: number; text: string; at: number; starId?: string; transit?: { size: string; days: number } }[];
+  archive?: { name: string; star: string; ly: number; text: string; at: number; starId?: string; transit?: { size: string; days: number }; orbit?: boolean }[];
   /** the Mycelial Loom's memories here, oldest first (leave_memory) */
   loom?: { name: string; text: string; at: number }[];
   /** Tamsin's Cemwright: threads left in it, answered once ripe (planet_states.data.cemwright) */
@@ -182,6 +191,8 @@ export interface JournalView {
   sharedWatches?: { name: string; star: string; ly: number; text: string; arrives: number; fromStar: string; fromPlanet: number; at?: number; starId?: string; transit?: { size: string; days: number } }[];
   /** Vigil's Tidewhisper: the faint pulse from the nearest other dish (src/core/network.ts tidewhisperPulse) */
   pulse?: { name: string; star: string; text: string; arrives: number; fromStar: string; fromPlanet: number } | null;
+  /** Watcher's Orrery: the worlds the Transit Lens found, with their years and next crossings (src/core/network.ts orreryOf) */
+  orrery?: OrreryWorld[];
   /** the Flare Almanac as this world knows it (Watcher's wish): a star's temper, who wrote it, by star id */
   almanac?: Record<string, { temper: string; by: string; at: number }>;
   /** the player's actions */
@@ -388,13 +399,18 @@ export function openJournal(v: JournalView) {
   }
   if (v.archive?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[18])}">THE ARCHIVE</h3>`);
-    for (const a of v.archive.slice(-8).reverse()) pages.here.push(`<p>${esc(a.name)} watched ${esc(a.star)}, ${a.ly < 10 ? a.ly.toFixed(1) : Math.round(a.ly)} ly: ${esc(a.text)}${a.transit ? ` <b>${esc(transitLine(a.transit))}</b>` : ''}<small>${ago(new Date(a.at).toISOString())}</small></p>`);
+    for (const a of v.archive.slice(-8).reverse()) pages.here.push(`<p>${esc(a.name)} watched ${esc(a.star)}, ${a.ly < 10 ? a.ly.toFixed(1) : Math.round(a.ly)} ly: ${esc(a.text)}${a.transit ? ` <b>${esc(transitLine(a.transit))}</b>` : ''}${a.orbit ? ` <b>ON TIME</b>` : ''}<small>${ago(new Date(a.at).toISOString())}</small></p>`);
   }
   // Watcher's Transit Lens: the first world found crossing each star, from this world's archive and through the Watchglass
   const waits = worldsWaiting([...(v.archive ?? []), ...(v.sharedWatches ?? [])]);
   if (waits.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[12])}">WORLDS WAITING</h3>`);
     for (const a of waits.slice(0, 12)) pages.here.push(`<p>${esc(a.star)}: ${esc(transitLine(a.transit!))}, found by ${esc(a.name)}. A world waits for a Vessel to wish it.${a.at ? `<small>${ago(new Date(a.at).toISOString())}</small>` : ''}</p>`);
+  }
+  // Watcher's Orrery: each found world's year and the hour of its next crossing
+  if (v.orrery?.length) {
+    pages.here.push(`<h3 style="color:${css(PALETTE[10])}">THE ORRERY</h3>`);
+    for (const w of v.orrery.slice(0, MIND.orrery.show)) pages.here.push(`<p>${esc(w.star)}: a ${esc(w.size)} world, a year of ${w.days} day${w.days === 1 ? '' : 's'}${w.pace ? ` (${w.pace})` : ''}. Next crossing ${until(w.next)}. Seen ${w.seen} time${w.seen === 1 ? '' : 's'}${w.confirmed ? `, ${w.confirmed} on time` : ''}; found by ${esc(w.by)}.</p>`);
   }
   if (v.cemwright?.length) {
     pages.here.push(`<h3 style="color:${css(PALETTE[14])}">THE CEMWRIGHT</h3>`);

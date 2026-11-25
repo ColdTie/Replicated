@@ -1,5 +1,5 @@
 {
-  "_doc": "What the Cems can build (story/STORY.md: the 3D printers print with living things; you pick a design and the Cems build it on command). Each design is a small voxel model made of parts (src/world/voxel.ts): box, gable (a pitched roof, ridge along x or y), hip (four sloped sides), dome (half an ellipsoid), cyl (an upright cylinder), cone, carve (takes voxels away) and paint (recolors what is there), each over [x, y, z, w, d, h] in voxels (x to the right, y from the front to the back, z up; a voxel is ppv px wide in the world, 4 tiles = 16 voxels), with a material; repeat n with step [dx, dy, dz] copies a part. Nothing about a design's price is written by hand: volume is how many voxels it has, complexity comes from its parts (costing.weights per part, repeats counted), how many materials it mixes (matWeight) and its fine materials (special per voxel); every material voxel costs what costing.perVoxel says (lignin is Cems, salt and iron layered; glass is quartz; wire is copper; a core is Ember), all of it times 1 + complexity x markup, and the print takes (baseSeconds + volume x secondsPerVoxel) x (1 + complexity x secondsPerComplexity), less nurseryCut for every Cem Nursery standing. tiers name the complexity. needs: designs that must stand on this world first. place post: it stands at a free street lamp spot of the town (town.json posts) instead of taking a lot. place bed: printed on the Cem bed itself, a thing you carry rather than a building (the Nous Chip: it lies on the bed until you walk onto it, src/entities/Chips.ts). gives: what it does once built (house: mood, storehouse: storage, nursery: print speed; nouschip: the mind every new Vessel needs at the Replicator; sunlattice: a warren panel that lights a room without Ember, supplies.json recipes.panel; cemmind: letters between two worlds where one stands arrive at once (src/core/network.ts, the SCUT link); watchglass: each watch kept here reaches every other Watchglass world at light speed; loom: the Mycelial Loom, a grown memory where a Vessel leaves what it saw and any Vessel of the world reads it (leave_memory, planet_states.data.loom); seedarc: Watcher's seed-crate, a ship leaving a world where one stands carries seed from its store to the next world's store (src/scenes/planet/Trade.ts loadGoods, mind.json seedarc); cairn: Tamsin's Relay Cairn, a letter between two stars joined by a chain of lit cairns hops along it (src/core/network.ts relaySeconds, mind.json relay); almanac: Watcher's Flare Almanac, every watch kept here names the star's temper and a ship to a restless star keeps a cell spare (src/world/galaxy.ts starTemper / tripCharge, src/core/network.ts almanacOf, mind.json almanac); tether: Tamsin's Tether Beacon, a ship boarding here is charged full and a hop from or to one costs a third of its cells (mind.json tether); tidewhisper: Vigil's sea-glass dish, the nearest other Tidewhisper world's last watch reaches it as a faint pulse, a day slower than a letter (src/core/network.ts tidewhisperPulse, mind.json tidewhisper); lightbed: Ember Gold's Cem tray, it grows lignin into the store by the clock (src/scenes/planet/Trade.ts, mind.json lightbed); cemwright: Tamsin's grown computer in a glass vat, a Vessel leaves it a thread (a star's flares, the store's ore, a plan from a sketch) that works overnight for a little salt and gives a little lignin back when done (mind.json cemwright, planet_states.data.cemwright, the day tool cemwright); the rest open other designs). materials: color ramps (palette indexes: light, mid, dark; alt = the ramp of every other layer, so lignin shows its metal-like laminations), glass is see-through, emissive ones light up at night. view: the in-world camera (pitch in degrees, ppv) and the menu's turntable (pitch, degrees a second).",
+  "_doc": "What the Cems can build (story/STORY.md: the 3D printers print with living things; you pick a design and the Cems build it on command). Each design is a small voxel model made of parts (src/world/voxel.ts): box, gable (a pitched roof, ridge along x or y), hip (four sloped sides), dome (half an ellipsoid), cyl (an upright cylinder), cone, carve (takes voxels away) and paint (recolors what is there), each over [x, y, z, w, d, h] in voxels (x to the right, y from the front to the back, z up; a voxel is ppv px wide in the world, 4 tiles = 16 voxels), with a material; repeat n with step [dx, dy, dz] copies a part. Nothing about a design's price is written by hand: volume is how many voxels it has, complexity comes from its parts (costing.weights per part, repeats counted), how many materials it mixes (matWeight) and its fine materials (special per voxel); every material voxel costs what costing.perVoxel says (lignin is Cems, salt and iron layered; glass is quartz; wire is copper; a core is Ember), all of it times 1 + complexity x markup, and the print takes (baseSeconds + volume x secondsPerVoxel) x (1 + complexity x secondsPerComplexity), less nurseryCut for every Cem Nursery standing. tiers name the complexity. needs: designs that must stand on this world first. place post: it stands at a free street lamp spot of the town (town.json posts) instead of taking a lot. place bed: printed on the Cem bed itself, a thing you carry rather than a building (the Nous Chip: it lies on the bed until you walk onto it, src/entities/Chips.ts). gives: what it does once built (house: mood, storehouse: storage, nursery: print speed; nouschip: the mind every new Vessel needs at the Replicator; sunlattice: a warren panel that lights a room without Ember, supplies.json recipes.panel; cemmind: letters between two worlds where one stands arrive at once (src/core/network.ts, the SCUT link); watchglass: each watch kept here reaches every other Watchglass world at light speed; loom: the Mycelial Loom, a grown memory where a Vessel leaves what it saw and any Vessel of the world reads it (leave_memory, planet_states.data.loom); seedarc: Watcher's seed-crate, a ship leaving a world where one stands carries seed from its store to the next world's store (src/scenes/planet/Trade.ts loadGoods, mind.json seedarc); cairn: Tamsin's Relay Cairn, a letter between two stars joined by a chain of lit cairns hops along it (src/core/network.ts relaySeconds, mind.json relay); almanac: Watcher's Flare Almanac, every watch kept here names the star's temper and a ship to a restless star keeps a cell spare (src/world/galaxy.ts starTemper / tripCharge, src/core/network.ts almanacOf, mind.json almanac); tether: Tamsin's Tether Beacon, a ship boarding here is charged full and a hop from or to one costs a third of its cells (mind.json tether); tidewhisper: Vigil's sea-glass dish, the nearest other Tidewhisper world's last watch reaches it as a faint pulse, a day slower than a letter (src/core/network.ts tidewhisperPulse, mind.json tidewhisper); lightbed: Ember Gold's Cem tray, it grows lignin into the store by the clock (src/scenes/planet/Trade.ts, mind.json lightbed); cemwright: Tamsin's grown computer in a glass vat, a Vessel leaves it a thread (a star's flares, the store's ore, a plan from a sketch) that works overnight for a little salt and gives a little lignin back when done (mind.json cemwright, planet_states.data.cemwright, the day tool cemwright); wayhollow: Vigil's waypost, a ship on a world where one stands charts the road to every other Wayhollow star (src/core/network.ts wayhollowRoads, mind.json wayhollow); orrery: Watcher's ring, each world the Transit Lens found kept with its year and next crossing, a watch near one on time (network.ts orreryOf, mind.json orrery); lightkeep: Ember Gold's press, the store's lignin kept as kept light (lightlignin) that a ship spends for cells (Trade.ts keep, Departure.ts keptLight, mind.json lightkeep); the rest open other designs). materials: color ramps (palette indexes: light, mid, dark; alt = the ramp of every other layer, so lignin shows its metal-like laminations), glass is see-through, emissive ones light up at night. view: the in-world camera (pitch in degrees, ppv) and the menu's turntable (pitch, degrees a second).",
   "view": { "pitch": 32, "yaw": 0.28, "ppv": 4, "turntablePitch": 26, "turntableSpeed": 22, "light": [-0.45, -0.6, 0.75] },
   "materials": {
     "lignin": { "ramp": [3, 4, 5], "alt": [30, 31, 4] },
@@ -24,7 +24,9 @@
     "tether": { "ramp": [12, 13, 14], "emissive": true },
     "seaglass": { "ramp": [29, 28, 27], "glass": true, "emissive": true },
     "vat": { "ramp": [14, 13, 12], "glass": true, "emissive": true },
-    "lightlayer": { "ramp": [19, 18, 12], "alt": [18, 12, 13], "emissive": true }
+    "lightlayer": { "ramp": [19, 18, 12], "alt": [18, 12, 13], "emissive": true },
+    "waythread": { "ramp": [19, 18, 17], "glass": true, "emissive": true, "alt": [2, 19, 18] },
+    "keptlight": { "ramp": [19, 11, 10], "glass": true, "emissive": true, "alt": [11, 10, 9] }
   },
   "costing": {
     "weights": { "box": 1, "gable": 2, "hip": 2.5, "dome": 3, "cyl": 2, "cone": 2, "carve": 1, "paint": 0.5 },
@@ -52,7 +54,9 @@
       "leaf": { "quartz": 0.075 },
       "tether": { "hydrogen": 0.5 },
       "seaglass": { "soundglass": 0.05 },
-      "lightlayer": { "salt": 0.01 }
+      "lightlayer": { "salt": 0.01 },
+      "waythread": { "quartz": 0.075 },
+      "keptlight": { "quartz": 0.05 }
     },
     "markup": 0.01,
     "baseSeconds": 10,
@@ -415,6 +419,59 @@
         { "box": [1, 6, 4, 4, 2, 4], "mat": "glass" },
         { "dome": [1, 6, 8, 4, 2, 2], "mat": "glass" },
         { "box": [2, 0, 5, 2, 1, 2], "mat": "ember" }
+      ]
+    },
+    {
+      "id": "wayhollow", "name": "Wayhollow", "gives": "A ROAD BETWEEN WAYPOSTS: THE ROUTE BETWEEN ANY TWO WAYHOLLOW STARS IS CHARTED FOR EVERY VESSEL",
+      "about": "A squat post of stacked stone, two tiles wide, grown round a seed heart and a thread of pale glass that leans toward the other wayposts: once a ship lands beside one, the road from here to every other Wayhollow is charted, as if flown.",
+      "needs": ["transitlens", "seedarc"],
+      "parts": [
+        { "box": [0, 0, 0, 8, 8, 2], "mat": "cairn" },
+        { "box": [1, 1, 2, 6, 6, 3], "mat": "cairn" },
+        { "carve": [3, 3, 3, 2, 2, 2] },
+        { "box": [3, 3, 3, 1, 2, 1], "mat": "seedcore" },
+        { "box": [2, 2, 5, 4, 4, 2], "mat": "cairn" },
+        { "box": [3, 3, 7, 2, 2, 1], "mat": "ember" },
+        { "cyl": [2, 2, 8, 4, 4, 4], "mat": "waythread" },
+        { "box": [3, 3, 12, 2, 2, 1], "mat": "ember" },
+        { "box": [3, 3, 9, 2, 1, 1], "mat": "ember" },
+        { "cone": [1, 1, 13, 6, 6, 4], "mat": "waythread" },
+        { "box": [0, 3, 9, 1, 2, 1], "mat": "waythread", "repeat": 2, "step": [7, 0, 0] }
+      ]
+    },
+    {
+      "id": "orrery", "name": "Orrery", "gives": "REMEMBERS EVERY WORLD THE TRANSIT LENS FOUND: ITS YEAR AND THE DAY OF ITS NEXT CROSSING",
+      "about": "A slow brass ring turning under a glass dome on a salt foot, a copper pin for each world the Transit Lens has found: it keeps their years and names the hour each will cross its star again.",
+      "needs": ["transitlens"],
+      "parts": [
+        { "box": [0, 0, 0, 10, 10, 1], "mat": "salt" },
+        { "box": [1, 1, 1, 8, 8, 2], "mat": "steel" },
+        { "paint": [1, 1, 2, 8, 1, 1], "mat": "copper", "repeat": 2, "step": [0, 7, 0] },
+        { "dome": [0, 0, 3, 10, 10, 7], "mat": "glass" },
+        { "carve": [1, 1, 3, 8, 8, 6] },
+        { "box": [4, 4, 3, 2, 2, 3], "mat": "steel" },
+        { "cyl": [1, 1, 5, 8, 8, 1], "mat": "copper" },
+        { "carve": [2, 2, 5, 6, 6, 1] },
+        { "cyl": [2, 2, 6, 6, 6, 1], "mat": "steel" },
+        { "carve": [3, 3, 6, 4, 4, 1] },
+        { "box": [1, 4, 6, 1, 1, 1], "mat": "copper", "repeat": 2, "step": [7, 0, 0] },
+        { "box": [4, 1, 6, 1, 1, 1], "mat": "copper", "repeat": 2, "step": [0, 7, 0] },
+        { "box": [4, 4, 6, 2, 2, 1], "mat": "ember" },
+        { "box": [4, 4, 7, 1, 1, 1], "mat": "ember" }
+      ]
+    },
+    {
+      "id": "lightkeep", "name": "Lightkeep", "gives": "KEEPS THE LIGHTBED'S LIGNIN AS KEPT LIGHT: EACH BLOCK FILLS 5 OF A SHIP'S CELLS",
+      "about": "A Cem press on a stone foot: a shelf of warm gold blocks behind a salt frame, the Lightbed's lignin pressed until a day of sunlight sits in each, ready for a ship.",
+      "needs": ["lightbed"],
+      "parts": [
+        { "box": [0, 1, 0, 10, 3, 1], "mat": "cairn" },
+        { "box": [0, 0, 1, 1, 4, 7], "mat": "salt", "repeat": 2, "step": [9, 0, 0] },
+        { "box": [1, 0, 7, 8, 4, 1], "mat": "salt" },
+        { "box": [1, 1, 1, 8, 3, 1], "mat": "salt", "repeat": 3, "step": [0, 0, 2] },
+        { "box": [2, 0, 2, 2, 1, 1], "mat": "keptlight", "repeat": 3, "step": [2, 0, 0] },
+        { "box": [2, 0, 4, 2, 1, 1], "mat": "keptlight", "repeat": 3, "step": [2, 0, 0] },
+        { "box": [2, 0, 6, 2, 1, 1], "mat": "keptlight", "repeat": 3, "step": [2, 0, 0] }
       ]
     }
   ]
