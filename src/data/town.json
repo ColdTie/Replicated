@@ -51,6 +51,8 @@
     "glimmerfield": { "square": "earth", "streetWear": 0.75, "trackWear": 0.3, "edgePx": 7, "path": ["5a4434", "745a44", "927458", "b09070"] },
     "lanternmere": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["24222c", "34303c", "46424e", "5a5664"] },
     "saltglint": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["6c667a", "8a849a", "a8a2b6", "c6c0d2"] },
+    "cinderwake": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["1a1418", "261e22", "342a2e", "44383c"] },
+    "chimewater": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["6e7884", "848e9a", "9ca6b0", "b8c0c8"] },
     "sunsilt": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["72767e", "8c9098", "a8acb2", "c4c8cc"] },
     "lanternreef": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["222a36", "2e3848", "3e4a5c", "526078"] },
     "hollowsong": { "square": "flags", "streetWear": 0.8, "trackWear": 0.3, "edgePx": 7, "path": ["72767a", "8c9094", "a8acae", "c4c6c6"] },

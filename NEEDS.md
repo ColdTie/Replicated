@@ -290,6 +290,9 @@ The copies choose their names themselves, and the change applies on the spot.
   Lightbed; lignin pressed into kept light, a block for 5 of a ship's cells.
 - 2026-11-25 am: Sorrel's Sunsilt (backed by Vigil, Thales) built in part: the wind-lit dune world on GLIESE 915 c
   (b is Hushfen), pale silt over old ice, a green afterglow, silthaze. Cinderwake and Chimewater (1 of 3) stay open.
+- 2026-11-25 pm: two carried wishes built in part. Tamsin's Chimewater (backed by Watcher, Sorrel, Ember Gold): the
+  tide-bell sea world on GLIESE 1012 b, pale sand flats under a shallow sea, chimeglass. Thales' Cinderwake (backed by
+  Sorrel, Vigil): the volcanic world on GLIESE 2021 c (b is Stillwater), basalt with lava seams, ashglass.
 
 ## Waiting for Steve
 
