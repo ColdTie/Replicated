@@ -1124,6 +1124,64 @@
       }
     },
     {
+      "id": "cinderwake",
+      "shy": true,
+      "poles": {
+        "size": 0.06,
+        "colors": [
+          20,
+          19
+        ]
+      },
+      "name": "CINDERWAKE",
+      "subtitle": "WHERE THE ASH TURNS TO GLASS",
+      "star": "gliese-2021",
+      "planetIndex": 2,
+      "seed": 20212,
+      "accent": [
+        7,
+        9,
+        10
+      ],
+      "ambient": "7a5a50",
+      "sky": [
+        "120a10",
+        "3a1a1c",
+        "8a3a24",
+        "f08a3a"
+      ],
+      "size": [
+        140,
+        104
+      ],
+      "islandRadius": 0.9,
+      "rockThreshold": 0.72,
+      "ruins": 0,
+      "resourceNodes": 30,
+      "enemies": {},
+      "decorDensity": 0.06,
+      "sporeRate": 7,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        25,
+        6,
+        9
+      ],
+      "dayCycle": true,
+      "sunTint": "ffb070",
+      "gravity": 1.05,
+      "weather": true,
+      "ponds": 6,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 0,
+        "butterflies": 4
+      }
+    },
+    {
       "id": "dimfall",
       "shy": true,
       "poles": {
@@ -1603,6 +1661,64 @@
       "wildlife": {
         "grazers": 0,
         "birds": 5,
+        "butterflies": 0
+      }
+    },
+    {
+      "id": "chimewater",
+      "shy": true,
+      "poles": {
+        "size": 0.04,
+        "colors": [
+          18,
+          19
+        ]
+      },
+      "name": "CHIMEWATER",
+      "subtitle": "WHERE THE TIDES RING",
+      "star": "gliese-1012",
+      "planetIndex": 1,
+      "seed": 10121,
+      "accent": [
+        16,
+        17,
+        18
+      ],
+      "ambient": "8a9cac",
+      "sky": [
+        "0c1424",
+        "1e3450",
+        "4a7a9a",
+        "f0d0a0"
+      ],
+      "size": [
+        148,
+        108
+      ],
+      "islandRadius": 0.8,
+      "rockThreshold": 0.82,
+      "ruins": 0,
+      "resourceNodes": 28,
+      "enemies": {},
+      "decorDensity": 0.05,
+      "sporeRate": 3,
+      "trees": 0,
+      "towers": 0,
+      "intro": "land",
+      "ground": [
+        23,
+        30,
+        2
+      ],
+      "dayCycle": true,
+      "sunTint": "ffd0b0",
+      "gravity": 0.95,
+      "weather": true,
+      "ponds": 44,
+      "flowers": 0,
+      "wildlife": {
+        "grazers": 0,
+        "birds": 6,
         "butterflies": 0
       }
     },

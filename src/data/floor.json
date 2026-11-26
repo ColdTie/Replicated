@@ -1021,6 +1021,39 @@
         "relief": 6
       }
     },
+    "cinderwake": {
+      "kind": "basalt",
+      "relief": 8,
+      "coverage": 0.3,
+      "pebbles": 3,
+      "soil": ["0e0a0e", "181216", "241a1e", "322428"],
+      "cover": ["3a3436", "4a4446", "5c5658", "6e686a"],
+      "detail": ["5a1820", "a22633", "f77622", "feae34"],
+      "stone": ["1a1418", "261e22", "342a2e", "44383c"],
+      "rock": {
+        "ramp": ["08060a", "120c10", "1e1418", "2c2024", "3e2e30", "54403e"],
+        "seams": ["a22633", "e43b44", "f77622", "feae34"],
+        "cracks": 0,
+        "relief": 6
+      }
+    },
+    "chimewater": {
+      "kind": "sand",
+      "relief": 5,
+      "coverage": 0.35,
+      "pebbles": 2,
+      "soil": ["a89a84", "c0b29a", "d4c8b0", "e6dcc6"],
+      "cover": ["8ab0b0", "9cc4c2", "b0d8d4", "c8ece6"],
+      "detail": ["2ce8f5", "9fe6f5", "eaffff", "f6757a"],
+      "stone": ["5a6470", "6e7884", "848e9a", "9ca6b0"],
+      "rock": {
+        "ramp": ["1a2230", "263040", "364254", "4a586a", "647484", "a0b0bc"],
+        "cover": ["dff4ff", "f4fbff"],
+        "coverage": 0.25,
+        "cracks": 0.4,
+        "relief": 7
+      }
+    },
     "sunsilt": {
       "kind": "sand",
       "relief": 7,
